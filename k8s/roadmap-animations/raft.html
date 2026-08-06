@@ -1,0 +1,539 @@
+<!-- RAFT-ANIM-START data-roadmap-animation-id="raft" -->
+<style id="raft-anim-style">
+#raft-anim {
+  border: 2px solid #1f2933;
+  border-radius: 10px;
+  background: #fdf6e3;
+  box-shadow: 3px 3px 0 #1f2933;
+  padding: 14px 16px 16px;
+  margin: 0 0 22px;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+#raft-anim .ra-head { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #1f2933; margin-bottom: 4px; }
+#raft-anim .ra-head small { font-weight: 400; color: #6b7280; font-size: 12px; }
+#raft-anim .ra-zoom {
+  margin-left: auto; flex-shrink: 0;
+  font: 600 12px/1 inherit; font-family: inherit;
+  border: 2px solid #1f2933; border-radius: 7px;
+  background: #fffdf5; color: #1f2933;
+  padding: 6px 11px; cursor: pointer; box-shadow: 2px 2px 0 #1f2933;
+}
+#raft-anim .ra-zoom:active { transform: translate(2px,2px); box-shadow: none; }
+#raft-anim-overlay { position: fixed; inset: 0; z-index: 60; display: none; }
+#raft-anim-overlay.open { display: flex; align-items: center; justify-content: center; }
+#raft-anim-overlay .ra-ov-backdrop { position: absolute; inset: 0; background: rgba(31,41,51,.55); }
+#raft-anim-overlay .ra-ov-box {
+  position: relative; z-index: 1;
+  width: min(1100px, 96vw); max-height: 94vh; overflow: auto;
+  border-radius: 12px;
+}
+#raft-anim-overlay #raft-anim { margin: 0; box-shadow: 6px 6px 0 #1f2933; }
+#raft-anim-overlay #raft-anim svg {
+  width: auto; max-width: 100%; max-height: 58vh;
+  display: block; margin: 0 auto;
+}
+#raft-anim .ra-tabs { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+#raft-anim .ra-tabs button {
+  font: 600 12.5px/1 inherit; font-family: inherit;
+  border: 2px solid #1f2933; border-radius: 999px;
+  background: #fffdf5; color: #1f2933;
+  padding: 6px 13px; cursor: pointer; box-shadow: 2px 2px 0 #1f2933;
+}
+#raft-anim .ra-tabs button.on { background: #fde68a; }
+#raft-anim .ra-tabs button:active { transform: translate(2px,2px); box-shadow: none; }
+#raft-anim svg { width: 100%; height: auto; display: block; background: #fffdf5; border: 1.5px solid #1f2933; border-radius: 8px; }
+#raft-anim .ra-caption {
+  margin-top: 10px; min-height: 50px;
+  background: #fffdf5; border: 1.5px solid #1f2933; border-radius: 8px;
+  padding: 9px 12px; font-size: 13.5px; line-height: 1.75; color: #1f2933;
+}
+#raft-anim .ra-caption b { color: #b45309; }
+#raft-anim .ra-ctrl { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+#raft-anim .ra-ctrl button, #raft-anim .ra-ctrl select {
+  font: 600 13px/1.2 inherit; font-family: inherit;
+  border: 2px solid #1f2933; border-radius: 7px;
+  background: #fffdf5; padding: 6px 12px; cursor: pointer; box-shadow: 2px 2px 0 #1f2933;
+}
+#raft-anim .ra-ctrl button:active { transform: translate(2px,2px); box-shadow: none; }
+#raft-anim .ra-ctrl button:disabled { opacity: .45; cursor: not-allowed; }
+#raft-anim .ra-ctrl label { font-size: 12.5px; color: #6b7280; }
+#raft-anim .ra-legend { margin-top: 8px; font-size: 11.5px; color: #6b7280; display: flex; gap: 14px; flex-wrap: wrap; }
+#raft-anim .ra-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; border: 1.5px solid #1f2933; }
+</style>
+<script id="raft-anim-script">
+(function(){
+  "use strict";
+  var SECTION_KEY = "Raft 如何处理选举";
+  var INK = "#1f2933", PAPER = "#fffdf5", FOLLOWER = "#e7e5d8",
+      CANDIDATE = "#fde68a", LEADER = "#fca5a5",
+      PENDING = "#fde68a", PENDING_BD = "#b45309",
+      COMMITTED = "#bbf7d0", COMMITTED_BD = "#15803d";
+  var NS = "http://www.w3.org/2000/svg";
+
+  /* 节点布局：上半 A、B（旧 Leader 一侧），下半 C、D、E */
+  var NODE_POS = { B:[250,112], A:[478,112], C:[172,332], D:[372,356], E:[572,332] };
+  var CLIENT = [52, 222];
+
+  var epoch = 0, playing = false, spd = 1, chapter = 0, stepIdx = 0;
+  var nodes = {}, ui = {};
+
+  function el(tag, attrs, parent){
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function delay(ms){
+    var myE = epoch;
+    return new Promise(function(res){ setTimeout(function(){ if (myE === epoch) res(); }, ms * spd); });
+  }
+
+  function freshState(){
+    ["A","B","C","D","E"].forEach(function(id){
+      if (!nodes[id]) nodes[id] = { id:id };
+      nodes[id].state = "follower";
+      nodes[id].term = 0;
+      nodes[id].log = [];
+    });
+  }
+
+  function buildDom(root){
+    root.innerHTML =
+      '<div class="ra-head">⚡ Raft 原理动画<small>仿 thesecretlivesofdata.com/raft · 对应本节 5 节点授课场景</small>' +
+        '<button class="ra-zoom" id="ra-zoom" title="放大演示">⛶ 放大</button></div>' +
+      '<div class="ra-tabs">' +
+        '<button data-ch="0">① 领导选举</button>' +
+        '<button data-ch="1">② 日志复制</button>' +
+        '<button data-ch="2">③ 网络分区与恢复</button>' +
+      '</div>' +
+      '<svg viewBox="0 0 720 470" id="ra-svg"></svg>' +
+      '<div class="ra-caption" id="ra-caption"></div>' +
+      '<div class="ra-ctrl">' +
+        '<button id="ra-play">▶ 播放本幕</button>' +
+        '<button id="ra-step">▷ 下一步</button>' +
+        '<button id="ra-reset">⏮ 重置本幕</button>' +
+        '<label>速度 <select id="ra-speed">' +
+          '<option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option>' +
+        '</select></label>' +
+      '</div>' +
+      '<div class="ra-legend">' +
+        '<span><i style="background:#e7e5d8"></i>Follower</span>' +
+        '<span><i style="background:#fde68a"></i>Candidate / 未提交日志</span>' +
+        '<span><i style="background:#fca5a5"></i>Leader</span>' +
+        '<span><i style="background:#bbf7d0"></i>已提交日志</span>' +
+      '</div>';
+
+    var svg = root.querySelector("#ra-svg");
+    ui = {
+      svg: svg,
+      caption: root.querySelector("#ra-caption"),
+      play: root.querySelector("#ra-play"),
+      step: root.querySelector("#ra-step"),
+      reset: root.querySelector("#ra-reset"),
+      speed: root.querySelector("#ra-speed"),
+      zoom: root.querySelector("#ra-zoom"),
+      tabs: Array.prototype.slice.call(root.querySelectorAll(".ra-tabs button"))
+    };
+
+    /* 分区墙 */
+    ui.wall = el("line", { x1:130, y1:226, x2:706, y2:226, stroke:"#b91c1c",
+      "stroke-width":3.5, "stroke-dasharray":"11 9", opacity:0 }, svg);
+
+    /* 客户端 */
+    var cg = el("g", {}, svg);
+    el("rect", { x:CLIENT[0]-36, y:CLIENT[1]-26, width:72, height:52, rx:9,
+      fill:PAPER, stroke:INK, "stroke-width":2 }, cg);
+    var ct = el("text", { x:CLIENT[0], y:CLIENT[1]+5, "text-anchor":"middle",
+      "font-size":13, "font-weight":700, fill:INK }, cg);
+    ct.textContent = "客户端";
+
+    /* 节点 */
+    ["A","B","C","D","E"].forEach(function(id){
+      var p = NODE_POS[id];
+      var g = el("g", {}, svg);
+      var n = nodes[id];
+      n.gfx = {
+        ring: el("circle", { cx:p[0], cy:p[1], r:40, fill:"none", stroke:PENDING_BD,
+          "stroke-width":3.5, opacity:0, "stroke-linecap":"round" }, g),
+        circle: el("circle", { cx:p[0], cy:p[1], r:30, fill:FOLLOWER, stroke:INK,
+          "stroke-width":2.5 }, g),
+        letter: el("text", { x:p[0], y:p[1]+6, "text-anchor":"middle",
+          "font-size":19, "font-weight":800, fill:INK }, g),
+        star: el("text", { x:p[0]+22, y:p[1]-20, "font-size":15, opacity:0 }, g),
+        term: el("text", { x:p[0], y:p[1]+52, "text-anchor":"middle",
+          "font-size":11.5, fill:"#6b7280" }, g),
+        logG: el("g", {}, g),
+        badge: el("text", { x:p[0], y:p[1]-46, "text-anchor":"middle",
+          "font-size":12.5, "font-weight":800, fill:COMMITTED_BD, opacity:0 }, g)
+      };
+      n.gfx.letter.textContent = id;
+      n.gfx.star.textContent = "★";
+      n.gfx.ringLen = 2 * Math.PI * 40;
+      n.gfx.ring.setAttribute("stroke-dasharray", String(n.gfx.ringLen));
+    });
+    ui.msgLayer = el("g", {}, svg);
+  }
+
+  function render(){
+    ["A","B","C","D","E"].forEach(function(id){
+      var n = nodes[id], g = n.gfx, p = NODE_POS[id];
+      g.circle.setAttribute("fill",
+        n.state === "leader" ? LEADER : n.state === "candidate" ? CANDIDATE : FOLLOWER);
+      g.star.setAttribute("opacity", n.state === "leader" ? 1 : 0);
+      g.term.textContent = "term " + n.term;
+      /* 日志槽 */
+      while (g.logG.firstChild) g.logG.removeChild(g.logG.firstChild);
+      n.log.forEach(function(entry, i){
+        var x = p[0] - (n.log.length * 26 - 4) / 2 + i * 26, y = p[1] + 60;
+        el("rect", { x:x, y:y, width:22, height:18, rx:4,
+          fill: entry.committed ? COMMITTED : PENDING,
+          stroke: entry.committed ? COMMITTED_BD : PENDING_BD, "stroke-width":2 }, g.logG);
+        var t = el("text", { x:x+11, y:y+13.5, "text-anchor":"middle",
+          "font-size":11.5, "font-weight":700, fill:INK }, g.logG);
+        t.textContent = entry.v;
+      });
+    });
+  }
+
+  function badge(id, text, ok){
+    var b = nodes[id].gfx.badge;
+    b.textContent = text;
+    b.setAttribute("fill", ok ? COMMITTED_BD : "#b91c1c");
+    b.setAttribute("opacity", 1);
+    var myE = epoch;
+    setTimeout(function(){ if (myE === epoch) b.setAttribute("opacity", 0); }, 1600 * spd);
+  }
+
+  /* 选举计时器圆环（耗尽式） */
+  function ring(id, dur){
+    var g = nodes[id].gfx, myE = epoch;
+    g.ring.setAttribute("opacity", 0.9);
+    var t0 = performance.now(), D = dur * spd;
+    return new Promise(function(res){
+      (function tick(now){
+        if (myE !== epoch) { g.ring.setAttribute("opacity", 0); return; }
+        var f = Math.min((now - t0) / D, 1);
+        g.ring.setAttribute("stroke-dashoffset", String(g.ringLen * f));
+        if (f < 1) requestAnimationFrame(tick);
+        else { g.ring.setAttribute("opacity", 0); g.ring.setAttribute("stroke-dashoffset", 0); res(); }
+      })(t0);
+    });
+  }
+  function stopRings(){
+    ["A","B","C","D","E"].forEach(function(id){
+      nodes[id].gfx.ring.setAttribute("opacity", 0);
+      nodes[id].gfx.ring.setAttribute("stroke-dashoffset", 0);
+    });
+  }
+
+  /* 飞行消息。kind: vote / grant / hb / entry / ack / reply / client */
+  function msg(from, to, kind, dur){
+    var f = from === "client" ? CLIENT : NODE_POS[from];
+    var t = to === "client" ? CLIENT : NODE_POS[to];
+    dur = (dur || 520) * spd;
+    var shape;
+    if (kind === "entry") {
+      shape = el("rect", { width:15, height:13, rx:3, fill:PENDING, stroke:PENDING_BD, "stroke-width":2 }, ui.msgLayer);
+    } else {
+      var fill = kind === "vote" ? PAPER : kind === "grant" || kind === "ack" ? COMMITTED
+               : kind === "hb" ? "#fcd34d" : kind === "reply" ? COMMITTED : INK;
+      shape = el("circle", { r: kind === "hb" ? 5 : 7, fill:fill, stroke:INK, "stroke-width":2 }, ui.msgLayer);
+    }
+    var myE = epoch, t0 = performance.now();
+    return new Promise(function(res){
+      (function tick(now){
+        if (myE !== epoch) { shape.remove(); return; }
+        var f01 = Math.min((now - t0) / dur, 1);
+        var e2 = f01 < .5 ? 2*f01*f01 : 1 - Math.pow(-2*f01+2, 2)/2;
+        var x = f[0] + (t[0]-f[0]) * e2, y = f[1] + (t[1]-f[1]) * e2;
+        if (kind === "entry") { shape.setAttribute("x", x-7.5); shape.setAttribute("y", y-6.5); }
+        else { shape.setAttribute("cx", x); shape.setAttribute("cy", y); }
+        if (f01 < 1) requestAnimationFrame(tick);
+        else { shape.remove(); res(); }
+      })(t0);
+    });
+  }
+  function bcast(from, tos, kind, dur){
+    return Promise.all(tos.map(function(t){ return msg(from, t, kind, dur); }));
+  }
+
+  /* ===== 三幕脚本 ===== */
+  function chapterInit(ch){
+    freshState();
+    stopRings();
+    ui.wall.setAttribute("opacity", 0);
+    if (ch >= 1) {
+      ["A","B","C","D","E"].forEach(function(id){ nodes[id].term = 1; });
+      nodes.B.state = "leader";
+    }
+    if (ch >= 2) {
+      ["A","B","C","D","E"].forEach(function(id){ nodes[id].log = [{ v:5, committed:true }]; });
+    }
+    render();
+  }
+
+  var CHAPTERS = [
+  { name:"① 领导选举", intro:"五个节点以 <b>Follower</b> 身份启动（term 0）。每个节点都有一个<b>随机时长的选举计时器</b>，收不到 Leader 心跳计时器就会走完。点「播放本幕」或「下一步」。",
+    steps: [
+    { text:"所有节点都在倒计时。<b>B 的计时器最先走完</b>——随机超时就是为了避免大家同时发起选举、互相抢票。",
+      run: function(){
+        ring("A", 2600); ring("C", 2400); ring("D", 2800); ring("E", 2500);
+        return ring("B", 1500).then(function(){ stopRings(); });
+      } },
+    { text:"B 超时后变成 <b>Candidate</b>，把任期升到 <b>term 1</b>，先给自己投一票（1/5）。",
+      run: function(){ nodes.B.state = "candidate"; nodes.B.term = 1; render(); badge("B", "票数 1/5", true); return delay(900); } },
+    { text:"B 向其余四个节点发送 <b>RequestVote</b>。",
+      run: function(){ return bcast("B", ["A","C","D","E"], "vote", 620); } },
+    { text:"A、C、D、E 在 term 1 里还没投过票，全部把票投给 B —— <b>5/5</b>，超过半数（3）。",
+      run: function(){
+        ["A","C","D","E"].forEach(function(id){ nodes[id].term = 1; }); render();
+        return Promise.all(["A","C","D","E"].map(function(id){ return msg(id, "B", "grant", 620); })).then(function(){ badge("B", "票数 5/5 ✓", true); return delay(700); });
+      } },
+    { text:"B 拿到多数票，成为 <b>Leader</b>。从现在起由它接收所有写请求。",
+      run: function(){ nodes.B.state = "leader"; render(); return delay(900); } },
+    { text:"Leader 周期性向所有 Follower 发送<b>心跳</b>（空的 AppendEntries）。Follower 每收到一次心跳就重置自己的选举计时器——只要心跳不断，就不会有人发起新选举，集群保持稳定。",
+      run: function(){
+        return bcast("B", ["A","C","D","E"], "hb", 480)
+          .then(function(){ return delay(420); })
+          .then(function(){ return bcast("B", ["A","C","D","E"], "hb", 480); })
+          .then(function(){ return delay(420); })
+          .then(function(){ return bcast("B", ["A","C","D","E"], "hb", 480); });
+      } }
+  ]},
+  { name:"② 日志复制", intro:"接上一幕：B 已是 term 1 的 Leader。这一幕演示一次完整写入——课上举的例子是客户端写一个值 <b>5</b>。",
+    steps: [
+    { text:"客户端把 <b>SET 5</b> 发给 Leader B。所有写请求都必须经过 Leader。",
+      run: function(){ return msg("client", "B", "client", 700); } },
+    { text:"B 先把 5 <b>追加到自己的日志</b>——黄色表示已写入但<b>未提交</b>，还不能被读到。",
+      run: function(){ nodes.B.log.push({ v:5, committed:false }); render(); return delay(900); } },
+    { text:"下一次心跳里，B 通过 <b>AppendEntries</b> 把这条日志带给所有 Follower。",
+      run: function(){
+        return bcast("B", ["A","C","D","E"], "entry", 620).then(function(){
+          ["A","C","D","E"].forEach(function(id){ nodes[id].log.push({ v:5, committed:false }); });
+          render(); return delay(300);
+        });
+      } },
+    { text:"Follower 写入本地日志后逐个应答。B 统计确认数：<b>5/5</b>，早已超过半数（3）。",
+      run: function(){
+        return Promise.all(["A","C","D","E"].map(function(id){ return msg(id, "B", "ack", 620); }))
+          .then(function(){ badge("B", "确认 5/5 ✓", true); return delay(700); });
+      } },
+    { text:"超过半数确认 → B <b>提交（commit）</b>这条日志（变绿），并响应客户端「写入成功」。注意：Leader 自己 commit 了就可以应答，这是默认的弱一致语义。",
+      run: function(){
+        nodes.B.log[nodes.B.log.length-1].committed = true; render();
+        return msg("B", "client", "reply", 700);
+      } },
+    { text:"B 在后续心跳中告诉 Follower「这条日志已提交」，Follower 也各自 commit。至此整个集群对值 5 达成一致——这就是<b>日志复制（log replication）</b>。",
+      run: function(){
+        return bcast("B", ["A","C","D","E"], "hb", 480).then(function(){
+          ["A","C","D","E"].forEach(function(id){ nodes[id].log[nodes[id].log.length-1].committed = true; });
+          render(); return delay(600);
+        });
+      } }
+  ]},
+  { name:"③ 网络分区与恢复", intro:"接上一幕：B 是 term 1 的 Leader，值 5 已在全集群提交。现在网络出了问题——这正是课上重点演示的<b>脑裂</b>场景。",
+    steps: [
+    { text:"<b>网络分区</b>出现：上面的 A、B 和下面的 C、D、E 互相失联。",
+      run: function(){ ui.wall.setAttribute("opacity", 1); return delay(900); } },
+    { text:"C、D、E 收不到 Leader 的心跳，选举计时器走完。<b>C 率先超时</b>，变成 Candidate，任期升到 <b>term 2</b>。",
+      run: function(){
+        ring("D", 2300); ring("E", 2500);
+        return ring("C", 1400).then(function(){
+          stopRings(); nodes.C.state = "candidate"; nodes.C.term = 2; render(); return delay(600);
+        });
+      } },
+    { text:"C 获得 D、E 的选票——下半边有 3 个节点，<b>3/5 本身就是多数</b>，C 成为 term 2 的新 Leader。注意：此刻集群里同时存在两个 Leader，这就是<b>脑裂</b>。",
+      run: function(){
+        return bcast("C", ["D","E"], "vote", 560).then(function(){
+          return Promise.all([msg("D","C","grant",560), msg("E","C","grant",560)]);
+        }).then(function(){
+          badge("C", "票数 3/5 ✓", true);
+          nodes.C.state = "leader"; nodes.D.term = 2; nodes.E.term = 2; render();
+          return delay(800);
+        });
+      } },
+    { text:"一个客户端把 <b>SET 3</b> 发给旧 Leader B。B 追加日志并复制，但隔着分区<b>只有 A 能确认：2/5 凑不齐多数</b>——这条日志永远无法提交。少数派一侧实际上退化成了只读。",
+      run: function(){
+        return msg("client", "B", "client", 650).then(function(){
+          nodes.B.log.push({ v:3, committed:false }); render();
+          return msg("B", "A", "entry", 560);
+        }).then(function(){
+          nodes.A.log.push({ v:3, committed:false }); render();
+          return msg("A", "B", "ack", 560);
+        }).then(function(){ badge("B", "确认 2/5 ✗", false); return delay(1000); });
+      } },
+    { text:"另一个客户端把 <b>SET 8</b> 发给新 Leader C。C、D、E 三票在手，<b>3/5 达到多数 → 提交成功</b>。「真理掌握在大多数人手里」。",
+      run: function(){
+        return msg("client", "C", "client", 650).then(function(){
+          nodes.C.log.push({ v:8, committed:false }); render();
+          return bcast("C", ["D","E"], "entry", 560);
+        }).then(function(){
+          nodes.D.log.push({ v:8, committed:false }); nodes.E.log.push({ v:8, committed:false }); render();
+          return Promise.all([msg("D","C","ack",560), msg("E","C","ack",560)]);
+        }).then(function(){
+          badge("C", "确认 3/5 ✓", true);
+          ["C","D","E"].forEach(function(id){ nodes[id].log[nodes[id].log.length-1].committed = true; });
+          render(); return delay(900);
+        });
+      } },
+    { text:"<b>分区恢复</b>。B 和 C 都在发心跳，但 B 的 term=1 低于 C 的 term=2 —— Raft 的规则是<b>只听任期更高的</b>。",
+      run: function(){ ui.wall.setAttribute("opacity", 0); return bcast("C", ["A","B"], "hb", 620); } },
+    { text:"B 看到更高任期，立刻<b>退回 Follower</b>；A、B <b>回滚</b>那条没提交的 3——未提交的尾部日志就是这样被新任期覆盖的。",
+      run: function(){
+        nodes.B.state = "follower"; nodes.B.term = 2; nodes.A.term = 2;
+        nodes.A.log = nodes.A.log.filter(function(e){ return e.committed; });
+        nodes.B.log = nodes.B.log.filter(function(e){ return e.committed; });
+        render(); return delay(1100);
+      } },
+    { text:"新 Leader C 把 term 2 的日志复制给 A、B。五个节点的日志重新一致：<b>[5, 8]</b>，3 从未存在过。集群在分区、脑裂之后依然收敛到一个一致的状态——这就是 Raft 给 etcd 的承诺。",
+      run: function(){
+        return bcast("C", ["A","B"], "entry", 620).then(function(){
+          nodes.A.log.push({ v:8, committed:true }); nodes.B.log.push({ v:8, committed:true });
+          render(); return delay(600);
+        });
+      } }
+  ]}
+  ];
+
+  /* ===== 放大弹层：整体搬移动画节点，保持运行状态 ===== */
+  var ovPlaceholder = null;
+  function ensureOverlay(){
+    var ov = document.getElementById("raft-anim-overlay");
+    if (ov) return ov;
+    ov = document.createElement("div");
+    ov.id = "raft-anim-overlay";
+    ov.innerHTML = '<div class="ra-ov-backdrop"></div><div class="ra-ov-box"></div>';
+    document.body.appendChild(ov);
+    ov.querySelector(".ra-ov-backdrop").addEventListener("click", closeOverlay);
+    return ov;
+  }
+  function overlayOpen(){
+    var ov = document.getElementById("raft-anim-overlay");
+    return !!(ov && ov.classList.contains("open"));
+  }
+  function openOverlay(){
+    var root = document.getElementById("raft-anim");
+    if (!root || overlayOpen()) return;
+    var ov = ensureOverlay();
+    ovPlaceholder = document.createElement("div");
+    root.parentNode.insertBefore(ovPlaceholder, root);
+    ov.querySelector(".ra-ov-box").appendChild(root);
+    ov.classList.add("open");
+    if (ui.zoom) ui.zoom.textContent = "✕ 还原";
+  }
+  function closeOverlay(){
+    if (!overlayOpen()) return;
+    var ov = document.getElementById("raft-anim-overlay");
+    var root = document.getElementById("raft-anim");
+    if (root && ovPlaceholder && ovPlaceholder.parentNode) {
+      ovPlaceholder.parentNode.insertBefore(root, ovPlaceholder);
+    }
+    if (ovPlaceholder) ovPlaceholder.remove();
+    ovPlaceholder = null;
+    ov.classList.remove("open");
+    if (ui.zoom) ui.zoom.textContent = "⛶ 放大";
+  }
+
+  /* ===== 播放器 ===== */
+  function setChapter(ch){
+    epoch++; playing = false; chapter = ch; stepIdx = 0;
+    ui.play.textContent = "▶ 播放本幕";
+    ui.tabs.forEach(function(b){ b.classList.toggle("on", +b.dataset.ch === ch); });
+    chapterInit(ch);
+    ui.caption.innerHTML = CHAPTERS[ch].intro;
+  }
+  function runStep(){
+    var myE = epoch, steps = CHAPTERS[chapter].steps;
+    if (stepIdx >= steps.length) return Promise.resolve(false);
+    var st = steps[stepIdx++];
+    ui.caption.innerHTML = st.text;
+    return st.run().then(function(){ return myE === epoch; });
+  }
+  function playLoop(){
+    var myE = epoch;
+    (function next(){
+      if (!playing || myE !== epoch) return;
+      if (stepIdx >= CHAPTERS[chapter].steps.length) {
+        playing = false; ui.play.textContent = "▶ 播放本幕";
+        if (chapter < 2) ui.caption.innerHTML += '<br><b>本幕结束</b>，点上方页签进入下一幕 →';
+        else ui.caption.innerHTML += '<br><b>全部演示结束</b>，可点任意页签重看。';
+        return;
+      }
+      runStep().then(function(ok){ if (ok && playing) delay(450).then(next); });
+    })();
+  }
+
+  function bindControls(){
+    ui.tabs.forEach(function(b){ b.onclick = function(){ setChapter(+b.dataset.ch); }; });
+    ui.play.onclick = function(){
+      if (stepIdx >= CHAPTERS[chapter].steps.length) { setChapter(chapter); }
+      playing = !playing;
+      ui.play.textContent = playing ? "⏸ 暂停" : "▶ 播放本幕";
+      if (playing) playLoop();
+    };
+    ui.step.onclick = function(){ if (!playing) runStep(); };
+    ui.reset.onclick = function(){ setChapter(chapter); };
+    ui.speed.onchange = function(){ spd = parseFloat(ui.speed.value); };
+    ui.zoom.onclick = function(){ overlayOpen() ? closeOverlay() : openOverlay(); };
+  }
+
+  function mount(host){
+    if (host.querySelector("#raft-anim")) return;
+    closeOverlay();
+    var stray = document.getElementById("raft-anim");
+    if (stray) stray.remove();
+    epoch++;
+    var root = document.createElement("div");
+    root.id = "raft-anim";
+    root.setAttribute("data-roadmap-animation-id", "raft");
+    host.insertBefore(root, host.firstChild);
+    freshState();
+    buildDom(root);
+    bindControls();
+    setChapter(0);
+  }
+
+  function unmount(){
+    epoch++;
+    closeOverlay();
+    var root = document.getElementById("raft-anim");
+    if (root) root.remove();
+  }
+
+  /* drawer 打开且标题命中 2.3 时挂载 */
+  function check(){
+    var drawer = document.getElementById("drawer");
+    var title = document.getElementById("d-title");
+    var body = document.getElementById("d-body");
+    if (!drawer || !title || !body) return;
+    if (drawer.classList.contains("open") && title.textContent.indexOf(SECTION_KEY) !== -1) mount(body);
+  }
+  function init(){
+    if (window.RoadmapAnimations && window.RoadmapAnimations.register) {
+      window.RoadmapAnimations.register({
+        animationId: "raft",
+        mount: mount,
+        unmount: unmount
+      });
+      return;
+    }
+    var drawer = document.getElementById("drawer");
+    var title = document.getElementById("d-title");
+    if (!drawer || !title) return;
+    new MutationObserver(check).observe(drawer, { attributes:true, attributeFilter:["class"] });
+    new MutationObserver(check).observe(title, { childList:true, characterData:true, subtree:true });
+    /* Esc 优先关闭动画放大层，不传给 drawer */
+    document.addEventListener("keydown", function(e){
+      if (e.key === "Escape" && overlayOpen()) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        closeOverlay();
+      }
+    }, true);
+    check();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+<!-- RAFT-ANIM-END -->

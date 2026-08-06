@@ -1,0 +1,168 @@
+<!-- POD-LIFECYCLE-START data-roadmap-animation-id="pod-lifecycle" -->
+<script id="pod-lifecycle-script">
+(function(){
+  "use strict";
+  var ID = "pod-lifecycle";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK = "#1f2933", PAPER = "#fffdf5", IDLE = "#e7e5d8",
+      ACTIVE = "#bfdbfe", ACTIVE_BD = "#1d4ed8",
+      DONE = "#bbf7d0", DONE_BD = "#15803d",
+      WARN = "#fde68a", WARN_BD = "#b45309",
+      FAIL = "#fecaca", FAIL_BD = "#b91c1c", MUTED = "#6b7280";
+  var player = null, root = null, ui = {}, state = {};
+  var layers = [
+    ["phase", 80, "Pod Phase"],
+    ["conditions", 185, "Pod Conditions"],
+    ["container", 290, "Container State"],
+    ["status", 395, "kubectl get pod STATUS"]
+  ];
+
+  function el(tag, attrs, parent){
+    var item = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function(key){ item.setAttribute(key, attrs[key]); });
+    if (parent) parent.appendChild(item);
+    return item;
+  }
+  function label(parent, x, y, text, size, weight, fill, anchor){
+    var t = el("text", { x:x, y:y, "text-anchor":anchor || "middle", "font-size":size || 12.5, "font-weight":weight || 700, fill:fill || INK }, parent);
+    t.textContent = text;
+    return t;
+  }
+  function rect(parent, x, y, w, h, fill, stroke){
+    return el("rect", { x:x, y:y, width:w, height:h, rx:10, fill:fill || PAPER, stroke:stroke || INK, "stroke-width":2 }, parent);
+  }
+  function setPanel(name, value){ if (ui.panels[name]) ui.panels[name].textContent = value; }
+  function statusColor(value, kind){
+    if (/CrashLoop|Error|Failed|Evicted|Unknown/.test(value)) return [FAIL, FAIL_BD];
+    if (/Pending|False|Waiting|Terminating/.test(value)) return [WARN, WARN_BD];
+    if (/Running|Ready True|Succeeded|Completed/.test(value)) return [DONE, DONE_BD];
+    return [PAPER, INK];
+  }
+
+  function buildDom(host){
+    root = document.createElement("div");
+    root.id = ID;
+    root.className = "ka-anim";
+    root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML =
+      '<div class="ka-head"><strong>Pod 生命周期状态转换动画</strong><small>Phase / Conditions / Container State / STATUS 四层同时看</small><button class="ka-zoom" data-action="zoom">⛶ 放大</button></div>' +
+      '<div class="ka-tabs"><button data-ch="0">① 正常生命周期</button><button data-ch="1">② 故障与重启</button><button data-ch="2">③ 删除与驱逐</button></div>' +
+      '<div class="ka-stage"><svg viewBox="0 0 980 500" role="img" aria-label="Kubernetes Pod 生命周期状态动画"></svg></div>' +
+      '<div class="ka-panels"><div class="ka-panel"><b>Phase</b><span data-panel="phase">—</span></div><div class="ka-panel"><b>Conditions</b><span data-panel="conditions">—</span></div><div class="ka-panel"><b>Container State</b><span data-panel="container">—</span></div><div class="ka-panel"><b>kubectl STATUS</b><span data-panel="status">—</span></div></div>' +
+      '<div class="ka-caption" data-role="caption"></div>' +
+      '<div class="ka-ctrl"><button data-action="play">▶ 播放本幕</button><button data-action="step">▷ 下一步</button><button data-action="reset">⏮ 重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>' +
+      '<div class="ka-legend"><span><i style="background:#bbf7d0"></i>健康 / 完成</span><span><i style="background:#fde68a"></i>等待 / 终止中</span><span><i style="background:#fecaca"></i>故障 / 驱逐 / 失联</span><span>排障：Pending 看调度/事件，CrashLoopBackOff 看容器日志，Evicted 看节点压力，Unknown 看节点和插件</span></div>';
+    host.appendChild(root);
+    ui.svg = root.querySelector("svg");
+    ui.panels = {};
+    root.querySelectorAll("[data-panel]").forEach(function(panel){ ui.panels[panel.dataset.panel] = panel; });
+    drawScene();
+  }
+
+  function drawScene(){
+    var svg = ui.svg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    layers.forEach(function(layer){
+      var key = layer[0], y = layer[1];
+      rect(svg, 36, y-32, 900, 70, "#f8fafc", INK);
+      label(svg, 138, y+6, layer[2], 14, 900, MUTED);
+      ui[key] = {
+        box: rect(svg, 260, y-22, 582, 44, PAPER, INK),
+        text: label(svg, 551, y+6, "—", 15, 900, INK)
+      };
+    });
+    ui.timeline = label(svg, 490, 36, "状态时间线", 15, 900, MUTED);
+    ui.tip = label(svg, 490, 470, "", 12, 800, WARN_BD);
+  }
+
+  function resetState(chapter){
+    state = {
+      phase: chapter === 0 ? "尚未创建" : "Running",
+      conditions: chapter === 0 ? "PodScheduled=False / Ready=False" : "PodScheduled=True / Ready=True",
+      container: chapter === 0 ? "Waiting: PodInitializing" : "Running",
+      status: chapter === 0 ? "Pending" : "Running",
+      tip: ""
+    };
+    if (chapter === 2) {
+      state.phase = "Running";
+      state.conditions = "Ready=True / deletionTimestamp=—";
+      state.container = "Running";
+      state.status = "Running";
+    }
+  }
+  function render(){
+    layers.forEach(function(layer){
+      var key = layer[0];
+      var value = state[key];
+      var c = statusColor(value, key);
+      ui[key].box.setAttribute("fill", c[0]);
+      ui[key].box.setAttribute("stroke", c[1]);
+      ui[key].text.textContent = value;
+      setPanel(key, value);
+    });
+    ui.tip.textContent = state.tip;
+  }
+  function set(values){
+    Object.keys(values).forEach(function(key){ state[key] = values[key]; });
+    render();
+  }
+
+  var CHAPTERS = [
+    {
+      intro:"正常生命周期同时观察四层状态：Pod Phase、Pod Conditions、Container State 和 kubectl STATUS。",
+      steps:[
+        { text:"对象刚创建，尚未绑定节点：Phase 是 <b>Pending</b>，PodScheduled=False，kubectl 也显示 Pending。", run:function(ctx){ set({phase:"Pending",conditions:"PodScheduled=False / Ready=False",container:"Waiting: PodInitializing",status:"Pending",tip:"Pending 优先看调度事件和 FailedScheduling"}); return ctx.wait(720); } },
+        { text:"调度成功并开始拉镜像/启动容器：PodScheduled=True，但容器仍在 Waiting。", run:function(ctx){ set({phase:"Pending",conditions:"PodScheduled=True / Ready=False",container:"Waiting: ContainerCreating",status:"ContainerCreating",tip:"ContainerCreating 常看镜像、挂载和 CNI 事件"}); return ctx.wait(720); } },
+        { text:"容器进程已经启动，Phase 进入 <b>Running</b>，但 Ready 仍可能是 False。", run:function(ctx){ set({phase:"Running",conditions:"PodScheduled=True / Ready=False",container:"Running",status:"Running / NotReady",tip:"Running 不等于已经接流量"}); return ctx.wait(720); } },
+        { text:"readiness probe 通过，Ready=True，kubectl READY 列才会变成可用。", run:function(ctx){ set({phase:"Running",conditions:"PodScheduled=True / Ready=True",container:"Running",status:"Running / Ready",tip:"Ready=True 后才适合进入 Service 后端"}); return ctx.wait(720); } },
+        { text:"普通一次性任务正常退出：容器 Terminated Completed，Pod Phase 变成 <b>Succeeded</b>。", run:function(ctx){ set({phase:"Succeeded",conditions:"Ready=False / ContainersReady=False",container:"Terminated: Completed",status:"Completed",tip:"Succeeded 常见于 Job 或一次性 Pod"}); return ctx.wait(780); } }
+      ]
+    },
+    {
+      intro:"CrashLoopBackOff 是 kubectl STATUS/容器等待原因，不是 Pod Phase。Pod phase 仍可能是 Running。",
+      steps:[
+        { text:"容器原本 Running，Pod Phase 也是 Running。", run:function(ctx){ set({phase:"Running",conditions:"Ready=True / ContainersReady=True",container:"Running",status:"Running",tip:"基线状态健康"}); return ctx.wait(650); } },
+        { text:"进程崩溃退出：容器状态变成 Terminated/Error，Ready=False。", run:function(ctx){ set({phase:"Running",conditions:"Ready=False / ContainersReady=False",container:"Terminated: Error exitCode=1",status:"Error",tip:"先看上一次容器日志：kubectl logs --previous"}); return ctx.wait(760); } },
+        { text:"kubelet 准备重启容器，状态进入 Waiting，原因是 <b>CrashLoopBackOff</b>。", run:function(ctx){ set({phase:"Running",conditions:"Ready=False / ContainersReady=False",container:"Waiting: CrashLoopBackOff",status:"CrashLoopBackOff",tip:"CrashLoopBackOff 不是 phase，phase 仍可能是 Running"}); return ctx.wait(820); } },
+        { text:"退避计时增长，短时间内不会立即重启。", run:function(ctx){ set({phase:"Running",conditions:"Ready=False / ContainersReady=False",container:"Waiting: BackOff 10s → 20s → 40s",status:"CrashLoopBackOff",tip:"反复失败时看启动命令、配置、依赖和探针"}); return ctx.wait(820); } },
+        { text:"退避结束后 kubelet 重启容器；如果进程稳定，重新回到 Running。", run:function(ctx){ set({phase:"Running",conditions:"Ready=False → Ready=True",container:"Restarting → Running",status:"Running",tip:"restartCount 增加，原因仍需从日志定位"}); return ctx.wait(820); } }
+      ]
+    },
+    {
+      intro:"删除、资源压力驱逐和节点失联是三条不同分支；本页签可重置后分别重放。",
+      steps:[
+        { text:"正常删除：API Server 设置 <code>deletionTimestamp</code>，kubectl STATUS 常显示 Terminating。", run:function(ctx){ set({phase:"Running",conditions:"Ready=False / deletionTimestamp=set",container:"Running → Terminating",status:"Terminating",tip:"正常删除会进入优雅终止流程，完整机制放在 5.2"}); return ctx.wait(760); } },
+        { text:"终止完成后对象被删除，Pod 从 API 中消失，不再有 Phase。", run:function(ctx){ set({phase:"Gone",conditions:"对象已删除",container:"Stopped",status:"NotFound",tip:"Terminating 不是标准 Pod phase，是展示状态"}); return ctx.wait(760); } },
+        { text:"资源压力分支：kubelet 根据 QoS 和资源压力选择驱逐对象。", run:function(ctx){ set({phase:"Running",conditions:"NodePressure=True / Ready=False",container:"Running",status:"Evicting",tip:"Evicted 优先看节点内存、磁盘、PID 压力"}); return ctx.wait(760); } },
+        { text:"被驱逐后 Pod Phase 变成 <b>Failed</b>，kubectl STATUS 显示 <b>Evicted</b>。", run:function(ctx){ set({phase:"Failed",conditions:"Reason=Evicted",container:"Terminated",status:"Evicted",tip:"Evicted 是失败原因/展示状态，不是单独 phase"}); return ctx.wait(760); } },
+        { text:"节点失联分支：控制面无法获得新状态，Pod Phase 可能显示 <b>Unknown</b>。", run:function(ctx){ set({phase:"Unknown",conditions:"Ready=Unknown / NodeLost",container:"Unknown",status:"Unknown",tip:"Unknown 看节点心跳、kubelet、CNI/CRI 插件和网络"}); return ctx.wait(820); } }
+      ]
+    }
+  ];
+
+  function mount(host){
+    if (host.querySelector("[data-roadmap-animation-id='" + ID + "']")) return;
+    buildDom(host);
+    player = window.RoadmapAnimations.createPlayer({
+      animationId: ID,
+      root: root,
+      chapters: CHAPTERS,
+      resetState: resetState,
+      render: render,
+      finishedText: function(){ return "<br><b>本幕结束</b>，可重置本页签独立重放。"; }
+    });
+  }
+  function unmount(){
+    if (player) player.destroy();
+    player = null;
+    if (root) root.remove();
+    root = null;
+  }
+  function init(){
+    window.RoadmapAnimations.register({ animationId: ID, mount: mount, unmount: unmount });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+<!-- POD-LIFECYCLE-END -->

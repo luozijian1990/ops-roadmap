@@ -1,0 +1,215 @@
+<!-- SCHEDULER-FILTER-SCORE-START data-roadmap-animation-id="scheduler-filter-score" -->
+<script id="scheduler-filter-score-script">
+(function(){
+  "use strict";
+  var ID = "scheduler-filter-score";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK = "#1f2933", PAPER = "#fffdf5", IDLE = "#e7e5d8",
+      ACTIVE = "#bfdbfe", ACTIVE_BD = "#1d4ed8",
+      DONE = "#bbf7d0", DONE_BD = "#15803d",
+      WARN = "#fde68a", WARN_BD = "#b45309",
+      FAIL = "#fecaca", FAIL_BD = "#b91c1c", MUTED = "#6b7280";
+  var player = null, root = null, ui = {}, state = {};
+  var nodes = {
+    pod: [84, 76, "待调度 Pod", "requests 待计算"],
+    queue: [280, 76, "SchedulingQueue", "activeQ"],
+    filter: [496, 76, "Filter 插件", "资源 / 亲和性 / 污点 / 卷"],
+    score: [710, 76, "Score 插件", "按权重汇总"],
+    api: [892, 76, "API Server", "Bind"]
+  };
+  var nodeRows = [
+    ["node-a", 126, "node-a"],
+    ["node-b", 216, "node-b"],
+    ["node-c", 306, "node-c"],
+    ["node-d", 396, "node-d"]
+  ];
+
+  function el(tag, attrs, parent){
+    var item = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function(key){ item.setAttribute(key, attrs[key]); });
+    if (parent) parent.appendChild(item);
+    return item;
+  }
+  function label(parent, x, y, text, size, weight, fill){
+    var t = el("text", {
+      x:x, y:y, "text-anchor":"middle", "font-size":size || 12.5,
+      "font-weight":weight || 700, fill:fill || INK
+    }, parent);
+    t.textContent = text;
+    return t;
+  }
+  function rect(parent, x, y, w, h, fill, stroke){
+    return el("rect", {
+      x:x, y:y, width:w, height:h, rx:10,
+      fill:fill || PAPER, stroke:stroke || INK, "stroke-width":2
+    }, parent);
+  }
+  function line(parent, x1, y1, x2, y2){
+    el("line", {
+      x1:x1, y1:y1, x2:x2, y2:y2, stroke:"#9ca3af",
+      "stroke-width":1.6, "stroke-dasharray":"5 5"
+    }, parent);
+  }
+  function setPanel(name, value){ if (ui.panels[name]) ui.panels[name].textContent = value; }
+  function color(status){
+    if (status === "active") return [ACTIVE, ACTIVE_BD];
+    if (status === "done") return [DONE, DONE_BD];
+    if (status === "warn") return [WARN, WARN_BD];
+    if (status === "fail") return [FAIL, FAIL_BD];
+    if (status === "muted") return [IDLE, MUTED];
+    return [PAPER, INK];
+  }
+
+  function buildDom(host){
+    root = document.createElement("div");
+    root.id = ID;
+    root.className = "ka-anim";
+    root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML =
+      '<div class="ka-head"><strong>调度过滤和评分动画</strong><small>requests 计算 → Filter 淘汰 → Score 绑定</small><button class="ka-zoom" data-action="zoom">⛶ 放大</button></div>' +
+      '<div class="ka-tabs"><button data-ch="0">① 资源需求计算</button><button data-ch="1">② Filter</button><button data-ch="2">③ Score 与 Bind</button></div>' +
+      '<div class="ka-stage"><svg viewBox="0 0 980 520" role="img" aria-label="Kubernetes 调度过滤和评分动画"></svg></div>' +
+      '<div class="ka-panels"><div class="ka-panel"><b>Pod request</b><span data-panel="request">—</span></div><div class="ka-panel"><b>当前插件</b><span data-panel="plugin">—</span></div><div class="ka-panel"><b>候选节点</b><span data-panel="candidates">A/B/C/D</span></div><div class="ka-panel"><b>绑定结果</b><span data-panel="bind">spec.nodeName: —</span></div></div>' +
+      '<div class="ka-caption" data-role="caption"></div>' +
+      '<div class="ka-ctrl"><button data-action="play">▶ 播放本幕</button><button data-action="step">▷ 下一步</button><button data-action="reset">⏮ 重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>' +
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前阶段</span><span><i style="background:#bbf7d0"></i>通过 / 已完成</span><span><i style="background:#fecaca"></i>被过滤</span><span><i style="background:#fde68a"></i>等待 / 计算中</span></div>';
+    host.appendChild(root);
+    ui.svg = root.querySelector("svg");
+    ui.panels = {};
+    root.querySelectorAll("[data-panel]").forEach(function(panel){
+      ui.panels[panel.dataset.panel] = panel;
+    });
+    drawScene();
+  }
+
+  function drawScene(){
+    var svg = ui.svg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    Object.keys(nodes).forEach(function(key){
+      var n = nodes[key];
+      ui[key] = { box: rect(svg, n[0]-74, n[1]-31, 148, 62, PAPER, INK) };
+      label(svg, n[0], n[1]-5, n[2], 13, 800);
+      ui[key].sub = label(svg, n[0], n[1]+16, n[3], 10.5, 600, MUTED);
+    });
+    line(svg, 158, 76, 206, 76);
+    line(svg, 354, 76, 422, 76);
+    line(svg, 570, 76, 636, 76);
+    line(svg, 784, 76, 818, 76);
+    rect(svg, 28, 145, 924, 338, "#f8fafc", INK).setAttribute("stroke-dasharray", "7 6");
+    label(svg, 108, 174, "候选节点池", 13, 800, MUTED);
+    nodeRows.forEach(function(row){
+      var key = row[0], y = row[1];
+      ui[key] = {
+        box: rect(svg, 60, y, 160, 58, PAPER, INK),
+        reason: label(svg, 410, y+34, "待检查", 12, 700, MUTED),
+        score: label(svg, 748, y+34, "score: —", 12, 800, MUTED)
+      };
+      label(svg, 140, y+24, row[2], 14, 900);
+      rect(svg, 256, y+12, 302, 34, PAPER, "#cbd5e1");
+      rect(svg, 612, y+12, 270, 34, PAPER, "#cbd5e1");
+    });
+    label(svg, 408, 156, "Filter 结果 / 淘汰原因", 12, 800, MUTED);
+    label(svg, 748, 156, "Score 结果 / 权重汇总", 12, 800, MUTED);
+    ui.note = label(svg, 490, 506, "", 12, 800, WARN_BD);
+  }
+
+  function resetState(chapter){
+    state = {
+      active: {},
+      done: {},
+      request: chapter === 0 ? "未计算" : "800m CPU / 1Gi memory",
+      plugin: "—",
+      candidates: "A/B/C/D",
+      bind: "spec.nodeName: —",
+      note: "",
+      nodes: {
+        "node-a": { status:"idle", reason:"待检查", score:"score: —" },
+        "node-b": { status:"idle", reason:"待检查", score:"score: —" },
+        "node-c": { status:"idle", reason:"待检查", score:"score: —" },
+        "node-d": { status:"idle", reason:"待检查", score:"score: —" }
+      }
+    };
+  }
+  function render(){
+    Object.keys(nodes).forEach(function(key){
+      var c = color(state.active[key] ? "active" : state.done[key] ? "done" : "idle");
+      ui[key].box.setAttribute("fill", c[0]);
+      ui[key].box.setAttribute("stroke", c[1]);
+    });
+    nodeRows.forEach(function(row){
+      var key = row[0], item = state.nodes[key], c = color(item.status);
+      ui[key].box.setAttribute("fill", c[0]);
+      ui[key].box.setAttribute("stroke", c[1]);
+      ui[key].reason.textContent = item.reason;
+      ui[key].reason.setAttribute("fill", item.status === "fail" ? FAIL_BD : item.status === "done" ? DONE_BD : MUTED);
+      ui[key].score.textContent = item.score;
+      ui[key].score.setAttribute("fill", item.status === "done" || item.status === "active" ? DONE_BD : MUTED);
+    });
+    setPanel("request", state.request);
+    setPanel("plugin", state.plugin);
+    setPanel("candidates", state.candidates);
+    setPanel("bind", state.bind);
+    ui.note.textContent = state.note;
+  }
+  function mark(active, done){
+    state.active = {};
+    state.done = {};
+    (active || []).forEach(function(key){ state.active[key] = true; });
+    (done || []).forEach(function(key){ state.done[key] = true; });
+    render();
+  }
+
+  var CHAPTERS = [
+    {
+      intro:"调度器使用 <code>requests</code> 做装箱，不用 <code>limits</code> 代替。init containers 取最大值，普通容器 requests 求和。",
+      steps:[
+        { text:"普通业务容器 requests 求和：app=200m/256Mi，sidecar=300m/512Mi，所以 app containers 合计 <b>500m CPU / 768Mi</b>。", run:function(ctx){ state.request="sum(app)=500m / 768Mi"; state.plugin="requests 求和"; mark(["pod"], []); return ctx.wait(650); } },
+        { text:"init containers 不并发运行，调度时取最大 init request：init-db=800m/1Gi，init-migrate=400m/512Mi，所以 init 最大值是 <b>800m CPU / 1Gi</b>。", run:function(ctx){ state.request="max(init)=800m / 1Gi"; state.plugin="init 最大值"; mark(["pod"], []); return ctx.wait(650); } },
+        { text:"最终用于调度的 Pod request 是 <code>max(sum(app containers), max(init containers))</code>，得到 <b>800m CPU / 1Gi</b>。", run:function(ctx){ state.request="800m CPU / 1Gi memory"; state.plugin="max(sum(app), max(init))"; state.note="limits 不参与本次调度容量计算"; mark(["pod","queue"], ["pod"]); return ctx.wait(780); } }
+      ]
+    },
+    {
+      intro:"Filter 阶段只保留可行节点；被过滤掉的节点不会回到后续评分集合。",
+      steps:[
+        { text:"Pod 进入调度队列，调度器开始按插件链检查四个候选节点。", run:function(ctx){ state.plugin="调度队列"; mark(["queue"], ["pod"]); return ctx.wait(620); } },
+        { text:"资源检查：node-a 可用 CPU/内存不足，被淘汰，原因是 <b>Insufficient cpu</b>。", run:function(ctx){ state.plugin="资源"; state.nodes["node-a"]={status:"fail",reason:"Insufficient cpu",score:"score: —"}; state.candidates="B/C/D"; mark(["filter"], ["pod","queue"]); return ctx.wait(720); } },
+        { text:"NodeAffinity 检查：node-d 缺少 <code>disk=ssd</code> 标签，被淘汰。", run:function(ctx){ state.plugin="NodeAffinity"; state.nodes["node-d"]={status:"fail",reason:"missing disk=ssd",score:"score: —"}; state.candidates="B/C"; mark(["filter"], ["pod","queue"]); return ctx.wait(720); } },
+        { text:"Taint/Toleration、PodAntiAffinity 和卷拓扑继续检查。node-b、node-c 通过，node-a/node-d 不会重新加入评分。", run:function(ctx){ state.plugin="Taint / AntiAffinity / Volume"; state.nodes["node-b"].status="done"; state.nodes["node-b"].reason="通过 Filter"; state.nodes["node-c"].status="done"; state.nodes["node-c"].reason="通过 Filter"; state.candidates="B/C"; mark(["filter"], ["pod","queue"]); return ctx.wait(780); } }
+      ]
+    },
+    {
+      intro:"Score 只给 Filter 后剩余节点打分，再通过 API Server 写入绑定结果。",
+      steps:[
+        { text:"Score 阶段只评估 node-b 和 node-c。资源均衡、镜像本地性、亲和性和拓扑分布按权重汇总。", run:function(ctx){ state.plugin="Score"; state.nodes["node-b"].score="资源30 镜像20 亲和10 拓扑10 = 70"; state.nodes["node-c"].score="资源35 镜像10 亲和20 拓扑20 = 85"; state.nodes["node-b"].status="done"; state.nodes["node-c"].status="active"; mark(["score"], ["pod","queue","filter"]); return ctx.wait(780); } },
+        { text:"node-c 得分最高。改变权重可能让装箱或打散策略偏向不同节点，但本批不展开抢占。", run:function(ctx){ state.plugin="选择最高分"; state.note="权重改变会影响最高分节点"; state.nodes["node-c"].reason="最高分"; state.nodes["node-b"].reason="可行但分数较低"; mark(["score"], ["pod","queue","filter"]); return ctx.wait(720); } },
+        { text:"Scheduler 通过 API Server 执行 Bind，写入 <code>spec.nodeName=node-c</code>，并更新 PodScheduled=True。", run:function(ctx){ state.plugin="Bind"; state.bind="spec.nodeName=node-c / PodScheduled=True"; mark(["api"], ["pod","queue","filter","score"]); return ctx.wait(780); } }
+      ]
+    }
+  ];
+
+  function mount(host){
+    if (host.querySelector("[data-roadmap-animation-id='" + ID + "']")) return;
+    buildDom(host);
+    player = window.RoadmapAnimations.createPlayer({
+      animationId: ID,
+      root: root,
+      chapters: CHAPTERS,
+      resetState: resetState,
+      render: render,
+      finishedText: function(){ return "<br><b>本幕结束</b>，可继续切换页签查看下一段调度决策。"; }
+    });
+  }
+  function unmount(){
+    if (player) player.destroy();
+    player = null;
+    if (root) root.remove();
+    root = null;
+  }
+  function init(){
+    window.RoadmapAnimations.register({ animationId: ID, mount: mount, unmount: unmount });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+<!-- SCHEDULER-FILTER-SCORE-END -->

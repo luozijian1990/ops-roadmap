@@ -1,0 +1,180 @@
+<!-- POD-NETWORK-PATH-START data-roadmap-animation-id="pod-network-path" -->
+<script id="pod-network-path-script">
+(function(){
+  "use strict";
+  var ID = "pod-network-path";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK = "#1f2933", PAPER = "#fffdf5", IDLE = "#e7e5d8",
+      ACTIVE = "#bfdbfe", ACTIVE_BD = "#1d4ed8",
+      DONE = "#bbf7d0", DONE_BD = "#15803d",
+      WARN = "#fde68a", WARN_BD = "#b45309",
+      MUTED = "#6b7280";
+  var player = null, root = null, ui = {}, state = {};
+  var points = {
+    procA:[78,160,"Pod A 进程","10.244.1.10"],
+    ethA:[224,160,"pod eth0","netns A"],
+    vethA:[370,160,"veth peer A","host netns"],
+    host:[516,160,"host 数据面","路由 / bridge / eBPF"],
+    vethB:[662,160,"veth peer B","host netns"],
+    podB:[808,160,"Pod B","10.244.1.20"],
+    hostProc:[808,315,"Host process","NodeIP 192.168.1.10"],
+    phy:[516,315,"物理网络","underlay"],
+    nodeB:[808,315,"目标节点","NodeIP 192.168.1.11"]
+  };
+
+  function el(tag, attrs, parent){
+    var item = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function(key){ item.setAttribute(key, attrs[key]); });
+    if (parent) parent.appendChild(item);
+    return item;
+  }
+  function label(parent, x, y, text, size, weight, fill){
+    var t = el("text", { x:x, y:y, "text-anchor":"middle", "font-size":size || 12.5, "font-weight":weight || 700, fill:fill || INK }, parent);
+    t.textContent = text;
+    return t;
+  }
+  function rect(parent, x, y, w, h, fill, stroke){
+    return el("rect", { x:x, y:y, width:w, height:h, rx:10, fill:fill || PAPER, stroke:stroke || INK, "stroke-width":2 }, parent);
+  }
+  function line(parent, a, b, dashed){
+    el("line", { x1:a[0], y1:a[1], x2:b[0], y2:b[1], stroke:"#9ca3af", "stroke-width":1.6, "stroke-dasharray":dashed ? "6 6" : "0" }, parent);
+  }
+  function setPanel(name, value){ if (ui.panels[name]) ui.panels[name].textContent = value; }
+  function color(status){
+    if (status === "active") return [ACTIVE, ACTIVE_BD];
+    if (status === "done") return [DONE, DONE_BD];
+    if (status === "warn") return [WARN, WARN_BD];
+    return [PAPER, INK];
+  }
+
+  function buildDom(host){
+    root = document.createElement("div");
+    root.id = ID;
+    root.className = "ka-anim";
+    root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML =
+      '<div class="ka-head"><strong>Pod 网络数据路径动画</strong><small>netns / veth / 路由 / 封装边界</small><button class="ka-zoom" data-action="zoom">⛶ 放大</button></div>' +
+      '<div class="ka-tabs"><button data-ch="0">① Pod 到主机</button><button data-ch="1">② 同节点 Pod 到 Pod</button><button data-ch="2">③ 不同节点 Pod 到 Pod</button></div>' +
+      '<div class="ka-stage"><svg viewBox="0 0 980 500" role="img" aria-label="Kubernetes Pod 网络路径动画"></svg></div>' +
+      '<div class="ka-panels"><div class="ka-panel"><b>当前 src/dst</b><span data-panel="addr">—</span></div><div class="ka-panel"><b>所在 netns</b><span data-panel="netns">—</span></div><div class="ka-panel"><b>封装状态</b><span data-panel="encap">无封装</span></div><div class="ka-panel"><b>责任组件</b><span data-panel="owner">—</span></div></div>' +
+      '<div class="ka-caption" data-role="caption"></div>' +
+      '<div class="ka-ctrl"><button data-action="play">▶ 播放本幕</button><button data-action="step">▷ 下一步</button><button data-action="reset">⏮ 重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>' +
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>包当前位置</span><span><i style="background:#bbf7d0"></i>已经过路径</span><span><i style="background:#fde68a"></i>封装 / 路由选择</span><span>本动画只覆盖 Pod IP 路由路径，不展开服务转发</span></div>';
+    host.appendChild(root);
+    ui.svg = root.querySelector("svg");
+    ui.panels = {};
+    root.querySelectorAll("[data-panel]").forEach(function(panel){ ui.panels[panel.dataset.panel] = panel; });
+    drawScene();
+  }
+
+  function drawScene(){
+    var svg = ui.svg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    rect(svg, 28, 48, 900, 178, "#dbeafe", INK).setAttribute("stroke-dasharray", "7 6");
+    label(svg, 112, 78, "Node A host netns", 13, 800, MUTED);
+    rect(svg, 42, 92, 260, 104, "#fef3c7", INK).setAttribute("stroke-dasharray", "5 5");
+    label(svg, 172, 118, "Pod A netns", 12, 800, MUTED);
+    rect(svg, 618, 92, 240, 104, "#dcfce7", INK).setAttribute("stroke-dasharray", "5 5");
+    label(svg, 738, 118, "Pod B netns", 12, 800, MUTED);
+    rect(svg, 28, 260, 900, 118, "#f8fafc", INK).setAttribute("stroke-dasharray", "7 6");
+    label(svg, 110, 290, "跨节点 underlay", 13, 800, MUTED);
+    [["procA","ethA"],["ethA","vethA"],["vethA","host"],["host","vethB"],["vethB","podB"],["host","hostProc"],["host","phy"],["phy","nodeB"],["nodeB","podB"]].forEach(function(pair){
+      line(svg, points[pair[0]], points[pair[1]], true);
+    });
+    Object.keys(points).forEach(function(key){
+      var p = points[key];
+      ui[key] = { box: rect(svg, p[0]-58, p[1]-28, 116, 56, PAPER, INK) };
+      label(svg, p[0], p[1]-4, p[2], 11.5, 800);
+      label(svg, p[0], p[1]+15, p[3], 9.8, 600, MUTED);
+    });
+    ui.packet = rect(svg, 44, 420, 892, 44, "#f8fafc", INK);
+    ui.packetText = label(svg, 490, 448, "packet: —", 13, 900, WARN_BD);
+  }
+
+  function resetState(chapter){
+    state = {
+      active:{},
+      done:{},
+      addr: chapter === 0 ? "10.244.1.10 → 192.168.1.10" : "10.244.1.10 → 10.244.1.20",
+      netns:"—",
+      encap:"无封装",
+      owner:"—",
+      packet:"packet: —"
+    };
+  }
+  function render(){
+    Object.keys(points).forEach(function(key){
+      var c = color(state.active[key] ? "active" : state.done[key] ? "done" : "idle");
+      ui[key].box.setAttribute("fill", c[0]);
+      ui[key].box.setAttribute("stroke", c[1]);
+    });
+    setPanel("addr", state.addr);
+    setPanel("netns", state.netns);
+    setPanel("encap", state.encap);
+    setPanel("owner", state.owner);
+    ui.packetText.textContent = state.packet;
+  }
+  function mark(active, done){
+    state.active = {};
+    state.done = {};
+    (active || []).forEach(function(key){ state.active[key] = true; });
+    (done || []).forEach(function(key){ state.done[key] = true; });
+    render();
+  }
+
+  var CHAPTERS = [
+    {
+      intro:"Pod 到主机：包从 Pod netns 经过 eth0/veth peer 进入 host netns，本地路由交给 NodeIP 上的主机进程，默认不做 DNAT。",
+      steps:[
+        { text:"Pod 进程发包，源地址是 Pod IP <b>10.244.1.10</b>，目标是本机 NodeIP <b>192.168.1.10</b>。", run:function(ctx){ state.netns="Pod A netns"; state.owner="Pod 进程"; state.packet="inner src=10.244.1.10 dst=192.168.1.10"; mark(["procA"], []); return ctx.wait(650); } },
+        { text:"包从 Pod netns 的 <code>eth0</code> 发出，仍保持源/目标地址不变。", run:function(ctx){ state.netns="Pod A netns / eth0"; state.owner="Linux netns"; mark(["ethA"], ["procA"]); return ctx.wait(650); } },
+        { text:"veth peer 把包带入 host netns。这里是 namespace 切换，不是物理网卡发送。", run:function(ctx){ state.netns="host netns"; state.owner="veth pair"; mark(["vethA"], ["procA","ethA"]); return ctx.wait(700); } },
+        { text:"本机路由发现目标是 NodeIP 上的主机进程，直接交付给 host process。", run:function(ctx){ state.owner="节点路由"; mark(["host","hostProc"], ["procA","ethA","vethA"]); return ctx.wait(760); } }
+      ]
+    },
+    {
+      intro:"同节点 Pod 到 Pod：源/目标保持 Pod IP，经 host 数据面转发到另一个 veth，不经过物理网卡，也不跨节点隧道。",
+      steps:[
+        { text:"Pod A 访问同节点 Pod B，包头保持 <b>src=10.244.1.10 dst=10.244.1.20</b>。", run:function(ctx){ state.addr="10.244.1.10 → 10.244.1.20"; state.netns="Pod A netns"; state.owner="Pod A"; state.packet="src=10.244.1.10 dst=10.244.1.20"; mark(["procA"], []); return ctx.wait(640); } },
+        { text:"包经过 Pod A 的 eth0 和 veth peer 进入 host netns。", run:function(ctx){ state.netns="host netns"; state.owner="veth A"; mark(["ethA","vethA"], ["procA"]); return ctx.wait(700); } },
+        { text:"host 数据面根据路由、bridge 或 eBPF 转发到目标 Pod 的 veth peer。", run:function(ctx){ state.owner="host routing / bridge / eBPF"; mark(["host","vethB"], ["procA","ethA","vethA"]); return ctx.wait(760); } },
+        { text:"包进入 Pod B netns，目标地址仍是 Pod B IP，没有经过物理网卡或跨节点封装。", run:function(ctx){ state.netns="Pod B netns"; state.owner="veth B"; mark(["podB"], ["procA","ethA","vethA","host","vethB"]); return ctx.wait(740); } }
+      ]
+    },
+    {
+      intro:"跨节点 Pod 到 Pod：同一页签内先演示 Overlay，再切换到 Direct Routing；两者都保持内层 Pod IP 语义。",
+      steps:[
+        { text:"Overlay 模式：Pod A 发往跨节点 Pod B，内层包头是 <b>10.244.1.10 → 10.244.2.20</b>。", run:function(ctx){ state.addr="10.244.1.10 → 10.244.2.20"; state.netns="Pod A netns"; state.owner="Pod A"; state.encap="未封装"; state.packet="inner src=10.244.1.10 dst=10.244.2.20"; mark(["procA","ethA"], []); return ctx.wait(700); } },
+        { text:"源节点路由发现目标 PodCIDR 在另一台节点，经 CNI 数据面做 VXLAN 或 IPIP 封装。", run:function(ctx){ state.netns="host netns"; state.owner="CNI overlay"; state.encap="VXLAN/IPIP 外层 192.168.1.10 → 192.168.1.11"; state.packet="outer src=192.168.1.10 dst=192.168.1.11 / inner Pod IP unchanged"; mark(["host"], ["procA","ethA","vethA"]); return ctx.wait(780); } },
+        { text:"封装后的包穿过物理网络到目标节点，目标节点解封装，再按内层 Pod IP 送入 Pod B。", run:function(ctx){ state.netns="underlay → target host netns"; state.owner="目标节点 CNI"; state.encap="目标节点解封装"; mark(["phy","nodeB","podB"], ["procA","ethA","vethA","host"]); return ctx.wait(820); } },
+        { text:"切换 Direct Routing：不做封装，源节点通过 BGP 或静态路由把下一跳指向目标节点。", run:function(ctx){ state.encap="不封装"; state.owner="BGP / 静态路由"; state.packet="src=10.244.1.10 dst=10.244.2.20 / next-hop=192.168.1.11"; mark(["host","phy","nodeB","podB"], ["procA","ethA","vethA"]); return ctx.wait(820); } }
+      ]
+    }
+  ];
+
+  function mount(host){
+    if (host.querySelector("[data-roadmap-animation-id='" + ID + "']")) return;
+    buildDom(host);
+    player = window.RoadmapAnimations.createPlayer({
+      animationId: ID,
+      root: root,
+      chapters: CHAPTERS,
+      resetState: resetState,
+      render: render,
+      finishedText: function(){ return "<br><b>本幕结束</b>，注意这里没有 Service 转发字段。"; }
+    });
+  }
+  function unmount(){
+    if (player) player.destroy();
+    player = null;
+    if (root) root.remove();
+    root = null;
+  }
+  function init(){
+    window.RoadmapAnimations.register({ animationId: ID, mount: mount, unmount: unmount });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+<!-- POD-NETWORK-PATH-END -->

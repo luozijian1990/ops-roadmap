@@ -1,0 +1,207 @@
+<!-- DEPLOYMENT-ROLLING-UPDATE-START data-roadmap-animation-id="deployment-rolling-update" -->
+<script id="deployment-rolling-update-script">
+(function(){
+  "use strict";
+  var ID = "deployment-rolling-update";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK = "#1f2933", PAPER = "#fffdf5", IDLE = "#e7e5d8",
+      ACTIVE = "#bfdbfe", ACTIVE_BD = "#1d4ed8",
+      DONE = "#bbf7d0", DONE_BD = "#15803d",
+      WARN = "#fde68a", WARN_BD = "#b45309",
+      FAIL = "#fecaca", FAIL_BD = "#b91c1c", MUTED = "#6b7280";
+  var player = null, root = null, ui = {}, state = {};
+  var podSlots = [
+    ["old-1", 104, 236, "old"], ["old-2", 214, 236, "old"], ["old-3", 324, 236, "old"],
+    ["new-1", 564, 236, "new"], ["new-2", 674, 236, "new"], ["new-3", 784, 236, "new"], ["new-4", 894, 236, "new"]
+  ];
+  var boxes = {
+    deploy:[120,86,"Deployment","replicas=3"],
+    controller:[350,86,"Deployment Controller","rollout reconcile"],
+    oldrs:[214,164,"old ReplicaSet","template hash abc"],
+    newrs:[674,164,"new ReplicaSet","template hash def"],
+    service:[474,360,"Service / Endpoints","只接 Ready Pod"],
+    api:[804,86,"API Server","status / scale"]
+  };
+
+  function el(tag, attrs, parent){
+    var item = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function(key){ item.setAttribute(key, attrs[key]); });
+    if (parent) parent.appendChild(item);
+    return item;
+  }
+  function label(parent, x, y, text, size, weight, fill, anchor){
+    var t = el("text", { x:x, y:y, "text-anchor":anchor || "middle", "font-size":size || 12.5, "font-weight":weight || 700, fill:fill || INK }, parent);
+    t.textContent = text;
+    return t;
+  }
+  function rect(parent, x, y, w, h, fill, stroke){
+    return el("rect", { x:x, y:y, width:w, height:h, rx:10, fill:fill || PAPER, stroke:stroke || INK, "stroke-width":2 }, parent);
+  }
+  function line(parent, x1, y1, x2, y2){
+    el("line", { x1:x1, y1:y1, x2:x2, y2:y2, stroke:"#9ca3af", "stroke-width":1.5, "stroke-dasharray":"5 5" }, parent);
+  }
+  function setPanel(name, value){ if (ui.panels[name]) ui.panels[name].textContent = value; }
+  function statusColor(status){
+    if (status === "active") return [ACTIVE, ACTIVE_BD];
+    if (status === "ready") return [DONE, DONE_BD];
+    if (status === "creating") return [WARN, WARN_BD];
+    if (status === "terminating") return [FAIL, FAIL_BD];
+    if (status === "gone") return ["#f3f4f6", "#cbd5e1"];
+    return [PAPER, INK];
+  }
+
+  function buildDom(host){
+    root = document.createElement("div");
+    root.id = ID;
+    root.className = "ka-anim";
+    root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML =
+      '<div class="ka-head"><strong>Deployment 滚动更新动画</strong><small>old ReplicaSet scale down · new ReplicaSet scale up</small><button class="ka-zoom" data-action="zoom">⛶ 放大</button></div>' +
+      '<div class="ka-tabs"><button data-ch="0">① 新旧 ReplicaSet</button><button data-ch="1">② 滚动替换</button><button data-ch="2">③ 暂停回滚</button></div>' +
+      '<div class="ka-stage"><svg viewBox="0 0 980 500" role="img" aria-label="Deployment rolling update animation"></svg></div>' +
+      '<div class="ka-panels"><div class="ka-panel"><b>Strategy</b><span data-panel="strategy">RollingUpdate</span></div><div class="ka-panel"><b>Replicas</b><span data-panel="replicas">desired=3 old=3 new=0</span></div><div class="ka-panel"><b>Availability</b><span data-panel="availability">available=3</span></div><div class="ka-panel"><b>Progress</b><span data-panel="progress">revision 1 stable</span></div></div>' +
+      '<div class="ka-caption" data-role="caption"></div>' +
+      '<div class="ka-ctrl"><button data-action="play">▶ 播放本幕</button><button data-action="step">▷ 下一步</button><button data-action="reset">⏮ 重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>' +
+      '<div class="ka-legend"><span><i style="background:#bbf7d0"></i>Ready / available</span><span><i style="background:#fde68a"></i>creating / surge</span><span><i style="background:#fecaca"></i>terminating / unavailable</span><span>核心约束：先让新 Pod Ready，再按 maxUnavailable 缩旧 Pod</span></div>';
+    host.appendChild(root);
+    ui.svg = root.querySelector("svg");
+    ui.panels = {};
+    root.querySelectorAll("[data-panel]").forEach(function(panel){ ui.panels[panel.dataset.panel] = panel; });
+    drawScene();
+  }
+
+  function drawScene(){
+    var svg = ui.svg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    line(svg, boxes.deploy[0]+74, boxes.deploy[1], boxes.controller[0]-74, boxes.controller[1]);
+    line(svg, boxes.controller[0]+74, boxes.controller[1], boxes.api[0]-74, boxes.api[1]);
+    line(svg, boxes.controller[0]-20, boxes.controller[1]+34, boxes.oldrs[0], boxes.oldrs[1]-36);
+    line(svg, boxes.controller[0]+70, boxes.controller[1]+34, boxes.newrs[0], boxes.newrs[1]-36);
+    line(svg, boxes.oldrs[0], boxes.oldrs[1]+36, boxes.service[0]-100, boxes.service[1]-35);
+    line(svg, boxes.newrs[0], boxes.newrs[1]+36, boxes.service[0]+100, boxes.service[1]-35);
+    Object.keys(boxes).forEach(function(key){
+      var b = boxes[key];
+      ui[key] = { box: rect(svg, b[0]-82, b[1]-32, 164, 64, PAPER, INK) };
+      label(svg, b[0], b[1]-5, b[2], 13, 800);
+      ui[key].sub = label(svg, b[0], b[1]+16, b[3], 10.5, 600, MUTED);
+    });
+    rect(svg, 42, 204, 336, 94, "#f8fafc", INK).setAttribute("stroke-dasharray", "7 6");
+    rect(svg, 502, 204, 430, 94, "#f8fafc", INK).setAttribute("stroke-dasharray", "7 6");
+    label(svg, 210, 218, "old pods", 11, 800, MUTED);
+    label(svg, 716, 218, "new pods", 11, 800, MUTED);
+    podSlots.forEach(function(slot){
+      var id = slot[0], x = slot[1], y = slot[2];
+      ui[id] = {
+        box: rect(svg, x-38, y-20, 76, 40, PAPER, INK),
+        text: label(svg, x, y+5, id.replace("-", " "), 11, 800)
+      };
+    });
+    ui.arrowText = label(svg, 490, 322, "", 12, 900, WARN_BD);
+  }
+
+  function resetState(chapter){
+    state = {
+      strategy:"RollingUpdate maxSurge=1 maxUnavailable=1",
+      replicas:"desired=3 old=3 new=0",
+      availability:"available=3",
+      progress: chapter === 2 ? "revision 2 partially rolled out" : "revision 1 stable",
+      boxes:{deploy:"ready",controller:"idle",oldrs:"ready",newrs:"idle",service:"ready",api:"idle"},
+      pods:{
+        "old-1":"ready", "old-2":"ready", "old-3":"ready",
+        "new-1":"gone", "new-2":"gone", "new-3":"gone", "new-4":"gone"
+      },
+      arrow:""
+    };
+  }
+  function render(){
+    Object.keys(boxes).forEach(function(key){
+      var c = statusColor(state.boxes[key]);
+      ui[key].box.setAttribute("fill", c[0]);
+      ui[key].box.setAttribute("stroke", c[1]);
+    });
+    Object.keys(state.pods).forEach(function(key){
+      var status = state.pods[key];
+      var c = statusColor(status);
+      ui[key].box.setAttribute("fill", c[0]);
+      ui[key].box.setAttribute("stroke", c[1]);
+      ui[key].box.setAttribute("opacity", status === "gone" ? ".28" : "1");
+      ui[key].text.setAttribute("opacity", status === "gone" ? ".38" : "1");
+      ui[key].text.textContent = status === "gone" ? "—" : key.replace("-", " ");
+    });
+    setPanel("strategy", state.strategy);
+    setPanel("replicas", state.replicas);
+    setPanel("availability", state.availability);
+    setPanel("progress", state.progress);
+    ui.arrowText.textContent = state.arrow;
+  }
+  function set(values){
+    Object.keys(values).forEach(function(key){ state[key] = values[key]; });
+    render();
+  }
+  function patchPods(next){
+    Object.keys(next).forEach(function(key){ state.pods[key] = next[key]; });
+    render();
+  }
+  function mark(active, done){
+    Object.keys(state.boxes).forEach(function(key){ state.boxes[key] = "idle"; });
+    (done || []).forEach(function(key){ state.boxes[key] = "ready"; });
+    (active || []).forEach(function(key){ state.boxes[key] = "active"; });
+    render();
+  }
+
+  var CHAPTERS = [
+    {
+      intro:"Deployment 更新模板后不会直接改旧 Pod，而是创建新的 ReplicaSet，再逐步调节 old/new replicas。",
+      steps:[
+        { text:"当前 Deployment revision 1 稳定运行：desired=3，old ReplicaSet 管着 3 个 Ready Pod。", run:function(ctx){ mark(["deploy","oldrs"], ["service"]); set({replicas:"desired=3 old=3 new=0", availability:"available=3", progress:"revision 1 stable", arrow:"old RS owns all traffic-ready Pods"}); return ctx.wait(700); } },
+        { text:"用户修改镜像或模板字段。Deployment Controller 计算出新的 pod-template-hash，创建 <b>new ReplicaSet</b>，但先不删除旧 Pod。", run:function(ctx){ mark(["controller","newrs","api"], ["deploy","oldrs","service"]); set({progress:"revision 2 created", arrow:"new template hash def"}); return ctx.wait(760); } },
+        { text:"此时新旧 ReplicaSet 并存：old RS 代表旧模板，new RS 代表新模板。Deployment 的任务是让 new 逐步接管 desired replicas。", run:function(ctx){ mark(["oldrs","newrs"], ["deploy","service"]); set({replicas:"desired=3 old=3 new=0", progress:"old/new RS coexist"}); return ctx.wait(760); } }
+      ]
+    },
+    {
+      intro:"RollingUpdate 的核心是受 <code>maxSurge</code> 和 <code>maxUnavailable</code> 约束的 scale up / scale down 节奏。",
+      steps:[
+        { text:"maxSurge=1 允许临时多出 1 个 Pod。控制器先把 new RS 扩到 1，创建 new-1。", run:function(ctx){ mark(["controller","newrs"], ["deploy","oldrs","service"]); patchPods({"new-1":"creating"}); set({replicas:"desired=3 old=3 new=1", availability:"available=3", progress:"surge +1 creating", arrow:"scale up new RS before cutting old"}); return ctx.wait(760); } },
+        { text:"new-1 Ready 后进入 Service 后端，available 变成 4。此时可以安全缩旧副本。", run:function(ctx){ patchPods({"new-1":"ready"}); set({availability:"available=4", progress:"new-1 Ready", arrow:"Service only routes Ready Pods"}); return ctx.wait(720); } },
+        { text:"控制器把 old RS 从 3 缩到 2，old-1 进入 Terminating。整体 available 仍满足最小可用要求。", run:function(ctx){ patchPods({"old-1":"terminating"}); set({replicas:"desired=3 old=2 new=1", availability:"available=3", progress:"scale down old RS", arrow:"maxUnavailable bounds the cutover"}); return ctx.wait(760); } },
+        { text:"继续循环：new-2 创建并 Ready，然后 old-2 被缩掉。new replicas 上升，old replicas 下降。", run:function(ctx){ patchPods({"old-1":"gone","new-2":"ready","old-2":"terminating"}); set({replicas:"desired=3 old=1 new=2", availability:"available=3", progress:"new=2 old=1", arrow:"rolling window moves forward"}); return ctx.wait(820); } },
+        { text:"最后 new-3 Ready，old-3 终止，old RS 缩到 0。Deployment 完成 rollout，revision 2 稳定。", run:function(ctx){ patchPods({"old-2":"gone","old-3":"gone","new-3":"ready"}); mark(["deploy","newrs"], ["controller","api","service"]); set({replicas:"desired=3 old=0 new=3", availability:"available=3", progress:"revision 2 complete", arrow:"old RS kept for rollback history, replicas=0"}); return ctx.wait(840); } }
+      ]
+    },
+    {
+      intro:"滚动更新可以暂停，也可以在新版本异常时回滚，本质仍是调节新旧 ReplicaSet 的 replicas。",
+      steps:[
+        { text:"发布到一半时发现新版本指标异常：new=1、old=2。可以先 <code>kubectl rollout pause</code> 暂停继续替换。", run:function(ctx){ mark(["deploy","controller"], ["oldrs","newrs","service"]); patchPods({"old-1":"gone","old-2":"ready","old-3":"ready","new-1":"ready","new-2":"gone","new-3":"gone","new-4":"gone"}); set({replicas:"desired=3 old=2 new=1", availability:"available=3", progress:"paused", arrow:"pause freezes further scale changes"}); return ctx.wait(780); } },
+        { text:"暂停期间可以继续修改 Deployment 模板或排查问题；控制器不会继续把 old replicas 缩到 0。", run:function(ctx){ mark(["controller"], ["deploy","oldrs","newrs","service"]); set({progress:"paused / inspecting", arrow:"old RS still carries most traffic"}); return ctx.wait(720); } },
+        { text:"如果确认新版本有问题，执行 rollback：控制器把 old RS 扩回 3，把 new RS 缩到 0。", run:function(ctx){ patchPods({"old-1":"ready","old-2":"ready","old-3":"ready","new-1":"terminating"}); mark(["controller","oldrs"], ["deploy","service"]); set({replicas:"desired=3 old=3 new=0", availability:"available=3", progress:"rollback to revision 1", arrow:"rollback is reverse scaling"}); return ctx.wait(820); } },
+        { text:"如果问题修复，也可以 resume，继续按 rolling window 推进。暂停、恢复、回滚都不是直接替换 Pod，而是围绕 ReplicaSet replicas 做状态收敛。", run:function(ctx){ patchPods({"new-1":"gone"}); mark(["deploy","oldrs"], ["controller","service"]); set({replicas:"desired=3 old=3 new=0", availability:"available=3", progress:"revision 1 restored", arrow:"ReplicaSet history enables rollback"}); return ctx.wait(820); } }
+      ]
+    }
+  ];
+
+  function mount(host){
+    if (host.querySelector("[data-roadmap-animation-id='" + ID + "']")) return;
+    buildDom(host);
+    player = window.RoadmapAnimations.createPlayer({
+      animationId: ID,
+      root: root,
+      chapters: CHAPTERS,
+      resetState: resetState,
+      render: render,
+      finishedText: function(){ return "<br><b>本幕结束</b>，关注 old/new ReplicaSet 的 replicas 如何收敛。"; }
+    });
+  }
+  function unmount(){
+    if (player) player.destroy();
+    player = null;
+    if (root) root.remove();
+    root = null;
+  }
+  function init(){
+    window.RoadmapAnimations.register({ animationId: ID, mount: mount, unmount: unmount });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+<!-- DEPLOYMENT-ROLLING-UPDATE-END -->

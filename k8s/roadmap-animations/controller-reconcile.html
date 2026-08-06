@@ -1,0 +1,193 @@
+<!-- CONTROLLER-RECONCILE-START data-roadmap-animation-id="controller-reconcile" -->
+<script id="controller-reconcile-script">
+(function(){
+  "use strict";
+  var ID = "controller-reconcile";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK = "#1f2933", PAPER = "#fffdf5", IDLE = "#e7e5d8",
+      ACTIVE = "#bfdbfe", ACTIVE_BD = "#1d4ed8",
+      DONE = "#bbf7d0", DONE_BD = "#15803d",
+      WARN = "#fde68a", WARN_BD = "#b45309",
+      FAIL = "#fecaca", FAIL_BD = "#b91c1c", MUTED = "#6b7280";
+  var player = null, root = null, ui = {}, state = {};
+  var boxes = {
+    api:[84,95,"API Server","Watch / Create"],
+    informer:[278,95,"Reflector / Informer","watch → cache"],
+    cache:[474,95,"Cache / Lister","本地只读视图"],
+    queue:[668,95,"WorkQueue","namespace/name key"],
+    worker:[848,95,"Worker","Reconcile(key)"],
+    rs:[278,315,"ReplicaSet","desired=3"],
+    pods:[474,315,"Pods","current=2"],
+    etcd:[668,315,"etcd","对象状态"],
+    kubelet:[848,315,"kubelet","不被控制器直接调用"]
+  };
+
+  function el(tag, attrs, parent){
+    var item = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function(key){ item.setAttribute(key, attrs[key]); });
+    if (parent) parent.appendChild(item);
+    return item;
+  }
+  function label(parent, x, y, text, size, weight, fill){
+    var t = el("text", { x:x, y:y, "text-anchor":"middle", "font-size":size || 12.5, "font-weight":weight || 700, fill:fill || INK }, parent);
+    t.textContent = text;
+    return t;
+  }
+  function rect(parent, x, y, w, h, fill, stroke){
+    return el("rect", { x:x, y:y, width:w, height:h, rx:10, fill:fill || PAPER, stroke:stroke || INK, "stroke-width":2 }, parent);
+  }
+  function line(parent, a, b, dashed){
+    el("line", { x1:a[0], y1:a[1], x2:b[0], y2:b[1], stroke:"#9ca3af", "stroke-width":1.6, "stroke-dasharray":dashed ? "6 6" : "0" }, parent);
+  }
+  function setPanel(name, value){ if (ui.panels[name]) ui.panels[name].textContent = value; }
+  function color(status){
+    if (status === "active") return [ACTIVE, ACTIVE_BD];
+    if (status === "done") return [DONE, DONE_BD];
+    if (status === "warn") return [WARN, WARN_BD];
+    if (status === "fail") return [FAIL, FAIL_BD];
+    if (status === "muted") return [IDLE, MUTED];
+    return [PAPER, INK];
+  }
+
+  function buildDom(host){
+    root = document.createElement("div");
+    root.id = ID;
+    root.className = "ka-anim";
+    root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML =
+      '<div class="ka-head"><strong>Controller Reconcile 动画</strong><small>事件只是触发器，状态才是事实来源</small><button class="ka-zoom" data-action="zoom">⛶ 放大</button></div>' +
+      '<div class="ka-tabs"><button data-ch="0">① 事件进入队列</button><button data-ch="1">② 状态对比</button><button data-ch="2">③ 执行动作</button><button data-ch="3">④ 失败重试</button></div>' +
+      '<div class="ka-stage"><svg viewBox="0 0 980 500" role="img" aria-label="Kubernetes Controller Reconcile 动画"></svg></div>' +
+      '<div class="ka-panels"><div class="ka-panel"><b>Key</b><span data-panel="key">—</span></div><div class="ka-panel"><b>缓存状态</b><span data-panel="cache">desired=3 current=2</span></div><div class="ka-panel"><b>队列状态</b><span data-panel="queue">empty</span></div><div class="ka-panel"><b>重试状态</b><span data-panel="retry">—</span></div></div>' +
+      '<div class="ka-caption" data-role="caption"></div>' +
+      '<div class="ka-ctrl"><button data-action="play">▶ 播放本幕</button><button data-action="step">▷ 下一步</button><button data-action="reset">⏮ 重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>' +
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前处理</span><span><i style="background:#bbf7d0"></i>已收敛</span><span><i style="background:#fde68a"></i>等待 / 重试</span><span><i style="background:#fecaca"></i>失败</span></div>';
+    host.appendChild(root);
+    ui.svg = root.querySelector("svg");
+    ui.panels = {};
+    root.querySelectorAll("[data-panel]").forEach(function(panel){ ui.panels[panel.dataset.panel] = panel; });
+    drawScene();
+  }
+
+  function drawScene(){
+    var svg = ui.svg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    line(svg, boxes.api, boxes.informer, true);
+    line(svg, boxes.informer, boxes.cache, true);
+    line(svg, boxes.informer, boxes.queue, true);
+    line(svg, boxes.queue, boxes.worker, true);
+    line(svg, boxes.worker, boxes.cache, true);
+    line(svg, boxes.worker, boxes.api, true);
+    line(svg, boxes.api, boxes.etcd, true);
+    line(svg, boxes.etcd, boxes.informer, true);
+    line(svg, boxes.worker, boxes.kubelet, true);
+    Object.keys(boxes).forEach(function(key){
+      var b = boxes[key];
+      ui[key] = { box: rect(svg, b[0]-76, b[1]-32, 152, 64, PAPER, INK) };
+      label(svg, b[0], b[1]-5, b[2], 13, 800);
+      ui[key].sub = label(svg, b[0], b[1]+16, b[3], 10.5, 600, MUTED);
+    });
+    ui.diff = rect(svg, 340, 400, 300, 52, "#f8fafc", INK);
+    ui.diffText = label(svg, 490, 432, "diff: —", 14, 900, MUTED);
+    ui.note = label(svg, 490, 476, "", 12, 800, WARN_BD);
+  }
+
+  function resetState(chapter){
+    state = {
+      active:{},
+      done:{},
+      key: "—",
+      cache: chapter === 2 ? "desired=3 current=3" : "desired=3 current=2",
+      queue: "empty",
+      retry: "—",
+      diff: "diff: —",
+      note: ""
+    };
+  }
+  function render(){
+    Object.keys(boxes).forEach(function(key){
+      var c = color(state.active[key] ? "active" : state.done[key] ? "done" : "idle");
+      ui[key].box.setAttribute("fill", c[0]);
+      ui[key].box.setAttribute("stroke", c[1]);
+    });
+    setPanel("key", state.key);
+    setPanel("cache", state.cache);
+    setPanel("queue", state.queue);
+    setPanel("retry", state.retry);
+    ui.diffText.textContent = state.diff;
+    ui.diffText.setAttribute("fill", state.diff.indexOf("+1") !== -1 ? WARN_BD : DONE_BD);
+    ui.note.textContent = state.note;
+  }
+  function mark(active, done){
+    state.active = {};
+    state.done = {};
+    (active || []).forEach(function(key){ state.active[key] = true; });
+    (done || []).forEach(function(key){ state.done[key] = true; });
+    render();
+  }
+
+  var CHAPTERS = [
+    {
+      intro:"Watch 事件先进入 Informer 和 WorkQueue。事件回调只生成 key，不直接执行 reconcile。",
+      steps:[
+        { text:"API Server 通过 Watch 推送 ReplicaSet 或 Pod 事件。", run:function(ctx){ mark(["api"], []); state.queue="empty"; return ctx.wait(620); } },
+        { text:"Reflector/Informer 收到事件，先更新本地缓存。Lister 后续读取的是这份缓存视图。", run:function(ctx){ mark(["informer","cache"], ["api"]); state.cache="ReplicaSet + Pods cache updated"; return ctx.wait(700); } },
+        { text:"EventHandler 只把对象转成 <code>namespace/name</code> key：<b>prod/web</b>。这里不直接创建 Pod。", run:function(ctx){ mark(["informer"], ["api","cache"]); state.key="prod/web"; state.note="事件回调不执行 reconcile"; return ctx.wait(720); } },
+        { text:"WorkQueue 对 key 去重入队。无论连续收到多少相关事件，Worker 都围绕这个 key 重新读取最新状态。", run:function(ctx){ mark(["queue"], ["api","informer","cache"]); state.queue="prod/web queued once"; return ctx.wait(760); } }
+      ]
+    },
+    {
+      intro:"Worker 取 key 后从缓存读取对象，把期望状态和当前状态做差。",
+      steps:[
+        { text:"Worker 从 WorkQueue 取出 <code>prod/web</code>，开始 Reconcile(key)。", run:function(ctx){ mark(["queue","worker"], []); state.key="prod/web"; state.queue="processing"; return ctx.wait(650); } },
+        { text:"Lister 从缓存读取 ReplicaSet：<b>desired replicas=3</b>。", run:function(ctx){ mark(["worker","cache","rs"], ["queue"]); state.cache="ReplicaSet desired=3"; return ctx.wait(700); } },
+        { text:"Lister 再读取 selector 匹配的 Pod：当前只有 <b>2</b> 个。", run:function(ctx){ mark(["worker","cache","pods"], ["queue","rs"]); state.cache="desired=3 current=2"; return ctx.wait(700); } },
+        { text:"对比得到 <b>diff=+1</b>，控制器需要创建一个缺失的 Pod。Reconcile 必须幂等：下次处理同一个 key 仍会重读最新状态。", run:function(ctx){ mark(["worker"], ["queue","rs","pods","cache"]); state.diff="diff: +1 Pod"; state.note="事件只是触发器，状态才是事实来源"; return ctx.wait(780); } }
+      ]
+    },
+    {
+      intro:"控制器通过 API Server 修改对象状态，再由 Informer 收到新状态，形成对象状态接力。",
+      steps:[
+        { text:"Worker 根据 diff 通过 API Server 创建一个 Pod。控制器不直接调用 kubelet。", run:function(ctx){ mark(["worker","api"], []); state.diff="create 1 Pod"; state.note="不直接调用 kubelet"; return ctx.wait(700); } },
+        { text:"API Server 把新 Pod 写入 etcd，集群事实发生变化。", run:function(ctx){ mark(["api","etcd"], ["worker"]); state.cache="desired=3 current=2 → write Pod"; return ctx.wait(720); } },
+        { text:"Informer 再次收到新 Pod 事件，更新缓存。", run:function(ctx){ mark(["etcd","informer","cache"], ["api","worker"]); state.cache="desired=3 current=3"; return ctx.wait(720); } },
+        { text:"下一次处理同一个 key 时重新读取最新状态，发现已收敛，不再执行动作。", run:function(ctx){ mark(["worker","cache"], ["api","etcd","informer","rs","pods"]); state.diff="diff: 0 / converged"; state.note="幂等：已收敛则不动作"; return ctx.wait(760); } }
+      ]
+    },
+    {
+      intro:"失败时 key 不能丢弃，而是 rate-limited requeue，退避后重新读取最新状态再处理。",
+      steps:[
+        { text:"Worker 尝试创建 Pod，但 API Server 或外部调用失败。", run:function(ctx){ mark(["worker","api"], []); state.retry="attempt=1 failed"; state.diff="create Pod failed"; return ctx.wait(700); } },
+        { text:"控制器调用 <code>AddRateLimited</code>，把同一个 key 重新放回队列，并增加 backoff。", run:function(ctx){ mark(["queue"], ["worker"]); state.queue="prod/web requeued"; state.retry="backoff 5s"; return ctx.wait(740); } },
+        { text:"退避时间增长后 Worker 再次取 key。失败时禁止把 key 丢弃。", run:function(ctx){ mark(["queue","worker"], []); state.retry="attempt=2"; state.note="失败 key 保留在队列"; return ctx.wait(720); } },
+        { text:"重试成功后创建 Pod，调用 <code>Forget</code> 清除失败计数。", run:function(ctx){ mark(["worker","api","etcd"], ["queue"]); state.retry="success / Forget"; state.queue="empty"; state.cache="desired=3 current=3"; state.diff="diff: 0 / converged"; return ctx.wait(780); } }
+      ]
+    }
+  ];
+
+  function mount(host){
+    if (host.querySelector("[data-roadmap-animation-id='" + ID + "']")) return;
+    buildDom(host);
+    player = window.RoadmapAnimations.createPlayer({
+      animationId: ID,
+      root: root,
+      chapters: CHAPTERS,
+      resetState: resetState,
+      render: render,
+      finishedText: function(){ return "<br><b>本幕结束</b>，Reconcile 会围绕 key 继续重新读取状态。"; }
+    });
+  }
+  function unmount(){
+    if (player) player.destroy();
+    player = null;
+    if (root) root.remove();
+    root = null;
+  }
+  function init(){
+    window.RoadmapAnimations.register({ animationId: ID, mount: mount, unmount: unmount });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+<!-- CONTROLLER-RECONCILE-END -->
