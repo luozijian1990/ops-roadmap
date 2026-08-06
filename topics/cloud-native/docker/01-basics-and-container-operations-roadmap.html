@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Docker 学习笔记 · 第一册：基础与容器操作 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Docker 学习笔记 · 第一册：基础与容器操作</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Docker 学习笔记 · 第一册：基础与容器操作", "intro": "> 📖 本文档是基于 Docker 官方文档整理的中文学习笔记，涵盖容器管理、镜像操作、网络配置、存储管理、Dockerfile 编写及 Docker Compose 编排等核心内容。\n> 🎯 目标读者：运维工程师 / SRE / 容器技术初学者\n> 📅 最后更新：2025-12\n\n---", "parts": [{"title": "第一章：Docker 基础概述", "sections": [{"title": "1.1 Docker 简介", "content": "**Docker** 是一个开源的容器化平台，允许开发者将应用程序及其依赖打包到一个轻量级、可移植的容器中。容器可以在任何支持 Docker 的环境中一致地运行。\n\n#### Docker 核心组件\n\n| 组件                                  | 说明                                     |\n| ------------------------------------- | ---------------------------------------- |\n| **Docker Engine**               | Docker 的核心运行时，负责构建和运行容器  |\n| **Docker CLI**                  | 命令行客户端，用于与 Docker Daemon 交互  |\n| **Docker Daemon** (`dockerd`) | 后台守护进程，管理容器、镜像、网络和存储 |\n| **Docker Registry**             | 镜像仓库，如 Docker Hub、私有 Registry   |\n\n#### 容器 vs 虚拟机\n\n| 特性               | 容器               | 虚拟机               |\n| ------------------ | ------------------ | -------------------- |\n| **启动速度** | 秒级               | 分钟级               |\n| **资源占用** | MB 级              | GB 级                |\n| **隔离级别** | 进程级（共享内核） | 完全隔离（独立内核） |\n| **性能**     | 接近原生           | 有一定损耗           |\n| **可移植性** | 高                 | 中等                 |", "subs": ["Docker 核心组件", "容器 vs 虚拟机"]}, {"title": "1.2 Docker 架构", "content": "```mermaid\ngraph TD\n    subgraph Client[\"Docker Client\"]\n        CLI[docker CLI]\n        API[Docker API]\n    end\n  \n    subgraph Host[\"Docker Host\"]\n        Daemon[Docker Daemon<br/>dockerd]\n      \n        subgraph Objects[\"Docker Objects\"]\n            Images[Images]\n            Containers[Containers]\n            Networks[Networks]\n            Volumes[Volumes]\n        end\n    end\n  \n    subgraph Registry[\"Registry\"]\n        Hub[Docker Hub]\n        Private[Private Registry]\n    end\n  \n    CLI --> Daemon\n    API --> Daemon\n    Daemon --> Images\n    Daemon --> Containers\n    Daemon --> Networks\n    Daemon --> Volumes\n    Daemon <--> Hub\n    Daemon <--> Private\n```\n\n#### 客户端-服务端通信流程\n\n1. 用户通过 `docker` CLI 发送命令\n2. CLI 将命令转换为 REST API 请求\n3. Docker Daemon 接收请求并执行相应操作\n4. Daemon 返回执行结果给 CLI\n5. CLI 将结果展示给用户\n\n---", "subs": ["客户端-服务端通信流程"]}]}, {"title": "第二章：容器管理 - 基础操作", "sections": [{"title": "2.1 容器生命周期概述", "content": "> 📁 本章内容来源于 Docker 官方文档 `容器管理/` 目录\n\n\n容器的生命周期包含以下几个关键状态：\n\n```mermaid\ngraph LR\n    A[镜像 Image] -->|docker create| B[已创建 Created]\n    B -->|docker start| C[运行中 Running]\n    A -->|docker run| C\n    C -->|docker pause| D[已暂停 Paused]\n    D -->|docker unpause| C\n    C -->|docker stop| E[已停止 Exited]\n    C -->|docker kill| E\n    E -->|docker start| C\n    E -->|docker rm| F[已删除 Removed]\n    C -->|docker restart| C\n```\n\n#### 容器状态说明\n\n| 状态        | 描述                             |\n| ----------- | -------------------------------- |\n| `created` | 容器已创建但未启动               |\n| `running` | 容器正在运行                     |\n| `paused`  | 容器进程被暂停（冻结）           |\n| `exited`  | 容器已停止运行                   |\n| `dead`    | 容器处于死亡状态（无法正常删除） |\n\n---", "subs": ["容器状态说明"]}, {"title": "2.2 创建容器（docker create）", "content": "`docker create` 命令用于**创建一个新容器**，但**不启动**它。这在需要预先配置容器、稍后再启动的场景中非常有用。\n\n#### 命令语法\n\n```bash\ndocker create [OPTIONS] IMAGE [COMMAND] [ARG...]\n\n# 别名\ndocker container create [OPTIONS] IMAGE [COMMAND] [ARG...]\n```\n\n#### 核心概念\n\n- `docker create` 从指定镜像创建一个可写的容器层\n- 容器创建后状态为 `created`，需使用 `docker start` 启动\n- 相当于 `docker run -d` 但不启动容器\n\n> 💡 **提示**：`docker create` 与 `docker run` 共享大部分选项，详细选项说明请参考 [第三章：docker run 命令详解](#第三章docker-run-命令详解)。\n\n#### 常用选项\n\n| 选项                  | 说明            |\n| --------------------- | --------------- |\n| `--name`            | 为容器指定名称  |\n| `-i, --interactive` | 保持 STDIN 打开 |\n| `-t, --tty`         | 分配伪终端      |\n| `-v, --volume`      | 挂载存储卷      |\n| `-p, --publish`     | 端口映射        |\n| `-e, --env`         | 设置环境变量    |\n| `--restart`         | 重启策略        |\n\n#### 实战示例\n\n**示例 1：创建并启动交互式容器**\n\n```bash\n# 创建交互式容器（带伪终端）\n$ docker create -it --name mycontainer alpine\n6d8af538ec541dd581ebc2a24153a28329acb5268abe5ef868c1f1a261221752\n\n# 启动容器并附加到终端\n$ docker start --attach -i mycontainer\n/ # echo hello world\nhello world\n```\n\n上述命令等价于：\n\n```bash\n$ docker run -it --name mycontainer2 alpine\n/ # echo hello world\nhello world\n```\n\n**示例 2：创建数据卷容器**\n\n```bash\n# 创建一个带数据卷的容器\n$ docker create -v /data --name data ubuntu\n240633dfbb98128fa77473d3d9018f6123b99c454b3251427ae190a7d951ad57\n\n# 从其他容器使用该数据卷\n$ docker run --rm --volumes-from data ubuntu ls -la /data\ntotal 8\ndrwxr-xr-x  2 root root 4096 Dec  5 04:10 .\ndrwxr-xr-x 48 root root 4096 Dec  5 04:11 ..\n```\n\n**示例 3：创建绑定挂载容器**\n\n```bash\n# 创建绑定主机目录的容器\n$ docker create -v /home/docker:/docker --name docker ubuntu\n9aa88c08f319cd1e4515c3c46b0de7cc9aa75e878357b1e96f91e2c773029f03\n\n# 从其他容器访问挂载的目录\n$ docker run --rm --volumes-from docker ubuntu ls -la /docker\n```\n\n---", "subs": ["命令语法", "核心概念", "常用选项", "实战示例"]}, {"title": "2.3 启动容器（docker start）", "content": "`docker start` 命令用于**启动一个或多个已停止的容器**。\n\n#### 命令语法\n\n```bash\ndocker start [OPTIONS] CONTAINER [CONTAINER...]\n\n# 别名\ndocker container start [OPTIONS] CONTAINER [CONTAINER...]\n```\n\n#### 命令选项\n\n| 选项                  | 说明                                  |\n| --------------------- | ------------------------------------- |\n| `-a, --attach`      | 附加到容器的 STDOUT/STDERR 并转发信号 |\n| `-i, --interactive` | 附加容器的 STDIN                      |\n| `--detach-keys`     | 覆盖分离容器的按键序列                |\n\n#### 实战示例\n\n**示例 1：启动已停止的容器**\n\n```bash\n# 启动名为 mycontainer 的容器\n$ docker start mycontainer\nmycontainer\n```\n\n**示例 2：启动并附加到容器**\n\n```bash\n# 启动容器并附加到终端（交互式）\n$ docker start -ai mycontainer\n/ # \n```\n\n**示例 3：批量启动多个容器**\n\n```bash\n# 同时启动多个容器\n$ docker start container1 container2 container3\n```\n\n---", "subs": ["命令语法", "命令选项", "实战示例"]}, {"title": "2.4 停止容器（docker stop）", "content": "`docker stop` 命令用于**优雅地停止一个或多个运行中的容器**。\n\n#### 命令语法\n\n```bash\ndocker stop [OPTIONS] CONTAINER [CONTAINER...]\n\n# 别名\ndocker container stop [OPTIONS] CONTAINER [CONTAINER...]\n```\n\n#### 停止流程\n\n1. 向容器主进程发送 **SIGTERM** 信号（或自定义信号）\n2. 等待优雅停止超时时间（默认 10 秒）\n3. 如果容器仍未退出，发送 **SIGKILL** 强制终止\n\n> 💡 **提示**：默认停止信号可通过 Dockerfile 的 `STOPSIGNAL` 指令或 `docker run --stop-signal` 选项配置。\n\n#### 命令选项\n\n| 选项              | 默认值  | 说明                         |\n| ----------------- | ------- | ---------------------------- |\n| `-s, --signal`  | SIGTERM | 发送给容器的信号             |\n| `-t, --timeout` | 10      | 等待容器停止的超时时间（秒） |\n\n#### 实战示例\n\n**示例 1：停止单个容器**\n\n```bash\n$ docker stop my_container\nmy_container\n```\n\n**示例 2：使用自定义信号停止容器**\n\n```bash\n# 使用 SIGKILL 立即终止容器\n$ docker stop -s SIGKILL my_container\n\n# 使用信号编号\n$ docker stop -s 9 my_container\n```\n\n**示例 3：设置超时时间**\n\n```bash\n# 等待 30 秒后再强制终止\n$ docker stop -t 30 my_container\n\n# 无限等待（不强制终止）\n$ docker stop -t -1 my_container\n```\n\n**示例 4：批量停止容器**\n\n```bash\n# 停止多个指定容器\n$ docker stop container1 container2 container3\n\n# 停止所有运行中的容器\n$ docker stop $(docker ps -q)\n```\n\n#### docker stop vs docker kill\n\n| 特性               | docker stop            | docker kill           |\n| ------------------ | ---------------------- | --------------------- |\n| **默认信号** | SIGTERM                | SIGKILL               |\n| **优雅停止** | ✅ 支持（有超时等待）  | ❌ 不支持（立即终止） |\n| **适用场景** | 生产环境、需要清理资源 | 容器卡死、紧急终止    |\n\n---", "subs": ["命令语法", "停止流程", "命令选项", "实战示例", "docker stop vs docker kill"]}, {"title": "2.5 重启容器（docker restart）", "content": "`docker restart` 命令用于**重启一个或多个容器**，相当于先执行 `docker stop` 再执行 `docker start`。\n\n#### 命令语法\n\n```bash\ndocker restart [OPTIONS] CONTAINER [CONTAINER...]\n\n# 别名\ndocker container restart [OPTIONS] CONTAINER [CONTAINER...]\n```\n\n#### 命令选项\n\n| 选项              | 默认值  | 说明                         |\n| ----------------- | ------- | ---------------------------- |\n| `-s, --signal`  | SIGTERM | 发送给容器的停止信号         |\n| `-t, --timeout` | 10      | 等待容器停止的超时时间（秒） |\n\n#### 实战示例\n\n**示例 1：重启单个容器**\n\n```bash\n$ docker restart my_container\nmy_container\n```\n\n**示例 2：使用自定义超时时间重启**\n\n```bash\n# 等待 20 秒后再强制重启\n$ docker restart -t 20 my_container\n```\n\n**示例 3：使用自定义信号重启**\n\n```bash\n# 使用 SIGTERM 信号优雅重启\n$ docker restart -s SIGTERM my_container\n```\n\n**示例 4：批量重启容器**\n\n```bash\n# 重启多个容器\n$ docker restart container1 container2\n\n# 重启所有运行中的容器\n$ docker restart $(docker ps -q)\n```\n\n---", "subs": ["命令语法", "命令选项", "实战示例"]}, {"title": "2.6 删除容器（docker rm）", "content": "`docker rm` 命令用于**删除一个或多个容器**。\n\n#### 命令语法\n\n```bash\ndocker rm [OPTIONS] CONTAINER [CONTAINER...]\n\n# 别名\ndocker container rm [OPTIONS] CONTAINER [CONTAINER...]\ndocker container remove [OPTIONS] CONTAINER [CONTAINER...]\n```\n\n> ⚠️ **注意**：默认情况下，只能删除已停止的容器。要删除运行中的容器，需使用 `-f` 选项。\n\n#### 命令选项\n\n| 选项              | 说明                                 |\n| ----------------- | ------------------------------------ |\n| `-f, --force`   | 强制删除运行中的容器（使用 SIGKILL） |\n| `-l, --link`    | 删除指定的链接                       |\n| `-v, --volumes` | 删除容器关联的匿名卷                 |\n\n#### 实战示例\n\n**示例 1：删除已停止的容器**\n\n```bash\n$ docker rm my_container\nmy_container\n```\n\n**示例 2：强制删除运行中的容器**\n\n```bash\n$ docker rm --force redis\nredis\n```\n\n> ⚠️ 使用 `--force` 会向容器主进程发送 SIGKILL 信号，然后删除容器。\n\n**示例 3：删除容器及其匿名卷**\n\n```bash\n$ docker rm -v redis\nredis\n```\n\n此命令会删除容器以及与其关联的匿名卷。**注意**：如果卷是具名卷，则不会被删除。\n\n```bash\n# 创建带有具名卷和匿名卷的容器\n$ docker create -v awesome:/foo -v /bar --name hello redis\nhello\n\n# 删除容器及匿名卷\n$ docker rm -v hello\n# /foo 卷（具名）保留，/bar 卷（匿名）被删除\n```\n\n**示例 4：删除链接**\n\n```bash\n# 删除容器之间的网络链接\n$ docker rm --link /webapp/redis\n/webapp/redis\n```\n\n**示例 5：批量删除容器**\n\n```bash\n# 删除所有已停止的容器（推荐使用 prune）\n$ docker rm $(docker ps --filter status=exited -q)\n\n# 使用 xargs\n$ docker ps --filter status=exited -q | xargs docker rm\n\n# 推荐：使用 docker container prune\n$ docker container prune\n```\n\n#### 最佳实践\n\n| 场景               | 推荐命令                     |\n| ------------------ | ---------------------------- |\n| 删除单个容器       | `docker rm <container>`    |\n| 强制删除运行中容器 | `docker rm -f <container>` |\n| 删除容器及匿名卷   | `docker rm -v <container>` |\n| 批量清理已停止容器 | `docker container prune`   |\n| 清理所有未使用资源 | `docker system prune`      |\n\n---", "subs": ["命令语法", "命令选项", "实战示例", "最佳实践"]}, {"title": "2.7 容器生命周期管理小结", "content": "#### 命令速查表\n\n| 命令               | 作用               | 常用选项                           |\n| ------------------ | ------------------ | ---------------------------------- |\n| `docker create`  | 创建容器（不启动） | `--name`, `-v`, `-p`, `-e` |\n| `docker start`   | 启动容器           | `-a`, `-i`                     |\n| `docker stop`    | 优雅停止容器       | `-t`, `-s`                     |\n| `docker restart` | 重启容器           | `-t`, `-s`                     |\n| `docker rm`      | 删除容器           | `-f`, `-v`                     |\n\n#### 组合使用示例\n\n```bash\n# 完整的容器生命周期\n$ docker create --name myapp -p 8080:80 nginx    # 创建\n$ docker start myapp                              # 启动\n$ docker stop myapp                               # 停止\n$ docker start myapp                              # 再次启动\n$ docker restart myapp                            # 重启\n$ docker stop myapp && docker rm myapp            # 停止并删除\n\n# 快捷方式：使用 docker run 一步完成创建和启动\n$ docker run -d --name myapp -p 8080:80 nginx\n```\n\n---", "subs": ["命令速查表", "组合使用示例"]}, {"title": "2.8 附加到容器（docker attach）", "content": "`docker attach` 命令用于**将本地终端的标准输入、输出和错误流附加到一个运行中的容器**，从而可以查看其输出或进行交互式控制。\n\n#### 命令语法\n\n```bash\ndocker attach [OPTIONS] CONTAINER\n\n# 别名\ndocker container attach [OPTIONS] CONTAINER\n```\n\n#### 核心概念\n\n- `docker attach` 将终端连接到容器的 **ENTRYPOINT/CMD** 进程\n- 可以同时从不同会话多次附加到同一容器\n- 使用 **CTRL-c** 发送 SIGINT/SIGKILL 信号（可能终止容器）\n- 使用 **CTRL-p CTRL-q** 从容器分离（需容器以 `-it` 启动）\n\n> ⚠️ **注意**：attach 命令显示的是容器主进程的输出。如果主进程没有输出，看起来像是命令卡住了。\n\n#### 命令选项\n\n| 选项              | 默认值 | 说明                     |\n| ----------------- | ------ | ------------------------ |\n| `--detach-keys` | -      | 覆盖分离容器的按键序列   |\n| `--no-stdin`    | false  | 不附加 STDIN             |\n| `--sig-proxy`   | true   | 将接收到的信号代理给进程 |\n\n#### 分离按键序列\n\n默认的分离按键序列是 `CTRL-p CTRL-q`，可以自定义为：\n\n| 格式            | 示例                                                        |\n| --------------- | ----------------------------------------------------------- |\n| 单个字母        | `a`, `X`                                                |\n| ctrl + 字母     | `ctrl-a`, `ctrl-z`                                      |\n| ctrl + 特殊字符 | `ctrl-@`, `ctrl-[`, `ctrl-\\\\`, `ctrl-_`, `ctrl-^` |\n\n#### 实战示例\n\n**示例 1：附加到运行中的容器**\n\n```bash\n# 后台启动一个运行 top 的容器\n$ docker run -d --name topdemo alpine top -b\n\n# 附加到容器\n$ docker attach topdemo\nMem: 2395856K used, 5638884K free, 2328K shrd, 61904K buff, 1524264K cached\nCPU:   0% usr   0% sys   0% nic  99% idle   0% io   0% irq   0% sirq\nLoad average: 0.15 0.06 0.01 1/567 6\n  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND\n    1     0 root     R     1700   0%   3   0% top -b\n```\n\n**示例 2：分离而不终止容器（需要 -it）**\n\n```bash\n# 使用 -dit 启动容器（支持分离）\n$ docker run -dit --name topdemo2 alpine top -b\n\n# 附加到容器\n$ docker attach topdemo2\nMem: 2405344K used, 5629396K free...\n  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND\n    1     0 root     R     1700   0%   3   0% top -b\n\n# 按 CTRL-p CTRL-q 分离\nread escape sequence\n\n# 容器仍在运行\n$ docker ps --filter name=topdemo2\nCONTAINER ID   IMAGE     COMMAND    STATUS          NAMES\nfde88b83c2c2   alpine    \"top -b\"   Up 21 seconds   topdemo2\n```\n\n**示例 3：获取容器的退出码**\n\n```bash\n# 启动容器\n$ docker run --name test -dit alpine\n\n# 附加并执行退出命令\n$ docker attach test\n/# exit 13\n\n# 检查退出码\n$ echo $?\n13\n```\n\n**示例 4：自定义分离按键**\n\n```bash\n# 使用 ctrl-a 作为分离按键\n$ docker attach --detach-keys=\"ctrl-a\" mycontainer\n```\n\n#### docker attach vs docker exec\n\n| 特性               | docker attach           | docker exec               |\n| ------------------ | ----------------------- | ------------------------- |\n| **连接目标** | 容器主进程（PID 1）     | 新建一个进程              |\n| **终止容器** | CTRL-c 可能终止容器     | CTRL-c 只终止 exec 的进程 |\n| **使用场景** | 查看主进程输出、调试    | 执行额外命令、进入 Shell  |\n| **分离容器** | CTRL-p CTRL-q（需 -it） | 直接退出                  |\n\n> 💡 **推荐**：在大多数场景下，推荐使用 `docker exec` 进入容器，更加灵活安全。\n\n---", "subs": ["命令语法", "核心概念", "命令选项", "分离按键序列", "实战示例", "docker attach vs docker exec"]}, {"title": "2.9 在容器中执行命令（docker exec）", "content": "`docker exec` 命令用于**在运行中的容器内执行新命令**，是进入容器进行调试和管理的最常用方式。\n\n#### 命令语法\n\n```bash\ndocker exec [OPTIONS] CONTAINER COMMAND [ARG...]\n\n# 别名\ndocker container exec [OPTIONS] CONTAINER COMMAND [ARG...]\n```\n\n#### 核心概念\n\n- `docker exec` 在运行中的容器内**启动一个新进程**\n- 该命令只在容器主进程（PID 1）运行时有效\n- 命令在容器的默认工作目录中执行\n- **命令必须是可执行程序**，不能是链式命令\n\n```bash\n# ✅ 正确：使用 sh -c 执行链式命令\ndocker exec -it my_container sh -c \"echo a && echo b\"\n\n# ❌ 错误：直接传入链式命令\ndocker exec -it my_container \"echo a && echo b\"\n```\n\n#### 命令选项\n\n| 选项                  | 说明                   |\n| --------------------- | ---------------------- |\n| `-d, --detach`      | 后台运行命令           |\n| `--detach-keys`     | 覆盖分离容器的按键序列 |\n| `-e, --env`         | 设置环境变量           |\n| `--env-file`        | 从文件读取环境变量     |\n| `-i, --interactive` | 保持 STDIN 打开        |\n| `--privileged`      | 以特权模式执行命令     |\n| `-t, --tty`         | 分配伪终端             |\n| `-u, --user`        | 指定执行命令的用户     |\n| `-w, --workdir`     | 指定工作目录           |\n\n#### 实战示例\n\n**示例 1：进入容器交互式 Shell**\n\n```bash\n# 进入容器的 bash shell\n$ docker exec -it mycontainer /bin/bash\n\n# 或使用 sh（适用于 Alpine 等精简镜像）\n$ docker exec -it mycontainer sh\n```\n\n**示例 2：执行单次命令**\n\n```bash\n# 查看容器内的进程\n$ docker exec mycontainer ps aux\n\n# 查看容器内的文件\n$ docker exec mycontainer ls -la /app\n```\n\n**示例 3：后台执行命令**\n\n```bash\n# 后台创建文件\n$ docker exec -d mycontainer touch /tmp/execWorks\n\n# 验证文件是否创建\n$ docker exec mycontainer ls /tmp/execWorks\n/tmp/execWorks\n```\n\n**示例 4：设置环境变量**\n\n```bash\n# 执行命令时设置环境变量\n$ docker exec -e VAR_A=1 -e VAR_B=2 mycontainer env\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nHOSTNAME=f64a4851eb71\nVAR_A=1\nVAR_B=2\nHOME=/root\n```\n\n> 💡 通过 `-e` 设置的环境变量**仅对当前 exec 进程有效**，不影响容器的其他进程。\n\n**示例 5：指定工作目录**\n\n```bash\n# 默认工作目录\n$ docker exec -it mycontainer pwd\n/\n\n# 指定工作目录\n$ docker exec -it -w /root mycontainer pwd\n/root\n```\n\n**示例 6：以特定用户执行命令**\n\n```bash\n# 以 www-data 用户执行命令\n$ docker exec -u www-data mycontainer whoami\nwww-data\n\n# 以 UID:GID 格式指定用户\n$ docker exec -u 1000:1000 mycontainer id\nuid=1000 gid=1000\n```\n\n**示例 7：在暂停的容器中执行命令（失败）**\n\n```bash\n$ docker pause mycontainer\nmycontainer\n\n$ docker exec mycontainer sh\nError response from daemon: Container mycontainer is paused, unpause the container before exec\n```\n\n> ⚠️ 无法在**已暂停**的容器中执行命令，需先 `docker unpause` 恢复容器。\n\n#### 常用场景总结\n\n| 场景           | 命令                                             |\n| -------------- | ------------------------------------------------ |\n| 进入容器 Shell | `docker exec -it <container> sh`               |\n| 查看日志文件   | `docker exec <container> cat /var/log/app.log` |\n| 安装调试工具   | `docker exec -it <container> apk add curl`     |\n| 执行数据库命令 | `docker exec -it mysql mysql -u root -p`       |\n| 检查网络连通性 | `docker exec <container> ping google.com`      |\n\n---", "subs": ["命令语法", "核心概念", "命令选项", "实战示例", "常用场景总结"]}, {"title": "2.10 查看容器日志（docker logs）", "content": "`docker logs` 命令用于**获取容器的日志输出**，包括 STDOUT 和 STDERR。\n\n#### 命令语法\n\n```bash\ndocker logs [OPTIONS] CONTAINER\n\n# 别名\ndocker container logs [OPTIONS] CONTAINER\n```\n\n#### 核心概念\n\n- `docker logs` 获取容器**执行时刻**存在的日志\n- 使用 `--follow` 可以持续流式输出新日志\n- 日志驱动不同，可用的功能也不同\n\n> 💡 关于日志驱动的配置，请参考 [第七章：Docker Daemon](#第七章docker-daemon-守护进程)。\n\n#### 命令选项\n\n| 选项                 | 默认值 | 说明                                   |\n| -------------------- | ------ | -------------------------------------- |\n| `--details`        | -      | 显示日志的额外详情（环境变量、标签等） |\n| `-f, --follow`     | -      | 持续输出日志（类似 `tail -f`）       |\n| `--since`          | -      | 显示指定时间之后的日志                 |\n| `--until`          | -      | 显示指定时间之前的日志                 |\n| `-n, --tail`       | all    | 显示最后 N 行日志                      |\n| `-t, --timestamps` | -      | 显示时间戳                             |\n\n#### 时间格式说明\n\n`--since` 和 `--until` 支持以下时间格式：\n\n| 格式        | 示例                                     |\n| ----------- | ---------------------------------------- |\n| RFC 3339    | `2023-12-01T10:00:00Z`                 |\n| UNIX 时间戳 | `1701421200`                           |\n| 相对时间    | `42m`（42 分钟前）、`3h`（3 小时前） |\n\n#### 实战示例\n\n**示例 1：查看容器全部日志**\n\n```bash\ndocker logs mycontainer\n```\n\n**示例 2：实时跟踪日志**\n\n```bash\n# 实时输出日志（类似 tail -f）\n$ docker logs -f mycontainer\n\n# 按 CTRL-c 停止跟踪\n```\n\n**示例 3：显示最后 N 行日志**\n\n```bash\n# 显示最后 100 行日志\n$ docker logs --tail 100 mycontainer\n\n# 显示最后 50 行并持续跟踪\n$ docker logs --tail 50 -f mycontainer\n```\n\n**示例 4：显示时间戳**\n\n```bash\n$ docker logs -t mycontainer\n2024-12-01T10:00:00.123456789Z Starting application...\n2024-12-01T10:00:01.234567890Z Listening on port 8080\n```\n\n**示例 5：按时间范围过滤日志**\n\n```bash\n# 显示最近 30 分钟的日志\n$ docker logs --since 30m mycontainer\n\n# 显示特定时间之后的日志\n$ docker logs --since 2024-12-01T10:00:00 mycontainer\n\n# 显示某个时间段的日志\n$ docker logs --since 2024-12-01T10:00:00 --until 2024-12-01T12:00:00 mycontainer\n```\n\n**示例 6：跟踪日志直到特定时间**\n\n```bash\n# 启动持续输出日志的容器\n$ docker run --name test -d busybox sh -c \"while true; do date; sleep 1; done\"\n\n# 实时跟踪日志，2 秒后停止\n$ docker logs -f --until=2s test\nTue 14 Nov 2017 16:40:00 CET\nTue 14 Nov 2017 16:40:01 CET\nTue 14 Nov 2017 16:40:02 CET\n```\n\n**示例 7：显示日志详情**\n\n```bash\n# 显示额外的环境变量和标签信息\n$ docker logs --details mycontainer\n```\n\n#### 日志最佳实践\n\n| 建议                     | 说明                                      |\n| ------------------------ | ----------------------------------------- |\n| 使用 `--tail` 限制行数 | 避免大量日志导致内存问题                  |\n| 配置日志轮转             | 防止日志文件无限增长                      |\n| 使用 `--since` 过滤    | 只查看需要的时间范围                      |\n| 考虑日志驱动             | 生产环境推荐使用 `json-file` + 轮转配置 |\n\n---", "subs": ["命令语法", "核心概念", "命令选项", "时间格式说明", "实战示例", "日志最佳实践"]}, {"title": "2.11 容器交互命令小结", "content": "#### 命令速查表\n\n| 命令              | 作用               | 常用选项                                |\n| ----------------- | ------------------ | --------------------------------------- |\n| `docker attach` | 附加到容器主进程   | `--detach-keys`, `--no-stdin`       |\n| `docker exec`   | 在容器中执行新命令 | `-it`, `-d`, `-e`, `-u`, `-w` |\n| `docker logs`   | 查看容器日志       | `-f`, `--tail`, `--since`, `-t` |\n\n#### 使用场景对比\n\n```mermaid\ngraph TD\n    A[需要与容器交互] --> B{目的是什么?}\n    B -->|查看主进程输出| C[docker attach]\n    B -->|执行额外命令| D[docker exec]\n    B -->|查看历史日志| E[docker logs]\n  \n    C --> C1[注意: CTRL-c 可能终止容器]\n    D --> D1[推荐: 进入容器 Shell]\n    D --> D2[推荐: 执行调试命令]\n    E --> E1[配合 -f 实时跟踪]\n```\n\n#### 快速操作示例\n\n```bash\n# 进入容器 Shell（最常用）\n$ docker exec -it mycontainer sh\n\n# 实时查看日志\n$ docker logs -f mycontainer\n\n# 查看最近 10 分钟的日志\n$ docker logs --since 10m mycontainer\n\n# 在容器中执行命令\n$ docker exec mycontainer cat /etc/hosts\n```\n\n---", "subs": ["命令速查表", "使用场景对比", "快速操作示例"]}, {"title": "2.12 列出容器（docker ps / docker container ls）", "content": "`docker ps` 命令用于**列出容器**，是最常用的容器查看命令。\n\n#### 命令语法\n\n```bash\ndocker ps [OPTIONS]\n\n# 别名\ndocker container ls [OPTIONS]\ndocker container list [OPTIONS]\ndocker container ps [OPTIONS]\n```\n\n#### 命令选项\n\n| 选项             | 默认值 | 说明                               |\n| ---------------- | ------ | ---------------------------------- |\n| `-a, --all`    | -      | 显示所有容器（默认只显示运行中的） |\n| `-f, --filter` | -      | 根据条件过滤输出                   |\n| `--format`     | -      | 使用 Go 模板格式化输出             |\n| `-n, --last`   | -1     | 显示最近创建的 N 个容器            |\n| `-l, --latest` | -      | 显示最近创建的容器                 |\n| `--no-trunc`   | -      | 不截断输出                         |\n| `-q, --quiet`  | -      | 只显示容器 ID                      |\n| `-s, --size`   | -      | 显示容器磁盘占用大小               |\n\n#### 过滤器（--filter）\n\n| 过滤器                   | 说明                                                               |\n| ------------------------ | ------------------------------------------------------------------ |\n| `id`                   | 容器 ID                                                            |\n| `name`                 | 容器名称（支持部分匹配）                                           |\n| `label`                | 标签（格式：`key` 或 `key=value`）                             |\n| `exited`               | 退出码（需配合 `--all`）                                         |\n| `status`               | 状态：created、restarting、running、removing、paused、exited、dead |\n| `ancestor`             | 基于镜像过滤（镜像名、ID、摘要）                                   |\n| `before` / `since`   | 在指定容器之前/之后创建的容器                                      |\n| `volume`               | 挂载了指定卷的容器                                                 |\n| `network`              | 连接到指定网络的容器                                               |\n| `publish` / `expose` | 发布/暴露指定端口的容器                                            |\n| `health`               | 健康状态：starting、healthy、unhealthy、none                       |\n\n#### 格式化输出占位符\n\n| 占位符          | 说明                           |\n| --------------- | ------------------------------ |\n| `.ID`         | 容器 ID                        |\n| `.Image`      | 镜像 ID                        |\n| `.Command`    | 启动命令                       |\n| `.CreatedAt`  | 创建时间                       |\n| `.RunningFor` | 运行时长                       |\n| `.Ports`      | 暴露的端口                     |\n| `.State`      | 容器状态                       |\n| `.Status`     | 状态详情（包含时长和健康状态） |\n| `.Size`       | 磁盘占用大小                   |\n| `.Names`      | 容器名称                       |\n| `.Labels`     | 所有标签                       |\n| `.Mounts`     | 挂载的卷名                     |\n| `.Networks`   | 连接的网络名                   |\n\n#### 实战示例\n\n**示例 1：查看运行中的容器**\n\n```bash\n$ docker ps\nCONTAINER ID   IMAGE     COMMAND   CREATED         STATUS         PORTS     NAMES\n9c3527ed70ce   busybox   \"top\"     14 seconds ago  Up 15 seconds            web\n```\n\n**示例 2：查看所有容器（包括已停止的）**\n\n```bash\n$ docker ps -a\nCONTAINER ID   IMAGE     COMMAND   CREATED         STATUS                     PORTS     NAMES\n9c3527ed70ce   busybox   \"top\"     14 seconds ago  Up 15 seconds                        web\n4aace5031105   busybox   \"top\"     48 seconds ago  Exited (0) 30 seconds ago            app\n```\n\n**示例 3：只显示容器 ID**\n\n```bash\n# 常用于批量操作\n$ docker ps -q\n9c3527ed70ce\n4aace5031105\n```\n\n**示例 4：显示磁盘占用**\n\n```bash\n$ docker ps --size\nCONTAINER ID   IMAGE   COMMAND   CREATED      STATUS      PORTS   NAMES      SIZE\ne90b8831a4b8   nginx   \"/bin…\"   11 weeks ago Up 4 hours          my_nginx   35.58 kB (virtual 109.2 MB)\n```\n\n- **size**：容器可写层的大小\n- **virtual size**：只读镜像 + 可写层的总大小\n\n**示例 5：按状态过滤**\n\n```bash\n# 只显示运行中的容器\n$ docker ps --filter status=running\n\n# 只显示已停止的容器\n$ docker ps -a --filter status=exited\n\n# 显示暂停的容器\n$ docker ps --filter status=paused\n```\n\n**示例 6：按名称过滤（支持模糊匹配）**\n\n```bash\ndocker ps --filter \"name=web\"\ndocker ps --filter \"name=nostalgic\"\n```\n\n**示例 7：按退出码过滤**\n\n```bash\n# 正常退出的容器（退出码 0）\n$ docker ps -a --filter 'exited=0'\n\n# 被 SIGKILL 终止的容器（退出码 137）\n$ docker ps -a --filter 'exited=137'\n```\n\n**示例 8：按镜像过滤**\n\n```bash\n# 基于 ubuntu 镜像的容器\n$ docker ps --filter ancestor=ubuntu\n\n# 基于特定版本的镜像\n$ docker ps --filter ancestor=ubuntu:24.04\n```\n\n**示例 9：按网络过滤**\n\n```bash\ndocker ps --filter network=my_network\n```\n\n**示例 10：自定义输出格式**\n\n```bash\n# 只显示 ID 和命令\n$ docker ps --format \"{{.ID}}: {{.Command}}\"\na87ecb4f327c: /bin/sh -c #(nop) MA\n\n# 表格形式显示指定列\n$ docker ps --format \"table {{.ID}}\\t{{.Names}}\\t{{.Status}}\"\nCONTAINER ID   NAMES      STATUS\na87ecb4f327c   web        Up 2 hours\n\n# JSON 格式输出\n$ docker ps --format json\n```\n\n---", "subs": ["命令语法", "命令选项", "过滤器（--filter）", "格式化输出占位符", "实战示例"]}, {"title": "2.13 查看容器详情（docker inspect）", "content": "`docker inspect` 命令用于**显示容器的详细信息**，返回 JSON 格式的元数据。\n\n#### 命令语法\n\n```bash\ndocker inspect [OPTIONS] CONTAINER [CONTAINER...]\n\n# 容器专用命令\ndocker container inspect [OPTIONS] CONTAINER [CONTAINER...]\n```\n\n> 💡 `docker inspect` 可以检查容器、镜像、网络、卷等多种对象，`docker container inspect` 专门用于容器。\n\n#### 命令选项\n\n| 选项             | 说明                   |\n| ---------------- | ---------------------- |\n| `-f, --format` | 使用 Go 模板格式化输出 |\n| `-s, --size`   | 显示容器文件系统大小   |\n\n#### 实战示例\n\n**示例 1：查看容器完整信息**\n\n```bash\n$ docker inspect mycontainer\n[\n    {\n        \"Id\": \"d2cc496561d6d520cbc0236b4ba88c362c446a7619992123f11c809cded25b47\",\n        \"Created\": \"2024-12-01T10:00:00.123456789Z\",\n        \"Path\": \"/bin/sh\",\n        \"Args\": [],\n        \"State\": {\n            \"Status\": \"running\",\n            \"Running\": true,\n            \"Paused\": false,\n            ...\n        },\n        ...\n    }\n]\n```\n\n**示例 2：获取容器 IP 地址**\n\n```bash\n$ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' mycontainer\n172.17.0.2\n```\n\n**示例 3：获取容器状态**\n\n```bash\n$ docker inspect -f '{{.State.Status}}' mycontainer\nrunning\n```\n\n**示例 4：获取容器启动命令**\n\n```bash\n$ docker inspect -f '{{.Config.Cmd}}' mycontainer\n[/bin/sh -c nginx -g 'daemon off;']\n```\n\n**示例 5：获取环境变量**\n\n```bash\n$ docker inspect -f '{{.Config.Env}}' mycontainer\n[PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin NGINX_VERSION=1.25.0]\n```\n\n**示例 6：获取挂载的卷信息**\n\n```bash\ndocker inspect -f '{{json .Mounts}}' mycontainer | jq\n```\n\n**示例 7：获取端口映射**\n\n```bash\n$ docker inspect -f '{{json .NetworkSettings.Ports}}' mycontainer\n{\"80/tcp\":[{\"HostIp\":\"0.0.0.0\",\"HostPort\":\"8080\"}]}\n```\n\n**示例 8：获取容器进程 PID**\n\n```bash\n$ docker inspect -f '{{.State.Pid}}' mycontainer\n12345\n```\n\n#### 常用 inspect 格式化查询\n\n| 信息     | 查询命令                                                                                      |\n| -------- | --------------------------------------------------------------------------------------------- |\n| IP 地址  | `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <container>`  |\n| MAC 地址 | `docker inspect -f '{{range .NetworkSettings.Networks}}{{.MacAddress}}{{end}}' <container>` |\n| 容器状态 | `docker inspect -f '{{.State.Status}}' <container>`                                         |\n| 重启次数 | `docker inspect -f '{{.RestartCount}}' <container>`                                         |\n| 启动时间 | `docker inspect -f '{{.State.StartedAt}}' <container>`                                      |\n| 日志路径 | `docker inspect -f '{{.LogPath}}' <container>`                                              |\n\n---", "subs": ["命令语法", "命令选项", "实战示例", "常用 inspect 格式化查询"]}, {"title": "2.14 查看容器资源使用（docker stats）", "content": "`docker stats` 命令用于**实时显示容器的资源使用统计**，包括 CPU、内存、网络和磁盘 IO。\n\n#### 命令语法\n\n```bash\ndocker stats [OPTIONS] [CONTAINER...]\n\n# 别名\ndocker container stats [OPTIONS] [CONTAINER...]\n```\n\n#### 命令选项\n\n| 选项            | 说明                         |\n| --------------- | ---------------------------- |\n| `-a, --all`   | 显示所有容器（包括已停止的） |\n| `--format`    | 使用 Go 模板格式化输出       |\n| `--no-stream` | 只获取一次结果，不持续刷新   |\n| `--no-trunc`  | 不截断输出                   |\n\n#### 输出列说明\n\n| 列名                  | 说明                  |\n| --------------------- | --------------------- |\n| `CONTAINER ID`      | 容器 ID               |\n| `NAME`              | 容器名称              |\n| `CPU %`             | CPU 使用百分比        |\n| `MEM USAGE / LIMIT` | 内存使用量 / 内存限制 |\n| `MEM %`             | 内存使用百分比        |\n| `NET I/O`           | 网络 I/O（接收/发送） |\n| `BLOCK I/O`         | 块设备 I/O（读/写）   |\n| `PIDS`              | 进程/线程数           |\n\n#### 格式化输出占位符\n\n| 占位符         | 说明                         |\n| -------------- | ---------------------------- |\n| `.Container` | 容器名称或 ID                |\n| `.Name`      | 容器名称                     |\n| `.ID`        | 容器 ID                      |\n| `.CPUPerc`   | CPU 百分比                   |\n| `.MemUsage`  | 内存使用量                   |\n| `.MemPerc`   | 内存百分比（Windows 不可用） |\n| `.NetIO`     | 网络 I/O                     |\n| `.BlockIO`   | 块设备 I/O                   |\n| `.PIDs`      | 进程数（Windows 不可用）     |\n\n#### 实战示例\n\n**示例 1：实时查看所有运行容器的资源使用**\n\n```bash\n$ docker stats\nCONTAINER ID   NAME               CPU %   MEM USAGE / LIMIT     MEM %   NET I/O       BLOCK I/O     PIDS\nb95a83497c91   awesome_brattain   0.28%   5.629MiB / 1.952GiB   0.28%   916B / 0B     147kB / 0B    9\n67b2525d8ad1   foobar             0.00%   1.727MiB / 1.952GiB   0.09%   2.48kB / 0B   4.11MB / 0B   2\n```\n\n**示例 2：查看指定容器的统计**\n\n```bash\ndocker stats nginx redis mysql\n```\n\n**示例 3：获取单次快照（不持续刷新）**\n\n```bash\ndocker stats --no-stream\n```\n\n**示例 4：自定义输出格式**\n\n```bash\n# 只显示关键指标\n$ docker stats --format \"table {{.Container}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\"\nCONTAINER           CPU %     MEM USAGE / LIMIT\nfervent_panini      0.00%     56KiB / 15.57GiB\n5acfcb1b4fd1        0.07%     32.86MiB / 15.57GiB\n```\n\n**示例 5：JSON 格式输出**\n\n```bash\n$ docker stats nginx --no-stream --format \"{{ json . }}\"\n{\"BlockIO\":\"0B / 13.3kB\",\"CPUPerc\":\"0.03%\",\"Container\":\"nginx\",\"ID\":\"ed37317fbf42\",\"MemPerc\":\"0.24%\",\"MemUsage\":\"2.352MiB / 982.5MiB\",\"Name\":\"nginx\",\"NetIO\":\"539kB / 606kB\",\"PIDs\":\"2\"}\n```\n\n**示例 6：包含已停止的容器**\n\n```bash\n$ docker stats --all --no-stream\n# 已停止的容器显示 0B / 0B\n```\n\n---", "subs": ["命令语法", "命令选项", "输出列说明", "格式化输出占位符", "实战示例"]}, {"title": "2.15 查看容器文件系统变更（docker diff）", "content": "`docker diff` 命令用于**显示容器文件系统自创建以来的变更**，可以查看哪些文件被添加、修改或删除。\n\n#### 命令语法\n\n```bash\ndocker diff CONTAINER\n\n# 别名\ndocker container diff CONTAINER\n```\n\n#### 变更类型标识\n\n| 符号  | 说明                              |\n| ----- | --------------------------------- |\n| `A` | 添加（Added）- 文件或目录被添加   |\n| `D` | 删除（Deleted）- 文件或目录被删除 |\n| `C` | 修改（Changed）- 文件或目录被修改 |\n\n#### 实战示例\n\n**示例 1：查看 nginx 容器的文件变更**\n\n```bash\n$ docker diff nginx_container\nC /dev\nC /dev/console\nC /dev/core\nC /dev/stdout\nC /run\nA /run/nginx.pid\nC /var/lib/nginx/tmp\nA /var/lib/nginx/tmp/client_body\nA /var/lib/nginx/tmp/fastcgi\nA /var/lib/nginx/tmp/proxy\nC /var/log/nginx\nA /var/log/nginx/access.log\nA /var/log/nginx/error.log\n```\n\n**示例 2：结合 commit 使用**\n\n```bash\n# 查看容器的修改\n$ docker diff mycontainer\n\n# 如果修改满意，可以提交为新镜像\n$ docker commit mycontainer myimage:v2\n```\n\n#### 使用场景\n\n| 场景                   | 说明                         |\n| ---------------------- | ---------------------------- |\n| **调试问题**     | 查看容器运行后哪些文件被修改 |\n| **安全审计**     | 检查容器是否有异常文件变更   |\n| **创建新镜像**   | 在 commit 前确认变更内容     |\n| **排查存储问题** | 了解容器写入了哪些文件       |\n\n---", "subs": ["命令语法", "变更类型标识", "实战示例", "使用场景"]}, {"title": "2.16 容器状态信息查看小结", "content": "#### 命令速查表\n\n| 命令               | 作用         | 常用选项                             |\n| ------------------ | ------------ | ------------------------------------ |\n| `docker ps`      | 列出容器     | `-a`, `-q`, `-f`, `--format` |\n| `docker inspect` | 查看容器详情 | `-f`                               |\n| `docker stats`   | 查看资源使用 | `--no-stream`, `--format`        |\n| `docker diff`    | 查看文件变更 | -                                    |\n\n#### 运维场景速查\n\n```bash\n# 查看所有容器 ID\n$ docker ps -aq\n\n# 查看运行中容器的 IP 地址\n$ docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <container>\n\n# 实时监控容器资源\n$ docker stats\n\n# 一次性获取统计快照\n$ docker stats --no-stream --format \"table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\"\n\n# 查看容器文件变更\n$ docker diff <container>\n\n# 按状态过滤容器\n$ docker ps -a --filter status=exited\n```\n\n---", "subs": ["命令速查表", "运维场景速查"]}, {"title": "2.17 动态更新容器配置（docker update）", "content": "`docker update` 命令用于**动态更新运行中或已停止容器的资源限制配置**，无需重建容器。\n\n#### 命令语法\n\n```bash\ndocker update [OPTIONS] CONTAINER [CONTAINER...]\n\n# 别名\ndocker container update [OPTIONS] CONTAINER [CONTAINER...]\n```\n\n> ⚠️ **注意**：`docker update` 不支持 Windows 容器。\n\n#### 命令选项\n\n| 选项                     | 说明                              |\n| ------------------------ | --------------------------------- |\n| `--blkio-weight`       | 块 IO 权重（10-1000，0 表示禁用） |\n| `--cpu-period`         | CPU CFS 调度周期                  |\n| `--cpu-quota`          | CPU CFS 调度配额                  |\n| `--cpu-rt-period`      | CPU 实时调度周期（微秒）          |\n| `--cpu-rt-runtime`     | CPU 实时调度运行时间（微秒）      |\n| `-c, --cpu-shares`     | CPU 份额（相对权重）              |\n| `--cpus`               | CPU 核心数                        |\n| `--cpuset-cpus`        | 允许使用的 CPU（如 0-3, 0,1）     |\n| `--cpuset-mems`        | 允许使用的内存节点                |\n| `-m, --memory`         | 内存限制                          |\n| `--memory-reservation` | 内存软限制                        |\n| `--memory-swap`        | 内存+Swap 总限制（-1 表示无限）   |\n| `--pids-limit`         | 进程数限制（-1 表示无限）         |\n| `--restart`            | 重启策略                          |\n\n#### 实战示例\n\n**示例 1：更新容器 CPU 份额**\n\n```bash\n# 将容器的 CPU 份额限制为 512\n$ docker update --cpu-shares 512 mycontainer\nmycontainer\n```\n\n**示例 2：同时更新多个容器的 CPU 和内存**\n\n```bash\n# 同时更新多个容器\n$ docker update --cpu-shares 512 -m 300M container1 container2\ncontainer1\ncontainer2\n```\n\n**示例 3：更新容器重启策略**\n\n```bash\n# 设置容器失败时自动重启（最多 3 次）\n$ docker update --restart=on-failure:3 mycontainer\n\n# 设置容器总是自动重启\n$ docker update --restart=always mycontainer\n\n# 禁用自动重启\n$ docker update --restart=no mycontainer\n```\n\n> ⚠️ 如果容器启动时使用了 `--rm` 标志，则无法更新其重启策略，因为 `AutoRemove` 和 `RestartPolicy` 互斥。\n\n**示例 4：限制容器 CPU 核心数**\n\n```bash\n# 限制容器最多使用 2 个 CPU 核心\n$ docker update --cpus 2 mycontainer\n\n# 限制容器只能在 CPU 0 和 1 上运行\n$ docker update --cpuset-cpus 0,1 mycontainer\n```\n\n**示例 5：更新内存限制**\n\n```bash\n# 设置内存硬限制为 512MB\n$ docker update -m 512M mycontainer\n\n# 设置内存软限制为 256MB\n$ docker update --memory-reservation 256M mycontainer\n```\n\n#### 使用场景\n\n| 场景          | 命令示例                                        |\n| ------------- | ----------------------------------------------- |\n| 限制资源使用  | `docker update --cpus 1 -m 256m <container>`  |\n| 更新重启策略  | `docker update --restart=always <container>`  |\n| 绑定 CPU 核心 | `docker update --cpuset-cpus 0,1 <container>` |\n| 限制进程数    | `docker update --pids-limit 100 <container>`  |\n\n---", "subs": ["命令语法", "命令选项", "实战示例", "使用场景"]}, {"title": "2.18 暂停容器（docker pause）", "content": "`docker pause` 命令用于**暂停（冻结）容器内的所有进程**。\n\n#### 命令语法\n\n```bash\ndocker pause CONTAINER [CONTAINER...]\n\n# 别名\ndocker container pause CONTAINER [CONTAINER...]\n```\n\n#### 核心概念\n\n- 在 Linux 上，使用 **freezer cgroup** 技术暂停进程\n- 与传统的 SIGSTOP 信号不同，容器内的进程**无法感知**自己被暂停\n- 暂停期间，进程完全停止执行，不消耗 CPU，但**内存仍被占用**\n- 在 Windows 上，只有 Hyper-V 容器可以被暂停\n\n#### 实战示例\n\n**示例 1：暂停单个容器**\n\n```bash\n$ docker pause mycontainer\nmycontainer\n```\n\n**示例 2：暂停多个容器**\n\n```bash\n$ docker pause container1 container2 container3\ncontainer1\ncontainer2\ncontainer3\n```\n\n**示例 3：查看已暂停的容器**\n\n```bash\n$ docker ps --filter status=paused\nCONTAINER ID   IMAGE     COMMAND   CREATED         STATUS                  PORTS   NAMES\n673394ef1d4c   busybox   \"top\"     1 hour ago      Up 1 hour (Paused)              mycontainer\n```\n\n#### pause vs stop 对比\n\n| 特性               | docker pause    | docker stop          |\n| ------------------ | --------------- | -------------------- |\n| **技术实现** | freezer cgroup  | SIGTERM/SIGKILL 信号 |\n| **进程感知** | 不感知          | 收到信号             |\n| **内存占用** | 保持            | 释放                 |\n| **恢复速度** | 瞬间（unpause） | 需重启（start）      |\n| **适用场景** | 临时冻结、调试  | 长期停止、维护       |\n\n---", "subs": ["命令语法", "核心概念", "实战示例", "pause vs stop 对比"]}, {"title": "2.19 恢复暂停的容器（docker unpause）", "content": "`docker unpause` 命令用于**恢复暂停状态的容器**，使其继续运行。\n\n#### 命令语法\n\n```bash\ndocker unpause CONTAINER [CONTAINER...]\n\n# 别名\ndocker container unpause CONTAINER [CONTAINER...]\n```\n\n#### 实战示例\n\n**示例 1：恢复单个容器**\n\n```bash\n$ docker unpause mycontainer\nmycontainer\n```\n\n**示例 2：恢复多个容器**\n\n```bash\n$ docker unpause container1 container2 container3\ncontainer1\ncontainer2\ncontainer3\n```\n\n**示例 3：暂停/恢复容器的完整流程**\n\n```bash\n# 启动容器\n$ docker run -d --name myapp nginx\n\n# 暂停容器\n$ docker pause myapp\nmyapp\n\n# 查看状态\n$ docker ps --filter name=myapp\nCONTAINER ID   IMAGE   COMMAND                  STATUS                  NAMES\nabc123def456   nginx   \"/docker-entrypoint.…\"   Up 5 minutes (Paused)   myapp\n\n# 恢复容器\n$ docker unpause myapp\nmyapp\n\n# 再次查看状态\n$ docker ps --filter name=myapp\nCONTAINER ID   IMAGE   COMMAND                  STATUS         NAMES\nabc123def456   nginx   \"/docker-entrypoint.…\"   Up 5 minutes   myapp\n```\n\n---", "subs": ["命令语法", "实战示例"]}, {"title": "2.20 容器资源管理小结", "content": "#### 命令速查表\n\n| 命令               | 作用             | 常用选项                          |\n| ------------------ | ---------------- | --------------------------------- |\n| `docker update`  | 动态更新容器配置 | `--cpus`, `-m`, `--restart` |\n| `docker pause`   | 暂停容器         | -                                 |\n| `docker unpause` | 恢复暂停的容器   | -                                 |\n\n#### 资源管理最佳实践\n\n```mermaid\ngraph TD\n    A[容器资源管理] --> B{需求类型}\n    B -->|限制资源| C[docker update]\n    B -->|临时冻结| D[docker pause]\n    B -->|恢复运行| E[docker unpause]\n  \n    C --> C1[--cpus 限制CPU]\n    C --> C2[-m 限制内存]\n    C --> C3[--restart 重启策略]\n  \n    D --> D1[调试场景]\n    D --> D2[资源争用时冻结]\n  \n    E --> E1[瞬间恢复]\n```\n\n#### 运维场景示例\n\n```bash\n# 限制容器资源使用\n$ docker update --cpus 2 -m 1g --restart=always myapp\n\n# 临时冻结容器（不释放内存）\n$ docker pause myapp\n\n# 恢复容器运行\n$ docker unpause myapp\n\n# 批量更新重启策略\n$ docker update --restart=always $(docker ps -q)\n```\n\n---", "subs": ["命令速查表", "资源管理最佳实践", "运维场景示例"]}, {"title": "2.21 导出容器文件系统（docker export）", "content": "`docker export` 命令用于**将容器的文件系统导出为 tar 归档文件**。\n\n#### 命令语法\n\n```bash\ndocker export [OPTIONS] CONTAINER\n\n# 别名\ndocker container export [OPTIONS] CONTAINER\n```\n\n#### 命令选项\n\n| 选项             | 说明                            |\n| ---------------- | ------------------------------- |\n| `-o, --output` | 输出到文件（默认输出到 STDOUT） |\n\n#### 核心概念\n\n- 导出的是容器的**完整文件系统**\n- **不包含**卷（volumes）中的数据\n- 如果卷挂载覆盖了目录，导出的是底层目录内容，不是卷内容\n- 可以导出运行中或已停止的容器\n\n> ⚠️ **export vs save**：`docker export` 导出容器文件系统，`docker save` 导出镜像（包含层信息）。\n\n#### 实战示例\n\n**示例 1：导出容器到 tar 文件**\n\n```bash\n# 使用重定向\n$ docker export mycontainer > container.tar\n\n# 使用 -o 选项\n$ docker export -o container.tar mycontainer\n```\n\n**示例 2：导出并压缩**\n\n```bash\ndocker export mycontainer | gzip > container.tar.gz\n```\n\n**示例 3：导出后导入为新镜像**\n\n```bash\n# 导出容器\n$ docker export mycontainer > container.tar\n\n# 导入为新镜像\n$ cat container.tar | docker import - myimage:latest\n```\n\n#### export vs save 对比\n\n| 特性               | docker export     | docker save             |\n| ------------------ | ----------------- | ----------------------- |\n| **操作对象** | 容器              | 镜像                    |\n| **输出内容** | 扁平化文件系统    | 分层镜像（含 metadata） |\n| **包含历史** | 不包含            | 包含所有层              |\n| **导入命令** | `docker import` | `docker load`         |\n| **适用场景** | 迁移容器状态      | 分发/备份镜像           |\n\n---", "subs": ["命令语法", "命令选项", "核心概念", "实战示例", "export vs save 对比"]}, {"title": "2.22 将容器提交为镜像（docker commit）", "content": "`docker commit` 命令用于**将容器的当前状态保存为新镜像**。\n\n#### 命令语法\n\n```bash\ndocker commit [OPTIONS] CONTAINER [REPOSITORY[:TAG]]\n\n# 别名\ndocker container commit [OPTIONS] CONTAINER [REPOSITORY[:TAG]]\n```\n\n#### 命令选项\n\n| 选项              | 默认值 | 说明                         |\n| ----------------- | ------ | ---------------------------- |\n| `-a, --author`  | -      | 镜像作者信息                 |\n| `-c, --change`  | -      | 应用 Dockerfile 指令到新镜像 |\n| `-m, --message` | -      | 提交信息                     |\n| `-p, --pause`   | true   | 提交时暂停容器               |\n\n#### --change 支持的 Dockerfile 指令\n\n- `CMD` - 默认执行命令\n- `ENTRYPOINT` - 入口点\n- `ENV` - 环境变量\n- `EXPOSE` - 暴露端口\n- `LABEL` - 标签\n- `ONBUILD` - 构建触发器\n- `USER` - 执行用户\n- `VOLUME` - 数据卷\n- `WORKDIR` - 工作目录\n\n#### 实战示例\n\n**示例 1：基本提交**\n\n```bash\n$ docker ps\nCONTAINER ID   IMAGE          COMMAND      CREATED      STATUS      NAMES\nc3f279d17e0a   ubuntu:24.04   /bin/bash    7 days ago   Up 25 hrs   mycontainer\n\n$ docker commit c3f279d17e0a myimage:v1\nsha256:f5283438590d...\n```\n\n**示例 2：添加作者和提交信息**\n\n```bash\ndocker commit -a \"John Doe <john@example.com>\" -m \"Added nginx\" mycontainer nginx-custom:v1\n```\n\n**示例 3：提交时修改环境变量**\n\n```bash\ndocker commit --change \"ENV DEBUG=true\" mycontainer myimage:debug\n```\n\n**示例 4：提交时修改 CMD 和 EXPOSE**\n\n```bash\n$ docker commit \\\n  --change='CMD [\"nginx\", \"-g\", \"daemon off;\"]' \\\n  --change=\"EXPOSE 80\" \\\n  mycontainer nginx-custom:v2\n```\n\n**示例 5：不暂停容器进行提交**\n\n```bash\n# 对于需要持续运行的容器\n$ docker commit --pause=false mycontainer myimage:latest\n```\n\n#### 最佳实践\n\n| 建议             | 说明                                 |\n| ---------------- | ------------------------------------ |\n| 使用 Dockerfile  | 优先使用 Dockerfile 构建可重复的镜像 |\n| 添加提交信息     | 使用 `-m` 记录变更内容             |\n| 指定作者         | 使用 `-a` 便于追踪来源             |\n| 使用有意义的 tag | 避免使用 `latest`                  |\n\n> 💡 `docker commit` 适用于调试和快速创建镜像，生产环境推荐使用 Dockerfile。\n\n---", "subs": ["命令语法", "命令选项", "--change 支持的 Dockerfile 指令", "实战示例", "最佳实践"]}, {"title": "2.23 容器与主机间复制文件（docker cp）", "content": "`docker cp` 命令用于**在容器和本地文件系统之间复制文件或目录**。\n\n#### 命令语法\n\n```bash\n# 从本地复制到容器\ndocker cp [OPTIONS] SRC_PATH CONTAINER:DEST_PATH\n\n# 从容器复制到本地\ndocker cp [OPTIONS] CONTAINER:SRC_PATH DEST_PATH\n\n# 别名\ndocker container cp ...\n```\n\n#### 命令选项\n\n| 选项                  | 说明                              |\n| --------------------- | --------------------------------- |\n| `-a, --archive`     | 归档模式（保留所有 UID/GID 信息） |\n| `-L, --follow-link` | 跟随源路径中的符号链接            |\n| `-q, --quiet`       | 静默模式，不显示进度              |\n\n#### 路径规则\n\n**源路径是文件时：**\n\n| 目标路径              | 行为                 |\n| --------------------- | -------------------- |\n| 不存在                | 创建文件             |\n| 不存在且以 `/` 结尾 | 报错（目录必须存在） |\n| 已存在是文件          | 覆盖                 |\n| 已存在是目录          | 复制到目录中         |\n\n**源路径是目录时：**\n\n| 目标路径             | 行为               |\n| -------------------- | ------------------ |\n| 不存在               | 创建目录并复制内容 |\n| 已存在是文件         | 报错               |\n| 已存在是目录         | 复制整个目录到其中 |\n| 源路径以 `/.` 结尾 | 只复制目录内容     |\n\n#### 实战示例\n\n**示例 1：从本地复制文件到容器**\n\n```bash\ndocker cp ./config.yaml mycontainer:/app/config.yaml\n```\n\n**示例 2：从本地复制目录到容器**\n\n```bash\ndocker cp ./app/ mycontainer:/opt/app\n```\n\n**示例 3：从容器复制文件到本地**\n\n```bash\ndocker cp mycontainer:/app/logs/app.log ./app.log\n```\n\n**示例 4：从容器复制目录到本地**\n\n```bash\ndocker cp mycontainer:/var/log/ ./container_logs/\n```\n\n**示例 5：只复制目录内容（使用 /.）**\n\n```bash\n# 复制目录内容而非目录本身\n$ docker cp ./config/. mycontainer:/app/config/\n```\n\n**示例 6：通过管道传输（使用 tar）**\n\n```bash\n# 从容器导出并过滤\n$ docker cp mycontainer:/var/logs/app.log - | tar x -O | grep \"ERROR\"\n\n# 复制系统文件（cp 不支持的路径）\n$ docker exec mycontainer tar Ccf /proc - cpuinfo | tar Cxf ./ -\n```\n\n**示例 7：保留文件权限**\n\n```bash\ndocker cp -a ./scripts/ mycontainer:/usr/local/bin/\n```\n\n#### 使用场景\n\n| 场景         | 命令示例                                                |\n| ------------ | ------------------------------------------------------- |\n| 提取日志文件 | `docker cp container:/var/log/app.log ./`             |\n| 部署配置文件 | `docker cp ./nginx.conf container:/etc/nginx/`        |\n| 备份数据     | `docker cp container:/data ./backup/`                 |\n| 注入脚本     | `docker cp ./init.sh container:/docker-entrypoint.d/` |\n\n> ⚠️ `docker cp` 不能复制 `/proc`、`/sys`、`/dev` 等系统目录，需使用 `docker exec` + `tar` 组合。\n\n---", "subs": ["命令语法", "命令选项", "路径规则", "实战示例", "使用场景"]}, {"title": "2.24 容器导入导出小结", "content": "#### 命令速查表\n\n| 命令              | 作用                 | 常用选项               |\n| ----------------- | -------------------- | ---------------------- |\n| `docker export` | 导出容器文件系统     | `-o`                 |\n| `docker commit` | 将容器提交为镜像     | `-m`, `-a`, `-c` |\n| `docker cp`     | 容器与主机间复制文件 | `-a`, `-L`         |\n\n#### 数据迁移流程\n\n```mermaid\ngraph LR\n    A[容器] -->|docker export| B[tar 文件]\n    B -->|docker import| C[新镜像]\n  \n    A -->|docker commit| D[镜像]\n    D -->|docker save| E[tar 文件]\n    E -->|docker load| F[镜像]\n  \n    A <-->|docker cp| G[本地文件]\n```\n\n#### 运维场景示例\n\n```bash\n# 导出容器为 tar 文件\n$ docker export mycontainer > container.tar\n\n# 将容器提交为镜像\n$ docker commit -m \"added nginx config\" mycontainer nginx-custom:v1\n\n# 从容器提取日志\n$ docker cp mycontainer:/var/log/nginx/ ./nginx_logs/\n\n# 部署配置到容器\n$ docker cp ./nginx.conf mycontainer:/etc/nginx/nginx.conf\n\n# 导入 tar 为新镜像\n$ cat container.tar | docker import - restored:latest\n```\n\n---", "subs": ["命令速查表", "数据迁移流程", "运维场景示例"]}, {"title": "2.25 批量清理已停止容器（docker container prune）", "content": "`docker container prune` 命令用于**删除所有已停止的容器**，是清理环境的常用命令。\n\n#### 命令语法\n\n```bash\ndocker container prune [OPTIONS]\n```\n\n> 💡 没有 `docker prune` 别名，必须使用完整命令 `docker container prune`。\n\n#### 命令选项\n\n| 选项            | 说明                                                  |\n| --------------- | ----------------------------------------------------- |\n| `--filter`    | 过滤条件（如 `until=<timestamp>`、`label=<key>`） |\n| `-f, --force` | 不提示确认直接删除                                    |\n\n#### 过滤器说明\n\n| 过滤器                  | 说明                         |\n| ----------------------- | ---------------------------- |\n| `until=<timestamp>`   | 只删除指定时间之前创建的容器 |\n| `label=<key>`         | 只删除带有指定标签的容器     |\n| `label=<key>=<value>` | 只删除标签值匹配的容器       |\n| `label!=<key>`        | 只删除不带指定标签的容器     |\n\n#### 时间格式\n\n- **RFC3339**：`2024-12-01T10:00:00Z`\n- **UNIX 时间戳**：`1701421200`\n- **相对时间**：`10m`（10分钟前）、`1h`（1小时前）、`24h`（24小时前）\n\n#### 实战示例\n\n**示例 1：删除所有已停止的容器**\n\n```bash\n$ docker container prune\nWARNING! This will remove all stopped containers.\nAre you sure you want to continue? [y/N] y\nDeleted Containers:\n4a7f7eebae0f63178aff7eb0aa39cd3f0627a203ab2df258c1a00b456cf20063\nf98f9c2aa1eaf727e4ec9c0283bc7d4aa4762fbdba7f26191f26c97f64090360\n\nTotal reclaimed space: 212 B\n```\n\n**示例 2：强制删除不提示确认**\n\n```bash\ndocker container prune -f\n```\n\n**示例 3：删除超过 5 分钟前创建的容器**\n\n```bash\ndocker container prune --force --filter \"until=5m\"\n```\n\n**示例 4：删除指定时间之前创建的容器**\n\n```bash\ndocker container prune -f --filter \"until=2024-12-01T10:00:00\"\n```\n\n**示例 5：删除超过 24 小时的容器**\n\n```bash\ndocker container prune -f --filter \"until=24h\"\n```\n\n**示例 6：按标签过滤删除**\n\n```bash\n# 删除带有 env=test 标签的已停止容器\n$ docker container prune -f --filter \"label=env=test\"\n\n# 删除不带 keep 标签的已停止容器\n$ docker container prune -f --filter \"label!=keep\"\n```\n\n#### 相关清理命令\n\n| 命令                       | 作用                             |\n| -------------------------- | -------------------------------- |\n| `docker container prune` | 清理所有已停止容器               |\n| `docker image prune`     | 清理悬空镜像                     |\n| `docker volume prune`    | 清理未使用的卷                   |\n| `docker network prune`   | 清理未使用的网络                 |\n| `docker system prune`    | **一键清理**所有未使用资源 |\n\n---", "subs": ["命令语法", "命令选项", "过滤器说明", "时间格式", "实战示例", "相关清理命令"]}, {"title": "2.26 强制终止容器（docker kill）", "content": "`docker kill` 命令用于**强制终止一个或多个运行中的容器**，默认发送 SIGKILL 信号。\n\n#### 命令语法\n\n```bash\ndocker kill [OPTIONS] CONTAINER [CONTAINER...]\n\n# 别名\ndocker container kill [OPTIONS] CONTAINER [CONTAINER...]\n```\n\n#### 命令选项\n\n| 选项             | 说明                             |\n| ---------------- | -------------------------------- |\n| `-s, --signal` | 发送给容器的信号（默认 SIGKILL） |\n\n#### 核心概念\n\n- 默认发送 **SIGKILL** 信号，立即终止容器\n- 可以发送其他信号（如 SIGHUP、SIGINT）\n- 信号名称的 `SIG` 前缀可选\n\n> ⚠️ **注意**：如果容器的 ENTRYPOINT 或 CMD 使用 shell 形式（如 `/bin/sh -c`），信号**不会传递到子进程**，因为主进程不是 PID 1。\n\n#### 常用信号\n\n| 信号    | 编号 | 说明                   |\n| ------- | ---- | ---------------------- |\n| SIGKILL | 9    | 立即终止（不可捕获）   |\n| SIGTERM | 15   | 请求终止（可捕获）     |\n| SIGINT  | 2    | 中断（Ctrl+C）         |\n| SIGHUP  | 1    | 挂起（常用于重载配置） |\n| SIGUSR1 | 10   | 用户自定义信号 1       |\n\n#### 实战示例\n\n**示例 1：强制终止容器（默认 SIGKILL）**\n\n```bash\n$ docker kill mycontainer\nmycontainer\n```\n\n**示例 2：发送 SIGHUP 信号（重载配置）**\n\n```bash\n# 以下命令等效\n$ docker kill --signal=SIGHUP mycontainer\n$ docker kill --signal=HUP mycontainer\n$ docker kill --signal=1 mycontainer\n```\n\n**示例 3：发送 SIGTERM 信号**\n\n```bash\ndocker kill -s SIGTERM mycontainer\n```\n\n**示例 4：终止多个容器**\n\n```bash\ndocker kill container1 container2 container3\n```\n\n**示例 5：终止所有运行中的容器**\n\n```bash\ndocker kill $(docker ps -q)\n```\n\n#### docker kill vs docker stop\n\n| 特性               | docker kill        | docker stop     |\n| ------------------ | ------------------ | --------------- |\n| **默认信号** | SIGKILL            | SIGTERM         |\n| **等待时间** | 无                 | 10 秒（可配置） |\n| **进程感知** | 无法捕获           | 可捕获处理      |\n| **适用场景** | 紧急终止、容器卡死 | 优雅停止        |\n\n---", "subs": ["命令语法", "命令选项", "核心概念", "常用信号", "实战示例", "docker kill vs docker stop"]}, {"title": "2.27 重命名容器（docker rename）", "content": "`docker rename` 命令用于**修改容器的名称**。\n\n#### 命令语法\n\n```bash\ndocker rename CONTAINER NEW_NAME\n\n# 别名\ndocker container rename CONTAINER NEW_NAME\n```\n\n#### 实战示例\n\n**示例 1：重命名容器**\n\n```bash\ndocker rename old_name new_name\n```\n\n**示例 2：规范化容器命名**\n\n```bash\n# 将随机名称改为有意义的名称\n$ docker rename quirky_einstein nginx-prod\n```\n\n**示例 3：添加版本后缀**\n\n```bash\ndocker rename myapp myapp-v1\n```\n\n#### 使用场景\n\n| 场景     | 说明                                         |\n| -------- | -------------------------------------------- |\n| 规范命名 | 将 Docker 自动生成的随机名替换为有意义的名称 |\n| 版本迭代 | 为容器添加版本后缀                           |\n| 环境区分 | 添加环境标识（如 `-dev`、`-prod`）       |\n| 迁移准备 | 在迁移前重命名避免冲突                       |\n\n---", "subs": ["命令语法", "实战示例", "使用场景"]}, {"title": "2.28 第二章完整总结", "content": "#### 容器管理命令速查表\n\n```mermaid\ngraph TD\n    subgraph Lifecycle[\"生命周期管理\"]\n        create[docker create]\n        start[docker start]\n        stop[docker stop]\n        restart[docker restart]\n        rm[docker rm]\n    end\n  \n    subgraph Interaction[\"容器交互\"]\n        attach[docker attach]\n        exec[docker exec]\n        logs[docker logs]\n    end\n  \n    subgraph Status[\"状态查看\"]\n        ps[docker ps]\n        inspect[docker inspect]\n        stats[docker stats]\n        diff[docker diff]\n    end\n  \n    subgraph Resource[\"资源管理\"]\n        update[docker update]\n        pause[docker pause]\n        unpause[docker unpause]\n    end\n  \n    subgraph DataIO[\"数据导入导出\"]\n        export[docker export]\n        commit[docker commit]\n        cp[docker cp]\n    end\n  \n    subgraph Cleanup[\"清理与其他\"]\n        prune[docker container prune]\n        kill[docker kill]\n        rename[docker rename]\n    end\n```\n\n#### 按功能分类速查\n\n| 类别                | 命令                                     | 说明               |\n| ------------------- | ---------------------------------------- | ------------------ |\n| **创建/启动** | `create`, `start`, `run`           | 容器创建和启动     |\n| **停止/删除** | `stop`, `kill`, `rm`, `prune`    | 容器停止和清理     |\n| **交互**      | `exec`, `attach`, `logs`           | 进入容器、查看输出 |\n| **状态查看**  | `ps`, `inspect`, `stats`, `diff` | 查看容器信息       |\n| **资源控制**  | `update`, `pause`, `unpause`       | 动态调整资源       |\n| **数据操作**  | `cp`, `export`, `commit`           | 文件复制、导出镜像 |\n\n#### 日常运维常用命令\n\n```bash\n# ===== 容器生命周期 =====\ndocker run -d --name myapp -p 8080:80 nginx     # 创建并启动\ndocker stop myapp                                 # 优雅停止\ndocker start myapp                                # 启动容器\ndocker restart myapp                              # 重启容器\ndocker rm myapp                                   # 删除容器\n\n# ===== 容器交互 =====\ndocker exec -it myapp sh                          # 进入容器\ndocker logs -f --tail 100 myapp                   # 查看日志\n\n# ===== 状态查看 =====\ndocker ps -a                                      # 列出所有容器\ndocker inspect myapp                              # 查看详情\ndocker stats --no-stream                          # 资源使用快照\n\n# ===== 资源管理 =====\ndocker update --cpus 2 -m 512m myapp              # 更新资源限制\ndocker update --restart=always myapp              # 设置自动重启\n\n# ===== 数据操作 =====\ndocker cp myapp:/var/log/ ./logs/                 # 复制日志\ndocker commit myapp myimage:v1                    # 提交为镜像\n\n# ===== 清理 =====\ndocker container prune -f                         # 清理已停止容器\ndocker system prune -af                           # 清理所有未使用资源\n```\n\n---\n\n*（第二章 容器管理 - 基础操作 完成）*\n\n---", "subs": ["容器管理命令速查表", "按功能分类速查", "日常运维常用命令"]}]}, {"title": "第三章：Docker Run 命令详解", "sections": [{"title": "3.1 命令概述", "content": "> `docker run` 是 Docker 最核心的命令，它将镜像拉取、容器创建和启动三个步骤合为一体。本章将详细讲解 `docker run` 的各个选项。\n\n\n#### 基本语法\n\n```bash\ndocker run [OPTIONS] IMAGE [COMMAND] [ARG...]\n\n# 别名\ndocker container run [OPTIONS] IMAGE [COMMAND] [ARG...]\n```\n\n#### 命令执行流程\n\n```mermaid\ngraph LR\n    A[docker run] --> B{镜像是否存在}\n    B -->|否| C[拉取镜像 pull]\n    B -->|是| D[创建容器 create]\n    C --> D\n    D --> E[启动容器 start]\n    E --> F{-d 选项}\n    F -->|是| G[后台运行]\n    F -->|否| H[前台运行]\n```\n\n#### 选项分类概览\n\n| 类别     | 主要选项                                            |\n| -------- | --------------------------------------------------- |\n| 容器标识 | `--name`, `--cidfile`                           |\n| 运行模式 | `-d`, `-it`, `--rm`                           |\n| 网络配置 | `-p`, `-P`, `--network`, `--hostname`       |\n| 存储挂载 | `-v`, `--mount`, `--tmpfs`                    |\n| 资源限制 | `--cpus`, `-m`, `--pids-limit`                |\n| 环境配置 | `-e`, `--env-file`, `-w`                      |\n| 安全配置 | `--privileged`, `--cap-add`, `--security-opt` |\n\n---", "subs": ["基本语法", "命令执行流程", "选项分类概览"]}, {"title": "3.2 容器标识与命名（--name, --cidfile）", "content": "#### --name：指定容器名称\n\n`--name` 选项用于**为容器指定一个自定义名称**，方便后续管理和引用。\n\n##### 基本用法\n\n```bash\ndocker run --name <container_name> IMAGE\n```\n\n##### 实战示例\n\n**示例 1：创建命名容器**\n\n```bash\n$ docker run --name test -d nginx:alpine\n4bed76d3ad428b889c56c1ecc2bf2ed95cb08256db22dc5ef5863e1d03252a19\n\n$ docker ps\nCONTAINER ID   IMAGE          COMMAND                  CREATED        STATUS   PORTS     NAMES\n4bed76d3ad42   nginx:alpine   \"/docker-entrypoint.…\"   1 second ago   Up       80/tcp    test\n```\n\n**示例 2：通过名称管理容器**\n\n```bash\n# 停止容器\n$ docker stop test\ntest\n\n# 删除容器\n$ docker rm test\ntest\n```\n\n**示例 3：容器名称用于网络 DNS**\n\n在用户定义的 bridge 网络中，容器名称可以作为 DNS 名称使用：\n\n```bash\n# 创建自定义网络\n$ docker network create mynet\n\n# 启动命名容器\n$ docker run --name test --net mynet -d nginx:alpine\n\n# 其他容器可以通过名称访问\n$ docker run --net mynet busybox ping test\nPING test (172.18.0.2): 56 data bytes\n64 bytes from 172.18.0.2: seq=0 ttl=64 time=0.073 ms\n64 bytes from 172.18.0.2: seq=1 ttl=64 time=0.411 ms\n```\n\n##### 命名规则与最佳实践\n\n| 规则   | 说明                           |\n| ------ | ------------------------------ |\n| 唯一性 | 同一主机上容器名称必须唯一     |\n| 可读性 | 使用有意义的名称便于管理       |\n| 格式   | 支持字母、数字、下划线、连字符 |\n| 长度   | 最小 1 字符，无明确最大限制    |\n\n**推荐命名格式：**\n\n```bash\n# 项目-服务-环境\nmyapp-nginx-prod\nmyapp-mysql-dev\n\n# 服务-版本\nnginx-v1.25\nredis-7.0\n\n# 用途-编号\nweb-01\ndb-master\n```\n\n> 💡 如果不指定 `--name`，Docker 会自动分配一个随机名称（如 `vibrant_cannon`）。\n\n---\n\n#### --cidfile：将容器 ID 写入文件\n\n`--cidfile` 选项用于**将容器 ID 写入指定文件**，常用于自动化脚本和进程管理。\n\n##### 基本用法\n\n```bash\ndocker run --cidfile <file_path> IMAGE\n```\n\n##### 核心特性\n\n- 容器启动时创建文件，写入完整容器 ID\n- 如果文件已存在，Docker 会报错（防止意外覆盖）\n- 容器退出时文件保留，需手动清理\n\n##### 实战示例\n\n**示例 1：基本用法**\n\n```bash\n$ docker run --cidfile /tmp/docker_test.cid ubuntu echo \"test\"\ntest\n\n$ cat /tmp/docker_test.cid\na1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6...\n```\n\n**示例 2：用于自动化脚本**\n\n```bash\n#!/bin/bash\nCID_FILE=\"/var/run/myapp.cid\"\n\n# 启动容器并保存 ID\ndocker run --cidfile \"$CID_FILE\" -d nginx:alpine\n\n# 后续操作使用保存的 ID\nCONTAINER_ID=$(cat \"$CID_FILE\")\necho \"Container started: $CONTAINER_ID\"\n\n# 停止容器\ndocker stop \"$CONTAINER_ID\"\n\n# 清理 CID 文件\nrm -f \"$CID_FILE\"\n```\n\n**示例 3：配合进程管理器使用**\n\n类似于传统 PID 文件的用法：\n\n```bash\n# 检查容器是否运行\nif [ -f /var/run/myapp.cid ]; then\n    CID=$(cat /var/run/myapp.cid)\n    if docker ps -q | grep -q \"$CID\"; then\n        echo \"Container is running\"\n    else\n        echo \"Container is stopped\"\n    fi\nelse\n    echo \"CID file not found\"\nfi\n```\n\n##### 使用场景\n\n| 场景         | 说明                    |\n| ------------ | ----------------------- |\n| 自动化部署   | 脚本需要跟踪容器 ID     |\n| 进程监控     | 类似 PID 文件的管理方式 |\n| Systemd 集成 | 与 systemd 服务管理配合 |\n| CI/CD 流水线 | 跟踪构建/测试容器       |\n\n---\n\n#### 容器标识小结\n\n```bash\n# 指定容器名称\n$ docker run --name myapp -d nginx\n\n# 保存容器 ID 到文件\n$ docker run --cidfile /var/run/myapp.cid -d nginx\n\n# 组合使用\n$ docker run --name myapp --cidfile /var/run/myapp.cid -d nginx\n```\n\n---", "subs": ["--name：指定容器名称", "--cidfile：将容器 ID 写入文件", "容器标识小结"]}, {"title": "3.3 运行模式选项（-d, -it, --rm）", "content": "容器的运行模式决定了它如何与终端交互以及退出后如何处理。\n\n#### -d, --detach：后台运行模式\n\n`-d` 选项让容器在**后台运行**（detached mode），不占用终端。\n\n##### 基本用法\n\n```bash\ndocker run -d IMAGE [COMMAND]\n```\n\n##### 核心特性\n\n- 容器启动后立即返回容器 ID\n- 容器在后台作为守护进程运行\n- 使用 `docker logs` 查看输出\n- 使用 `docker attach` 或 `docker exec` 进入容器\n\n##### 实战示例\n\n**示例 1：后台运行 nginx**\n\n```bash\n$ docker run -d -p 80:80 nginx:alpine\n5101d3b7fe931c27c2ba0e65fd989654d297393ad65ae238f20b97a020e7295b\n\n$ docker ps\nCONTAINER ID   IMAGE          COMMAND                  STATUS         PORTS                NAMES\n5101d3b7fe93   nginx:alpine   \"/docker-entrypoint.…\"   Up 5 seconds   0.0.0.0:80->80/tcp   wizardly_tesla\n```\n\n**示例 2：后台运行并查看日志**\n\n```bash\n$ docker run -d --name myapp nginx:alpine\n\n# 查看日志\n$ docker logs myapp\n\n# 实时跟踪日志\n$ docker logs -f myapp\n```\n\n> ⚠️ **注意**：后台容器的根进程退出时，容器也会停止。确保容器内的主进程持续运行。\n\n**错误示例：**\n\n```bash\n# 错误：service 命令启动后立即退出\n$ docker run -d nginx service nginx start\n\n# 正确：直接运行 nginx 前台进程\n$ docker run -d nginx nginx -g 'daemon off;'\n```\n\n---\n\n#### -i, --interactive：保持 STDIN 开启\n\n`-i` 选项保持容器的**标准输入（STDIN）开启**，允许向容器发送输入。\n\n##### 基本用法\n\n```bash\ndocker run -i IMAGE [COMMAND]\n```\n\n##### 实战示例\n\n**示例 1：通过管道发送输入**\n\n```bash\n$ echo hello | docker run --rm -i busybox cat\nhello\n```\n\n**示例 2：管道链式处理**\n\n```bash\n$ docker run --rm -i busybox echo \"foo bar baz\" \\\n  | docker run --rm -i busybox awk '{ print $2 }' \\\n  | docker run --rm -i busybox rev\nrab\n```\n\n---\n\n#### -t, --tty：分配伪终端\n\n`-t` 选项为容器**分配一个伪终端（pseudo-TTY）**，提供终端功能。\n\n##### 基本用法\n\n```bash\ndocker run -t IMAGE [COMMAND]\n```\n\n##### -it 组合：交互式终端\n\n`-i` 和 `-t` 通常**组合使用**，创建一个完整的交互式终端会话：\n\n```bash\ndocker run -it IMAGE [COMMAND]\n```\n\n##### 实战示例\n\n**示例 1：进入交互式 shell**\n\n```bash\n$ docker run -it debian bash\nroot@10a3e71492b0:/# ls\nbin  boot  dev  etc  home  lib  ...\nroot@10a3e71492b0:/# exit\nexit\n```\n\n**示例 2：-t 的作用（密码隐藏）**\n\n不使用 `-t` 时，密码会显示明文：\n\n```bash\n$ docker run -i debian passwd root\nNew password: karjalanpiirakka9\nRetype new password: karjalanpiirakka9\npasswd: password updated successfully\n```\n\n使用 `-t` 时，密码被隐藏：\n\n```bash\n$ docker run -it debian passwd root\nNew password:\nRetype new password:\npasswd: password updated successfully\n```\n\n> 💡 这是因为 `-t` 启用了 TTY 的 echo-off 功能。\n\n---\n\n#### --rm：退出时自动删除容器\n\n`--rm` 选项让容器**在退出时自动删除**，包括其关联的匿名卷。\n\n##### 基本用法\n\n```bash\ndocker run --rm IMAGE [COMMAND]\n```\n\n##### 核心特性\n\n- 容器退出后自动删除\n- 同时删除容器关联的**匿名卷**\n- **命名卷不会被删除**\n- 不能与 `--restart` 同时使用\n\n##### 实战示例\n\n**示例 1：一次性任务**\n\n```bash\n# 执行后自动清理\n$ docker run --rm alpine echo \"Hello, World!\"\nHello, World!\n\n# 容器已被自动删除\n$ docker ps -a | grep alpine\n# （无输出）\n```\n\n**示例 2：临时交互式会话**\n\n```bash\n$ docker run --rm -it ubuntu bash\nroot@abcd1234:/# apt update\nroot@abcd1234:/# exit\n# 退出后容器自动删除\n```\n\n**示例 3：卷的删除行为**\n\n```bash\n# 匿名卷会被删除\n$ docker run --rm -v /foo busybox touch /foo/test\n\n# 命名卷不会被删除\n$ docker run --rm -v mydata:/bar busybox touch /bar/test\n# mydata 卷仍然存在\n```\n\n---\n\n#### 运行模式对比\n\n| 选项     | 作用            | 典型场景                   |\n| -------- | --------------- | -------------------------- |\n| `-d`   | 后台运行        | 服务型容器（nginx, mysql） |\n| `-i`   | 保持 STDIN 开启 | 管道输入、脚本交互         |\n| `-t`   | 分配伪终端      | 需要 TTY 功能的程序        |\n| `-it`  | 交互式终端      | 进入容器调试、执行命令     |\n| `--rm` | 退出后删除      | 一次性任务、测试           |\n\n#### 组合使用示例\n\n```bash\n# 后台运行服务\n$ docker run -d --name nginx -p 80:80 nginx\n\n# 交互式调试\n$ docker run -it --rm ubuntu bash\n\n# 后台运行 + 退出删除（测试）\n$ docker run -d --rm --name test nginx\n\n# 交互式 + 后台（启动后分离）\n$ docker run -dit --name myapp alpine sh\n```\n\n---\n\n#### --detach-keys：自定义分离快捷键\n\n`--detach-keys` 选项用于**自定义从容器分离的快捷键**，默认是 `Ctrl-p Ctrl-q`。\n\n##### 基本用法\n\n```bash\ndocker run --detach-keys=\"<sequence>\" IMAGE\n```\n\n##### 支持的按键格式\n\n- 字母：`a-z`\n- Ctrl 组合：`ctrl-a`、`ctrl-@`、`ctrl-[`、`ctrl-\\\\`、`ctrl-_`、`ctrl-^`\n\n##### 实战示例\n\n```bash\n# 使用 Ctrl-a 分离\n$ docker run -it --detach-keys=\"ctrl-a\" ubuntu bash\n```\n\n---", "subs": ["-d, --detach：后台运行模式", "-i, --interactive：保持 STDIN 开启", "-t, --tty：分配伪终端", "--rm：退出时自动删除容器", "运行模式对比", "组合使用示例", "--detach-keys：自定义分离快捷键"]}, {"title": "3.4 命名空间配置（--pid, --uts, --ipc, --userns）", "content": "Linux 命名空间是容器隔离的核心技术。Docker 允许通过选项配置容器使用的命名空间。\n\n#### --pid：PID 命名空间\n\n`--pid` 选项用于**配置容器的进程命名空间**。\n\n##### 可选值\n\n| 值                      | 说明                        |\n| ----------------------- | --------------------------- |\n| `\"\"` (默认)           | 使用独立的 PID 命名空间     |\n| `host`                | 共享宿主机的 PID 命名空间   |\n| `container:<name\\|id>` | 共享其他容器的 PID 命名空间 |\n\n##### 核心概念\n\n- **默认**：容器有独立的 PID 命名空间，进程 ID 从 1 开始\n- **host**：容器可以看到宿主机上所有进程\n- **container**：多个容器共享进程视图，用于调试\n\n##### 实战示例\n\n**示例 1：共享宿主机 PID 命名空间**\n\n用于在容器中监控宿主机进程：\n\n```bash\n# 启动容器并共享宿主机 PID 命名空间\n$ docker run --rm -it --pid=host alpine\n\n# 在容器中安装并运行 htop\n/ # apk add htop\n/ # htop\n# 可以看到宿主机上所有进程\n```\n\n**示例 2：共享其他容器的 PID 命名空间**\n\n用于调试运行中的容器：\n\n```bash\n# 启动目标容器\n$ docker run --rm --name my-nginx -d nginx:alpine\n\n# 启动调试容器，共享 my-nginx 的 PID 命名空间\n$ docker run --rm -it --pid=container:my-nginx \\\n  --cap-add SYS_PTRACE \\\n  alpine\n\n# 在调试容器中跟踪 nginx 主进程\n/ # apk add strace\n/ # strace -p 1\nstrace: Process 1 attached\n```\n\n---\n\n#### --uts：UTS 命名空间\n\n`--uts` 选项用于**配置容器的 UTS（UNIX Time-sharing System）命名空间**，控制主机名和域名。\n\n##### 可选值\n\n| 值            | 说明                      |\n| ------------- | ------------------------- |\n| `\"\"` (默认) | 使用独立的 UTS 命名空间   |\n| `host`      | 共享宿主机的 UTS 命名空间 |\n\n##### 核心概念\n\n- **默认**：容器有独立的主机名（可通过 `--hostname` 设置）\n- **host**：容器与宿主机共享主机名\n\n> ⚠️ `--uts=host` 不能与 `--hostname` 或 `--domainname` 同时使用。\n\n##### 实战示例\n\n```bash\n# 默认：容器有独立主机名\n$ docker run --rm -it --hostname mycontainer alpine hostname\nmycontainer\n\n# 共享宿主机 UTS 命名空间\n$ docker run --rm -it --uts=host alpine hostname\n# 输出宿主机的主机名\n```\n\n---\n\n#### --ipc：IPC 命名空间\n\n`--ipc` 选项用于**配置容器的 IPC（进程间通信）命名空间**。\n\n##### 可选值\n\n| 值                      | 说明                                 |\n| ----------------------- | ------------------------------------ |\n| `\"\"`                  | 使用守护进程默认值                   |\n| `none`                | 独立的 IPC 命名空间，不挂载 /dev/shm |\n| `private`             | 独立的 IPC 命名空间                  |\n| `shareable`           | 独立但可共享的 IPC 命名空间          |\n| `container:<name\\|id>` | 加入其他容器的 IPC 命名空间          |\n| `host`                | 使用宿主机的 IPC 命名空间            |\n\n##### 核心概念\n\nIPC 命名空间隔离的资源：\n\n- **共享内存段**（System V shared memory）\n- **信号量**（semaphores）\n- **消息队列**（message queues）\n\n##### 使用场景\n\n| 场景                             | 配置                                            |\n| -------------------------------- | ----------------------------------------------- |\n| 高性能计算应用（需要共享内存）   | `--ipc=shareable` + `--ipc=container:donor` |\n| 数据库（如 PostgreSQL 大页内存） | `--ipc=host` 或 `--ipc=shareable`           |\n| 安全隔离                         | `--ipc=private`（默认）                       |\n\n##### 实战示例\n\n```bash\n# 创建可共享 IPC 的容器\n$ docker run -d --name ipc-donor --ipc=shareable nginx\n\n# 其他容器加入该 IPC 命名空间\n$ docker run --rm -it --ipc=container:ipc-donor alpine\n\n# 使用宿主机 IPC 命名空间（用于特殊性能优化）\n$ docker run --rm -it --ipc=host alpine\n```\n\n---\n\n#### --userns：用户命名空间\n\n`--userns` 选项用于**配置容器的用户命名空间**。\n\n##### 可选值\n\n| 值       | 说明                           |\n| -------- | ------------------------------ |\n| `\"\"`   | 使用守护进程配置的用户命名空间 |\n| `host` | 禁用用户命名空间重映射         |\n\n##### 核心概念\n\n- 当 Docker 守护进程启用了用户命名空间（user namespace remapping）时：\n  - 容器内的 root（UID 0）被映射为宿主机上的非特权用户\n  - 提高安全性，防止容器逃逸\n- `--userns=host` 禁用此重映射，容器内 root 即为宿主机 root\n\n> ⚠️ `--userns=host` 会降低安全性，仅在必要时使用。\n\n##### 实战示例\n\n```bash\n# 禁用用户命名空间重映射\n$ docker run --userns=host hello-world\n```\n\n---\n\n#### 命名空间配置小结\n\n```mermaid\ngraph TD\n    A[Linux 命名空间] --> B[PID]\n    A --> C[UTS]\n    A --> D[IPC]\n    A --> E[User]\n    A --> F[Network]\n    A --> G[Mount]\n    A --> H[Cgroup]\n  \n    B --> B1[--pid=host 共享宿主机进程]\n    C --> C1[--uts=host 共享主机名]\n    D --> D1[--ipc=shareable 共享内存]\n    E --> E1[--userns=host 禁用重映射]\n```\n\n#### 命名空间选项速查\n\n| 选项         | 作用           | 常用值                                        |\n| ------------ | -------------- | --------------------------------------------- |\n| `--pid`    | PID 命名空间   | `host`, `container:<name>`                |\n| `--uts`    | 主机名命名空间 | `host`                                      |\n| `--ipc`    | IPC 命名空间   | `host`, `shareable`, `container:<name>` |\n| `--userns` | 用户命名空间   | `host`                                      |\n\n---", "subs": ["--pid：PID 命名空间", "--uts：UTS 命名空间", "--ipc：IPC 命名空间", "--userns：用户命名空间", "命名空间配置小结", "命名空间选项速查"]}, {"title": "3.5 网络配置选项（--network, -p, --dns, --add-host）", "content": "网络配置是容器运行的核心配置之一，影响容器如何与外界通信。\n\n#### --network：连接到网络\n\n`--network` 选项用于**指定容器连接的网络**。\n\n##### 预定义网络\n\n| 网络                 | 说明                    |\n| -------------------- | ----------------------- |\n| `bridge`           | 默认网络，容器有独立 IP |\n| `host`             | 共享宿主机网络栈        |\n| `none`             | 无网络连接              |\n| `container:<name>` | 共享其他容器的网络      |\n\n##### 实战示例\n\n**示例 1：连接到自定义网络**\n\n```bash\n# 创建自定义网络\n$ docker network create my-net\n\n# 启动容器并连接到该网络\n$ docker run -itd --network=my-net busybox\n```\n\n**示例 2：指定静态 IP**\n\n```bash\n# 创建带子网的网络\n$ docker network create --subnet 192.0.2.0/24 my-net\n\n# 启动容器并指定 IP\n$ docker run -itd --network=my-net --ip=192.0.2.69 busybox\n```\n\n**示例 3：连接多个网络**\n\n```bash\n$ docker network create --subnet 192.0.2.0/24 my-net1\n$ docker network create --subnet 192.0.3.0/24 my-net2\n\n# 容器同时连接两个网络\n$ docker run -itd --network=my-net1 --network=my-net2 busybox\n```\n\n**示例 4：使用扩展语法**\n\n```bash\n$ docker run -itd \\\n  --network=name=my-net1,ip=192.0.2.42 \\\n  --network=name=my-net2,ip=192.0.3.42 \\\n  busybox\n```\n\n##### 扩展语法选项\n\n| 选项            | 说明             |\n| --------------- | ---------------- |\n| `name`        | 网络名称（必需） |\n| `alias`       | 网络作用域别名   |\n| `ip`          | IPv4 地址        |\n| `ip6`         | IPv6 地址        |\n| `mac-address` | MAC 地址         |\n| `driver-opt`  | 驱动选项         |\n\n---\n\n#### -p, --publish：发布端口\n\n`-p` 选项用于**将容器端口映射到宿主机端口**。\n\n##### 语法格式\n\n```bash\n-p [host_ip:]host_port:container_port[/protocol]\n```\n\n##### 实战示例\n\n**示例 1：基本端口映射**\n\n```bash\n# 宿主机 8080 -> 容器 80\n$ docker run -d -p 8080:80 nginx\n```\n\n**示例 2：绑定到特定 IP**\n\n```bash\n# 只监听 127.0.0.1\n$ docker run -d -p 127.0.0.1:80:8080 nginx\n```\n\n**示例 3：随机端口**\n\n```bash\n# 宿主机随机端口 -> 容器 80\n$ docker run -d -p 80 nginx\n\n# 查看分配的端口\n$ docker port <container_id>\n```\n\n**示例 4：指定协议（UDP）**\n\n```bash\ndocker run -d -p 53:53/udp dns-server\n```\n\n**示例 5：端口范围**\n\n```bash\ndocker run -d -p 8000-8010:8000-8010 myapp\n```\n\n> ⚠️ 如果不指定 host_ip，端口会绑定到 `0.0.0.0`（所有接口），可能存在安全风险。\n\n---\n\n#### -P, --publish-all：发布所有暴露端口\n\n`-P` 选项用于**自动发布镜像中 EXPOSE 的所有端口**。\n\n```bash\n$ docker run -d -P nginx\n\n# 查看端口映射\n$ docker port <container_id>\n80/tcp -> 0.0.0.0:32768\n```\n\n---\n\n#### --expose：暴露端口（不发布）\n\n`--expose` 选项用于**声明容器使用的端口**，但不映射到宿主机。\n\n```bash\ndocker run --expose 80 nginx\n```\n\n> 💡 `--expose` 主要用于容器间通信和文档用途。\n\n---\n\n#### --dns：设置 DNS 服务器\n\n`--dns` 选项用于**自定义容器的 DNS 服务器**。\n\n```bash\ndocker run --dns 8.8.8.8 --dns 8.8.4.4 alpine\n```\n\n##### 相关选项\n\n| 选项             | 说明                       |\n| ---------------- | -------------------------- |\n| `--dns`        | DNS 服务器地址             |\n| `--dns-search` | DNS 搜索域                 |\n| `--dns-option` | DNS 选项（如 `ndots:5`） |\n\n##### 实战示例\n\n```bash\n$ docker run --rm \\\n  --dns 8.8.8.8 \\\n  --dns-search example.com \\\n  --dns-option ndots:3 \\\n  alpine cat /etc/resolv.conf\n\nnameserver 8.8.8.8\nsearch example.com\noptions ndots:3\n```\n\n---\n\n#### --add-host：添加 hosts 条目\n\n`--add-host` 选项用于**向容器的 /etc/hosts 添加条目**。\n\n##### 语法格式\n\n```bash\n--add-host=<hostname>:<ip>\n# 或\n--add-host=<hostname>=<ip>\n```\n\n##### 实战示例\n\n**示例 1：添加自定义主机**\n\n```bash\n$ docker run --add-host=myhost:192.168.1.100 alpine ping myhost\nPING myhost (192.168.1.100): 56 data bytes\n```\n\n**示例 2：IPv6 地址**\n\n```bash\ndocker run --add-host myhost=[2001:db8::33] alpine\n```\n\n**示例 3：host-gateway（访问宿主机）**\n\n```bash\n# 特殊值 host-gateway 解析为宿主机内部 IP\n$ docker run --add-host host.docker.internal=host-gateway alpine\n\n# 在容器中访问宿主机服务\n$ curl host.docker.internal:8080\n```\n\n> 💡 `host-gateway` 是一个特殊值，自动解析为宿主机的内部 IP 地址。\n\n---\n\n#### --hostname：设置容器主机名\n\n```bash\n$ docker run --hostname mycontainer alpine hostname\nmycontainer\n```\n\n---\n\n#### --domainname：设置 NIS 域名\n\n```bash\ndocker run --domainname example.com alpine\n```\n\n---\n\n#### --mac-address：设置 MAC 地址\n\n```bash\ndocker run --mac-address 92:d0:c6:0a:29:33 alpine\n```\n\n---\n\n#### 网络配置小结\n\n| 选项           | 作用         | 示例                          |\n| -------------- | ------------ | ----------------------------- |\n| `--network`  | 连接网络     | `--network=my-net`          |\n| `-p`         | 发布端口     | `-p 8080:80`                |\n| `-P`         | 发布所有端口 | `-P`                        |\n| `--dns`      | DNS 服务器   | `--dns 8.8.8.8`             |\n| `--add-host` | hosts 条目   | `--add-host=myhost:1.2.3.4` |\n| `--hostname` | 主机名       | `--hostname myapp`          |\n\n---", "subs": ["--network：连接到网络", "-p, --publish：发布端口", "-P, --publish-all：发布所有暴露端口", "--expose：暴露端口（不发布）", "--dns：设置 DNS 服务器", "--add-host：添加 hosts 条目", "--hostname：设置容器主机名", "--domainname：设置 NIS 域名", "--mac-address：设置 MAC 地址", "网络配置小结"]}, {"title": "3.6 存储与挂载选项（-v, --mount, --tmpfs, --volumes-from）", "content": "容器的存储配置决定了数据如何持久化以及如何与宿主机共享数据。\n\n#### -v, --volume：挂载卷或绑定目录\n\n`-v` 选项用于**挂载数据卷或绑定宿主机目录**。\n\n##### 语法格式\n\n```bash\n# 绑定挂载（bind mount）\n-v <host_path>:<container_path>[:options]\n\n# 命名卷（named volume）\n-v <volume_name>:<container_path>[:options]\n\n# 匿名卷（anonymous volume）\n-v <container_path>\n```\n\n##### 常用选项\n\n| 选项   | 说明             |\n| ------ | ---------------- |\n| `ro` | 只读挂载         |\n| `rw` | 读写挂载（默认） |\n| `z`  | SELinux 共享标签 |\n| `Z`  | SELinux 私有标签 |\n\n##### 实战示例\n\n**示例 1：绑定挂载宿主机目录**\n\n```bash\n# 挂载当前目录到容器\n$ docker run -v $(pwd):/app -w /app ubuntu pwd\n/app\n\n# 使用相对路径（Docker 23+）\n$ docker run -v ./content:/content ubuntu ls /content\n```\n\n**示例 2：命名卷**\n\n```bash\n# 创建并使用命名卷\n$ docker run -v mydata:/data alpine touch /data/test.txt\n\n# 查看卷\n$ docker volume ls\nDRIVER    VOLUME NAME\nlocal     mydata\n```\n\n**示例 3：只读挂载**\n\n```bash\ndocker run -v /host/config:/config:ro alpine cat /config/app.conf\n```\n\n**示例 4：挂载主机文件**\n\n```bash\ndocker run -v /etc/hosts:/etc/hosts:ro alpine cat /etc/hosts\n```\n\n> ⚠️ 如果宿主机路径不存在，Docker 会自动创建目录。\n\n---\n\n#### --mount：更明确的挂载语法\n\n`--mount` 选项提供**更清晰、更明确的挂载语法**，推荐使用。\n\n##### 语法格式\n\n```bash\n--mount type=<type>,source=<src>,target=<dst>[,options]\n```\n\n##### 挂载类型\n\n| 类型       | 说明                   |\n| ---------- | ---------------------- |\n| `bind`   | 绑定挂载（宿主机路径） |\n| `volume` | 数据卷                 |\n| `tmpfs`  | 临时文件系统           |\n\n##### 常用选项\n\n| 选项                         | 说明           |\n| ---------------------------- | -------------- |\n| `source, src`              | 源路径或卷名   |\n| `target, dst, destination` | 容器内目标路径 |\n| `readonly, ro`             | 只读挂载       |\n| `volume-opt`               | 卷驱动选项     |\n\n##### 实战示例\n\n**示例 1：绑定挂载**\n\n```bash\ndocker run --mount type=bind,src=/data,dst=/data alpine ls /data\n```\n\n**示例 2：数据卷**\n\n```bash\ndocker run --mount type=volume,src=mydata,dst=/data alpine touch /data/test\n```\n\n**示例 3：只读挂载**\n\n```bash\ndocker run --mount type=bind,src=/config,dst=/config,readonly alpine\n```\n\n**示例 4：结合 --read-only**\n\n```bash\n# 容器根文件系统只读，但指定目录可写\n$ docker run --read-only --mount type=volume,target=/writable alpine touch /writable/ok\n```\n\n---\n\n#### -v vs --mount 对比\n\n| 特性         | -v / --volume | --mount        |\n| ------------ | ------------- | -------------- |\n| 语法         | 简洁          | 明确           |\n| 自动创建目录 | 是            | 否（报错）     |\n| 推荐程度     | 兼容性好      | **推荐** |\n| 可读性       | 较低          | 较高           |\n\n---\n\n#### --tmpfs：挂载临时文件系统\n\n`--tmpfs` 选项用于**挂载内存文件系统**，数据不持久化。\n\n##### 基本用法\n\n```bash\ndocker run --tmpfs <container_path>[:options]\n```\n\n##### 常用选项\n\n与 Linux `mount -t tmpfs -o` 相同：\n\n- `rw` / `ro` - 读写/只读\n- `noexec` - 禁止执行\n- `nosuid` - 禁止 SUID\n- `size=<bytes>` - 大小限制\n\n##### 实战示例\n\n```bash\n# 挂载 tmpfs 到 /run\n$ docker run -d --tmpfs /run:rw,noexec,nosuid,size=65536k myimage\n\n# 查看挂载\n$ docker exec mycontainer mount | grep tmpfs\ntmpfs on /run type tmpfs (rw,nosuid,noexec,relatime,size=65536k)\n```\n\n##### 使用场景\n\n| 场景     | 说明                     |\n| -------- | ------------------------ |\n| 敏感数据 | 密钥、令牌等不应写入磁盘 |\n| 临时缓存 | 不需要持久化的缓存数据   |\n| 高性能   | 需要高速 I/O 的临时存储  |\n\n---\n\n#### --volumes-from：从其他容器挂载卷\n\n`--volumes-from` 选项用于**继承其他容器的卷挂载**。\n\n##### 基本用法\n\n```bash\ndocker run --volumes-from <container>[:mode] IMAGE\n```\n\n##### 模式选项\n\n| 模式   | 说明                         |\n| ------ | ---------------------------- |\n| `rw` | 读写（默认，继承原容器模式） |\n| `ro` | 只读                         |\n\n##### 实战示例\n\n**示例 1：共享数据卷**\n\n```bash\n# 创建数据容器\n$ docker run -v /data --name data-container alpine\n\n# 从数据容器挂载卷\n$ docker run --volumes-from data-container alpine ls /data\n```\n\n**示例 2：只读模式**\n\n```bash\ndocker run --volumes-from data-container:ro alpine\n```\n\n**示例 3：多容器共享卷**\n\n```bash\n# 创建带卷的容器\n$ docker run -d -v webdata:/var/www --name web nginx\n\n# 备份容器共享卷\n$ docker run --volumes-from web -v $(pwd):/backup alpine \\\n    tar cvf /backup/webdata.tar /var/www\n```\n\n---\n\n#### --read-only：根文件系统只读\n\n`--read-only` 选项使**容器根文件系统只读**，提高安全性。\n\n```bash\n$ docker run --read-only alpine touch /test\ntouch: /test: Read-only file system\n\n# 配合挂载使用\n$ docker run --read-only -v /writable alpine touch /writable/ok\n```\n\n---\n\n#### 存储配置小结\n\n| 选项               | 作用           | 示例                                  |\n| ------------------ | -------------- | ------------------------------------- |\n| `-v`             | 挂载卷或目录   | `-v /host:/container`               |\n| `--mount`        | 明确挂载语法   | `--mount type=bind,src=...,dst=...` |\n| `--tmpfs`        | 内存文件系统   | `--tmpfs /run:size=64k`             |\n| `--volumes-from` | 继承其他容器卷 | `--volumes-from data`               |\n| `--read-only`    | 根文件系统只读 | `--read-only`                       |\n\n---", "subs": ["-v, --volume：挂载卷或绑定目录", "--mount：更明确的挂载语法", "-v vs --mount 对比", "--tmpfs：挂载临时文件系统", "--volumes-from：从其他容器挂载卷", "--read-only：根文件系统只读", "存储配置小结"]}, {"title": "3.7 资源限制选项（--memory, --cpus, --ulimit, --blkio-weight）", "content": "资源限制确保容器不会过度消耗系统资源，是生产环境容器管理的关键。\n\n#### 内存限制\n\n##### -m, --memory：设置内存上限\n\n```bash\ndocker run -m <limit> IMAGE\n\n# 支持单位：b, k, m, g\ndocker run -m 512m nginx\ndocker run --memory 1g nginx\n```\n\n##### --memory-reservation：内存软限制\n\n当系统内存紧张时才生效的软限制：\n\n```bash\ndocker run -m 1g --memory-reservation 512m nginx\n```\n\n##### --memory-swap：交换空间限制\n\n| 值             | 说明                          |\n| -------------- | ----------------------------- |\n| 未设置         | swap = 2 × memory            |\n| 与 memory 相同 | 禁用 swap                     |\n| `-1`         | 无限制 swap                   |\n| 大于 memory    | `swap - memory` = 可用 swap |\n\n```bash\n# 内存 1G，禁用 swap\ndocker run -m 1g --memory-swap 1g nginx\n\n# 内存 1G，swap 1G（总共可用 2G）\ndocker run -m 1g --memory-swap 2g nginx\n```\n\n##### --oom-kill-disable：禁用 OOM Killer\n\n```bash\n# 禁用 OOM Killer（必须设置 -m）\ndocker run -m 512m --oom-kill-disable nginx\n```\n\n> ⚠️ **警告**：禁用 OOM Killer 可能导致系统不稳定。\n\n---\n\n#### CPU 限制\n\n##### --cpus：限制 CPU 数量\n\n```bash\n# 限制使用 1.5 个 CPU\ndocker run --cpus 1.5 nginx\n\n# 限制使用 0.5 个 CPU\ndocker run --cpus 0.5 nginx\n```\n\n##### --cpu-shares：CPU 相对权重\n\n默认值 1024，用于 CPU 竞争时的相对优先级：\n\n```bash\n# 高优先级容器\ndocker run --cpu-shares 2048 high-priority-app\n\n# 低优先级容器\ndocker run --cpu-shares 512 low-priority-app\n```\n\n> 💡 CPU shares 只在 CPU 竞争时生效，空闲时容器可使用所有可用 CPU。\n\n##### --cpuset-cpus：绑定 CPU 核心\n\n```bash\n# 只使用 CPU 0 和 1\ndocker run --cpuset-cpus 0,1 nginx\n\n# 使用 CPU 0-3\ndocker run --cpuset-cpus 0-3 nginx\n```\n\n##### --cpu-period / --cpu-quota：精细控制\n\n```bash\n# 每 100ms 内最多使用 50ms CPU（相当于 0.5 CPU）\ndocker run --cpu-period 100000 --cpu-quota 50000 nginx\n```\n\n---\n\n#### --ulimit：设置资源限制\n\n`--ulimit` 选项设置**容器的 ulimit 值**。\n\n##### 语法格式\n\n```bash\n--ulimit <type>=<soft>[:<hard>]\n```\n\n##### 常用限制类型\n\n| 类型        | 说明           |\n| ----------- | -------------- |\n| `nofile`  | 最大打开文件数 |\n| `nproc`   | 最大进程数     |\n| `core`    | 核心转储大小   |\n| `memlock` | 最大锁定内存   |\n| `stack`   | 最大栈大小     |\n\n##### 实战示例\n\n```bash\n# 设置最大打开文件数\n$ docker run --ulimit nofile=1024:1024 nginx\n\n# 设置多个限制\n$ docker run --ulimit nofile=65535 --ulimit nproc=4096 nginx\n\n# 查看容器内 ulimit\n$ docker run --rm --ulimit nofile=1024 alpine sh -c \"ulimit -n\"\n1024\n```\n\n> ⚠️ **注意**：`nproc` 限制的是用户可用进程数，而非容器进程数。\n\n---\n\n#### Block I/O 限制\n\n##### --blkio-weight：I/O 相对权重\n\n范围 10-1000，默认 0（禁用）：\n\n```bash\n# 高 I/O 优先级\ndocker run --blkio-weight 500 nginx\n\n# 低 I/O 优先级\ndocker run --blkio-weight 100 nginx\n```\n\n##### 设备级别限制\n\n```bash\n# 限制读取速率\ndocker run --device-read-bps /dev/sda:1mb nginx\n\n# 限制写入速率\ndocker run --device-write-bps /dev/sda:1mb nginx\n\n# 限制 IOPS\ndocker run --device-read-iops /dev/sda:100 nginx\ndocker run --device-write-iops /dev/sda:100 nginx\n```\n\n---\n\n#### --pids-limit：进程数限制\n\n限制容器内可创建的进程数量：\n\n```bash\n# 最多 100 个进程\ndocker run --pids-limit 100 nginx\n\n# 无限制\ndocker run --pids-limit -1 nginx\n```\n\n---\n\n#### --storage-opt：存储限制\n\n限制容器文件系统大小（需要特定存储驱动支持）：\n\n```bash\n# 限制容器大小为 10G\ndocker run --storage-opt size=10G fedora\n```\n\n> 💡 仅支持 `btrfs`, `overlay2`, `zfs` 等存储驱动。\n\n---\n\n#### 资源限制小结\n\n| 选项               | 作用        | 示例                     |\n| ------------------ | ----------- | ------------------------ |\n| `-m`             | 内存上限    | `-m 512m`              |\n| `--cpus`         | CPU 数量    | `--cpus 2`             |\n| `--cpu-shares`   | CPU 权重    | `--cpu-shares 1024`    |\n| `--cpuset-cpus`  | 绑定 CPU    | `--cpuset-cpus 0,1`    |\n| `--ulimit`       | ulimit 限制 | `--ulimit nofile=1024` |\n| `--blkio-weight` | I/O 权重    | `--blkio-weight 500`   |\n| `--pids-limit`   | 进程数限制  | `--pids-limit 100`     |\n\n---", "subs": ["内存限制", "CPU 限制", "--ulimit：设置资源限制", "Block I/O 限制", "--pids-limit：进程数限制", "--storage-opt：存储限制", "资源限制小结"]}, {"title": "3.8 环境变量与元数据选项（-e, --env-file, -l, -h, -w）", "content": "环境变量和元数据用于配置容器运行时的行为和标识。\n\n#### -e, --env：设置环境变量\n\n`-e` 选项用于**向容器传递环境变量**。\n\n##### 语法格式\n\n```bash\n# 指定变量名和值\n-e VAR=value\n\n# 传递宿主机环境变量\n-e VAR\n```\n\n##### 实战示例\n\n**示例 1：设置环境变量**\n\n```bash\n$ docker run -e MYVAR=foo --rm alpine env | grep MYVAR\nMYVAR=foo\n```\n\n**示例 2：多个环境变量**\n\n```bash\ndocker run -e VAR1=val1 -e VAR2=val2 alpine env\n```\n\n**示例 3：传递宿主机变量**\n\n```bash\n$ export MYVAR=hello\n$ docker run -e MYVAR --rm alpine env | grep MYVAR\nMYVAR=hello\n```\n\n**示例 4：用于数据库配置**\n\n```bash\n$ docker run -d \\\n  -e MYSQL_ROOT_PASSWORD=secret \\\n  -e MYSQL_DATABASE=myapp \\\n  -e MYSQL_USER=user \\\n  -e MYSQL_PASSWORD=password \\\n  mysql:8.0\n```\n\n---\n\n#### --env-file：从文件加载环境变量\n\n`--env-file` 选项用于**从文件批量加载环境变量**。\n\n##### 文件格式\n\n```bash\n# 环境变量文件 (.env)\nVAR1=value1\nVAR2=value2\n# 注释以 # 开头\nDB_HOST=localhost\nDB_PORT=3306\n```\n\n##### 实战示例\n\n```bash\n# 创建 .env 文件\n$ cat > .env << EOF\nAPP_ENV=production\nDB_HOST=mysql.example.com\nDB_PORT=3306\nLOG_LEVEL=info\nEOF\n\n# 加载环境变量\n$ docker run --env-file .env alpine env\n```\n\n> 💡 每行一个变量，`#` 开头的行为注释。\n\n---\n\n#### -l, --label：添加元数据标签\n\n`-l` 选项用于**为容器添加元数据标签**。\n\n##### 语法格式\n\n```bash\n-l <key>=<value>\n--label <key>=<value>\n```\n\n##### 实战示例\n\n**示例 1：添加标签**\n\n```bash\ndocker run -d -l app=nginx -l env=prod nginx\n```\n\n**示例 2：查看标签**\n\n```bash\n$ docker inspect --format '{{json .Config.Labels}}' <container>\n{\"app\":\"nginx\",\"env\":\"prod\"}\n```\n\n**示例 3：按标签过滤**\n\n```bash\n# 列出带特定标签的容器\n$ docker ps -f label=app=nginx\n\n# 删除带特定标签的容器\n$ docker rm $(docker ps -aq -f label=env=test)\n```\n\n##### 常用标签规范\n\n| 标签                        | 说明                     |\n| --------------------------- | ------------------------ |\n| `com.example.description` | 描述                     |\n| `com.example.version`     | 版本                     |\n| `maintainer`              | 维护者                   |\n| `environment`             | 环境（dev/staging/prod） |\n\n---\n\n#### --label-file：从文件加载标签\n\n类似于 `--env-file`，从文件批量加载标签：\n\n```bash\n$ cat > labels.txt << EOF\napp=myapp\nversion=1.0\nEOF\n\n$ docker run --label-file labels.txt nginx\n```\n\n---\n\n#### -h, --hostname：设置主机名\n\n`-h` 选项用于**设置容器的主机名**。\n\n```bash\n$ docker run -h mycontainer alpine hostname\nmycontainer\n\n# 等同于\n$ docker run --hostname mycontainer alpine hostname\n```\n\n---\n\n#### -w, --workdir：设置工作目录\n\n`-w` 选项用于**设置容器内的工作目录**。\n\n```bash\n$ docker run -w /app ubuntu pwd\n/app\n\n# 配合执行命令\n$ docker run -v $(pwd):/app -w /app node npm install\n```\n\n##### 工作目录与挂载\n\n```bash\n# 常用开发模式：挂载 + 设置工作目录\n$ docker run -it \\\n  -v $(pwd):/workspace \\\n  -w /workspace \\\n  --rm \\\n  python:3.11 python app.py\n```\n\n---\n\n#### --entrypoint：覆盖入口点\n\n`--entrypoint` 选项用于**覆盖镜像的 ENTRYPOINT**。\n\n```bash\n# 覆盖入口点为 sh\n$ docker run --entrypoint sh nginx -c \"echo hello\"\n\n# 清空入口点\n$ docker run --entrypoint \"\" nginx echo \"custom command\"\n```\n\n---\n\n#### 环境配置小结\n\n| 选项             | 作用           | 示例                        |\n| ---------------- | -------------- | --------------------------- |\n| `-e`           | 设置环境变量   | `-e DB_HOST=localhost`    |\n| `--env-file`   | 从文件加载变量 | `--env-file .env`         |\n| `-l`           | 添加标签       | `-l app=nginx`            |\n| `--label-file` | 从文件加载标签 | `--label-file labels.txt` |\n| `-h`           | 设置主机名     | `-h mycontainer`          |\n| `-w`           | 设置工作目录   | `-w /app`                 |\n| `--entrypoint` | 覆盖入口点     | `--entrypoint sh`         |\n\n---", "subs": ["-e, --env：设置环境变量", "--env-file：从文件加载环境变量", "-l, --label：添加元数据标签", "--label-file：从文件加载标签", "-h, --hostname：设置主机名", "-w, --workdir：设置工作目录", "--entrypoint：覆盖入口点", "环境配置小结"]}, {"title": "3.9 安全配置选项（--privileged, --cap-add/drop, --security-opt, -u）", "content": "安全配置决定了容器的权限级别和访问控制，是生产环境的关键考量。\n\n#### --privileged：特权模式\n\n`--privileged` 选项授予容器**几乎所有宿主机权限**。\n\n```bash\ndocker run --privileged IMAGE\n```\n\n##### 特权模式影响\n\n| 方面             | 影响                        |\n| ---------------- | --------------------------- |\n| 设备访问         | 可访问所有宿主机设备        |\n| 内核能力         | 拥有所有 Linux capabilities |\n| AppArmor/SELinux | 绑定不受限制                |\n| seccomp          | 禁用系统调用过滤            |\n\n##### 实战示例\n\n```bash\n# Docker-in-Docker（DinD）\n$ docker run --privileged -d docker:dind\n\n# 访问宿主机设备\n$ docker run --privileged -it ubuntu fdisk -l\n```\n\n> ⚠️ **警告**：特权模式严重降低安全性，仅在必要时使用！\n\n---\n\n#### --cap-add / --cap-drop：细粒度权限控制\n\n比 `--privileged` 更安全的权限管理方式。\n\n##### 基本用法\n\n```bash\n# 添加能力\ndocker run --cap-add <capability> IMAGE\n\n# 移除能力\ndocker run --cap-drop <capability> IMAGE\n\n# 添加所有，移除特定\ndocker run --cap-add ALL --cap-drop MKNOD IMAGE\n```\n\n##### 常用 Linux Capabilities\n\n| 能力             | 说明                         |\n| ---------------- | ---------------------------- |\n| `NET_ADMIN`    | 网络管理（修改路由、防火墙） |\n| `NET_RAW`      | 使用 RAW 和 PACKET 套接字    |\n| `SYS_ADMIN`    | 系统管理（mount, swapon）    |\n| `SYS_PTRACE`   | 跟踪进程（strace, gdb）      |\n| `SYS_TIME`     | 修改系统时间                 |\n| `MKNOD`        | 创建特殊文件                 |\n| `CHOWN`        | 改变文件所有者               |\n| `DAC_OVERRIDE` | 绕过文件权限检查             |\n\n##### 实战示例\n\n**示例 1：网络调试（tcpdump, iptables）**\n\n```bash\ndocker run --cap-add NET_ADMIN --cap-add NET_RAW alpine tcpdump\n```\n\n**示例 2：进程调试（strace）**\n\n```bash\ndocker run --cap-add SYS_PTRACE alpine strace ls\n```\n\n**示例 3：移除所有能力（最小权限）**\n\n```bash\ndocker run --cap-drop ALL alpine\n```\n\n**示例 4：修改系统时间**\n\n```bash\ndocker run --cap-add SYS_TIME alpine date -s \"2024-01-01\"\n```\n\n---\n\n#### -u, --user：指定运行用户\n\n`-u` 选项用于**指定容器内进程的运行用户**。\n\n##### 语法格式\n\n```bash\n-u <user>[:<group>]\n-u <uid>[:<gid>]\n```\n\n##### 实战示例\n\n```bash\n# 使用用户名\n$ docker run -u nobody alpine id\nuid=65534(nobody) gid=65534(nobody)\n\n# 使用 UID\n$ docker run -u 1000 alpine id\nuid=1000 gid=0(root)\n\n# 使用 UID:GID\n$ docker run -u 1000:1000 alpine id\nuid=1000 gid=1000\n\n# 使用当前用户\n$ docker run -u $(id -u):$(id -g) alpine id\n```\n\n> 💡 非 root 用户运行是容器安全最佳实践。\n\n---\n\n#### --security-opt：安全模块配置\n\n`--security-opt` 选项用于**配置 AppArmor、SELinux、seccomp 等安全模块**。\n\n##### 常用选项\n\n| 选项                    | 说明                  |\n| ----------------------- | --------------------- |\n| `label:disable`       | 禁用 SELinux 标签     |\n| `label:type:TYPE`     | 设置 SELinux 类型     |\n| `apparmor=PROFILE`    | 使用 AppArmor 配置    |\n| `apparmor=unconfined` | 禁用 AppArmor         |\n| `seccomp=PROFILE`     | 使用 seccomp 配置文件 |\n| `seccomp=unconfined`  | 禁用 seccomp          |\n| `no-new-privileges`   | 禁止进程提权          |\n\n##### 实战示例\n\n**示例 1：禁止进程提权**\n\n```bash\ndocker run --security-opt no-new-privileges:true alpine\n```\n\n**示例 2：禁用 AppArmor**\n\n```bash\ndocker run --security-opt apparmor=unconfined alpine\n```\n\n**示例 3：禁用 seccomp**\n\n```bash\ndocker run --security-opt seccomp=unconfined alpine\n```\n\n**示例 4：自定义 seccomp 配置**\n\n```bash\ndocker run --security-opt seccomp=./my-profile.json alpine\n```\n\n---\n\n#### --userns：用户命名空间\n\n```bash\n# 禁用用户命名空间重映射\n$ docker run --userns=host alpine\n```\n\n---\n\n#### --group-add：添加额外用户组\n\n```bash\n# 添加到 docker 组\n$ docker run --group-add docker alpine id\n\n# 添加多个组\n$ docker run --group-add audio --group-add video alpine\n```\n\n---\n\n#### 安全配置小结\n\n| 选项               | 作用       | 示例                                 |\n| ------------------ | ---------- | ------------------------------------ |\n| `--privileged`   | 特权模式   | `--privileged`                     |\n| `--cap-add`      | 添加能力   | `--cap-add NET_ADMIN`              |\n| `--cap-drop`     | 移除能力   | `--cap-drop ALL`                   |\n| `-u`             | 指定用户   | `-u 1000:1000`                     |\n| `--security-opt` | 安全模块   | `--security-opt no-new-privileges` |\n| `--group-add`    | 添加用户组 | `--group-add docker`               |\n\n##### 安全最佳实践\n\n```bash\n# 最安全的运行方式\n$ docker run \\\n  --cap-drop ALL \\\n  --security-opt no-new-privileges:true \\\n  --read-only \\\n  -u 1000:1000 \\\n  myapp\n```\n\n---", "subs": ["--privileged：特权模式", "--cap-add / --cap-drop：细粒度权限控制", "-u, --user：指定运行用户", "--security-opt：安全模块配置", "--userns：用户命名空间", "--group-add：添加额外用户组", "安全配置小结"]}, {"title": "3.10 设备与 GPU 选项（--device, --gpus）", "content": "设备选项允许容器访问宿主机硬件设备。\n\n#### --device：映射设备\n\n`--device` 选项用于**将宿主机设备映射到容器内**。\n\n##### 语法格式\n\n```bash\n--device=<host_device>:<container_device>:<permissions>\n```\n\n##### 权限选项\n\n| 权限    | 说明                  |\n| ------- | --------------------- |\n| `r`   | 读取                  |\n| `w`   | 写入                  |\n| `m`   | 创建设备文件（mknod） |\n| `rwm` | 完全访问（默认）      |\n\n##### 实战示例\n\n**示例 1：映射 USB 设备**\n\n```bash\ndocker run --device /dev/ttyUSB0 alpine\n```\n\n**示例 2：映射声卡**\n\n```bash\ndocker run --device /dev/snd alpine aplay test.wav\n```\n\n**示例 3：只读访问**\n\n```bash\ndocker run --device /dev/video0:/dev/video0:r alpine\n```\n\n**示例 4：访问磁盘设备**\n\n```bash\ndocker run --device /dev/sda alpine fdisk -l /dev/sda\n```\n\n---\n\n#### --gpus：GPU 访问\n\n`--gpus` 选项用于**配置容器的 GPU 访问**（需要 NVIDIA Container Toolkit）。\n\n##### 前置条件\n\n1. 安装 NVIDIA 驱动\n2. 安装 NVIDIA Container Toolkit\n3. 配置 Docker runtime\n\n##### 语法格式\n\n```bash\n--gpus <specification>\n```\n\n##### 规格选项\n\n| 选项                  | 说明         |\n| --------------------- | ------------ |\n| `all`               | 所有 GPU     |\n| `\"device=0\"`        | 指定 GPU 0   |\n| `\"device=0,1\"`      | 指定多个 GPU |\n| `\"device=GPU-UUID\"` | 按 UUID 指定 |\n\n##### 实战示例\n\n**示例 1：使用所有 GPU**\n\n```bash\ndocker run --gpus all nvidia/cuda:12.0-base nvidia-smi\n```\n\n**示例 2：指定 GPU**\n\n```bash\n# 使用 GPU 0\n$ docker run --gpus \"device=0\" nvidia/cuda:12.0-base nvidia-smi\n\n# 使用 GPU 0 和 1\n$ docker run --gpus \"device=0,1\" nvidia/cuda:12.0-base nvidia-smi\n```\n\n**示例 3：限制 GPU 能力**\n\n```bash\n# 只允许计算和图形功能\n$ docker run --gpus \"all,capabilities=compute,utility\" nvidia/cuda:12.0-base\n```\n\n##### GPU 能力列表\n\n| 能力         | 说明              |\n| ------------ | ----------------- |\n| `compute`  | CUDA / 计算       |\n| `compat32` | 32 位兼容         |\n| `graphics` | OpenGL / 图形     |\n| `utility`  | nvidia-smi 等工具 |\n| `video`    | 视频编解码        |\n| `display`  | 显示输出          |\n\n---\n\n#### 设备配置小结\n\n| 选项         | 作用     | 示例                      |\n| ------------ | -------- | ------------------------- |\n| `--device` | 映射设备 | `--device /dev/ttyUSB0` |\n| `--gpus`   | GPU 访问 | `--gpus all`            |\n\n##### 完整 GPU 容器示例\n\n```bash\n$ docker run -d \\\n  --gpus all \\\n  --name ml-training \\\n  -v $(pwd)/data:/data \\\n  tensorflow/tensorflow:latest-gpu \\\n  python train.py\n```\n\n---", "subs": ["--device：映射设备", "--gpus：GPU 访问", "设备配置小结"]}, {"title": "3.11 重启策略与信号选项（--restart, --stop-signal, --stop-timeout）", "content": "重启策略决定容器退出后的行为，信号选项控制容器的停止方式。\n\n#### --restart：重启策略\n\n`--restart` 选项用于**配置容器的重启策略**。\n\n##### 策略类型\n\n| 策略                 | 说明                             |\n| -------------------- | -------------------------------- |\n| `no`               | 不自动重启（默认）               |\n| `on-failure[:max]` | 仅在非零退出码时重启，可限制次数 |\n| `always`           | 始终重启                         |\n| `unless-stopped`   | 始终重启，除非手动停止           |\n\n##### 实战示例\n\n**示例 1：失败时重启**\n\n```bash\ndocker run --restart on-failure nginx\n```\n\n**示例 2：限制重启次数**\n\n```bash\n# 最多重启 3 次\n$ docker run --restart on-failure:3 nginx\n```\n\n**示例 3：始终重启**\n\n```bash\ndocker run --restart always nginx\n```\n\n**示例 4：unless-stopped（生产推荐）**\n\n```bash\ndocker run --restart unless-stopped nginx\n```\n\n##### always vs unless-stopped\n\n| 场景                     | always | unless-stopped   |\n| ------------------------ | ------ | ---------------- |\n| 容器退出                 | 重启   | 重启             |\n| Docker 重启              | 重启   | 重启             |\n| 手动 stop 后 Docker 重启 | 重启   | **不重启** |\n\n> 💡 生产环境推荐使用 `unless-stopped`，便于维护时手动停止容器。\n\n##### 修改运行中容器的重启策略\n\n```bash\ndocker update --restart unless-stopped <container>\n```\n\n> ⚠️ `--restart` 不能与 `--rm` 同时使用。\n\n---\n\n#### --stop-signal：停止信号\n\n`--stop-signal` 选项用于**指定停止容器时发送的信号**。\n\n##### 基本用法\n\n```bash\ndocker run --stop-signal <signal> IMAGE\n```\n\n##### 常用信号\n\n| 信号        | 编号 | 说明           |\n| ----------- | ---- | -------------- |\n| `SIGTERM` | 15   | 默认，优雅终止 |\n| `SIGKILL` | 9    | 强制终止       |\n| `SIGINT`  | 2    | 中断（Ctrl+C） |\n| `SIGQUIT` | 3    | 退出           |\n| `SIGHUP`  | 1    | 挂起           |\n| `SIGUSR1` | 10   | 用户自定义 1   |\n| `SIGUSR2` | 12   | 用户自定义 2   |\n\n##### 实战示例\n\n```bash\n# 使用 SIGINT 停止\n$ docker run --stop-signal SIGINT nginx\n\n# 使用信号编号\n$ docker run --stop-signal 2 nginx\n```\n\n> 💡 确保应用程序正确处理自定义停止信号。\n\n---\n\n#### --stop-timeout：停止超时\n\n`--stop-timeout` 选项用于**设置等待容器停止的超时时间**。\n\n##### 基本用法\n\n```bash\ndocker run --stop-timeout <seconds> IMAGE\n```\n\n##### 工作流程\n\n1. Docker 发送 `--stop-signal` 指定的信号\n2. 等待 `--stop-timeout` 秒\n3. 如果容器未停止，发送 SIGKILL\n\n##### 实战示例\n\n```bash\n# 等待 30 秒\n$ docker run --stop-timeout 30 nginx\n\n# 立即发送 SIGKILL（0 秒超时）\n$ docker run --stop-timeout 0 nginx\n```\n\n##### 停止命令的超时\n\n```bash\n# 使用 docker stop 时指定超时\n$ docker stop -t 30 <container>\n```\n\n---\n\n#### 重启与信号配置小结\n\n| 选项               | 作用     | 示例                         |\n| ------------------ | -------- | ---------------------------- |\n| `--restart`      | 重启策略 | `--restart unless-stopped` |\n| `--stop-signal`  | 停止信号 | `--stop-signal SIGINT`     |\n| `--stop-timeout` | 停止超时 | `--stop-timeout 30`        |\n\n##### 生产环境推荐配置\n\n```bash\n$ docker run -d \\\n  --restart unless-stopped \\\n  --stop-timeout 30 \\\n  --name myapp \\\n  myapp:latest\n```\n\n---", "subs": ["--restart：重启策略", "--stop-signal：停止信号", "--stop-timeout：停止超时", "重启与信号配置小结"]}, {"title": "3.12 日志配置选项（--log-driver, --log-opt）", "content": "日志配置决定了容器日志的收集和存储方式。\n\n#### --log-driver：日志驱动\n\n`--log-driver` 选项用于**指定容器的日志驱动**。\n\n##### 可用驱动\n\n| 驱动          | 说明                        |\n| ------------- | --------------------------- |\n| `json-file` | JSON 文件（默认）           |\n| `syslog`    | 系统日志                    |\n| `journald`  | systemd journal             |\n| `gelf`      | Graylog Extended Log Format |\n| `fluentd`   | Fluentd 日志收集器          |\n| `awslogs`   | AWS CloudWatch Logs         |\n| `splunk`    | Splunk HTTP Event Collector |\n| `etwlogs`   | Windows ETW                 |\n| `gcplogs`   | Google Cloud Logging        |\n| `local`     | 本地日志驱动（优化存储）    |\n| `none`      | 禁用日志                    |\n\n##### 实战示例\n\n```bash\n# 使用 syslog 驱动\n$ docker run --log-driver syslog nginx\n\n# 禁用日志\n$ docker run --log-driver none nginx\n\n# 使用 journald\n$ docker run --log-driver journald nginx\n```\n\n---\n\n#### --log-opt：日志选项\n\n`--log-opt` 选项用于**配置日志驱动的额外选项**。\n\n##### json-file 驱动选项\n\n| 选项         | 说明               | 默认值           |\n| ------------ | ------------------ | ---------------- |\n| `max-size` | 日志文件最大大小   | `-1`（无限制） |\n| `max-file` | 保留的日志文件数   | `1`            |\n| `compress` | 是否压缩轮转的日志 | `disabled`     |\n| `labels`   | 记录容器标签       | -                |\n| `env`      | 记录环境变量       | -                |\n\n##### 实战示例\n\n**示例 1：限制日志大小和文件数**\n\n```bash\n$ docker run \\\n  --log-driver json-file \\\n  --log-opt max-size=10m \\\n  --log-opt max-file=3 \\\n  nginx\n```\n\n**示例 2：启用日志压缩**\n\n```bash\n$ docker run \\\n  --log-driver json-file \\\n  --log-opt max-size=10m \\\n  --log-opt max-file=5 \\\n  --log-opt compress=true \\\n  nginx\n```\n\n**示例 3：记录容器标签和环境变量**\n\n```bash\n$ docker run \\\n  --log-opt labels=app,env \\\n  --log-opt env=APP_VERSION \\\n  -l app=myapp \\\n  -l env=prod \\\n  -e APP_VERSION=1.0 \\\n  nginx\n```\n\n---\n\n#### syslog 驱动选项\n\n| 选项                | 说明              |\n| ------------------- | ----------------- |\n| `syslog-address`  | syslog 服务器地址 |\n| `syslog-facility` | syslog facility   |\n| `syslog-format`   | 消息格式          |\n| `tag`             | 日志标签          |\n\n```bash\n$ docker run \\\n  --log-driver syslog \\\n  --log-opt syslog-address=tcp://192.168.1.100:514 \\\n  --log-opt tag=\"{{.Name}}\" \\\n  nginx\n```\n\n---\n\n#### fluentd 驱动选项\n\n| 选项                | 说明         |\n| ------------------- | ------------ |\n| `fluentd-address` | Fluentd 地址 |\n| `fluentd-async`   | 异步发送     |\n| `tag`             | 日志标签     |\n\n```bash\n$ docker run \\\n  --log-driver fluentd \\\n  --log-opt fluentd-address=localhost:24224 \\\n  --log-opt tag=docker.{{.Name}} \\\n  nginx\n```\n\n---\n\n#### awslogs 驱动选项\n\n| 选项               | 说明       |\n| ------------------ | ---------- |\n| `awslogs-region` | AWS 区域   |\n| `awslogs-group`  | 日志组名称 |\n| `awslogs-stream` | 日志流名称 |\n\n```bash\n$ docker run \\\n  --log-driver awslogs \\\n  --log-opt awslogs-region=us-east-1 \\\n  --log-opt awslogs-group=myapp-logs \\\n  --log-opt awslogs-stream=container-1 \\\n  nginx\n```\n\n---\n\n#### 日志配置小结\n\n| 选项             | 作用     | 示例                       |\n| ---------------- | -------- | -------------------------- |\n| `--log-driver` | 日志驱动 | `--log-driver json-file` |\n| `--log-opt`    | 驱动选项 | `--log-opt max-size=10m` |\n\n##### 生产环境推荐配置\n\n```bash\n$ docker run -d \\\n  --log-driver json-file \\\n  --log-opt max-size=100m \\\n  --log-opt max-file=5 \\\n  --log-opt compress=true \\\n  --name myapp \\\n  myapp:latest\n```\n\n> 💡 **提示**：可在 `/etc/docker/daemon.json` 中设置全局日志默认值。\n\n---", "subs": ["--log-driver：日志驱动", "--log-opt：日志选项", "syslog 驱动选项", "fluentd 驱动选项", "awslogs 驱动选项", "日志配置小结"]}, {"title": "3.13 其他选项（--pull, --init, --cgroup-parent）", "content": "本节介绍其他常用的 `docker run` 选项。\n\n#### --pull：镜像拉取策略\n\n`--pull` 选项用于**控制运行前是否拉取镜像**。\n\n##### 策略选项\n\n| 策略        | 说明                         |\n| ----------- | ---------------------------- |\n| `always`  | 始终拉取最新镜像             |\n| `missing` | 仅在本地不存在时拉取（默认） |\n| `never`   | 从不拉取，本地不存在则报错   |\n\n##### 实战示例\n\n```bash\n# 始终拉取最新镜像\n$ docker run --pull always nginx\n\n# 仅在本地不存在时拉取\n$ docker run --pull missing nginx\n\n# 从不拉取\n$ docker run --pull never nginx\n```\n\n> 💡 CI/CD 环境推荐使用 `--pull always` 确保使用最新镜像。\n\n---\n\n#### --init：使用 init 进程\n\n`--init` 选项用于**在容器中运行 init 进程作为 PID 1**。\n\n##### 为什么需要 init\n\n- 正确处理信号转发\n- 收割僵尸进程（zombie processes）\n- 确保子进程能被正确终止\n\n##### 实战示例\n\n```bash\ndocker run --init alpine sh -c \"sleep infinity\"\n```\n\n##### 查看 init 进程\n\n```bash\n$ docker run --init alpine ps aux\nPID   USER     TIME  COMMAND\n    1 root      0:00 /sbin/docker-init -- sh\n    7 root      0:00 sh\n    8 root      0:00 ps aux\n```\n\n> 💡 对于不处理信号的应用程序，建议使用 `--init`。\n\n---\n\n#### --cgroup-parent：控制组父级\n\n`--cgroup-parent` 选项用于**指定容器的 cgroup 父路径**。\n\n```bash\ndocker run --cgroup-parent=/mygroup nginx\n```\n\n> 💡 用于高级资源隔离场景。\n\n---\n\n#### --runtime：容器运行时\n\n指定容器使用的运行时：\n\n```bash\n# 使用 runc（默认）\n$ docker run --runtime runc nginx\n\n# 使用 nvidia 运行时（GPU）\n$ docker run --runtime nvidia nvidia/cuda:12.0-base\n```\n\n---\n\n#### --annotation：添加注解\n\n添加容器注解（元数据）：\n\n```bash\ndocker run --annotation \"com.example.key=value\" nginx\n```\n\n---\n\n#### --platform：指定平台\n\n指定容器的目标平台（多架构镜像）：\n\n```bash\n# 运行 ARM64 镜像\n$ docker run --platform linux/arm64 nginx\n\n# 运行 AMD64 镜像\n$ docker run --platform linux/amd64 nginx\n```\n\n---\n\n#### --health-cmd：健康检查\n\n配置容器健康检查：\n\n```bash\n$ docker run \\\n  --health-cmd \"curl -f http://localhost/ || exit 1\" \\\n  --health-interval 30s \\\n  --health-timeout 10s \\\n  --health-retries 3 \\\n  --health-start-period 5s \\\n  nginx\n```\n\n##### 健康检查选项\n\n| 选项                      | 说明         |\n| ------------------------- | ------------ |\n| `--health-cmd`          | 健康检查命令 |\n| `--health-interval`     | 检查间隔     |\n| `--health-timeout`      | 命令超时     |\n| `--health-retries`      | 失败重试次数 |\n| `--health-start-period` | 启动宽限期   |\n| `--no-healthcheck`      | 禁用健康检查 |\n\n---\n\n#### 其他选项小结\n\n| 选项                | 作用           | 示例                         |\n| ------------------- | -------------- | ---------------------------- |\n| `--pull`          | 镜像拉取策略   | `--pull always`            |\n| `--init`          | 使用 init 进程 | `--init`                   |\n| `--cgroup-parent` | cgroup 父级    | `--cgroup-parent=/mygroup` |\n| `--runtime`       | 容器运行时     | `--runtime nvidia`         |\n| `--platform`      | 目标平台       | `--platform linux/arm64`   |\n| `--health-cmd`    | 健康检查       | `--health-cmd \"curl ...\"`  |\n\n---", "subs": ["--pull：镜像拉取策略", "--init：使用 init 进程", "--cgroup-parent：控制组父级", "--runtime：容器运行时", "--annotation：添加注解", "--platform：指定平台", "--health-cmd：健康检查", "其他选项小结"]}, {"title": "3.14 docker run 完整示例", "content": "将本章所学选项组合成一个生产级别的容器配置：\n\n```bash\n$ docker run -d \\\n  --name myapp \\\n  --hostname myapp-1 \\\n  --restart unless-stopped \\\n  --pull always \\\n  --init \\\n  \\\n  # 网络配置\n  --network mynet \\\n  -p 8080:80 \\\n  --dns 8.8.8.8 \\\n  \\\n  # 存储配置\n  -v /data/app:/app \\\n  --tmpfs /run:size=64k \\\n  --read-only \\\n  \\\n  # 资源限制\n  -m 512m \\\n  --cpus 1 \\\n  --pids-limit 100 \\\n  \\\n  # 环境配置\n  -e APP_ENV=production \\\n  --env-file .env \\\n  -l app=myapp \\\n  -l env=prod \\\n  \\\n  # 安全配置\n  --cap-drop ALL \\\n  --security-opt no-new-privileges:true \\\n  -u 1000:1000 \\\n  \\\n  # 日志配置\n  --log-driver json-file \\\n  --log-opt max-size=100m \\\n  --log-opt max-file=5 \\\n  \\\n  # 健康检查\n  --health-cmd \"curl -f http://localhost/ || exit 1\" \\\n  --health-interval 30s \\\n  --health-retries 3 \\\n  \\\n  myapp:latest\n```\n\n---\n\n---", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

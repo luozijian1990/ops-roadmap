@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Linux 底层原理学习笔记 · 第二册：进程、线程与调度 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Linux 底层原理学习笔记 · 第二册：进程、线程与调度</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Linux 底层原理学习笔记 · 第二册：进程、线程与调度", "intro": "", "parts": [{"title": "第3章 进程管理（上）：进程与线程", "sections": [{"title": "3.1 进程创建与管理", "content": "> **核心思想**：进程是项目，线程是项目中的任务。掌握进程和线程的创建、管理和同步机制。\n\n#### 进程生命周期状态转换图\n\n```mermaid\ngraph LR\n    NEW[\"🆕 新建<br/>TASK_NEW\"]\n    READY[\"✅ 就绪<br/>TASK_RUNNING<br/>(在就绪队列)\"]\n    RUNNING[\"⚡ 运行<br/>TASK_RUNNING<br/>(正在CPU上)\"]\n    INTERRUPTIBLE[\"💤 可中断睡眠<br/>TASK_INTERRUPTIBLE<br/>(等待资源/事件)\"]\n    UNINTERRUPTIBLE[\"🚫 不可中断睡眠<br/>TASK_UNINTERRUPTIBLE<br/>(I/O等待)\"]\n    STOPPED[\"⏸️ 停止<br/>TASK_STOPPED<br/>(Ctrl+Z/调试)\"]\n    ZOMBIE[\"👻 僵尸<br/>TASK_ZOMBIE<br/>(已终止未回收)\"]\n    EXIT[\"❌ 退出<br/>TASK_DEAD\"]\n    \n    NEW -->|fork完成| READY\n    READY -->|调度器选中| RUNNING\n    RUNNING -->|时间片耗尽/被抢占| READY\n    RUNNING -->|等待资源| INTERRUPTIBLE\n    RUNNING -->|I/O操作| UNINTERRUPTIBLE\n    RUNNING -->|信号SIGSTOP| STOPPED\n    RUNNING -->|exit()| ZOMBIE\n    \n    INTERRUPTIBLE -->|资源可用/信号| READY\n    INTERRUPTIBLE -->|信号SIGKILL| EXIT\n    UNINTERRUPTIBLE -->|I/O完成| READY\n    STOPPED -->|信号SIGCONT| READY\n    STOPPED -->|信号SIGKILL| EXIT\n    ZOMBIE -->|父进程wait()| EXIT\n    \n    style RUNNING fill:#4caf50,stroke:#2e7d32,stroke-width:3px,color:#fff\n    style READY fill:#2196f3,stroke:#1565c0,color:#fff\n    style INTERRUPTIBLE fill:#ff9800,stroke:#e65100,color:#fff\n    style UNINTERRUPTIBLE fill:#f44336,stroke:#c62828,color:#fff\n    style ZOMBIE fill:#9c27b0,stroke:#6a1b9a,color:#fff\n    style NEW fill:#e0e0e0,stroke:#757575\n    style EXIT fill:#424242,stroke:#212121,color:#fff\n    style STOPPED fill:#ffeb3b,stroke:#f57f17\n```\n\n**状态说明**：\n\n| 状态 | 宏定义 | 触发条件 | 能否被信号打断 |\n|------|--------|----------|----------------|\n| 新建 | TASK_NEW | fork()刚创建 | N/A |\n| 就绪 | TASK_RUNNING | 在就绪队列等待CPU | 是 |\n| 运行 | TASK_RUNNING | 正在CPU上执行 | 是 |\n| 可中断睡眠 | TASK_INTERRUPTIBLE | wait()等待资源/事件 | **是** |\n| 不可中断睡眠 | TASK_UNINTERRUPTIBLE | I/O操作 | **否** |\n| 停止 | TASK_STOPPED | 收到SIGSTOP/调试断点 | 部分 |\n| 僵尸 | TASK_ZOMBIE | 已exit()但未被回收 | 否 |\n| 退出 | TASK_DEAD | 完全退出 | 否 |\n\n**核心理解**：\n\n1. **RUNNING状态双重含义**：既表示运行也表示就绪（都在runqueue中）\n2. **睡眠状态区别**：INTERRUPTIBLE可被信号唤醒，UNINTERRUPTIBLE不可被打断（避免数据不一致）\n3. **僵尸进程**：已终止但task_struct未释放，等待父进程收割（wait()）\n4. **ps命令对应**：R=RUNNING, S=INTERRUPTIBLE, D=UNINTERRUPTIBLE, T=STOPPED, Z=ZOMBIE\n\n\n#### 3.1.1 使用系统调用创建进程\n\n**进程创建示例**（process.c）：\n\n```c\n#include <stdio.h>\n#include <stdlib.h>\n#include <sys/types.h>\n#include <unistd.h>\n\nextern int create_process(char* program, char** arg_list);\n\nint create_process(char* program, char** arg_list) {\n    pid_t child_pid;\n    child_pid = fork();\n    \n    if (child_pid != 0)\n        return child_pid;  // 父进程返回子进程PID\n    else {\n        execvp(program, arg_list);  // 子进程执行新程序\n        abort();\n    }\n}\n```\n\n**调用示例**（createprocess.c）：\n\n```c\n#include <stdio.h>\n#include <stdlib.h>\n#include <sys/types.h>\n#include <unistd.h>\n\nextern int create_process(char* program, char** arg_list);\n\nint main() {\n    char* arg_list[] = {\n        \"ls\",\n        \"-l\",\n        \"/etc/yum.repos.d/\",\n        NULL\n    };\n    create_process(\"ls\", arg_list);\n    return 0;\n}\n```\n\n**编译命令**：\n\n```bash\ngcc -c -fPIC process.c\ngcc -c -fPIC createprocess.c\n```\n\n#### 3.1.2 ELF二进制格式\n\n**ELF格式类型**：\n\n1. **可重定位文件**（Relocatable File，.o文件）\n   - 编译生成的中间文件\n   - 可以链接成可执行文件或共享库\n\n2. **可执行文件**（Executable File）\n   - 可直接运行的程序\n   - 包含程序入口地址\n\n3. **共享对象文件**（Shared Object，.so文件）\n   - 动态链接库\n   - 运行时加载\n\n**ELF文件结构**：\n\n```mermaid\ngraph TD\n    A[ELF Header] --> B[Program Header Table]\n    B --> C[.text 代码段]\n    C --> D[.data 数据段]\n    D --> E[.rodata 只读数据]\n    E --> F[.bss 未初始化数据]\n    F --> G[.symtab 符号表]\n    G --> H[Section Header Table]\n    \n    style A fill:#e1f5ff\n    style C fill:#fff9c4\n    style D fill:#c8e6c9\n```\n\n**主要Section说明**：\n\n| Section | 内容 | 说明 |\n|---------|------|------|\n| `.text` | 可执行代码 | 编译后的机器指令 |\n| `.data` | 已初始化全局变量 | 有初始值的全局/静态变量 |\n| `.rodata` | 只读数据 | 字符串常量、const变量 |\n| `.bss` | 未初始化全局变量 | 运行时置0 |\n| `.symtab` | 符号表 | 函数和变量信息 |\n| `.strtab` | 字符串表 | 符号名称 |\n\n#### 3.1.3 静态链接库与动态链接库\n\n**静态链接库**（.a文件）：\n\n```bash\n# 创建静态库\nar cr libstaticprocess.a process.o\n\n# 链接静态库\ngcc -o staticcreateprocess createprocess.o -L. -lstaticprocess\n```\n\n**特点**：\n\n- ✅ 程序运行不依赖库文件\n- ❌ 代码重复，浪费内存\n- ❌ 库更新需重新编译\n\n**动态链接库**（.so文件）：\n\n```bash\n# 创建动态库\ngcc -shared -fPIC -o libdynamicprocess.so process.o\n\n# 链接动态库\ngcc -o dynamiccreateprocess createprocess.o -L. -ldynamicprocess\n\n# 设置库搜索路径\nexport LD_LIBRARY_PATH=.\n```\n\n**特点**：\n\n- ✅ 节省内存，多进程共享\n- ✅ 库更新无需重新编译\n- ❌ 运行时需要库文件\n\n**PLT/GOT机制**：\n\n```mermaid\ngraph LR\n    A[程序调用函数] --> B[PLT代理]\n    B --> C{GOT中有地址?}\n    C -->|是| D[直接调用]\n    C -->|否| E[调用ld-linux.so]\n    E --> F[查找函数地址]\n    F --> G[更新GOT]\n    G --> D\n    \n    style B fill:#ffccbc\n    style E fill:#fff9c4\n    style D fill:#c8e6c9\n```\n\n#### 3.1.4 进程加载与执行\n\n**exec系列函数**：\n\n```c\nint execl(const char *path, const char *arg, ...);\nint execlp(const char *file, const char *arg, ...);\nint execle(const char *path, const char *arg, ..., char *const envp[]);\nint execv(const char *path, char *const argv[]);\nint execvp(const char *file, char *const argv[]);\nint execve(const char *path, char *const argv[], char *const envp[]);\n```\n\n**函数名含义**：\n\n- **p**：在PATH中搜索程序\n- **v**：参数以数组形式传递\n- **l**：参数以列表形式传递\n- **e**：可传递环境变量\n\n**加载流程**：\n\n```mermaid\ngraph TD\n    A[execve系统调用] --> B[do_execve]\n    B --> C[do_execveat_common]\n    C --> D[exec_binprm]\n    D --> E[search_binary_handler]\n    E --> F[load_elf_binary]\n    F --> G[加载ELF到内存]\n    G --> H[设置程序入口]\n    H --> I[开始执行]\n    \n    style A fill:#e1f5ff\n    style F fill:#fff9c4\n    style I fill:#c8e6c9\n```\n\n#### 3.1.5 进程树\n\n**init进程**（PID 1）：\n\n- 所有用户态进程的祖先\n- CentOS 7: `/sbin/init -> /lib/systemd/systemd`\n\n**kthreadd进程**（PID 2）：\n\n- 所有内核态线程的祖先\n\n**进程查看**：\n\n```bash\nps -ef\n# UID  PID  PPID  C STIME TTY      TIME CMD\n# root   1     0  0 2018  ?    00:00:29 /usr/lib/systemd/systemd\n# root   2     0  0 2018  ?    00:00:00 [kthreadd]\n```\n\n---", "subs": ["进程生命周期状态转换图", "3.1.1 使用系统调用创建进程", "3.1.2 ELF二进制格式", "3.1.3 静态链接库与动态链接库", "3.1.4 进程加载与执行", "3.1.5 进程树"]}, {"title": "3.2 线程机制", "content": "#### 3.2.1 为什么需要线程\n\n**线程的优势**：\n\n1. **并行执行**\n   - 多个任务同时进行\n   - 充分利用多核CPU\n\n2. **资源共享**\n   - 共享进程的内存空间\n   - 避免进程间通信开销\n\n3. **响应性**\n   - 前台任务和后台任务分离\n   - 提高用户体验\n\n**类比**：\n\n- **进程** = 项目（独立的资源空间）\n- **线程** = 项目中的任务（共享资源）\n\n#### 3.2.2 创建线程\n\n**线程创建示例**：\n\n```c\n#include <pthread.h>\n#include <stdio.h>\n#include <stdlib.h>\n\n#define NUM_OF_TASKS 5\n\nvoid *downloadfile(void *filename) {\n    printf(\"I am downloading the file %s!\\n\", (char *)filename);\n    sleep(10);\n    long downloadtime = rand() % 100;\n    printf(\"I finish downloading in %ld minutes!\\n\", downloadtime);\n    pthread_exit((void *)downloadtime);\n}\n\nint main(int argc, char *argv[]) {\n    char files[NUM_OF_TASKS][20] = {\n        \"file1.avi\", \"file2.rmvb\", \"file3.mp4\",\n        \"file4.wmv\", \"file5.flv\"\n    };\n    pthread_t threads[NUM_OF_TASKS];\n    pthread_attr_t thread_attr;\n    \n    // 初始化线程属性\n    pthread_attr_init(&thread_attr);\n    pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);\n    \n    // 创建线程\n    for (int t = 0; t < NUM_OF_TASKS; t++) {\n        printf(\"creating thread %d\\n\", t);\n        int rc = pthread_create(&threads[t], &thread_attr,\n                               downloadfile, (void *)files[t]);\n        if (rc) {\n            printf(\"ERROR: return code is %d\\n\", rc);\n            exit(-1);\n        }\n    }\n    \n    pthread_attr_destroy(&thread_attr);\n    \n    // 等待线程结束\n    for (int t = 0; t < NUM_OF_TASKS; t++) {\n        long downloadtime;\n        pthread_join(threads[t], (void**)&downloadtime);\n        printf(\"Thread %d took %ld minutes\\n\", t, downloadtime);\n    }\n    \n    pthread_exit(NULL);\n}\n```\n\n**编译运行**：\n\n```bash\ngcc download.c -lpthread\n./a.out\n```\n\n**线程创建流程**：\n\n```mermaid\ngraph TD\n    A[主线程main] --> B[pthread_attr_init]\n    B --> C[设置线程属性]\n    C --> D[循环创建线程]\n    D --> E[pthread_create]\n    E --> F[线程开始执行]\n    F --> G[线程函数运行]\n    G --> H[pthread_exit]\n    H --> I[pthread_join等待]\n    I --> J[获取返回值]\n    \n    style A fill:#e1f5ff\n    style E fill:#fff9c4\n    style J fill:#c8e6c9\n```\n\n#### 3.2.3 线程数据\n\n**三类数据**：\n\n1. **线程栈数据**\n   - 函数局部变量\n   - 每个线程独立的栈空间\n   - 默认8MB，可通过`pthread_attr_setstacksize`修改\n\n2. **进程全局数据**\n   - 全局变量\n   - 所有线程共享\n   - 需要同步保护\n\n3. **线程私有数据**（Thread Specific Data）\n\n   ```c\n   pthread_key_t key;\n   \n   // 创建key\n   pthread_key_create(&key, destructor_function);\n   \n   // 设置value\n   pthread_setspecific(key, value);\n   \n   // 获取value\n   void *data = pthread_getspecific(key);\n   ```\n\n#### 3.2.4 线程同步 - Mutex互斥锁\n\n**Mutex原理**：\n\n- Mutual Exclusion（互斥）\n- 保护共享资源\n- 同一时间只有一个线程访问\n\n**转账示例（无锁 vs 有锁）**：\n\n```c\n#include <pthread.h>\n#include <stdio.h>\n\nint money_of_tom = 100;\nint money_of_jerry = 100;\npthread_mutex_t g_money_lock;  // 互斥锁\n\nvoid *transfer(void *notused) {\n    pthread_t tid = pthread_self();\n    printf(\"Thread %u is transfering money!\\n\", (unsigned int)tid);\n    \n    pthread_mutex_lock(&g_money_lock);      // 加锁\n    \n    sleep(rand() % 10);\n    money_of_tom += 10;\n    sleep(rand() % 10);\n    money_of_jerry -= 10;\n    \n    pthread_mutex_unlock(&g_money_lock);    // 解锁\n    \n    printf(\"Thread %u finish transfering!\\n\", (unsigned int)tid);\n    pthread_exit((void *)0);\n}\n\nint main() {\n    pthread_t threads[5];\n    \n    pthread_mutex_init(&g_money_lock, NULL);  // 初始化锁\n    \n    // 创建5个线程进行转账\n    for (int t = 0; t < 5; t++) {\n        pthread_create(&threads[t], NULL, transfer, NULL);\n    }\n    \n    // 主线程检查总金额\n    for (int t = 0; t < 100; t++) {\n        pthread_mutex_lock(&g_money_lock);\n        printf(\"Total: %d\\n\", money_of_tom + money_of_jerry);\n        pthread_mutex_unlock(&g_money_lock);\n    }\n    \n    pthread_mutex_destroy(&g_money_lock);  // 销毁锁\n    pthread_exit(NULL);\n}\n```\n\n**Mutex使用流程**：\n\n```mermaid\ngraph TD\n    A[pthread_mutex_init初始化] --> B[pthread_mutex_lock加锁]\n    B --> C{抢到锁?}\n    C -->|是| D[访问共享资源]\n    C -->|否| E[阻塞等待]\n    E --> B\n    D --> F[pthread_mutex_unlock解锁]\n    F --> G[其他线程可抢锁]\n    G --> H[pthread_mutex_destroy销毁]\n    \n    style C fill:#ffccbc\n    style D fill:#c8e6c9\n    style E fill:#ffe082\n```\n\n**Mutex函数**：\n\n| 函数 | 说明 | 阻塞性 |\n|------|------|--------|\n| `pthread_mutex_lock` | 加锁 | 阻塞等待 |\n| `pthread_mutex_trylock` | 尝试加锁 | 非阻塞，失败返回错误 |\n| `pthread_mutex_unlock` | 解锁 | - |\n\n#### 3.2.5 线程同步 - Condition条件变量\n\n**条件变量**用于线程间的通知机制。\n\n**生产者-消费者示例**：\n\n```c\n#include <pthread.h>\n#include <stdio.h>\n\npthread_mutex_t g_mutex;\npthread_cond_t g_cond;\nint g_avail = 0;  // 可用资源数量\n\nvoid *consumer(void *arg) {\n    pthread_mutex_lock(&g_mutex);\n    \n    while (g_avail == 0) {\n        // 等待条件满足（有资源可用）\n        pthread_cond_wait(&g_cond, &g_mutex);\n    }\n    \n    // 消费资源\n    g_avail--;\n    printf(\"Consumer: consumed, avail=%d\\n\", g_avail);\n    \n    pthread_mutex_unlock(&g_mutex);\n    return NULL;\n}\n\nvoid *producer(void *arg) {\n    pthread_mutex_lock(&g_mutex);\n    \n    // 生产资源\n    g_avail++;\n    printf(\"Producer: produced, avail=%d\\n\", g_avail);\n    \n    // 通知等待的线程\n    pthread_cond_signal(&g_cond);\n    \n    pthread_mutex_unlock(&g_mutex);\n    return NULL;\n}\n\nint main() {\n    pthread_t consumer_thread, producer_thread;\n    \n    pthread_mutex_init(&g_mutex, NULL);\n    pthread_cond_init(&g_cond, NULL);\n    \n    pthread_create(&consumer_thread, NULL, consumer, NULL);\n    sleep(1);  // 让消费者先运行并等待\n    pthread_create(&producer_thread, NULL, producer, NULL);\n    \n    pthread_join(consumer_thread, NULL);\n    pthread_join(producer_thread, NULL);\n    \n    pthread_mutex_destroy(&g_mutex);\n    pthread_cond_destroy(&g_cond);\n    return 0;\n}\n```\n\n**条件变量工作流程**：\n\n```mermaid\ngraph TD\n    A[消费者线程] --> B[pthread_mutex_lock]\n    B --> C{资源可用?}\n    C -->|否| D[pthread_cond_wait]\n    D --> E[释放锁并等待]\n    E --> F[生产者生产资源]\n    F --> G[pthread_cond_signal]\n    G --> H[唤醒消费者]\n    H --> I[重新获得锁]\n    I --> C\n    C -->|是| J[消费资源]\n    J --> K[pthread_mutex_unlock]\n    \n    style D fill:#ffccbc\n    style G fill:#fff9c4\n    style J fill:#c8e6c9\n```\n\n**关键函数**：\n\n```c\n// 初始化\npthread_cond_init(&cond, NULL);\n\n// 等待条件（会释放锁，被唤醒后重新获取锁）\npthread_cond_wait(&cond, &mutex);\n\n// 唤醒一个等待线程\npthread_cond_signal(&cond);\n\n// 唤醒所有等待线程\npthread_cond_broadcast(&cond);\n\n// 销毁\npthread_cond_destroy(&cond);\n```\n\n**注意事项**：\n\n1. **必须在锁内使用**\n\n   ```c\n   pthread_mutex_lock(&mutex);\n   while (condition_not_met) {\n       pthread_cond_wait(&cond, &mutex);\n   }\n   // 处理...\n   pthread_mutex_unlock(&mutex);\n   ```\n\n2. **使用while而非if**\n   - 防止虚假唤醒\n   - 再次检查条件\n\n3. **signal vs broadcast**\n   - `signal`：唤醒一个线程\n   - `broadcast`：唤醒所有线程\n\n---", "subs": ["3.2.1 为什么需要线程", "3.2.2 创建线程", "3.2.3 线程数据", "3.2.4 线程同步 - Mutex互斥锁", "3.2.5 线程同步 - Condition条件变量"]}, {"title": "3.3 总结", "content": "#### 3.3.1 核心要点\n\n**进程管理**：\n\n1. **fork系统调用**：创建子进程，返回值区分父子\n2. **exec系列函数**：执行新程序\n3. **ELF格式**：Linux二进制可执行文件格式\n4. **静态链接vs动态链接**：各有优劣，按需选择\n\n**线程管理**：\n\n1. **线程创建**：`pthread_create`创建，`pthread_join`等待\n2. **线程数据**：栈数据、全局数据、私有数据\n3. **Mutex互斥锁**：保护共享资源，防止竞争条件\n4. **条件变量**：线程间通知机制，实现同步\n\n#### 3.3.2 对比总结\n\n| 对比项 | 进程 | 线程 |\n|--------|------|------|\n| **资源** | 独立地址空间 | 共享进程地址空间 |\n| **开销** | 创建/切换开销大 | 创建/切换开销小 |\n| **通信** | IPC机制（复杂） | 共享内存（简单） |\n| **稳定性** | 一个进程崩溃不影响其他 | 一个线程崩溃影响整个进程 |\n| **应用** | 独立任务 | 并行子任务 |\n\n#### 3.3.3 常用命令速查\n\n```bash\n# 查看进程树\npstree -p\n\n# 查看进程详情\nps -ef | grep process_name\nps aux | grep process_name\n\n# 查看线程\nps -eLf | grep process_name\ntop -H -p PID\n\n# 查看ELF文件信息\nreadelf -h executable    # 查看ELF头\nreadelf -l executable    # 查看程序头\nreadelf -S executable    # 查看节头\nobjdump -d executable    # 反汇编\nnm executable            # 查看符号表\nldd executable           # 查看依赖的动态库\n```\n\n#### 3.3.4 编程最佳实践\n\n**进程编程**：\n\n- ✅ fork后立即exec，避免资源浪费\n- ✅ 父进程使用waitpid回收子进程\n- ✅ 检查fork/exec返回值\n\n**线程编程**：\n\n- ✅ 始终初始化互斥锁和条件变量\n- ✅ 加锁后尽快解锁，减少临界区\n- ✅ 使用while检查条件，防止虚假唤醒\n- ✅ 避免死锁（按固定顺序获取锁）\n- ✅ 线程退出前释放所有资源\n\n---", "subs": ["3.3.1 核心要点", "3.3.2 对比总结", "3.3.3 常用命令速查", "3.3.4 编程最佳实践"]}]}, {"title": "第3章 进程管理（下）：进程数据结构", "sections": [{"title": "3.4 进程数据结构概述", "content": "> **核心思想**：task_struct是Linux进程管理的核心数据结构，就像项目管理系统记录每个项目的所有信息。\n\n\n在Linux内核中，无论是进程还是线程，都统一使用`task_struct`结构进行管理。这是一个非常庞大的结构体，包含了进程运行的方方面面。\n\n**类比**：\n\n- **task_struct** = 项目管理工具（如Jira）中的项目卡片\n- 记录项目所有信息：ID、状态、负责人、资源、进度等\n\n**任务列表**：\n\n```c\nstruct list_head tasks;  // 将所有task_struct串成链表\n```\n\n---", "subs": ["task_struct = 项目管理工具（如Jira）中的项目卡片", "记录项目所有信息"]}, {"title": "3.5 任务ID", "content": "#### 3.5.1 ID字段\n\n```c\npid_t pid;                           // 进程ID\npid_t tgid;                          // 线程组ID  \nstruct task_struct *group_leader;   // 线程组leader\n```\n\n**为什么需要多个ID？**\n\n1. **任务展示问题**\n   - 用户使用`ps`命令时，只想看到进程，不想看到所有线程\n   - 需要区分哪些是进程，哪些是线程\n\n2. **指令下发问题**\n   - `kill`发送信号时，需要区分是发给整个进程还是单个线程\n   - 信号应该发给整个线程组\n\n**ID规则**：\n\n| 类型 | pid | tgid | group_leader |\n|------|-----|------|--------------|\n| **单线程进程** | 自己 | 自己 | 指向自己 |\n| **主线程** | 自己 | 自己 | 指向自己 |\n| **子线程** | 自己的ID | 主线程的pid | 指向主线程 |\n\n#### 3.5.2 信号处理\n\n```c\n/* Signal handlers */\nstruct signal_struct *signal;        // 线程组共享pending\nstruct sighand_struct *sighand;      // 信号处理函数\nsigset_t blocked;                    // 被阻塞的信号\nsigset_t real_blocked;\nsigset_t saved_sigmask;\nstruct sigpending pending;           // 本任务的pending\nunsigned long sas_ss_sp;             // 信号栈指针\nsize_t sas_ss_size;\nunsigned int sas_ss_flags;\n```\n\n**两个pending**：\n\n- `pending`：发给特定线程的信号\n- `signal->shared_pending`：发给整个线程组的信号\n\n---", "subs": ["3.5.1 ID字段", "3.5.2 信号处理"]}, {"title": "3.6 任务状态", "content": "#### 3.6.1 状态字段\n\n```c\nvolatile long state;     // 运行状态\nint exit_state;          // 退出状态\nunsigned int flags;      // 标志位\n```\n\n#### 3.6.2 状态值定义\n\n```c\n/* Used in tsk->state */\n#define TASK_RUNNING             0   // 可运行\n#define TASK_INTERRUPTIBLE       1   // 可中断睡眠\n#define TASK_UNINTERRUPTIBLE     2   // 不可中断睡眠\n#define __TASK_STOPPED           4   // 停止\n#define __TASK_TRACED            8   // 被调试\n\n/* Used in tsk->exit_state */\n#define EXIT_ZOMBIE              32  // 僵尸状态\n#define EXIT_DEAD                16  // 死亡状态\n\n/* Used in tsk->state again */\n#define TASK_DEAD                64\n#define TASK_WAKEKILL           128  // 可被致命信号唤醒\n#define TASK_WAKING             256\n#define TASK_PARKED             512\n#define TASK_NOLOAD            1024\n#define TASK_NEW               2048\n#define TASK_KILLABLE  (TASK_WAKEKILL | TASK_UNINTERRUPTIBLE)\n```\n\n#### 3.6.3 主要状态说明\n\n**TASK_RUNNING**（可运行）：\n\n- 并不是正在运行\n- 而是时刻准备运行\n- 获得时间片就运行，没获得就等待\n\n**睡眠状态**：\n\n1. **TASK_INTERRUPTIBLE**（可中断睡眠）\n   - 浅睡眠\n   - 等待I/O，但可被信号唤醒\n   - 唤醒后进行信号处理\n\n2. **TASK_UNINTERRUPTIBLE**（不可中断睡眠）\n   - 深度睡眠\n   - 不可被信号唤醒\n   - 只能等I/O完成\n   - ⚠️ 危险：kill也杀不死，只能重启\n\n3. **TASK_KILLABLE**（可终止睡眠）\n   - 类似TASK_UNINTERRUPTIBLE\n   - 但可响应致命信号\n   - 更安全的选择\n\n**停止状态**：\n\n- **TASK_STOPPED**：收到SIGSTOP等信号后进入\n- **TASK_TRACED**：被debugger监视\n\n**退出状态**：\n\n- **EXIT_ZOMBIE**（僵尸）：已退出，但父进程未回收\n- **EXIT_DEAD**：最终状态\n\n```mermaid\ngraph TD\n    A[TASK_NEW新建] --> B[TASK_RUNNING可运行]\n    B --> C{需要I/O?}\n    C -->|是| D[TASK_INTERRUPTIBLE]\n    C -->|是| E[TASK_UNINTERRUPTIBLE]\n    D --> F{收到信号?}\n    F -->|是| B\n    E --> G{I/O完成?}\n    G -->|是| B\n    B --> H{收到SIGSTOP?}\n    H -->|是| I[TASK_STOPPED]\n    I --> J{收到SIGCONT?}\n    J -->|是| B\n    B --> K[退出]\n    K --> L[EXIT_ZOMBIE]\n    L --> M{父进程wait?}\n    M -->|是| N[EXIT_DEAD]\n    \n    style B fill:#c8e6c9\n    style D fill:#fff9c4\n    style E fill:#ffccbc\n    style L fill:#ffe082\n```\n\n#### 3.6.4 标志位\n\n```c\n#define PF_EXITING      0x00000004  // 正在退出\n#define PF_VCPU         0x00000010  // 运行在虚拟CPU\n#define PF_FORKNOEXEC   0x00000040  // fork了但还没exec\n```\n\n---", "subs": ["3.6.1 状态字段", "3.6.2 状态值定义", "3.6.3 主要状态说明", "3.6.4 标志位"]}, {"title": "3.7 运行统计信息", "content": "```c\nu64 utime;                    // 用户态消耗CPU时间\nu64 stime;                    // 内核态消耗CPU时间\nunsigned long nvcsw;          // 自愿上下文切换次数\nunsigned long nivcsw;         // 非自愿上下文切换次数\nu64 start_time;               // 进程启动时间（不含睡眠）\nu64 real_start_time;          // 进程启动时间（含睡眠）\n```\n\n**类比**：项目经理需要了解员工工作情况\n\n- 某员工长时间做一个任务→需要关注\n- 某员工琐碎任务太多→影响效率\n\n---", "subs": ["某员工长时间做一个任务→需要关注", "某员工琐碎任务太多→影响效率"]}, {"title": "3.8 进程亲缘关系", "content": "#### 3.8.1 关系字段\n\n```c\nstruct task_struct __rcu *real_parent;  // 真正的父进程\nstruct task_struct __rcu *parent;       // 接收SIGCHLD的父进程\nstruct list_head children;              // 子进程链表头\nstruct list_head sibling;               // 兄弟进程链表节点\n```\n\n#### 3.8.2 进程家族树\n\n```mermaid\ngraph TD\n    A[init进程PID=1] --> B[bash]\n    A --> C[systemd服务]\n    B --> D[子进程1]\n    B --> E[子进程2]\n    E --> F[孙进程]\n    \n    style A fill:#e1f5ff\n    style B fill:#fff9c4\n    style F fill:#c8e6c9\n```\n\n**特殊情况**：\n\n- 通常`real_parent == parent`\n- 例外：GDB调试时\n  - `parent` = GDB（接收信号）\n  - `real_parent` = bash（真正的父进程）\n\n---", "subs": ["3.8.1 关系字段", "3.8.2 进程家族树"]}, {"title": "3.9 进程权限", "content": "#### 3.9.1 权限字段\n\n```c\nconst struct cred __rcu *real_cred;  // 谁能操作我（Objective）\nconst struct cred __rcu *cred;       // 我能操作谁（Subjective）\n```\n\n#### 3.9.2 cred结构体\n\n```c\nstruct cred {\n    kuid_t uid;         // real UID\n    kgid_t gid;         // real GID\n    kuid_t suid;        // saved UID\n    kgid_t sgid;        // saved GID\n    kuid_t euid;        // effective UID (起作用)\n    kgid_t egid;        // effective GID (起作用)\n    kuid_t fsuid;       // UID for VFS ops\n    kgid_t fsgid;       // GID for VFS ops\n    \n    kernel_cap_t cap_inheritable;  // 可继承权限\n    kernel_cap_t cap_permitted;    // 允许使用的权限\n    kernel_cap_t cap_effective;    // 实际起作用的权限\n    kernel_cap_t cap_bset;         // capability bounding set\n    kernel_cap_t cap_ambient;      // ambient权限\n};\n```\n\n#### 3.9.3 UID/GID详解\n\n**三种ID**：\n\n1. **uid/gid**（Real）\n   - 谁启动的进程\n   - 权限审核时不常用\n\n2. **euid/egid**（Effective）\n   - 真正起作用的ID\n   - 操作消息队列、共享内存、信号量时比较\n\n3. **fsuid/fsgid**（Filesystem）\n   - 文件操作时审核\n   - 通常与euid/egid相同\n\n**set-user-ID示例**：\n\n```bash\n# 游戏程序场景\n# 用户A想运行用户B的游戏\n# 游戏数据文件只有B可写\n\n# 方案1：给所有人执行权限（不安全）\nchmod 755 game\n\n# 方案2：使用set-user-ID\nchmod u+s game  # rwsr-xr-x\n\n# 运行时：\n# uid = A（启动者）\n# euid = B（文件所有者）\n# fsuid = B（可以写游戏数据）\n```\n\n**suid/sgid**（Saved）：\n\n- 保存原来的特权用户ID\n- 方便通过`setuid`切换权限\n\n#### 3.9.4 Capabilities细粒度权限\n\n**为什么需要Capabilities**：\n\n- root权限太大\n- 普通用户权限太小\n- 需要更细粒度的权限控制\n\n**部分Capabilities**：\n\n```c\n#define CAP_CHOWN            0   // 修改文件所有者\n#define CAP_KILL             5   // 发送信号\n#define CAP_NET_BIND_SERVICE 10  // 绑定小于1024的端口\n#define CAP_NET_RAW          13  // 使用RAW和PACKET socket\n#define CAP_SYS_MODULE       16  // 加载内核模块\n#define CAP_SYS_RAWIO        17  // 原始I/O操作\n#define CAP_SYS_BOOT         22  // 重启系统\n#define CAP_SYS_TIME         25  // 修改系统时间\n#define CAP_AUDIT_READ       37  // 读取审计日志\n```\n\n**五种Capabilities集合**：\n\n1. **cap_permitted**\n   - 进程可以使用的权限\n   - 可以包含effective中没有的\n\n2. **cap_effective**\n   - 实际起作用的权限\n   - 进程可以临时放弃某些权限\n\n3. **cap_inheritable**\n   - 可执行文件有inheritable属性时继承\n   - 非root用户下较鸡肋\n\n4. **cap_bset**（Bounding Set）\n   - 系统所有进程允许保留的权限\n   - 限制整个系统的权限范围\n   - 例如：去掉CAP_SYS_MODULE，所有进程都不能加载模块\n\n5. **cap_ambient**\n   - 解决cap_inheritable的问题\n   - 非root用户exec时也能保留权限\n\n---", "subs": ["3.9.1 权限字段", "3.9.2 cred结构体", "3.9.3 UID/GID详解", "3.9.4 Capabilities细粒度权限"]}, {"title": "3.10 内存管理", "content": "```c\nstruct mm_struct *mm;              // 进程内存空间\nstruct mm_struct *active_mm;       // 当前使用的内存空间\n```\n\n每个进程都有独立的虚拟内存空间，由`mm_struct`表示。详见第4章内存管理。\n\n---", "subs": []}, {"title": "3.11 文件与文件系统", "content": "```c\n/* Filesystem information */\nstruct fs_struct *fs;              // 文件系统信息\n\n/* Open file information */\nstruct files_struct *files;        // 打开的文件信息\n```\n\n详见第5章文件系统。\n\n---", "subs": []}, {"title": "3.12 总结", "content": "#### 3.12.1 task_struct核心字段总结\n\n```mermaid\ngraph TD\n    A[task_struct] --> B[ID标识]\n    A --> C[状态管理]\n    A --> D[运行统计]\n    A --> E[进程关系]\n    A --> F[权限控制]\n    A --> G[内存管理]\n    A --> H[文件系统]\n    A --> I[调度信息]\n    A --> J[信号处理]\n    \n    B --> B1[pid/tgid/group_leader]\n    C --> C1[state/exit_state/flags]\n    D --> D1[utime/stime/nvcsw/nivcsw]\n    E --> E1[parent/children/sibling]\n    F --> F1[real_cred/cred]\n    G --> G1[mm/active_mm]\n    H --> H1[fs/files]\n    I --> I1[prio/policy/sched_class]\n    J --> J1[signal/sighand/pending]\n    \n    style A fill:#e1f5ff\n    style F fill:#fff9c4\n```\n\n#### 3.12.2 重点知识\n\n**必须掌握**：\n\n1. **ID管理**\n   - pid、tgid、group_leader三者关系\n   - 如何区分进程和线程\n\n2. **状态转换**\n   - TASK_RUNNING、睡眠状态、停止状态、退出状态\n   - 不同睡眠状态的区别和使用场景\n\n3. **权限机制**\n   - uid、euid、suid、fsuid的作用和区别\n   - set-user-ID的工作原理 ⭐⭐⭐（面试高频）\n   - Capabilities细粒度权限\n\n4. **进程关系**\n   - parent、real_parent、children、sibling\n   - 进程树的组织方式\n\n#### 3.12.3 实用命令\n\n```bash\n# 查看进程详细信息\ncat /proc/PID/status\n\n# 查看进程状态\nps -eo pid,stat,comm | grep PID\n\n# 状态标识\n# R: running\n# S: sleeping (TASK_INTERRUPTIBLE)\n# D: disk sleep (TASK_UNINTERRUPTIBLE)\n# T: stopped\n# Z: zombie\n\n# 查看进程关系\npstree -p PID\n\n# 查看进程权限\ncat /proc/PID/status | grep -E \"Uid|Gid|Cap\"\n\n# 查看进程所有信息\ncat /proc/PID/stat\ncat /proc/PID/statm  # 内存统计\n```\n\n#### 3.12.4 关键数据结构图\n\n**完整的task_struct结构**（简化版）：\n\n```\ntask_struct (进程/线程描述符)\n├── 标识信息\n│   ├── pid (进程ID)\n│   ├── tgid (线程组ID)\n│   └── comm[16] (进程名)\n├── 状态信息\n│   ├── state (运行状态)\n│   ├── exit_state (退出状态)\n│   └── flags (标志位)\n├── 调度信息\n│   ├── prio (优先级)\n│   ├── static_prio\n│   ├── rt_priority\n│   ├── sched_class (调度类)\n│   └── policy (调度策略)\n├── 时间统计\n│   ├── utime (用户态时间)\n│   ├── stime (内核态时间)\n│   └── start_time (启动时间)\n├── 进程关系\n│   ├── parent (父进程)\n│   ├── children (子进程链表)\n│   └── sibling (兄弟链表)\n├── 权限控制\n│   ├── real_cred\n│   └── cred (uid/gid/euid/egid/capabilities)\n├── 信号处理\n│   ├── signal\n│   ├── sighand\n│   └── pending\n├── 内存管理\n│   └── mm (mm_struct)\n├── 文件系统\n│   ├── fs (fs_struct)\n│   └── files (files_struct)\n└── 内核栈\n    └── stack (thread_info)\n```\n\n---\n\n**本章总结**：\n\n- ✅ 第一部分：进程创建、线程机制、同步原语\n- ✅ 第二部分：task_struct数据结构详解\n- ✅ 第三部分：进程调度机制（调度策略、CFS算法、主动调度、抢占调度）\n\n---", "subs": ["3.12.1 task_struct核心字段总结", "3.12.2 重点知识", "3.12.3 实用命令", "3.12.4 关键数据结构图"]}]}, {"title": "第3章 进程管理（三）：调度机制", "sections": [{"title": "3.13 调度策略与调度类", "content": "> **核心思想**：调度是操作系统的核心功能，需要在响应速度和公平性之间找到平衡。Linux使用CFS算法实现公平调度。\n\n\n#### 3.13.1 进程分类\n\n**两大类进程**：\n\n1. **实时进程**（Real-Time）\n   - 需要尽快执行并返回结果\n   - 优先级高，类比：加急项目\n   - 优先级范围：0-99（数值越小越高）\n\n2. **普通进程**（Normal）\n   - 大部分进程\n   - 按正常流程执行\n   - 优先级范围：100-139\n\n**实时进程优先级 > 普通进程优先级**\n\n#### 3.13.2 调度策略\n\n```c\nunsigned int policy;  // 在task_struct中\n\n// 调度策略定义\n#define SCHED_NORMAL     0  // 普通进程CFS\n#define SCHED_FIFO       1  // 实时进程：先进先出\n#define SCHED_RR         2  // 实时进程：轮转\n#define SCHED_BATCH      3  // 后台进程\n#define SCHED_IDLE       5  // 空闲时运行\n#define SCHED_DEADLINE   6  // 实时进程：按deadline调度\n```\n\n**策略说明**：\n\n| 策略 | 类型 | 说明 |\n|------|------|------|\n| **SCHED_FIFO** | 实时 | 先来先服务，高优先级可抢占低优先级 |\n| **SCHED_RR** | 实时 | 轮转，相同优先级轮流使用时间片 |\n| **SCHED_DEADLINE** | 实时 | 按deadline调度，最紧急的先执行 |\n| **SCHED_NORMAL** | 普通 | CFS公平调度 |\n| **SCHED_BATCH** | 普通 | 后台任务，降低优先级 |\n| **SCHED_IDLE** | 普通 | 空闲时才运行 |\n\n#### 3.13.3 调度类\n\n```c\nconst struct sched_class *sched_class;  // 真正干活的\n```\n\n**五大调度类**（优先级从高到低）：\n\n1. **stop_sched_class**：最高优先级，中断所有其他线程\n2. **dl_sched_class**：对应SCHED_DEADLINE\n3. **rt_sched_class**：对应SCHED_FIFO/SCHED_RR\n4. **fair_sched_class**：对应SCHED_NORMAL/SCHED_BATCH（★重点）\n5. **idle_sched_class**：对应SCHED_IDLE\n\n**调度类链表**：\n\n```c\nfor_each_class(class) {\n    p = class->pick_next_task(rq, prev, rf);\n    if (p)\n        return p;\n}\n```\n\n---", "subs": ["3.13.1 进程分类", "3.13.2 调度策略", "3.13.3 调度类"]}, {"title": "3.14 完全公平调度（CFS）", "content": "#### 3.14.1 CFS基本原理\n\n**核心思想**：让每个进程获得公平的CPU时间。\n\n**虚拟运行时间（vruntime）**：\n\n- CPU每个tick更新vruntime\n- 运行的进程vruntime增加\n- 未运行的进程vruntime不变\n- 总是选择vruntime最小的进程运行\n\n**类比**：把球分配到N个口袋\n\n- 看哪个少，就多放一些\n- 哪个多了，就先不放\n- 经过多轮，达到基本公平\n\n#### 3.14.2 权重与优先级\n\n**虚拟时间计算公式**：\n\n```\nvruntime += 实际运行时间 × NICE_0_LOAD / 权重\n```\n\n**效果**：\n\n- 高权重：实际运行时间多，vruntime增长慢\n- 低权重：实际运行时间少，vruntime增长快\n- 结果：高权重进程获得更多CPU时间\n\n**更新vruntime的代码**：\n\n```c\nstatic void update_curr(struct cfs_rq *cfs_rq) {\n    struct sched_entity *curr = cfs_rq->curr;\n    u64 now = rq_clock_task(rq_of(cfs_rq));\n    u64 delta_exec = now - curr->exec_start;\n    \n    curr->exec_start = now;\n    curr->sum_exec_runtime += delta_exec;\n    curr->vruntime += calc_delta_fair(delta_exec, curr);\n}\n\nstatic inline u64 calc_delta_fair(u64 delta, struct sched_entity *se) {\n    if (unlikely(se->load.weight != NICE_0_LOAD))\n        delta = calc_delta(delta, NICE_0_LOAD, &se->load);\n    return delta;\n}\n```\n\n#### 3.14.3 红黑树调度队列\n\n**为什么用红黑树？**\n\n- 需要快速找到vruntime最小的进程\n- 需要快速插入和删除\n- 红黑树查询和更新都是O(log n)\n\n**调度实体（sched_entity）**：\n\n```c\nstruct sched_entity {\n    struct load_weight load;        // 权重\n    struct rb_node run_node;        // 红黑树节点\n    u64 exec_start;                 // 开始执行时间\n    u64 sum_exec_runtime;           // 总运行时间\n    u64 vruntime;                   // 虚拟运行时间\n    u64 prev_sum_exec_runtime;\n    ...\n};\n```\n\n**CFS运行队列**：\n\n```c\nstruct cfs_rq {\n    struct load_weight load;\n    unsigned int nr_running;\n    u64 exec_clock;\n    u64 min_vruntime;\n    struct rb_root tasks_timeline;  // 红黑树根\n    struct rb_node *rb_leftmost;    // 最左节点（vruntime最小）\n    struct sched_entity *curr, *next, *last, *skip;\n    ...\n};\n```\n\n**每个CPU的运行队列（rq）**：\n\n```c\nstruct rq {\n    raw_spinlock_t lock;\n    unsigned int nr_running;\n    struct cfs_rq cfs;              // CFS队列\n    struct rt_rq rt;                // 实时队列\n    struct dl_rq dl;                // Deadline队列\n    struct task_struct *curr, *idle, *stop;\n    ...\n};\n```\n\n```mermaid\ngraph TD\n    A[CPU运行队列rq] --> B[实时队列rt_rq]\n    A --> C[CFS队列cfs_rq]\n    A --> D[Deadline队列dl_rq]\n    C --> E[红黑树]\n    E --> F[vruntime=100]\n    E --> G[vruntime=150]\n    E --> H[vruntime=200]\n    F --> I[最左节点<br/>下一个运行]\n    \n    style A fill:#e1f5ff\n    style C fill:#fff9c4\n    style I fill:#c8e6c9\n```\n\n---", "subs": ["3.14.1 CFS基本原理", "3.14.2 权重与优先级", "3.14.3 红黑树调度队列"]}, {"title": "3.15 主动调度", "content": "#### 3.15.1 主动调度场景\n\n**什么是主动调度？**\n进程主动让出CPU，例如：\n\n- 等待I/O操作\n- 调用sleep()\n- 等待网络数据\n\n**示例1：等待写入**\n\n```c\nstatic void btrfs_wait_for_no_snapshoting_writes(struct btrfs_root *root) {\n    do {\n        prepare_to_wait(&root->subv_writers->wait, &wait,\n                       TASK_UNINTERRUPTIBLE);\n        writers = percpu_counter_sum(&root->subv_writers->counter);\n        if (writers)\n            schedule();  // 主动让出CPU\n        finish_wait(&root->subv_writers->wait, &wait);\n    } while (writers);\n}\n```\n\n**示例2：等待网络数据**\n\n```c\nstatic ssize_t tap_do_read(struct tap_queue *q, struct iov_iter *to,\n                          int noblock, struct sk_buff *skb) {\n    while (1) {\n        if (!noblock)\n            prepare_to_wait(sk_sleep(&q->sk), &wait,\n                           TASK_INTERRUPTIBLE);\n        // 没有数据，让出CPU\n        schedule();\n    }\n}\n```\n\n#### 3.15.2 schedule()函数\n\n**调用链**：\n\n```\nschedule()\n  └─> __schedule(false)\n```\n\n**__schedule核心流程**：\n\n```mermaid\ngraph TD\n    A[__schedule开始] --> B[获取当前CPU的rq]\n    B --> C[prev=当前进程]\n    C --> D[pick_next_task选择下一个进程]\n    D --> E{prev != next?}\n    E -->|是| F[context_switch上下文切换]\n    E -->|否| G[继续运行当前进程]\n    F --> H[switch_mm切换内存空间]\n    H --> I[switch_to切换寄存器和栈]\n    \n    style A fill:#e1f5ff\n    style D fill:#fff9c4\n    style F fill:#ffccbc\n    style I fill:#c8e6c9\n```\n\n**选择下一个进程**：\n\n```c\nstatic inline struct task_struct *\npick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf) {\n    // 优化：大部分是普通进程\n    if (likely(prev->sched_class == &fair_sched_class &&\n               rq->nr_running == rq->cfs.h_nr_running)) {\n        p = fair_sched_class.pick_next_task(rq, prev, rf);\n        if (unlikely(!p))\n            p = idle_sched_class.pick_next_task(rq, prev, rf);\n        return p;\n    }\n    \n    // 依次尝试各调度类\n    for_each_class(class) {\n        p = class->pick_next_task(rq, prev, rf);\n        if (p)\n            return p;\n    }\n}\n```\n\n**CFS选择下一个任务**：\n\n```c\nstatic struct task_struct *\npick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf) {\n    struct cfs_rq *cfs_rq = &rq->cfs;\n    struct sched_entity *se;\n    \n    // 更新当前进程的vruntime\n    if (curr && curr->on_rq)\n        update_curr(cfs_rq);\n    \n    // 从红黑树取最左节点\n    se = pick_next_entity(cfs_rq, curr);\n    p = task_of(se);\n    \n    // 如果不同，更新红黑树\n    if (prev != p) {\n        put_prev_entity(cfs_rq, &prev->se);\n        set_next_entity(cfs_rq, se);\n    }\n    return p;\n}\n```\n\n#### 3.15.3 上下文切换\n\n**两大任务**：\n\n1. 切换进程内存空间（虚拟内存）\n2. 切换寄存器和CPU上下文\n\n**context_switch实现**：\n\n```c\nstatic __always_inline struct rq *\ncontext_switch(struct rq *rq, struct task_struct *prev,\n              struct task_struct *next, struct rq_flags *rf) {\n    struct mm_struct *mm, *oldmm;\n    \n    mm = next->mm;\n    oldmm = prev->active_mm;\n    \n    // 切换内存空间\n    switch_mm_irqs_off(oldmm, mm, next);\n    \n    // 切换寄存器和栈\n    switch_to(prev, next, prev);\n    \n    return finish_task_switch(prev);\n}\n```\n\n**切换栈（32位）**：\n\n```assembly\n/* %eax: prev task, %edx: next task */\nENTRY(__switch_to_asm)\n    /* 切换栈 */\n    movl %esp, TASK_threadsp(%eax)      # 保存prev的栈指针\n    movl TASK_threadsp(%edx), %esp      # 加载next的栈指针\n    jmp __switch_to\nEND(__switch_to_asm)\n```\n\n**切换栈（64位）**：\n\n```assembly\n/* %rdi: prev task, %rsi: next task */\nENTRY(__switch_to_asm)\n    /* 切换栈 */\n    movq %rsp, TASK_threadsp(%rdi)      # 保存prev的栈指针\n    movq TASK_threadsp(%rsi), %rsp      # 加载next的栈指针\n    jmp __switch_to\nEND(__switch_to_asm)\n```\n\n---", "subs": ["3.15.1 主动调度场景", "3.15.2 schedule()函数", "3.15.3 上下文切换"]}, {"title": "3.16 抢占式调度", "content": "#### 3.16.1 抢占的必要性\n\n**为什么需要抢占？**\n\n- 防止某进程长时间独占CPU\n- 保证系统响应性\n- 实现时间片轮转\n\n**抢占触发机制**：\n\n- 时钟中断：定期检查是否需要抢占\n- 进程唤醒：高优先级进程被唤醒\n\n#### 3.16.2 时钟中断触发抢占\n\n**流程**：\n\n```\n时钟中断\n  └─> scheduler_tick()\n        └─> curr->sched_class->task_tick()\n              └─> task_tick_fair()  (对于CFS)\n                    └─> entity_tick()\n                          └─> check_preempt_tick()\n```\n\n**检查是否需要抢占**：\n\n```c\nstatic void check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr) {\n    unsigned long ideal_runtime, delta_exec;\n    struct sched_entity *se;\n    s64 delta;\n    \n    // 计算理想运行时间\n    ideal_runtime = sched_slice(cfs_rq, curr);\n    // 计算实际运行时间\n    delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;\n    \n    // 超过理想运行时间，应该被抢占\n    if (delta_exec > ideal_runtime) {\n        resched_curr(rq_of(cfs_rq));\n        return;\n    }\n    \n    // 或者vruntime差距过大\n    se = __pick_first_entity(cfs_rq);\n    delta = curr->vruntime - se->vruntime;\n    if (delta > ideal_runtime)\n        resched_curr(rq_of(cfs_rq));\n}\n```\n\n**标记抢占**：\n\n```c\nstatic inline void set_tsk_need_resched(struct task_struct *tsk) {\n    set_tsk_thread_flag(tsk, TIF_NEED_RESCHED);  // 打标签\n}\n```\n\n#### 3.16.3 进程唤醒触发抢占\n\n**唤醒流程**：\n\n```\ntry_to_wake_up()\n  └─> ttwu_queue()\n        └─> ttwu_do_activate()\n              └─> ttwu_do_wakeup()\n                    └─> check_preempt_curr()  // 检查是否抢占\n```\n\n```c\nstatic void ttwu_do_wakeup(struct rq *rq, struct task_struct *p,\n                          int wake_flags, struct rq_flags *rf) {\n    check_preempt_curr(rq, p, wake_flags);  // 检查是否需要抢占\n    p->state = TASK_RUNNING;\n}\n```\n\n#### 3.16.4 抢占时机\n\n**用户态抢占时机**：\n\n1. **系统调用返回**：\n\n```c\nstatic void exit_to_usermode_loop(struct pt_regs *regs, u32 cached_flags) {\n    while (true) {\n        local_irq_enable();\n        if (cached_flags & _TIF_NEED_RESCHED)\n            schedule();  // 发生调度\n        ...\n    }\n}\n```\n\n2. **中断返回**：\n\n```assembly\ncommon_interrupt:\n    ...\nret_from_intr:\n    popq %rsp\n    testb $3, CS(%rsp)          # 测试返回用户态还是内核态\n    jz retint_kernel\n    \nGLOBAL(retint_user)\n    mov %rsp,%rdi\n    call prepare_exit_to_usermode  # 可能触发调度\n    SWAPGS\n    jmp restore_regs_and_iret\n```\n\n**内核态抢占时机**：\n\n1. **preempt_enable()时**：\n\n```c\n#define preempt_enable() \\\n    do { \\\n        if (unlikely(preempt_count_dec_and_test())) \\\n            __preempt_schedule(); \\\n    } while (0)\n\n#define preempt_count_dec_and_test() \\\n    ({ preempt_count_sub(1); should_resched(0); })\n\nstatic __always_inline bool should_resched(int preempt_offset) {\n    return unlikely(preempt_count() == preempt_offset &&\n                   tif_need_resched());\n}\n```\n\n2. **中断返回内核态**：\n\n```assembly\nretint_kernel:\n#ifdef CONFIG_PREEMPT\n    bt $9, EFLAGS(%rsp)                    # 检查中断标志\n    jnc 1f\n0:  cmpl $0, PER_CPU_VAR(__preempt_count)\n    jnz 1f\n    call preempt_schedule_irq              # 触发调度\n    jmp 0b\n#endif\n```\n\n```c\nasmlinkage __visible void __sched preempt_schedule_irq(void) {\n    do {\n        preempt_disable();\n        local_irq_enable();\n        __schedule(true);  // 发生调度\n        local_irq_disable();\n        sched_preempt_enable_no_resched();\n    } while (need_resched());\n}\n```\n\n---", "subs": ["3.16.1 抢占的必要性", "3.16.2 时钟中断触发抢占", "3.16.3 进程唤醒触发抢占", "3.16.4 抢占时机"]}, {"title": "3.17 总结", "content": "#### 3.17.1 核心要点\n\n**调度体系**：\n\n1. **调度策略**：定义\"应该怎么调度\"\n2. **调度类**：实现\"真正怎么调度\"\n3. **调度算法**：CFS实现公平调度\n4. **调度时机**：主动调度 + 抢占调度\n\n**CFS核心思想**：\n\n- 使用vruntime保证公平\n- 红黑树快速选择下一个进程\n- 权重机制处理优先级\n\n**调度第一定律**：\n> 所有调度路径最终都会调用`__schedule()`函数\n\n#### 3.17.2 调度全流程图\n\n```mermaid\ngraph TD\n    A[进程调度触发] --> B{触发方式}\n    B -->|主动调度| C[schedule<br/>等待I/O]\n    B -->|抢占调度| D{抢占场景}\n    D --> E[时钟中断<br/>scheduler_tick]\n    D --> F[进程唤醒<br/>try_to_wake_up]\n    C --> G[__schedule]\n    E --> H[标记TIF_NEED_RESCHED]\n    F --> H\n    H --> I{抢占时机}\n    I -->|用户态| J[系统调用返回<br/>中断返回]\n    I -->|内核态| K[preempt_enable<br/>中断返回]\n    J --> G\n    K --> G\n    G --> L[pick_next_task]\n    L --> M[context_switch]\n    M --> N[switch_mm<br/>切换内存]\n    N --> O[switch_to<br/>切换寄存器]\n    \n    style G fill:#e1f5ff\n    style L fill:#fff9c4\n    style M fill:#ffccbc\n    style O fill:#c8e6c9\n```\n\n#### 3.17.3 重要数据结构关系\n\n```\ntask_struct\n├── policy (调度策略)\n├── prio, static_prio, normal_prio (优先级)\n├── sched_class (调度类)\n│   ├── stop_sched_class\n│   ├── dl_sched_class\n│   ├── rt_sched_class\n│   ├── fair_sched_class ★\n│   └── idle_sched_class\n└── se (sched_entity调度实体)\n    ├── vruntime (虚拟运行时间)\n    ├── load.weight (权重)\n    └── run_node (红黑树节点)\n\nrq (每CPU运行队列)\n├── cfs_rq (CFS队列)\n│   ├── tasks_timeline (红黑树根)\n│   ├── rb_leftmost (最左节点)\n│   └── min_vruntime\n├── rt_rq (实时队列)\n└── dl_rq (Deadline队列)\n```\n\n#### 3.17.4 关键函数速查\n\n| 函数 | 功能 | 调用场景 |\n|------|------|----------|\n| `schedule()` | 主动调度入口 | 等待I/O、sleep等 |\n| `__schedule()` | 调度核心 | 所有调度最终调用 |\n| `pick_next_task()` | 选择下一个进程 | 每次调度时 |\n| `context_switch()` | 上下文切换 | 切换进程时 |\n| `scheduler_tick()` | 时钟中断处理 | 每个tick |\n| `check_preempt_tick()` | 检查抢占 | 时钟中断时 |\n| `resched_curr()` | 标记需要抢占 | 抢占检查时 |\n\n---\n\n**下一节预告**：将继续处理第4批第二部分（进程/线程创建的详细实现）。\n\n---", "subs": ["3.17.1 核心要点", "3.17.2 调度全流程图", "3.17.3 重要数据结构关系", "3.17.4 关键函数速查"]}]}, {"title": "第3章 进程管理（四）：进程与线程创建", "sections": [{"title": "3.18 进程创建：fork系统调用", "content": "> **核心思想**：进程使用fork创建，线程使用clone创建。两者的本质区别在于资源共享程度。\n\n\n#### 进程创建完整流程图（fork → exec）\n\n```mermaid\ngraph TD\n    START[\"⭐ 父进程执行中<br/>运行业务代码\"] --> FORK_CALL[\"📞 调用fork()<br/>用户态\"]  \n    \n    FORK_CALL --> SYSCALL[\"🚪 系统调用陷入<br/>进入内核态\"]\n    \n    SYSCALL --> DO_FORK[\"⚙️ _do_fork()<br/>内核核心函数\"]\n    \n    DO_FORK --> COPY_PROCESS[\"📋 copy_process()<br/>复制进程结构\"]\n    \n    subgraph 复制五大结构[\"🔄 复制五大结构\"]\n        direction TB\n        COPY1[\"1. dup_task_struct<br/>复制task_struct\"]\n        COPY2[\"2. copy_files<br/>文件描述符表\"]\n        COPY3[\"3. copy_mm<br/>内存空间mm_struct\"]\n        COPY4[\"4. copy_thread<br/>内核栈和寄存器\"]\n        COPY5[\"5. 分配PID<br/>新进程标识\"]\n    end\n    \n    COPY_PROCESS --> COPY1\n    COPY1 --> COPY2\n    COPY2 --> COPY3\n    COPY3 --> COPY4\n    COPY4 --> COPY5\n    \n    COPY5 --> SCHED_FORK[\"⏰ sched_fork()<br/>调度器初始化\"]\n    \n    SCHED_FORK --> SCHED1[\"设置子进程状态<br/>TASK_NEW\"]\n    SCHED1 --> SCHED2[\"设置优先级<br/>prio和vruntime\"]\n    SCHED2 --> SCHED3[\"不放入runqueue<br/>暂不可调度\"]\n    \n    SCHED3 --> WAKE_UP[\"🎬 wake_up_new_task()<br/>唤醒子进程\"]\n    \n    WAKE_UP --> WAKE1[\"状态改为RUNNING\"]  \n    WAKE1 --> WAKE2[\"加入runqueue<br/>可被调度\"]\n    WAKE2 --> WAKE3[\"调用check_preempt_curr<br/>检查是否抢占父进程\"]\n    \n    WAKE3 --> FORK_RETURN[\"↩️ fork()返回\"]\n    \n    FORK_RETURN --> PARENT{\"📊 返回值判断\"}\n    \n    PARENT -->|\"返回子进程PID<br/>(大于0)\"| PARENT_PROC[\"👨 父进程继续<br/>拿到child_pid\"]\n    PARENT -->|\"返回0\"| CHILD_PROC[\"👶 子进程开始<br/>从fork返回点执行\"]\n    \n    PARENT_PROC --> PARENT_WAIT[\"🔄 父进程选择<br/>wait()等待 或 继续执行\"]\n    \n    subgraph exec流程[\"🚀 exec流程（子进程通常执行）\"]\n        direction TB\n        EXEC_CALL[\"📞 调用execve()<br/>execve(\\\"ls\\\", args, env)\"]\n        EXEC_LOAD[\"📂 加载ELF文件<br/>读取可执行文件\"]\n        EXEC_CLEAR[\"🧹 清理旧内存空间<br/>释放原mm_struct\"]\n        EXEC_NEW_MM[\"🆕 创建新地址空间<br/>代码段/数据段/堆/栈\"]\n        EXEC_ENTRY[\"🎯 设置执行入口<br/>rip = ELF entry point\"]\n        EXEC_START[\"▶️ 开始执行新程序<br/>从新的main()开始\"]\n    end\n    \n    CHILD_PROC --> EXEC_DECISION{\"是否exec?\"}\n    EXEC_DECISION -->|\"是\"| EXEC_CALL\n    EXEC_DECISION -->|\"否\"| CHILD_CONTINUE[\"继续执行<br/>与父进程相同代码\"]\n    \n    EXEC_CALL --> EXEC_LOAD\n    EXEC_LOAD --> EXEC_CLEAR\n    EXEC_CLEAR --> EXEC_NEW_MM\n    EXEC_NEW_MM --> EXEC_ENTRY\n    EXEC_ENTRY --> EXEC_START\n    \n    EXEC_START --> NEW_PROG[\"🎉 新程序运行<br/>ls程序执行\"]\n    \n    subgraph 进程终止[\"⚰️ 进程终止\"]\n        direction LR\n        CHILD_EXIT[\"调用exit()\"]\n        ZOMBIE[\"进入ZOMBIE状态\"]\n        PARENT_REAP[\"父进程wait()回收\"]\n        FINALLY_EXIT[\"完全退出\"]\n    end\n    \n    NEW_PROG -.结束后.-> CHILD_EXIT\n    CHILD_CONTINUE -.结束后.-> CHILD_EXIT\n    CHILD_EXIT --> ZOMBIE\n    ZOMBIE --> PARENT_REAP\n    PARENT_REAP --> FINALLY_EXIT\n    \n    style FORK_CALL fill:#e3f2fd,stroke:#1976d2,stroke-width:2px\n    style COPY_PROCESS fill:#fff3e0,stroke:#f57c00,stroke-width:2px\n    style PARENT_PROC fill:#c8e6c9,stroke:#388e3c,stroke-width:2px\n    style CHILD_PROC fill:#f8bbd0,stroke:#c2185b,stroke-width:2px\n    style EXEC_CALL fill:#e1bee7,stroke:#7b1fa2,stroke-width:2px\n    style NEW_PROG fill:#ffccbc,stroke:#d84315,stroke-width:2px\n    style ZOMBIE fill:#b39ddb,stroke:#512da8,stroke-width:2px\n```\n\n**进程创建流程关键点**：\n\n#### 1️⃣ fork阶段（复制）\n\n| 步骤 | 函数 | 作用 | 关键点 |\n|------|------|------|--------|\n| 系统调用 | `sys_fork()` | fork入口 | 调用_do_fork(SIGCHLD, 0...) |\n| 核心实现 | `_do_fork()` | 进程创建核心 | 统一入口（fork/vfork/clone） |\n| 复制进程 | `copy_process()` | 复制task_struct | **写时复制COW** |\n| 复制内存 | `copy_mm()` | 复制mm_struct | 共享页表（COW） |\n| 复制文件 | `copy_files()` | 复制fd表 | 引用计数+1 |\n| 复制线程 | `copy_thread()` | 复制内核栈 | 设置子进程返回值=0 |\n| 调度初始化 | `sched_fork()` | 初始化调度信息 | 设置vruntime |\n| 唤醒 | `wake_up_new_task()` | 加入runqueue | TASK_RUNNING |\n\n#### 2️⃣ fork返回（分叉）\n\n**父进程视角**：\n\n```c\npid_t child_pid = fork();\nif (child_pid > 0) {\n    // 父进程：child_pid是子进程PID\n    printf(\"我是父进程，子进程PID=%d\\n\", child_pid);\n    wait(NULL);  // 等待子进程结束\n}\n```\n\n**子进程视角**：\n\n```c\npid_t child_pid = fork();\nif (child_pid == 0) {\n    // 子进程：返回值为0\n    printf(\"我是子进程\\n\");\n    // 通常接着调用exec\n    execvp(\"ls\", args);\n}\n```\n\n#### 3️⃣ exec阶段（替换）\n\n| 步骤 | 函数 | 作用 | 关键点 |\n|------|------|------|--------|\n| 系统调用 | `execve()` | exec入口 | 加载新程序 |\n| 加载ELF | `load_elf_binary()` | 解析ELF文件 | 代码段/数据段 |\n| 清理旧空间 | `flush_old_exec()` | 释放原mm_struct | COW页面释放 |\n| 建立新空间 | `setup_new_exec()` | 创建新mm_struct | 新的代码/数据/堆/栈 |\n| 设置入口 | `start_thread()` | 设置rip寄存器 | ELF entry point |\n\n#### 4️⃣ 写时复制（COW）\n\n```\nfork后：\n父进程页表  →  [只读]物理页面\n                    ↑\n子进程页表  →  [只读]同一物理页面\n\n写入时（触发缺页异常）：\n父进程页表  →  [读写]物理页面A\n子进程页表  →  [读写]物理页面B（新分配）\n```\n\n**优点**：\n\n- fork后立即exec时，不会浪费内存复制\n- 只在真正写入时才复制\n\n#### 核心理解\n\n1. **fork返回两次**：一个调用，两个返回（父进程和子进程）\n2. **写时复制**：fork后不立即复制内存，而是共享页面标记为只读\n3. **fork+exec模式**：Unix/Linux创建新进程的标准模式\n4. **子进程返回0**：通过`copy_thread()`设置子进程的返回值为0\n5. **exec清理旧程序**：完全替换进程的地址空间，但保留PID、文件描述符等\n\n#### 3.18.1 fork调用链\n\n**从用户态到内核态**：\n\n```c\nfork()  // 用户程序调用\n  └─> sys_fork()  // 系统调用入口\n        └─> _do_fork()  // 核心实现\n```\n\n**sys_fork定义**：\n\n```c\nSYSCALL_DEFINE0(fork) {\n    return _do_fork(SIGCHLD, 0, 0, NULL, NULL, 0);\n}\n```\n\n#### 3.18.2 _do_fork核心流程\n\n```c\nlong _do_fork(unsigned long clone_flags,\n             unsigned long stack_start,\n             unsigned long stack_size,\n             int __user *parent_tidptr,\n             int __user *child_tidptr,\n             unsigned long tls) {\n    struct task_struct *p;\n    long nr;\n    \n    // 第一步：复制进程结构\n    p = copy_process(clone_flags, stack_start, stack_size,\n                    child_tidptr, NULL, trace, tls, NUMA_NO_NODE);\n    \n    if (!IS_ERR(p)) {\n        struct pid *pid = get_task_pid(p, PIDTYPE_PID);\n        nr = pid_vnr(pid);\n        \n        // 第二步：唤醒新进程\n        wake_up_new_task(p);\n        \n        put_pid(pid);\n    }\n    \n    return nr;\n}\n```\n\n---", "subs": ["进程创建完整流程图（fork → exec）", "1️⃣ fork阶段（复制）", "2️⃣ fork返回（分叉）", "3️⃣ exec阶段（替换）", "4️⃣ 写时复制（COW）", "核心理解", "3.18.1 fork调用链", "3.18.2 _do_fork核心流程"]}, {"title": "3.19 copy_process：复制进程结构", "content": "#### 3.19.1 复制task_struct\n\n```c\nstatic struct task_struct *copy_process(...) {\n    struct task_struct *p;\n    \n    // 1. 复制task_struct\n    p = dup_task_struct(current, node);\n}\n```\n\n**dup_task_struct做了什么**：\n\n1. `alloc_task_struct_node`：分配新的task_struct\n2. `alloc_thread_stack_node`：创建内核栈（__vmalloc_node_range分配THREAD_SIZE内存）\n3. `arch_dup_task_struct`：memcpy复制task_struct\n4. `setup_thread_stack`：设置thread_info\n\n#### 3.19.2 复制权限\n\n```c\nretval = copy_creds(p, clone_flags);\n```\n\n**copy_creds流程**：\n\n- `prepare_creds`：分配新的`struct cred`，memcpy复制父进程的cred\n- `p->cred = p->real_cred = get_cred(new)`：设置权限\n\n#### 3.19.3 初始化统计量\n\n```c\np->utime = p->stime = p->gtime = 0;\np->start_time = ktime_get_ns();\np->real_start_time = ktime_get_boot_ns();\n```\n\n#### 3.19.4 设置调度信息\n\n```c\nretval = sched_fork(clone_flags, p);\n```\n\n**sched_fork做什么**：\n\n1. `__sched_fork`：\n   - `on_rq = 0`\n   - 初始化sched_entity\n   - `exec_start、sum_exec_runtime、vruntime = 0`\n\n2. 设置进程状态：`p->state = TASK_NEW`\n\n3. 初始化优先级：`prio、normal_prio、static_prio`\n\n4. 设置调度类：`p->sched_class = &fair_sched_class`\n\n5. 调用`task_fork_fair`：\n   - `update_curr`：更新当前进程统计量\n   - 设置子进程`vruntime = 父进程vruntime`\n   - `place_entity`：初始化sched_entity\n   - 如果`sysctl_sched_child_runs_first`，让子进程先运行\n\n#### 3.19.5 复制文件和文件系统\n\n```c\nretval = copy_files(clone_flags, p);  // 复制打开文件\nretval = copy_fs(clone_flags, p);     // 复制目录信息\n```\n\n- `copy_files`→`dup_fd`：创建新的files_struct，拷贝文件描述符数组fdtable\n- `copy_fs`→`copy_fs_struct`：创建新的fs_struct，复制根目录root和当前目录pwd\n\n#### 3.19.6 复制信号处理\n\n```c\ninit_sigpending(&p->pending);\nretval = copy_sighand(clone_flags, p);\nretval = copy_signal(clone_flags, p);\n```\n\n- `copy_sighand`：分配新的sighand_struct，memcpy复制信号处理函数sighand->action\n- `copy_signal`：分配新的signal_struct，初始化shared_pending\n\n#### 3.19.7 复制内存空间\n\n```c\nretval = copy_mm(clone_flags, p);\n```\n\n- 调用`dup_mm`：分配新的mm_struct，memcpy复制\n- `dup_mmap`：复制内存映射（mmap）\n\n#### 3.19.8 设置PID和亲缘关系\n\n```c\nINIT_LIST_HEAD(&p->children);\nINIT_LIST_HEAD(&p->sibling);\n\np->pid = pid_nr(pid);\n\nif (clone_flags & CLONE_THREAD) {\n    p->exit_signal = -1;\n    p->group_leader = current->group_leader;\n    p->tgid = current->tgid;\n} else {\n    p->exit_signal = (clone_flags & CSIGNAL);\n    p->group_leader = p;\n    p->tgid = p->pid;\n}\n\np->real_parent = current;\n```\n\n---", "subs": ["3.19.1 复制task_struct", "3.19.2 复制权限", "3.19.3 初始化统计量", "3.19.4 设置调度信息", "3.19.5 复制文件和文件系统", "3.19.6 复制信号处理", "3.19.7 复制内存空间", "3.19.8 设置PID和亲缘关系"]}, {"title": "3.20 wake_up_new_task：唤醒新进程", "content": "```c\nvoid wake_up_new_task(struct task_struct *p) {\n    struct rq *rq;\n    \n    // 1. 设置状态为RUNNING\n    p->state = TASK_RUNNING;\n    \n    // 2. 将进程放入运行队列\n    activate_task(rq, p, ENQUEUE_NOCLOCK);\n    p->on_rq = TASK_ON_RQ_QUEUED;\n    \n    // 3. 检查是否可以抢占\n    check_preempt_curr(rq, p, WF_FORK);\n}\n```\n\n**activate_task流程**：\n\n```c\nenqueue_task(rq, p, flags)\n  └─> p->sched_class->enqueue_task(rq, p, flags)  // CFS调用enqueue_task_fair\n        └─> enqueue_entity(cfs_rq, se, flags)\n              ├─> update_curr()  // 更新统计量\n              ├─> __enqueue_entity()  // 插入红黑树\n              └─> se->on_rq = 1\n```\n\n**check_preempt_wakeup**：\n\n```c\n// 检查新进程能否抢占父进程\nif (wakeup_preempt_entity(se, pse) == 1) {\n    resched_curr(rq);  // 标记TIF_NEED_RESCHED\n}\n```\n\n---", "subs": []}, {"title": "3.21 线程创建：pthread_create", "content": "#### 3.21.1 用户态准备\n\n**pthread_create调用链**：\n\n```\npthread_create()\n  ├─> 处理线程属性\n  ├─> 分配struct pthread\n  ├─> ALLOCATE_STACK()  // 创建线程栈\n  └─> create_thread()   // 创建线程\n```\n\n#### 3.21.2 分配线程栈\n\n```c\nstatic int allocate_stack(const struct pthread_attr *attr,\n                         struct pthread **pdp) {\n    size_t size = attr->stacksize;\n    size_t guardsize;\n    void *mem;\n    struct pthread *pd;\n    \n    // 1. 先从缓存中查找\n    pd = get_cached_stack(&size, &mem);\n    \n    // 2. 缓存没有，使用mmap分配\n    if (pd == NULL) {\n        mem = __mmap(NULL, size,\n                    (guardsize == 0) ? prot : PROT_NONE,\n                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,\n                    -1, 0);\n        \n        // 3. pthread结构放在栈底（地址最高处）\n        pd = (struct pthread *) ((char *) mem + size) - 1;\n        \n        // 4. 设置guard保护页\n        char *guard = guard_position(mem, size, guardsize, pd, pagesize_m1);\n        setup_stack_prot(mem, size, guard, guardsize, prot);\n        \n        // 5. 填充pthread成员\n        pd->stackblock = mem;\n        pd->stackblock_size = size;\n        pd->guardsize = guardsize;\n        \n        // 6. 加入stack_used链表\n        stack_list_add(&pd->list, &stack_used);\n    }\n    \n    *pdp = pd;\n}\n```\n\n**栈管理**：\n\n- `stack_used`：正在使用的栈链表\n- `stack_cache`：缓存的栈链表（线程结束后不释放，复用）\n\n#### 3.21.3 设置线程信息\n\n```c\npd->start_routine = start_routine;  // 线程函数\npd->arg = arg;                      // 函数参数\npd->schedpolicy = self->schedpolicy;\npd->schedparam = self->schedparam;\n\n*newthread = (pthread_t) pd;\natomic_increment(&__nptl_nthreads);  // 线程数+1\n\nretval = create_thread(pd, iattr, &stopped_start, ...);\n```\n\n#### 3.21.4 create_thread调用clone\n\n```c\nstatic int create_thread(struct pthread *pd, ...) {\n    const int clone_flags = (CLONE_VM | CLONE_FS | CLONE_FILES |\n                            CLONE_SYSVSEM | CLONE_SIGHAND | CLONE_THREAD |\n                            CLONE_SETTLS | CLONE_PARENT_SETTID |\n                            CLONE_CHILD_CLEARTID);\n    \n    return ARCH_CLONE(&start_thread, STACK_VARIABLES_ARGS,\n                     clone_flags, pd, &pd->tid, tp, &pd->tid);\n}\n```\n\n**关键clone_flags**：\n\n| 标志 | 作用 |\n|------|------|\n| `CLONE_VM` | 共享内存空间 |\n| `CLONE_FS` | 共享文件系统信息 |\n| `CLONE_FILES` | 共享文件描述符表 |\n| `CLONE_SIGHAND` | 共享信号处理函数 |\n| `CLONE_THREAD` | 同一线程组 |\n| `CLONE_SYSVSEM` | 共享System V信号量 |\n\n---", "subs": ["3.21.1 用户态准备", "3.21.2 分配线程栈", "3.21.3 设置线程信息", "3.21.4 create_thread调用clone"]}, {"title": "3.22 clone系统调用", "content": "#### 3.22.1 clone vs fork\n\n```c\nSYSCALL_DEFINE5(clone, unsigned long, clone_flags,\n               unsigned long, newsp,\n               int __user *, parent_tidptr,\n               int __user *, child_tidptr,\n               unsigned long, tls) {\n    return _do_fork(clone_flags, newsp, 0,\n                   parent_tidptr, child_tidptr, tls);\n}\n```\n\n**clone和fork都调用_do_fork，区别在于clone_flags！**\n\n#### 3.22.2 clone_flags的影响\n\n**1. copy_files**：\n\n```c\nif (clone_flags & CLONE_FILES) {\n    atomic_inc(&oldf->count);  // 引用计数+1，共享\n} else {\n    newf = dup_fd(oldf, &error);  // 复制\n    tsk->files = newf;\n}\n```\n\n**2. copy_fs**：\n\n```c\nif (clone_flags & CLONE_FS) {\n    fs->users++;  // 共享\n} else {\n    tsk->fs = copy_fs_struct(fs);  // 复制\n}\n```\n\n**3. copy_sighand**：\n\n```c\nif (clone_flags & CLONE_SIGHAND) {\n    atomic_inc(&current->sighand->count);  // 共享\n} else {\n    sig = kmem_cache_alloc(sighand_cachep, GFP_KERNEL);\n    // 复制\n}\n```\n\n**4. copy_signal**：\n\n```c\nif (clone_flags & CLONE_THREAD)\n    return 0;  //直接返回，共享\n// 否则分配新的signal_struct\nsig = kmem_cache_zalloc(signal_cachep, GFP_KERNEL);\n```\n\n**5. copy_mm**：\n\n```c\nif (clone_flags & CLONE_VM) {\n    mmget(oldmm);  // 共享\n    mm = oldmm;\n} else {\n    mm = dup_mm(tsk);  // 复制\n}\n```\n\n#### 3.22.3 亲缘关系设置\n\n```c\nif (clone_flags & CLONE_THREAD) {\n    // 线程：同一线程组\n    p->exit_signal = -1;\n    p->group_leader = current->group_leader;\n    p->tgid = current->tgid;\n} else {\n    // 进程：新线程组\n    p->group_leader = p;\n    p->tgid = p->pid;\n}\n\nif (clone_flags & (CLONE_PARENT|CLONE_THREAD)) {\n    // 线程：和父进程平辈\n    p->real_parent = current->real_parent;\n} else {\n    // 进程：父子关系\n    p->real_parent = current;\n}\n```\n\n#### 3.22.4 信号处理\n\n**两个信号队列**：\n\n1. **task_struct->pending**：\n   - 每个任务都有\n   - 线程：发给该线程的信号\n   - 进程：发给主线程的信号\n\n2. **signal_struct->shared_pending**：\n   - 发给整个进程的信号\n   - 线程共享同一个signal_struct\n   - 哪个线程处理都可以\n\n---", "subs": ["3.22.1 clone vs fork", "3.22.2 clone_flags的影响", "3.22.3 亲缘关系设置", "3.22.4 信号处理"]}, {"title": "3.23 用户态线程执行", "content": "#### 3.23.1 start_thread入口\n\n从内核返回后，执行`start_thread`（所有线程统一入口）：\n\n```c\nstatic int start_thread(void *arg) {\n    struct pthread *pd = START_THREAD_SELF;\n    \n    // 1. 执行用户提供的函数\n    THREAD_SETMEM(pd, result, pd->start_routine(pd->arg));\n    \n    // 2. 清理TLS变量\n    __nptl_deallocate_tsd();\n    \n    // 3. 线程数-1\n    if (atomic_decrement_and_test(&__nptl_nthreads))\n        exit(0);  // 最后一个线程，退出进程\n    \n    // 4. 释放pthread\n    __free_tcb(pd);\n    __exit_thread();\n}\n```\n\n#### 3.23.2 释放线程资源\n\n```c\nvoid __free_tcb(struct pthread *pd) {\n    __deallocate_stack(pd);\n}\n\nvoid __deallocate_stack(struct pthread *pd) {\n    // 从stack_used移除\n    stack_list_del(&pd->list);\n    \n    // 放入stack_cache缓存\n    queue_stack(pd);\n}\n```\n\n---", "subs": ["3.23.1 start_thread入口", "3.23.2 释放线程资源"]}, {"title": "3.24 总结", "content": "#### 3.24.1 进程vs线程创建对比\n\n| 项目 | 进程fork | 线程clone |\n|------|----------|-----------|\n| **系统调用** | fork() | clone() |\n| **clone_flags** | SIGCHLD | CLONE_VM\\|CLONE_FS\\|CLONE_FILES\\|...|\n| **内存空间** | 复制mm_struct | 共享mm_struct |\n| **文件描述符** | 复制files_struct | 共享files_struct |\n| **文件系统信息** | 复制fs_struct | 共享fs_struct |\n| **信号处理函数** | 复制sighand_struct | 共享sighand_struct |\n| **信号队列** | 新的signal_struct | 共享signal_struct |\n| **tgid** | 自己的pid | 主线程的pid |\n| **group_leader** | 指向自己 | 指向主线程 |\n| **栈** | 内核栈（内核分配） | 用户栈（堆上mmap）|\n\n#### 3.24.2 核心流程图\n\n```mermaid\ngraph TD\n    A[用户调用] --> B{类型}\n    B -->|进程| C[fork]\n    B -->|线程| D[pthread_create]\n    C --> E[sys_fork]\n    D --> F[分配pthread]\n    D --> G[ALLOCATE_STACK<br/>mmap分配栈]\n    F --> H[create_thread]\n    G --> H\n    H --> I[__clone]\n    E --> J[_do_fork<br/>flags=SIGCHLD]\n    I --> K[sys_clone<br/>flags=CLONE_VM等]\n    J --> L[copy_process]\n    K --> L\n    L --> M{检查flags}\n    M -->|fork| N[复制五大结构]\n    M -->|clone| O[五大结构引用+1]\n    N --> P[wake_up_new_task]\n    O --> P\n    P --> Q[返回用户态]\n    Q -->|fork| R[从fork返回]\n    Q -->|pthread| S[start_thread<br/>执行线程函数]\n    \n    style L fill:#e1f5ff\n    style M fill:#fff9c4\n    style P fill:#c8e6c9\n```\n\n#### 3.24.3 五大结构共享vs复制\n\n```\n进程fork：全部复制\n├── files_struct (文件描述符表) → dup_fd()\n├── fs_struct (文件系统信息) → copy_fs_struct()\n├── sighand_struct (信号处理函数) → 分配新的\n├── signal_struct (信号队列) → 分配新的\n└── mm_struct (内存空间) → dup_mm()\n\n线程clone：全部共享\n├── files_struct → atomic_inc(&count)\n├── fs_struct → users++\n├── sighand_struct → atomic_inc(&count)\n├── signal_struct → 直接返回\n└── mm_struct → mmget()\n```\n\n#### 3.24.4 关键代码位置\n\n```c\n// 进程创建\nkernel/fork.c:\n  - SYSCALL_DEFINE0(fork)\n  - _do_fork()\n  - copy_process()\n  - dup_task_struct()\n  - sched_fork()\n  - wake_up_new_task()\n\n// 线程创建（用户态）\nnptl/pthread_create.c:\n  - pthread_create()\n  - allocate_stack()\n  - create_thread()\n  - __clone()  // 汇编\n  - start_thread()\n\n// 线程创建（内核态）\nkernel/fork.c:\n  - SYSCALL_DEFINE5(clone)\n  - _do_fork()\n  - copy_process()  // 与fork共用\n```\n\n---\n\n**第3章完结**：进程管理的四个部分全部完成！\n\n**章节回顾**：\n\n- ✅ 第一部分：进程创建、线程机制、同步原语\n- ✅ 第二部分：task_struct数据结构\n- ✅ 第三部分：调度机制（CFS、主动调度、抢占调度）\n- ✅ 第四部分：进程/线程创建实现\n\n**下一章预告**：第4章将讲解内存管理机制。\n\n---", "subs": ["3.24.1 进程vs线程创建对比", "3.24.2 核心流程图", "3.24.3 五大结构共享vs复制", "3.24.4 关键代码位置"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

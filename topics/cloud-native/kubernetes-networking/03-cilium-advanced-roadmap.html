@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 容器网络学习笔记 · 第三册：Cilium 高级能力 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 容器网络学习笔记 · 第三册：Cilium 高级能力</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 容器网络学习笔记 · 第三册：Cilium 高级能力", "intro": "", "parts": [{"title": "Cilium 高级能力", "sections": [{"title": "第十八章 Cilium-SocketLB", "content": "本章介绍 Cilium 独有的 Socket-based Load Balancing（Socket LB）特性，这是一种基于 eBPF 在 Socket 层面实现服务负载均衡的技术，能够显著优化集群内部的流量路径。\n\n#### 18.1 背景与问题\n\n##### 18.1.1 传统 Service 访问模式的问题\n\n在传统的 Kubernetes 网络实现中（如 Flannel、Calico 等），当 Pod 访问 Service 时，数据包需要经历以下过程：\n\n```mermaid\nsequenceDiagram\n    participant Pod as Pod (Client)\n    participant NS as Root Namespace\n    participant IPT as iptables/IPVS\n    participant Backend as Backend Pod\n    \n    Pod->>NS: 发送数据包<br/>dst=Service IP\n    NS->>IPT: 进入宿主机网络栈\n    IPT->>IPT: DNAT 转换<br/>Service IP → Pod IP\n    IPT->>Backend: 转发到后端 Pod\n    Backend-->>IPT: 响应\n    IPT-->>NS: SNAT (如跨节点)\n    NS-->>Pod: 返回响应\n```\n\n**问题分析**：\n\n| 问题 | 描述 |\n|:---|:---|\n| **多层处理** | 数据包需先到 Root Namespace，再经 iptables/IPVS 处理 |\n| **规则匹配** | iptables 链式匹配，规则多时性能下降 |\n| **额外跳转** | 跨节点时还需要 SNAT，增加处理开销 |\n| **延迟增加** | 整个处理流程增加了访问延迟 |\n\n##### 18.1.2 理想的访问模式\n\n用户期望的访问模式应该更加直接：\n\n```mermaid\ngraph LR\n    subgraph \"理想模式\"\n        Pod[\"Pod (Client)\"] -->|\"直接访问\"| Backend1[\"Backend Pod 1\"]\n        Pod -->|\"直接访问\"| Backend2[\"Backend Pod 2\"]\n    end\n```\n\n> [!NOTE]\n> **理想状态**：Pod 发出的数据包直接以后端 Pod 的 IP 作为目的地址，无需经过中间的 NAT 转换。\n\n#### 18.2 Socket LB 原理\n\n##### 18.2.1 核心思想\n\nSocket LB 的核心思想是：**在 Socket 层面提前完成负载均衡决策**，在数据包离开 Pod 之前就将 Service IP 替换为真实的后端 Pod IP。\n\n```mermaid\nflowchart LR\n    subgraph Pod[\"Pod Namespace\"]\n        App[\"应用程序<br/>connect(Service IP)\"]\n        eBPF[\"eBPF Hook<br/>(cgroup/connect4)\"]\n        Socket[\"Socket<br/>dst=Backend Pod IP\"]\n    end\n    \n    subgraph Host[\"Root Namespace\"]\n        Stack[\"网络栈\"]\n    end\n    \n    subgraph Remote[\"远端节点\"]\n        Backend[\"Backend Pod\"]\n    end\n    \n    App -->|\"原始目的: Service IP\"| eBPF\n    eBPF -->|\"Socket LB 替换\"| Socket\n    Socket -->|\"实际目的: Pod IP\"| Stack\n    Stack -->|\"普通路由\"| Backend\n```\n\n##### 18.2.2 工作机制\n\n| 阶段 | 传统模式 | Socket LB 模式 |\n|:---|:---|:---|\n| **发包位置** | Pod 内发包，dst = Service IP | Pod 内发包，dst = **Backend Pod IP** |\n| **NAT 位置** | Root Namespace (iptables) | Pod Namespace (eBPF) |\n| **后续路由** | 需要 iptables 规则匹配 | 简单的跨节点/同节点路由 |\n| **返回处理** | 可能需要 SNAT 反向转换 | 直接返回，无需额外处理 |\n\n> [!IMPORTANT]\n> **关键优势**：DNAT 提前在 Pod 命名空间内完成，后续流量变成简单的 Pod-to-Pod 通信，无需经过 iptables 规则链。\n\n##### 18.2.3 eBPF 实现位置\n\nSocket LB 通过 eBPF 程序挂载在 cgroup 的 socket 操作钩子上实现：\n\n```mermaid\ngraph TB\n    subgraph \"eBPF 挂载点\"\n        connect[\"cgroup/connect4<br/>connect() 系统调用\"]\n        sendmsg[\"cgroup/sendmsg4<br/>sendmsg() 系统调用\"]\n        recvmsg[\"cgroup/recvmsg4<br/>recvmsg() 系统调用\"]\n    end\n    \n    subgraph \"Service Map\"\n        svc[\"Service → Endpoints 映射\"]\n    end\n    \n    connect -->|\"查询\"| svc\n    sendmsg -->|\"查询\"| svc\n    \n    svc -->|\"返回 Backend Pod IP\"| connect\n    svc -->|\"返回 Backend Pod IP\"| sendmsg\n```\n\n#### 18.3 传统模式抓包分析\n\n##### 18.3.1 环境准备（以 Flannel 为例）\n\n```bash\n# 创建测试服务\nkubectl apply -f demo-deployment.yaml\n\n# 查看 Service\nkubectl get svc demo-svc\n# NAME       TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE\n# demo-svc   NodePort   172.18.0.2     <none>        80:32000/TCP   1m\n\n# 查看 iptables 规则链\niptables -t nat -L | grep 32000\n# 可以看到 KUBE-SVC-xxx 链\n```\n\n##### 18.3.2 抓包验证\n\n```bash\n# 进入 Pod 内抓包\nkubectl exec -it frontend-pod -- tcpdump -i eth0 -n\n\n# 在另一个终端，从 Pod 内访问 Service\nkubectl exec -it frontend-pod -- curl 172.18.0.2:32000\n```\n\n**抓包结果分析**：\n\n```\n# TCP 三次握手\n10.244.2.2.42962 > 172.18.0.2.32000: Flags [S]      # SYN: dst=Service IP\n172.18.0.2.32000 > 10.244.2.2.42962: Flags [S.]    # SYN-ACK\n10.244.2.2.42962 > 172.18.0.2.32000: Flags [.]     # ACK\n```\n\n```mermaid\nsequenceDiagram\n    participant Client as Client Pod<br/>10.244.2.2\n    participant Service as Service IP<br/>172.18.0.2:32000\n    \n    Note over Client,Service: 传统模式：目的地址是 Service IP\n    \n    Client->>Service: SYN (src=10.244.2.2:42962, dst=172.18.0.2:32000)\n    Service-->>Client: SYN-ACK\n    Client->>Service: ACK\n    \n    Note over Client,Service: iptables 在 Root NS 做 DNAT\n```\n\n> [!NOTE]\n> **观察要点**：\n>\n> - 目的 IP 是 Service IP（172.18.0.2），而非后端 Pod IP\n> - 数据包需要到达 Root Namespace 后，由 iptables 进行 DNAT 转换\n> - 这是传统的、符合直觉的实现方式\n\n#### 18.4 Socket LB 模式抓包分析\n\n##### 18.4.1 启用 Socket LB\n\n通过 Helm 部署 Cilium 并启用 Socket LB：\n\n```bash\nhelm install cilium cilium/cilium --namespace kube-system \\\n  --set kubeProxyReplacement=strict \\\n  --set socketLB.enabled=true\n```\n\n##### 18.4.2 验证配置\n\n```bash\n# 查看 Cilium 配置\ncilium config view | grep -i socket\n# socket-lb: enabled\n\n# 或通过 cilium status\ncilium status --verbose | grep -i socket\n# KubeProxyReplacement Info: Socket LB: enabled\n```\n\n##### 18.4.3 抓包验证\n\n```bash\n# 进入 Pod 内抓包\nkubectl exec -it frontend-pod -- tcpdump -i eth0 -n\n\n# 从 Pod 内访问 Service\nkubectl exec -it frontend-pod -- curl 172.18.0.2:32000\n```\n\n**抓包结果分析**：\n\n```\n# TCP 三次握手\n10.0.0.221.58504 > 10.0.2.22.80: Flags [S]     # SYN: dst=Backend Pod IP !!!\n10.0.2.22.80 > 10.0.0.221.58504: Flags [S.]   # SYN-ACK\n10.0.0.221.58504 > 10.0.2.22.80: Flags [.]    # ACK\n```\n\n```mermaid\nsequenceDiagram\n    participant Client as Client Pod<br/>10.0.0.221\n    participant Backend as Backend Pod<br/>10.0.2.22:80\n    \n    Note over Client,Backend: Socket LB：目的地址直接是 Backend Pod IP\n    \n    Client->>Backend: SYN (src=10.0.0.221:58504, dst=10.0.2.22:80)\n    Backend-->>Client: SYN-ACK\n    Client->>Backend: ACK\n    \n    Note over Client,Backend: eBPF 在 Pod NS 内提前完成 DNAT\n```\n\n> [!IMPORTANT]\n> **关键发现**：\n>\n> - 虽然应用访问的是 Service IP（172.18.0.2:32000）\n> - 但抓包看到的目的 IP 直接是 Backend Pod IP（10.0.2.22:80）\n> - 这说明 Socket LB 在数据包发出前就完成了地址替换\n\n#### 18.5 对比总结\n\n##### 18.5.1 数据路径对比\n\n```mermaid\nflowchart TB\n    subgraph Traditional[\"传统模式 (Flannel/Calico)\"]\n        direction LR\n        T_Pod[\"Pod\"] -->|\"dst=Service IP\"| T_veth[\"veth pair\"]\n        T_veth --> T_Root[\"Root NS\"]\n        T_Root --> T_IPT[\"iptables DNAT\"]\n        T_IPT -->|\"dst=Pod IP\"| T_Backend[\"Backend\"]\n    end\n    \n    subgraph SocketLB[\"Socket LB 模式 (Cilium)\"]\n        direction LR\n        S_Pod[\"Pod\"] -->|\"eBPF 替换\"| S_Socket[\"Socket\"]\n        S_Socket -->|\"dst=Pod IP\"| S_Root[\"Root NS\"]\n        S_Root -->|\"普通路由\"| S_Backend[\"Backend\"]\n    end\n```\n\n##### 18.5.2 核心差异表\n\n| 对比项 | 传统模式 | Socket LB 模式 |\n|:---|:---|:---|\n| **DNAT 位置** | Root Namespace | Pod Namespace |\n| **DNAT 时机** | 数据包到达宿主机后 | 数据包离开 Pod 前 |\n| **实现技术** | iptables / IPVS | eBPF (cgroup hooks) |\n| **抓包看到的目的 IP** | Service IP | Backend Pod IP |\n| **后续处理** | 需要规则匹配 | 简单路由 |\n| **性能开销** | 较高（规则链匹配） | 较低（Map 查询） |\n\n##### 18.5.3 性能优势\n\n```mermaid\ngraph LR\n    subgraph \"性能优势\"\n        A[\"提前 DNAT\"] --> B[\"跳过 iptables\"]\n        B --> C[\"减少规则匹配\"]\n        C --> D[\"降低延迟\"]\n        D --> E[\"提升吞吐量\"]\n    end\n```\n\n| 优势 | 说明 |\n|:---|:---|\n| **减少跳数** | 不需要经过 Root NS 的 iptables 处理 |\n| **规避规则膨胀** | Service 多时，iptables 规则链很长 |\n| **路径简化** | 变成简单的 Pod-to-Pod 通信 |\n| **性能提升** | 减少 CPU 开销和延迟 |\n\n#### 18.6 配置选项\n\n##### 18.6.1 Helm 配置参数\n\n```yaml\n# values.yaml 关键配置\nkubeProxyReplacement: strict  # 或 partial\nsocketLB:\n  enabled: true\n  hostNamespaceOnly: false    # 是否仅对 host namespace 生效\n```\n\n##### 18.6.2 模式说明\n\n| 模式 | kubeProxyReplacement | 说明 |\n|:---|:---|:---|\n| **strict** | strict | 完全替换 kube-proxy，启用所有 eBPF 功能 |\n| **partial** | partial | 部分替换，与 kube-proxy 共存 |\n\n##### 18.6.3 验证命令\n\n```bash\n# 查看 Socket LB 状态\ncilium status --verbose\n\n# 查看详细配置\ncilium config view\n\n# 查看 BPF 程序\nbpftool prog list | grep cgroup\n```\n\n#### 18.7 历史演进\n\n| 版本阶段 | 功能名称 | 说明 |\n|:---|:---|:---|\n| **早期版本** | Host Reachable Services | 最初的功能名称 |\n| **当前版本** | Socket LB | 统一命名为 Socket-based Load Balancing |\n\n> [!TIP]\n> 如果在旧版本 Cilium 文档中看到 \"Host Reachable Services\"，它与 Socket LB 描述的是同一功能。\n\n#### 18.8 适用场景\n\n```mermaid\ngraph TB\n    subgraph \"适用场景\"\n        A[\"集群内 Pod 访问 Service\"]\n        B[\"东西向流量优化\"]\n        C[\"大规模 Service 环境\"]\n        D[\"延迟敏感型应用\"]\n    end\n    \n    subgraph \"不适用场景\"\n        E[\"外部流量进入集群\"]\n        F[\"NodePort 外部访问\"]\n    end\n```\n\n| 场景 | Socket LB 作用 |\n|:---|:---|\n| **Pod → ClusterIP** | ✅ 直接替换为后端 Pod IP |\n| **Pod → NodePort（集群内）** | ✅ 同样可以优化 |\n| **外部 → NodePort** | ❌ 需要其他机制（如 DSR） |\n\n#### 18.9 章节小结\n\n```mermaid\nmindmap\n  root((Socket LB))\n    背景\n      传统模式需要 iptables DNAT\n      规则匹配开销大\n      路径复杂\n    原理\n      eBPF 挂载 cgroup hooks\n      Socket 层面完成 LB\n      提前替换目的 IP\n    验证\n      传统模式：抓包看到 Service IP\n      Socket LB：抓包看到 Backend Pod IP\n    优势\n      减少跳数\n      降低延迟\n      提升性能\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **什么是 Socket LB**：在 Socket 层面通过 eBPF 实现的负载均衡，提前完成 Service IP 到 Backend Pod IP 的转换\n>\n> 2. **与传统模式区别**：\n>    - 传统：Pod → Root NS → iptables DNAT → Backend\n>    - Socket LB：Pod (eBPF DNAT) → Root NS → 直接路由 → Backend\n>\n> 3. **抓包验证**：\n>    - 传统模式抓包看到 dst = Service IP\n>    - Socket LB 模式抓包看到 dst = Backend Pod IP\n>\n> 4. **配置方法**：`kubeProxyReplacement=strict` 或单独设置 `socketLB.enabled=true`\n>\n> 5. **核心优势**：减少 iptables 规则匹配，降低延迟，提升大规模集群的 Service 访问性能\n\n---", "subs": ["18.1 背景与问题", "18.2 Socket LB 原理", "18.3 传统模式抓包分析", "18.4 Socket LB 模式抓包分析", "18.5 对比总结", "18.6 配置选项", "18.7 历史演进", "18.8 适用场景", "18.9 章节小结"]}, {"title": "第十九章 Cilium-DSR 模式", "content": "本章介绍 Cilium 的 DSR（Direct Server Return）模式，这是一种优化南北向流量的技术，通过让后端 Pod 直接响应客户端，减少返回路径的跳数，降低入口节点的负载。\n\n#### 19.1 背景与问题\n\n##### 19.1.1 传统 SNAT 模式的数据路径\n\n在传统的 NodePort/LoadBalancer 访问模式中，外部客户端访问集群内服务时，数据包需要经过 SNAT 处理：\n\n```mermaid\nsequenceDiagram\n    participant Client as 外部客户端<br/>1.1.1.10\n    participant NodeA as Node A<br/>1.1.1.1:32000\n    participant NodeB as Node B<br/>1.1.1.2\n    participant Pod as Backend Pod<br/>10.0.0.1\n    \n    Note over Client,Pod: SNAT 模式：返回路径经过入口节点\n    \n    Client->>NodeA: ① SYN (src=1.1.1.10, dst=1.1.1.1:32000)\n    NodeA->>NodeA: SNAT: src=1.1.1.10 → src=1.1.1.1\n    NodeA->>Pod: ② (src=1.1.1.1, dst=10.0.0.1:80)\n    Pod->>NodeA: ③ SYN-ACK (src=10.0.0.1, dst=1.1.1.1)\n    NodeA->>NodeA: Reverse SNAT\n    NodeA->>Client: ④ (src=1.1.1.1, dst=1.1.1.10)\n```\n\n**SNAT 模式的问题**：\n\n| 问题 | 描述 |\n|:---|:---|\n| **入口节点瓶颈** | 所有进出流量都经过入口节点，容易成为瓶颈 |\n| **多一跳** | 返回响应需要先回到入口节点，再转发给客户端 |\n| **源 IP 丢失** | Pod 看到的源 IP 是入口节点 IP，而非真实客户端 IP |\n| **负载不均** | 入口节点承担额外的转发负担 |\n\n##### 19.1.2 DSR 的核心思想\n\nDSR（Direct Server Return）的核心思想是：**让后端 Pod 直接将响应发送给客户端，跳过入口节点**。\n\n```mermaid\nsequenceDiagram\n    participant Client as 外部客户端<br/>1.1.1.10\n    participant NodeA as Node A<br/>1.1.1.1:32000\n    participant NodeB as Node B<br/>1.1.1.2\n    participant Pod as Backend Pod<br/>10.0.0.1\n    \n    Note over Client,Pod: DSR 模式：响应直接返回客户端\n    \n    Client->>NodeA: ① SYN (src=1.1.1.10, dst=1.1.1.1:32000)\n    NodeA->>Pod: ② SYN (携带原始目的 IP 信息)\n    Pod->>Client: ③ SYN-ACK (src=1.1.1.1, dst=1.1.1.10)\n    Client->>NodeA: ④ ACK\n    NodeA->>Pod: ⑤ ACK\n```\n\n> [!IMPORTANT]\n> **DSR 的关键**：后端 Pod 在发送响应时，必须使用客户端原始访问的目的 IP（入口节点 IP）作为源 IP，否则客户端会丢弃这个\"意外\"的响应包。\n\n#### 19.2 DSR vs SNAT 对比\n\n##### 19.2.1 数据路径对比\n\n```mermaid\nflowchart TB\n    subgraph SNAT[\"SNAT 模式\"]\n        direction LR\n        S_Client[\"Client\"] -->|\"①\"| S_NodeA[\"Node A\"]\n        S_NodeA -->|\"② SNAT\"| S_Pod[\"Pod\"]\n        S_Pod -->|\"③\"| S_NodeA\n        S_NodeA -->|\"④ Reverse\"| S_Client\n    end\n    \n    subgraph DSR[\"DSR 模式\"]\n        direction LR\n        D_Client[\"Client\"] -->|\"①\"| D_NodeA[\"Node A\"]\n        D_NodeA -->|\"② + IP Info\"| D_Pod[\"Pod\"]\n        D_Pod -->|\"③ 直接返回\"| D_Client\n    end\n```\n\n##### 19.2.2 核心差异表\n\n| 对比项 | SNAT 模式 | DSR 模式 |\n|:---|:---|:---|\n| **返回路径** | Client ← Node A ← Pod | Client ← Pod (直接) |\n| **跳数** | 请求 2 跳 + 响应 2 跳 = 4 跳 | 请求 2 跳 + 响应 1 跳 = 3 跳 |\n| **入口节点负载** | 高（处理双向流量） | 低（只处理入向流量） |\n| **源 IP 可见性** | Pod 看到 Node A IP | Pod 看到真实 Client IP |\n| **响应包源 IP** | Node A IP | Node A IP (伪装) |\n\n#### 19.3 核心挑战：IP 传递问题\n\n##### 19.3.1 问题描述\n\nDSR 模式的核心挑战是：**如何将客户端原始访问的目的 IP（入口节点 IP）传递给后端 Pod？**\n\n```mermaid\ngraph TB\n    subgraph \"问题\"\n        A[\"客户端访问 1.1.1.1:32000\"]\n        B[\"Pod 在 Node B (1.1.1.2)\"]\n        C[\"Pod 响应时必须使用 src=1.1.1.1\"]\n        D[\"但 Pod 不知道 1.1.1.1 这个地址\"]\n    end\n    \n    A --> B --> C --> D\n    \n    subgraph \"解决方案\"\n        E[\"在请求转发时携带原始目的 IP\"]\n    end\n    \n    D --> E\n```\n\n##### 19.3.2 IP 响应的要求\n\n客户端发送请求后，期望收到来自原始目的 IP 的响应：\n\n| 场景 | 客户端行为 |\n|:---|:---|\n| 响应源 IP = 原始目的 IP | ✅ 接受响应，通信正常 |\n| 响应源 IP ≠ 原始目的 IP | ❌ 丢弃响应，认为是无效包 |\n\n> [!NOTE]\n> **类比理解**：就像你 ping 1.1.1.1，但收到 1.1.1.2 的 reply，这个 reply 会被丢弃，因为\"你问的是 A，但 B 来回答了\"。\n\n#### 19.4 Cilium DSR 实现机制\n\n##### 19.4.1 IP Options 方案\n\nCilium 原生使用 **IP Options 字段** 来传递原始目的 IP 信息：\n\n```mermaid\ngraph LR\n    subgraph \"第一跳：Client → Node A\"\n        A1[\"IP Header\"]\n        A2[\"src=1.1.1.10\"]\n        A3[\"dst=1.1.1.1\"]\n    end\n    \n    subgraph \"第二跳：Node A → Pod (携带 Options)\"\n        B1[\"IP Header\"]\n        B2[\"src=1.1.1.10\"]\n        B3[\"dst=10.0.0.1\"]\n        B4[\"<b>Options: orig_dst=1.1.1.1:32000</b>\"]\n    end\n    \n    A1 --> B1\n```\n\n##### 19.4.2 IP Options 字段解析\n\n```\nIP Header Options 字段内容（十六进制）：\n+------+------+------+------+------+------+------+------+\n| 0x9a | ...  | 0xAC | 0x12 | 0x00 | 0x04 | 0x7D | 0x00 |\n+------+------+------+------+------+------+------+------+\n                 ↓      ↓      ↓      ↓      ↓      ↓\n               172     18     0      4    32000端口高位\n               \n解析结果：原始目的 IP = 172.18.0.4，端口 = 32000\n```\n\n| 十六进制 | 十进制 | 含义 |\n|:---|:---|:---|\n| 0xAC | 172 | IP 第一段 |\n| 0x12 | 18 | IP 第二段 |\n| 0x00 | 0 | IP 第三段 |\n| 0x04 | 4 | IP 第四段 |\n| 0x7D00 | 32000 | 端口号 |\n\n##### 19.4.3 抓包验证\n\n**第一跳抓包（Client → Node A）**：\n\n```\n# 正常的 SYN 包，没有 Options 字段\n172.18.0.1.38645 > 172.18.0.4.32000: Flags [S]\nIP Header: 无 Options\n```\n\n**第二跳抓包（Node A → Pod）**：\n\n```\n# 携带 Options 字段的 SYN 包\n172.18.0.1.38645 > 10.0.2.148.80: Flags [S]\nIP Header Options: unknown (0x9a) [包含原始目的 IP]\n```\n\n```mermaid\nsequenceDiagram\n    participant C as Client<br/>172.18.0.1\n    participant A as Node A<br/>172.18.0.4\n    participant B as Node B<br/>172.18.0.2\n    participant P as Pod<br/>10.0.2.148\n    \n    C->>A: ① SYN (无 Options)\n    A->>P: ② SYN + Options (orig_dst=172.18.0.4:32000)\n    Note over P: 解析 Options 获取原始目的 IP\n    P->>C: ③ SYN-ACK (src=172.18.0.4)\n    Note over A: Node A 上只能看到 SYN 和 ACK\n    C->>A: ④ ACK\n    A->>P: ⑤ ACK\n```\n\n#### 19.5 TCP 三次握手详解\n\n##### 19.5.1 握手过程分析\n\n在 DSR 模式下，三次握手的包分布在不同路径：\n\n| 包名 | 路径 | Node A 可见 | Node B/Pod 可见 |\n|:---|:---|:---|:---|\n| **SYN** | Client → A → Pod | ✅ | ✅ |\n| **SYN-ACK** | Pod → Client | ❌ (跳过) | ✅ |\n| **ACK** | Client → A → Pod | ✅ | ✅ |\n\n> [!TIP]\n> **抓包技巧**：在 Node A 上抓包只能看到 SYN 和 ACK，看不到 SYN-ACK；要看 SYN-ACK 需要在 Pod 所在节点抓包。\n\n##### 19.5.2 TCP 三次握手简单理解\n\n```mermaid\nsequenceDiagram\n    participant A as Client (张三)\n    participant B as Server (李四)\n    \n    A->>B: SYN: \"你好，我是张三\"\n    B->>A: SYN-ACK: \"张三你好，我是李四\"\n    A->>B: ACK: \"好的，我知道你是李四了\"\n    \n    Note over A,B: 握手完成，可以开始通信\n```\n\n- **第一次握手 (SYN)**：证明自己的存在\n- **第二次握手 (SYN-ACK)**：证明对方的存在 + 确认收到\n- **第三次握手 (ACK)**：确认彼此都存在\n\n#### 19.6 配置方法\n\n##### 19.6.1 Helm 部署\n\n```bash\nhelm install cilium cilium/cilium --namespace kube-system \\\n  --set kubeProxyReplacement=strict \\\n  --set loadBalancer.mode=dsr\n```\n\n##### 19.6.2 验证配置\n\n```bash\n# 查看 Cilium 状态\ncilium status --verbose | grep -i \"load\"\n# LoadBalancer Mode: DSR\n\n# 或通过 config view\ncilium config view | grep -i loadbalancer\n# loadbalancer-mode: dsr\n```\n\n#### 19.7 进阶方案：IPIP 隧道\n\n##### 19.7.1 IP Options 的局限性\n\n| 问题 | 描述 |\n|:---|:---|\n| **TCP Fast Open 不兼容** | 使用 Options 字段会影响 TCP Fast Open |\n| **交换机处理慢** | 交换机需要解析 Options，增加处理开销 |\n| **Slow Path** | 触发非快速路径处理 |\n\n##### 19.7.2 IPIP 隧道方案\n\n字节跳动工程师提出了使用 **IPIP 隧道** 来传递原始 IP 信息的方案：\n\n```mermaid\ngraph TB\n    subgraph \"IPIP 封装\"\n        direction TB\n        Outer[\"外层 IP Header<br/>src=Node A IP, dst=Pod IP\"]\n        Inner[\"内层 IP Header<br/>src=Client IP, dst=Pod IP<br/>+ Options: orig_dst\"]\n        Data[\"TCP/Payload\"]\n        \n        Outer --> Inner --> Data\n    end\n```\n\n##### 19.7.3 IPIP vs IP Options 对比\n\n| 对比项 | IP Options | IPIP 隧道 |\n|:---|:---|:---|\n| **交换机可见** | ✅ 可见，需解析 | ❌ 不可见，快速转发 |\n| **处理路径** | Slow Path | Fast Path |\n| **封装开销** | 低 | 略高（多一层 IP） |\n| **实现状态** | Cilium 原生支持 | 需要二次开发 |\n\n> [!NOTE]\n> IPIP 隧道方案将 Options 信息\"隐藏\"在内层 IP 中，外层 IP 是标准包，交换机可以快速转发。\n\n#### 19.8 应用场景\n\n```mermaid\ngraph TB\n    subgraph \"适用 DSR 的场景\"\n        A[\"外部流量访问 NodePort\"]\n        B[\"LoadBalancer 类型 Service\"]\n        C[\"南北向流量优化\"]\n        D[\"入口节点负载分散\"]\n    end\n    \n    subgraph \"不适用 DSR 的场景\"\n        E[\"集群内 Pod-to-Pod\"]\n        F[\"东西向流量 (用 Socket LB)\"]\n    end\n```\n\n| 场景 | 推荐模式 |\n|:---|:---|\n| **外部 → ClusterIP/NodePort** | DSR |\n| **外部 → LoadBalancer** | DSR |\n| **Pod → Service（集群内）** | Socket LB |\n| **需要源 IP 保留** | DSR (externalTrafficPolicy=Local) |\n\n#### 19.9 与 LVS DSR 的关系\n\nCilium DSR 的思想源自 Linux LVS 的 DR 模式：\n\n| LVS 术语 | Cilium 对应 |\n|:---|:---|\n| **Director** | 入口节点 (Node A) |\n| **Real Server** | 后端 Pod |\n| **VIP** | Service IP / NodePort |\n| **DIP** | Pod IP |\n\n> [!TIP]\n> 学习 LVS 的 DR/NAT/TUN 模式可以帮助理解 Cilium DSR 的设计思想。\n\n#### 19.10 章节小结\n\n```mermaid\nmindmap\n  root((DSR 模式))\n    背景\n      SNAT 模式入口节点瓶颈\n      返回流量多一跳\n    原理\n      后端直接响应客户端\n      跳过入口节点\n    挑战\n      如何传递原始目的 IP\n      Pod 响应需伪装源 IP\n    实现\n      IP Options 字段\n      IPIP 隧道(进阶)\n    验证\n      Node A 看不到 SYN-ACK\n      Pod 节点可见完整握手\n    配置\n      loadBalancer.mode=dsr\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **什么是 DSR**：Direct Server Return，后端 Pod 直接响应客户端，跳过入口节点\n>\n> 2. **解决的问题**：\n>    - 减少返回路径跳数（4 跳 → 3 跳）\n>    - 分散入口节点负载\n>    - 保留真实客户端源 IP\n>\n> 3. **核心挑战**：如何将原始目的 IP 传递给后端 Pod\n>\n> 4. **Cilium 实现**：通过 IP Options 字段携带 `orig_dst` 信息\n>\n> 5. **抓包验证**：SYN-ACK 从 Pod 直接发往 Client，Node A 看不到\n>\n> 6. **配置方法**：`loadBalancer.mode=dsr`\n>\n> 7. **与 Socket LB 的区别**：\n>    - Socket LB：优化东西向（集群内）流量\n>    - DSR：优化南北向（外部访问）流量\n\n---", "subs": ["19.1 背景与问题", "19.2 DSR vs SNAT 对比", "19.3 核心挑战：IP 传递问题", "19.4 Cilium DSR 实现机制", "19.5 TCP 三次握手详解", "19.6 配置方法", "19.7 进阶方案：IPIP 隧道", "19.8 应用场景", "19.9 与 LVS DSR 的关系", "19.10 章节小结"]}, {"title": "第二十章 Cilium 双栈模式", "content": "本章介绍 Cilium 的 IPv4/IPv6 双栈（Dual Stack）支持，这是一种让 Pod 和 Service 同时拥有 IPv4 和 IPv6 地址的网络配置方式，是从 IPv4 向 IPv6 过渡的重要技术。\n\n#### 20.1 背景与概念\n\n##### 20.1.1 为什么需要双栈\n\n随着 IPv4 地址资源枯竭和 IPv6 的推广，越来越多的企业开始进行 IPv6 改造：\n\n```mermaid\ngraph LR\n    subgraph \"演进路径\"\n        A[\"纯 IPv4\"] --> B[\"双栈过渡\"]\n        B --> C[\"纯 IPv6\"]\n    end\n```\n\n| 方案 | 描述 |\n|:---|:---|\n| **纯 IPv4** | 传统方案，地址资源紧张 |\n| **假双栈** | 两个网卡分别承载 IPv4/IPv6 |\n| **真双栈** | 同一网卡同时拥有 IPv4 和 IPv6 地址 |\n| **纯 IPv6** | 未来目标，彻底解决地址问题 |\n\n##### 20.1.2 双栈的定义\n\n**真正的双栈（Dual Stack）**：一个网络接口上同时配置 IPv4 和 IPv6 地址，两种协议栈独立运行。\n\n```mermaid\ngraph TB\n    subgraph \"双栈网卡\"\n        NIC[\"eth0\"]\n        IPv4[\"IPv4: 10.0.0.1/24\"]\n        IPv6[\"IPv6: fd00::1/64\"]\n        \n        NIC --> IPv4\n        NIC --> IPv6\n    end\n```\n\n> [!NOTE]\n> **假双栈 vs 真双栈**：\n>\n> - **假双栈**：两个接口分别提供 IPv4 和 IPv6 服务，客户端根据协议访问不同接口\n> - **真双栈**：一个接口同时提供两种协议，客户端可以使用任意协议访问\n\n#### 20.2 Cilium 双栈配置\n\n##### 20.2.1 Helm 部署参数\n\n```bash\nhelm install cilium cilium/cilium --namespace kube-system \\\n  --set ipv6.enabled=true \\\n  --set ipam.mode=kubernetes\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| `ipv6.enabled=true` | 启用 IPv6 支持 |\n| `ipv4.enabled=true` | 默认启用，无需显式设置 |\n| `kubeProxyReplacement` | 双栈暂不支持 strict 模式 |\n\n> [!WARNING]\n> **注意事项**：Cilium 双栈模式目前不支持 `kubeProxyReplacement=strict`，需要保留 kube-proxy。\n\n##### 20.2.2 Kind 集群配置\n\n```yaml\n# kind-config.yaml\nkind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnetworking:\n  ipFamily: dual  # 关键配置：启用双栈\n  podSubnet: \"10.244.0.0/16,fd00:10:244::/56\"\n  serviceSubnet: \"10.96.0.0/12,fd00:10:96::/112\"\n```\n\n#### 20.3 Pod 双栈验证\n\n##### 20.3.1 查看 Pod IP\n\n```bash\n# 简单查看（只显示一个 IP）\nkubectl get pod -o wide\n\n# 详细查看（显示所有 IP）\nkubectl get pod -o yaml | grep -A 10 \"podIPs\"\n```\n\n**输出示例**：\n\n```yaml\npodIPs:\n  - ip: \"10.244.1.57\"      # IPv4 地址\n  - ip: \"fd00::982a:...\"   # IPv6 地址\n```\n\n##### 20.3.2 验证网卡配置\n\n```bash\n# 进入 Pod 查看 IP 地址\nkubectl exec -it <pod-name> -- ip addr show eth0\n```\n\n**输出示例**：\n\n```\n2: eth0@if15: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n    inet 10.244.1.57/32 scope global eth0\n    inet6 fd00::982a:.../128 scope global\n    inet6 fe80::xxxx/64 scope link\n```\n\n```mermaid\ngraph TB\n    subgraph \"Pod 网卡 eth0\"\n        A[\"IPv4: 10.244.1.57/32\"]\n        B[\"IPv6: fd00::982a.../128<br/>(Global)\"]\n        C[\"IPv6: fe80::xxxx/64<br/>(Link-local)\"]\n    end\n```\n\n> [!NOTE]\n> **三种地址**：\n>\n> - **IPv4 地址**：Pod 的 IPv4 通信地址\n> - **IPv6 Global 地址**：Pod 的 IPv6 全局通信地址\n> - **IPv6 Link-local 地址**：以 `fe80::` 开头，仅用于本地链路通信\n\n#### 20.4 Service 双栈支持\n\n##### 20.4.1 Service 配置\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: demo-svc\nspec:\n  ipFamilyPolicy: PreferDualStack  # 优先双栈\n  ipFamilies:\n    - IPv4\n    - IPv6\n  selector:\n    app: demo\n  ports:\n    - port: 80\n```\n\n| 字段 | 值 | 说明 |\n|:---|:---|:---|\n| `ipFamilyPolicy` | `PreferDualStack` | 优先使用双栈 |\n| `ipFamilyPolicy` | `RequireDualStack` | 强制要求双栈 |\n| `ipFamilies` | `[IPv4, IPv6]` | 指定支持的 IP 类型 |\n\n##### 20.4.2 验证 Service IP\n\n```bash\nkubectl get svc demo-svc -o yaml | grep -A 5 \"clusterIPs\"\n```\n\n**输出示例**：\n\n```yaml\nclusterIPs:\n  - \"10.96.44.152\"     # IPv4 ClusterIP\n  - \"fd00:10:96::xxx\"  # IPv6 ClusterIP\n```\n\n#### 20.5 DNS 解析\n\n##### 20.5.1 A 记录与 AAAA 记录\n\n```mermaid\ngraph LR\n    subgraph \"DNS 记录类型\"\n        A[\"A 记录\"] -->|\"返回\"| IPv4[\"IPv4 地址\"]\n        AAAA[\"AAAA 记录\"] -->|\"返回\"| IPv6[\"IPv6 地址\"]\n    end\n```\n\n##### 20.5.2 解析示例\n\n```bash\n# 解析 IPv4 地址（A 记录）\nnslookup -type=A demo-svc.default.svc.cluster.local\n# 返回：10.96.44.152\n\n# 解析 IPv6 地址（AAAA 记录）\nnslookup -type=AAAA demo-svc.default.svc.cluster.local\n# 返回：fd00:10:96::xxx\n```\n\n| 记录类型 | 返回内容 | 用途 |\n|:---|:---|:---|\n| **A** | IPv4 地址 | IPv4 客户端访问 |\n| **AAAA** | IPv6 地址 | IPv6 客户端访问 |\n\n#### 20.6 双栈路由\n\n##### 20.6.1 IPv4 路由表\n\n```bash\n# Pod 内查看 IPv4 路由\nip route\n```\n\n```\ndefault via 10.244.1.5 dev eth0\n10.244.1.5 dev eth0 scope link\n```\n\n##### 20.6.2 IPv6 路由表\n\n```bash\n# Pod 内查看 IPv6 路由\nip -6 route\n```\n\n```\ndefault via fe80::xxxx dev eth0\nfd00::/64 dev eth0\n```\n\n```mermaid\ngraph TB\n    subgraph \"双栈路由\"\n        Pod[\"Pod\"]\n        \n        subgraph \"IPv4 路径\"\n            GW4[\"网关: 10.244.1.5\"]\n        end\n        \n        subgraph \"IPv6 路径\"\n            GW6[\"网关: fe80::xxxx\"]\n        end\n        \n        Pod -->|\"IPv4 流量\"| GW4\n        Pod -->|\"IPv6 流量\"| GW6\n    end\n```\n\n#### 20.7 IPv6 邻居发现\n\n##### 20.7.1 与 ARP 的区别\n\n| 特性 | IPv4 ARP | IPv6 NDP |\n|:---|:---|:---|\n| **协议名称** | ARP | NDP (Neighbor Discovery Protocol) |\n| **请求消息** | ARP Request | NS (Neighbor Solicitation) |\n| **响应消息** | ARP Reply | NA (Neighbor Advertisement) |\n| **复杂度** | 简单 | 复杂（有状态机） |\n| **查看命令** | `arp -n` | `ip -6 neigh` |\n\n##### 20.7.2 IPv6 地址类型\n\n```mermaid\ngraph TB\n    subgraph \"IPv6 地址类型\"\n        Global[\"全局地址<br/>fd00::/8 或 2000::/3\"]\n        LinkLocal[\"链路本地地址<br/>fe80::/10\"]\n        Multicast[\"组播地址<br/>ff00::/8\"]\n    end\n```\n\n| 地址类型 | 前缀 | 用途 |\n|:---|:---|:---|\n| **Global** | `2000::/3` 或 `fd00::/8` | 全局通信 |\n| **Link-local** | `fe80::/10` | 本地链路通信 |\n| **Multicast** | `ff00::/8` | 组播通信 |\n\n> [!NOTE]\n> **Link-local 地址**：每个启用 IPv6 的网卡都会自动生成一个 `fe80::` 开头的链路本地地址，用于邻居发现等本地通信。\n\n##### 20.7.3 邻居发现状态机\n\nIPv6 邻居发现有多种状态：\n\n```mermaid\nstateDiagram-v2\n    [*] --> INCOMPLETE\n    INCOMPLETE --> REACHABLE: 收到 NA\n    REACHABLE --> STALE: 超时\n    STALE --> DELAY: 有数据发送\n    DELAY --> PROBE: 超时\n    PROBE --> REACHABLE: 收到 NA\n    PROBE --> [*]: 失败\n```\n\n| 状态 | 说明 |\n|:---|:---|\n| **INCOMPLETE** | 正在解析，等待 NA 响应 |\n| **REACHABLE** | 可达，最近确认过 |\n| **STALE** | 过期，需要重新验证 |\n| **DELAY** | 延迟探测 |\n| **PROBE** | 主动探测中 |\n\n#### 20.8 跨节点通信验证\n\n##### 20.8.1 IPv6 Ping 测试\n\n```bash\n# Pod 内 ping IPv6 地址\nping6 fd00::9d86:...\n```\n\n##### 20.8.2 抓包分析\n\n```bash\n# 在节点上抓包\ntcpdump -i lxc-xxx icmp6\n```\n\n**抓包输出**：\n\n```\n# NS/NA 消息（邻居发现）\nfe80::xxxx > ff02::1:ffxx:xxxx: ICMP6, neighbor solicitation\nfe80::xxxx > fe80::yyyy: ICMP6, neighbor advertisement\n\n# Echo Request/Reply\nfd00::982a > fd00::9d86: ICMP6, echo request\nfd00::9d86 > fd00::982a: ICMP6, echo reply\n```\n\n#### 20.9 MAC 地址学习\n\n##### 20.9.1 eBPF 的作用\n\nCilium 使用 eBPF 来处理 IPv6 邻居发现：\n\n```mermaid\ngraph LR\n    subgraph \"MAC 地址学习\"\n        NS[\"NS 请求\"] --> eBPF[\"eBPF Hook\"]\n        eBPF --> NA[\"NA 响应\"]\n        NA --> MAC[\"获取 MAC 地址\"]\n    end\n```\n\n> [!TIP]\n> Cilium 的 eBPF 程序会劫持邻居发现请求，返回对应的 lxc 网卡 MAC 地址，类似于 Calico 中的 `169.254.1.1` 代理 ARP 机制。\n\n##### 20.9.2 验证 MAC 地址\n\n```bash\n# 抓包查看目的 MAC\ntcpdump -i lxc-xxx -e icmp6\n\n# 输出示例\n# src MAC: 7c:f9:26:... (Pod 网卡)\n# dst MAC: b6:44:1b:... (lxc 网卡)\n```\n\n#### 20.10 配置总结\n\n##### 20.10.1 完整配置流程\n\n```mermaid\nflowchart TB\n    A[\"1. Kind 集群配置<br/>ipFamily: dual\"] --> B[\"2. Helm 安装 Cilium<br/>ipv6.enabled=true\"]\n    B --> C[\"3. 部署 Pod<br/>自动获取双 IP\"]\n    C --> D[\"4. 创建 Service<br/>ipFamilyPolicy: PreferDualStack\"]\n    D --> E[\"5. 验证通信<br/>ping/ping6 测试\"]\n```\n\n##### 20.10.2 关键配置对照表\n\n| 层级 | 配置项 | 值 |\n|:---|:---|:---|\n| **Cluster** | `ipFamily` | `dual` |\n| **Cilium** | `ipv6.enabled` | `true` |\n| **Service** | `ipFamilyPolicy` | `PreferDualStack` |\n| **Service** | `ipFamilies` | `[IPv4, IPv6]` |\n\n#### 20.11 章节小结\n\n```mermaid\nmindmap\n  root((双栈模式))\n    概念\n      同一网卡双 IP\n      IPv4 + IPv6 共存\n    配置\n      ipv6.enabled=true\n      ipFamilyPolicy: PreferDualStack\n    Pod 验证\n      kubectl get pod -o yaml\n      ip addr show eth0\n    Service 验证\n      A 记录返回 IPv4\n      AAAA 记录返回 IPv6\n    IPv6 特性\n      NDP 替代 ARP\n      Link-local 地址\n      状态机复杂\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **什么是双栈**：同一网卡同时拥有 IPv4 和 IPv6 地址\n>\n> 2. **配置要点**：\n>    - Cilium: `ipv6.enabled=true`\n>    - Service: `ipFamilyPolicy: PreferDualStack`\n>\n> 3. **验证方法**：\n>    - Pod: `ip addr show eth0` 看到两个地址\n>    - Service: `kubectl get svc -o yaml` 看到两个 ClusterIP\n>\n> 4. **DNS 解析**：\n>    - A 记录 → IPv4 地址\n>    - AAAA 记录 → IPv6 地址\n>\n> 5. **IPv6 特性**：\n>    - 使用 NDP 替代 ARP\n>    - 自动生成 Link-local 地址 (`fe80::`)\n>    - 邻居状态机比 ARP 复杂\n>\n> 6. **当前限制**：双栈不支持 `kubeProxyReplacement=strict`\n\n---", "subs": ["20.1 背景与概念", "20.2 Cilium 双栈配置", "20.3 Pod 双栈验证", "20.4 Service 双栈支持", "20.5 DNS 解析", "20.6 双栈路由", "20.7 IPv6 邻居发现", "20.8 跨节点通信验证", "20.9 MAC 地址学习", "20.10 配置总结", "20.11 章节小结"]}, {"title": "第二十一章 Cilium-LB-IPAM", "content": "本章介绍 Cilium 的 LB IPAM（LoadBalancer IP Address Management）功能，这是一个专门为 LoadBalancer 类型 Service 分配 IP 地址的工具，常与 BGP Control Plane 结合使用实现外部访问。\n\n#### 21.1 背景与问题\n\n##### 21.1.1 LoadBalancer Service 的困境\n\n在裸金属（Bare Metal）Kubernetes 集群中，创建 LoadBalancer 类型的 Service 时，常遇到以下问题：\n\n```mermaid\ngraph LR\n    subgraph \"云环境\"\n        A[\"创建 LB Service\"] --> B[\"云厂商自动分配 IP\"]\n        B --> C[\"External IP 就绪\"]\n    end\n    \n    subgraph \"裸金属环境\"\n        D[\"创建 LB Service\"] --> E[\"无 IP 分配器\"]\n        E --> F[\"External IP: Pending\"]\n    end\n```\n\n| 环境 | LoadBalancer 支持 |\n|:---|:---|\n| **云环境（AWS/GCP/Azure）** | 云厂商自动分配公网 IP |\n| **裸金属集群** | 默认无 IP 分配，状态为 Pending |\n\n> [!NOTE]\n> 很多初学者在部署 Ingress Controller 时遇到 `EXTERNAL-IP` 一直显示 `<pending>` 的问题，原因就是没有 LoadBalancer IP 分配器。\n\n##### 21.1.2 常见解决方案\n\n```mermaid\ngraph TB\n    subgraph \"LoadBalancer IP 解决方案\"\n        A[\"MetalLB\"]\n        B[\"Cilium LB IPAM\"]\n        C[\"kube-vip\"]\n        D[\"OpenELB\"]\n    end\n```\n\n| 方案 | 特点 |\n|:---|:---|\n| **MetalLB** | 独立项目，支持 L2 和 BGP 模式 |\n| **Cilium LB IPAM** | Cilium 内置，需配合 BGP 使用 |\n| **kube-vip** | 轻量级，支持 VIP 和 LB |\n\n#### 21.2 核心概念\n\n##### 21.2.1 LB IPAM 的职责\n\n**LB IPAM 只负责分配 IP 地址，不负责流量转发！**\n\n```mermaid\ngraph LR\n    subgraph \"LB IPAM 职责\"\n        A[\"IP Pool 管理\"]\n        B[\"IP 分配\"]\n        C[\"Service 标签匹配\"]\n    end\n    \n    subgraph \"不负责\"\n        D[\"流量路由\"]\n        E[\"负载均衡\"]\n        F[\"外部可达性\"]\n    end\n    \n    A --> B --> C\n```\n\n> [!IMPORTANT]\n> **关键理解**：LB IPAM 分配的 IP 地址默认不可路由，需要配合 **BGP Control Plane** 将地址宣告出去，才能实现外部访问。\n\n##### 21.2.2 与 BGP 的关系\n\n```mermaid\nsequenceDiagram\n    participant Svc as Service\n    participant IPAM as LB IPAM\n    participant BGP as BGP Control Plane\n    participant Router as 外部路由器\n    \n    Svc->>IPAM: 请求 LoadBalancer IP\n    IPAM->>Svc: 分配 IP（如 20.0.10.1）\n    Note over Svc: EXTERNAL-IP 就绪\n    BGP->>Router: 宣告 20.0.10.1\n    Router->>Router: 更新路由表\n    Note over Router: 地址变得可路由\n```\n\n#### 21.3 Cilium vs Calico 设计对比\n\n##### 21.3.1 宣告的 IP 类型\n\n```mermaid\ngraph TB\n    subgraph \"Cilium 方案\"\n        A[\"宣告 LoadBalancer IP\"]\n        B[\"符合 K8s 设计理念\"]\n        C[\"LB IP 本应外部可达\"]\n    end\n    \n    subgraph \"Calico 方案\"\n        D[\"宣告 ClusterIP\"]\n        E[\"ClusterIP 变得外部可达\"]\n        F[\"可能违背设计初衷\"]\n    end\n```\n\n| 对比项 | Cilium | Calico |\n|:---|:---|:---|\n| **宣告的 IP** | LoadBalancer IP | ClusterIP |\n| **设计契合度** | 符合 K8s 设计 | 略有争议 |\n| **ClusterIP 暴露** | ❌ 保持内部 | ✅ 可外部访问 |\n\n> [!TIP]\n> Kubernetes 设计中 ClusterIP 是集群内部地址，Cilium 选择宣告 LB IP 更符合这一理念。\n\n#### 21.4 配置与使用\n\n##### 21.4.1 CRD 资源\n\nCilium 安装后会自动创建 `CiliumLoadBalancerIPPool` CRD：\n\n```bash\n# 查看 CRD\nkubectl api-resources | grep cilium | grep pool\n\n# 输出\nciliumloadbalancerippools  ippools,lbippool  cilium.io/v2alpha1  false  CiliumLoadBalancerIPPool\n```\n\n##### 21.4.2 创建 IP Pool\n\n```yaml\napiVersion: cilium.io/v2alpha1\nkind: CiliumLoadBalancerIPPool\nmetadata:\n  name: blue-pool\nspec:\n  blocks:\n    - cidr: \"20.0.10.0/24\"   # IP 地址池范围\n  serviceSelector:\n    matchLabels:\n      color: blue             # 匹配的 Service 标签\n---\napiVersion: cilium.io/v2alpha1\nkind: CiliumLoadBalancerIPPool\nmetadata:\n  name: red-pool\nspec:\n  blocks:\n    - cidr: \"30.0.10.0/24\"\n  serviceSelector:\n    matchLabels:\n      color: red\n```\n\n##### 21.4.3 IP Pool 结构说明\n\n```mermaid\ngraph TB\n    subgraph \"IP Pool 结构\"\n        Pool[\"CiliumLoadBalancerIPPool\"]\n        Blocks[\"blocks<br/>(IP 地址段列表)\"]\n        CIDR[\"cidr: 20.0.10.0/24\"]\n        Selector[\"serviceSelector<br/>(Service 选择器)\"]\n        Labels[\"matchLabels<br/>color: blue\"]\n        \n        Pool --> Blocks --> CIDR\n        Pool --> Selector --> Labels\n    end\n```\n\n| 字段 | 说明 |\n|:---|:---|\n| `blocks` | IP 地址段列表，支持多个 CIDR |\n| `serviceSelector` | Service 标签选择器 |\n| `matchLabels` | 精确匹配标签 |\n| `matchExpressions` | 表达式匹配（可选） |\n\n#### 21.5 Service 配置\n\n##### 21.5.1 创建使用 IP Pool 的 Service\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: demo-svc\n  labels:\n    color: red    # 匹配 red-pool\nspec:\n  type: LoadBalancer  # 必须是 LoadBalancer 类型\n  selector:\n    app: demo\n  ports:\n    - port: 80\n```\n\n##### 21.5.2 验证 IP 分配\n\n```bash\n# 查看 Service\nkubectl get svc demo-svc\n\n# 输出示例\nNAME       TYPE           CLUSTER-IP    EXTERNAL-IP    PORT(S)\ndemo-svc   LoadBalancer   10.96.1.100   30.0.10.208   80:31234/TCP\n```\n\n```mermaid\ngraph LR\n    subgraph \"IP 分配流程\"\n        A[\"Service<br/>labels: color=red\"] --> B[\"匹配 red-pool\"]\n        B --> C[\"从 30.0.10.0/24 分配\"]\n        C --> D[\"EXTERNAL-IP: 30.0.10.208\"]\n    end\n```\n\n#### 21.6 工作原理\n\n##### 21.6.1 标签匹配机制\n\n```mermaid\nflowchart TB\n    subgraph \"匹配流程\"\n        S[\"Service 创建<br/>type: LoadBalancer\"]\n        L[\"检查 Service labels\"]\n        P1[\"blue-pool<br/>matchLabels: color=blue\"]\n        P2[\"red-pool<br/>matchLabels: color=red\"]\n        IP1[\"分配 20.0.10.x\"]\n        IP2[\"分配 30.0.10.x\"]\n        \n        S --> L\n        L -->|\"color=blue\"| P1 --> IP1\n        L -->|\"color=red\"| P2 --> IP2\n    end\n```\n\n##### 21.6.2 多 Pool 匹配规则\n\n| 场景 | 行为 |\n|:---|:---|\n| Service 标签匹配单个 Pool | 从该 Pool 分配 IP |\n| Service 标签匹配多个 Pool | 从第一个匹配的 Pool 分配 |\n| Service 无匹配标签 | IP 不分配，状态 Pending |\n\n#### 21.7 与 MetalLB 对比\n\n##### 21.7.1 功能对比\n\n| 特性 | Cilium LB IPAM | MetalLB |\n|:---|:---|:---|\n| **IP 分配** | ✅ | ✅ |\n| **L2 模式** | ❌ | ✅ |\n| **BGP 模式** | ✅（需 BGP CP） | ✅ |\n| **独立使用** | ❌（需配合 BGP） | ✅ |\n| **CNI 集成** | ✅ 原生 | ❌ 独立部署 |\n\n##### 21.7.2 选择建议\n\n```mermaid\ngraph TB\n    subgraph \"选择指南\"\n        Q1[\"使用 Cilium CNI?\"]\n        Q2[\"有 BGP 基础设施?\"]\n        A1[\"Cilium LB IPAM<br/>+ BGP Control Plane\"]\n        A2[\"MetalLB L2 模式\"]\n        A3[\"MetalLB\"]\n        \n        Q1 -->|\"是\"| Q2\n        Q1 -->|\"否\"| A3\n        Q2 -->|\"是\"| A1\n        Q2 -->|\"否\"| A2\n    end\n```\n\n#### 21.8 重要限制\n\n> [!WARNING]\n> **LB IPAM 单独使用时的限制**：\n>\n> 1. **IP 不可路由**：分配的 IP 只是写入 Service，外部无法访问\n> 2. **需要 BGP**：必须配合 BGP Control Plane 宣告路由\n> 3. **版本要求**：Cilium 1.13+ 支持 BGP 宣告 LB IP\n\n##### 21.8.1 单独使用 LB IPAM 的效果\n\n```bash\n# Service 获得 IP，但无法访问\nkubectl get svc\nNAME       TYPE           EXTERNAL-IP    ...\ndemo-svc   LoadBalancer   30.0.10.208   ...\n\n# 从集群外部访问\ncurl 30.0.10.208\n# 超时 - IP 不可路由\n```\n\n#### 21.9 完整工作流程\n\n##### 21.9.1 LB IPAM + BGP Control Plane\n\n```mermaid\nsequenceDiagram\n    participant User as 用户\n    participant Svc as Service\n    participant IPAM as LB IPAM\n    participant BGP as BGP CP\n    participant TOR as ToR 交换机\n    participant Client as 外部客户端\n    \n    User->>Svc: 创建 LB Service\n    IPAM->>Svc: 分配 IP 30.0.10.208\n    BGP->>TOR: BGP 宣告 30.0.10.208\n    TOR->>TOR: 更新路由表\n    Client->>TOR: 访问 30.0.10.208\n    TOR->>Svc: 路由到集群节点\n    Svc->>Client: 响应\n```\n\n##### 21.9.2 ECMP 负载均衡\n\n配合 BGP 可实现 ECMP（等价多路径）负载均衡：\n\n```\n# 路由表示例\n30.0.10.208 via 10.1.5.10  # Node 1\n30.0.10.208 via 10.1.5.11  # Node 2\n# = 等价路由，流量分担\n```\n\n#### 21.10 章节小结\n\n```mermaid\nmindmap\n  root((LB IPAM))\n    概念\n      LoadBalancer IP 管理器\n      只分配IP不负责路由\n    配置\n      CiliumLoadBalancerIPPool\n      blocks + serviceSelector\n    匹配\n      Service labels 匹配 Pool\n      分配对应网段 IP\n    限制\n      单独使用IP不可路由\n      需配合BGP使用\n    对比\n      Cilium宣告LB IP\n      Calico宣告ClusterIP\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **什么是 LB IPAM**：Cilium 内置的 LoadBalancer IP 地址分配器\n>\n> 2. **核心职责**：只负责分配 IP，不负责路由和负载均衡\n>\n> 3. **配置方式**：\n>    - 创建 `CiliumLoadBalancerIPPool` 定义 IP 池\n>    - Service 通过 labels 匹配 Pool\n>\n> 4. **重要限制**：\n>    - 单独使用时 IP 不可路由\n>    - 需要配合 BGP Control Plane 宣告路由\n>\n> 5. **与 Calico 对比**：\n>    - Cilium：宣告 LB IP（符合 K8s 设计）\n>    - Calico：宣告 ClusterIP（有争议）\n>\n> 6. **版本要求**：Cilium 1.13+ 才支持 BGP 宣告 LB IP\n\n---", "subs": ["21.1 背景与问题", "21.2 核心概念", "21.3 Cilium vs Calico 设计对比", "21.4 配置与使用", "21.5 Service 配置", "21.6 工作原理", "21.7 与 MetalLB 对比", "21.8 重要限制", "21.9 完整工作流程", "21.10 章节小结"]}, {"title": "第二十二章 Cilium 带宽管理", "content": "本章介绍 Cilium 的带宽管理（Bandwidth Manager）功能，这是一种通过 EDT（Earliest Departure Time）时间戳机制在物理网卡上实现 Pod 流量限速的技术。\n\n#### 22.1 背景与问题\n\n##### 22.1.1 传统限速思路的局限\n\n最直觉的限速方式是在 Pod 的网卡上做限制：\n\n```mermaid\ngraph LR\n    subgraph \"传统思路\"\n        Pod[\"Pod eth0\"] --> LXC[\"lxc 网卡\"]\n        LXC --> PHY[\"物理网卡\"]\n        \n        Pod -.->|\"❌ 在这限速\"| Pod\n        LXC -.->|\"❌ 在这限速\"| LXC\n    end\n```\n\n**为什么不能在 veth 网卡上限速？**\n\n| 问题 | 说明 |\n|:---|:---|\n| **Buffer Bloat** | veth 队列缓冲区容易被填满 |\n| **TCP TSQ 处理差** | 影响 TCP 小队列优化 |\n| **驱动限制** | veth pair 驱动不支持高级队列调度 |\n\n> [!WARNING]\n> Docker/Kubernetes 的 veth pair 虚拟网卡在带宽管理上存在天然限制，不适合做精确限速。\n\n##### 22.1.2 Cilium 的解决方案\n\nCilium 选择在**物理网卡**上做限速，通过 EDT 时间戳告诉物理网卡何时发送数据包：\n\n```mermaid\ngraph LR\n    subgraph \"Cilium 方案\"\n        Pod[\"Pod eth0\"] --> LXC[\"lxc 网卡\"]\n        LXC --> |\"EDT 时间戳\"| PHY[\"物理网卡\"]\n        PHY -.->|\"✅ 在这限速\"| PHY\n    end\n```\n\n#### 22.2 核心原理\n\n##### 22.2.1 EDT (Earliest Departure Time)\n\nEDT 是一个内核功能，数据包在发送时会携带一个时间戳，告诉网卡设备这个包最早什么时候可以发出：\n\n```mermaid\nsequenceDiagram\n    participant Pod as Pod\n    participant eBPF as eBPF Datapath\n    participant NIC as 物理网卡\n    \n    Pod->>eBPF: 发送数据包\n    eBPF->>eBPF: 计算 EDT 时间戳\n    eBPF->>NIC: 数据包 + EDT\n    Note over NIC: 根据 EDT 调度发送\n    NIC->>NIC: 时间到才发送\n```\n\n> [!NOTE]\n> **EDT 时间戳**是 Linux 内核 5.x 版本引入的功能，Cilium 利用这一特性实现精确的带宽控制。\n\n##### 22.2.2 MQ + FQ 队列协作\n\n物理网卡使用两种队列机制配合实现限速：\n\n```mermaid\ngraph TB\n    subgraph \"队列调度架构\"\n        Packets[\"数据包流\"] --> MQ[\"MQ (Multi-Queue)<br/>多队列分发\"]\n        MQ --> Q1[\"队列 1\"]\n        MQ --> Q2[\"队列 2\"]\n        MQ --> Q3[\"队列 N\"]\n        \n        Q1 --> FQ[\"FQ (Fair Queue)<br/>公平队列\"]\n        Q2 --> FQ\n        Q3 --> FQ\n        \n        FQ --> |\"根据 EDT 调度\"| NIC[\"网卡发送\"]\n    end\n```\n\n| 组件 | 全称 | 作用 |\n|:---|:---|:---|\n| **MQ** | Multi-Queue | 多队列，将流量分散到多个 CPU/队列 |\n| **FQ** | Fair Queue | 公平队列，基于时间轮按 EDT 调度发包 |\n\n##### 22.2.3 工作流程\n\n```mermaid\nflowchart TB\n    A[\"1. Cilium Agent 监控 Pod 注解\"]\n    B[\"2. 读取带宽限制配置\"]\n    C[\"3. 将限制写入 eBPF Datapath\"]\n    D[\"4. 数据包发送时计算 EDT\"]\n    E[\"5. 物理网卡 FQ 根据 EDT 调度\"]\n    F[\"6. 实现带宽限速\"]\n    \n    A --> B --> C --> D --> E --> F\n```\n\n#### 22.3 配置方法\n\n##### 22.3.1 启用带宽管理\n\n安装 Cilium 时需要开启 `bandwidthManager` 功能：\n\n```bash\nhelm install cilium cilium/cilium --namespace kube-system \\\n  --set bandwidthManager.enabled=true \\\n  --set bandwidthManager.bbr=true \\\n  --set bpf.masquerade=true \\\n  --set kubeProxyReplacement=true\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| `bandwidthManager.enabled=true` | 启用带宽管理功能 |\n| `bandwidthManager.bbr=true` | 启用 BBR 拥塞控制算法 |\n\n##### 22.3.2 验证功能启用\n\n```bash\n# 查看 Cilium 状态\ncilium status\n\n# 输出中确认\nBandwidthManager:    EDT with BPF [BBR]\n```\n\n##### 22.3.3 Pod 注解配置\n\n通过注解（Annotation）为 Pod 设置带宽限制：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: bandwidth-limited-pod\n  annotations:\n    kubernetes.io/egress-bandwidth: \"50M\"   # 限制出站带宽 50Mbps\n    # kubernetes.io/ingress-bandwidth: \"100M\"  # 入站带宽（可选）\nspec:\n  containers:\n    - name: app\n      image: nginx\n```\n\n| 注解 | 说明 |\n|:---|:---|\n| `kubernetes.io/egress-bandwidth` | 限制出站（发送）带宽 |\n| `kubernetes.io/ingress-bandwidth` | 限制入站（接收）带宽 |\n\n> [!TIP]\n> 常用单位：`K`（Kbps）、`M`（Mbps）、`G`（Gbps），如 `10M` 表示 10 Mbps。\n\n#### 22.4 实现原理详解\n\n##### 22.4.1 为什么在物理网卡限速\n\n```mermaid\ngraph TB\n    subgraph \"veth 限速问题\"\n        V1[\"veth 队列满\"]\n        V2[\"Buffer Bloat\"]\n        V3[\"TCP 性能下降\"]\n        V1 --> V2 --> V3\n    end\n    \n    subgraph \"物理网卡优势\"\n        P1[\"硬件队列支持\"]\n        P2[\"MQ+FQ 调度\"]\n        P3[\"EDT 精确控制\"]\n        P1 --> P2 --> P3\n    end\n```\n\n| 对比项 | veth 网卡 | 物理网卡 |\n|:---|:---|:---|\n| **队列支持** | 简单队列 | 多队列 + 硬件队列 |\n| **调度能力** | 有限 | FQ 公平调度 |\n| **性能影响** | 大（buffer bloat） | 小 |\n| **限速精度** | 低 | 高（EDT 时间戳） |\n\n##### 22.4.2 EDT 时间戳原理\n\n```mermaid\nsequenceDiagram\n    participant App as 应用\n    participant Kernel as 内核\n    participant FQ as FQ 调度器\n    participant NIC as 网卡\n    \n    App->>Kernel: 发送数据包\n    Kernel->>Kernel: 计算 EDT = 当前时间 + 延迟\n    Kernel->>FQ: 数据包 + EDT\n    \n    Note over FQ: 时间轮调度\n    \n    loop 每个时间片\n        FQ->>FQ: 检查 EDT <= 当前时间?\n        alt EDT 到达\n            FQ->>NIC: 发送数据包\n        else EDT 未到\n            FQ->>FQ: 继续等待\n        end\n    end\n```\n\n**限速计算示例**：\n\n```\n原始带宽：1 Gbps = 每秒发送 1000M 数据\n限制带宽：50 Mbps\n\n计算：1000 / 50 = 20 倍\n\n实现：每 20 个时间片才发送 1 个包\n结果：带宽降低到 50 Mbps\n```\n\n#### 22.5 测试验证\n\n##### 22.5.1 部署测试 Pod\n\n```yaml\n# 10M 带宽限制\napiVersion: v1\nkind: Pod\nmetadata:\n  name: netperf-10m\n  annotations:\n    kubernetes.io/egress-bandwidth: \"10M\"\nspec:\n  containers:\n    - name: netperf\n      image: networkstatic/netperf\n---\n# 100M 带宽限制\napiVersion: v1\nkind: Pod\nmetadata:\n  name: netperf-100m\n  annotations:\n    kubernetes.io/egress-bandwidth: \"100M\"\nspec:\n  containers:\n    - name: netperf\n      image: networkstatic/netperf\n```\n\n##### 22.5.2 使用 netperf 测试\n\n```bash\n# 获取服务端 IP\nSERVER_IP=$(kubectl get pod netperf-server -o jsonpath='{.status.podIP}')\n\n# 从限速 Pod 测试带宽\nkubectl exec -it netperf-10m -- netperf -H $SERVER_IP -t TCP_STREAM\n\n# 预期结果：~9.5 Mbps（接近 10M 限制）\n```\n\n##### 22.5.3 测试结果对照\n\n| 配置 | 预期带宽 | 实测带宽 |\n|:---|:---|:---|\n| `egress-bandwidth: 10M` | 10 Mbps | ~9.5 Mbps |\n| `egress-bandwidth: 100M` | 100 Mbps | ~93 Mbps |\n| 无限制 | 网卡最大 | ~500+ Mbps |\n\n#### 22.6 与传统方案对比\n\n##### 22.6.1 与 CNI bandwidth 插件对比\n\n```mermaid\ngraph TB\n    subgraph \"传统方案 - CNI bandwidth\"\n        A1[\"使用 tc 规则\"]\n        A2[\"在 veth 上限速\"]\n        A3[\"tbf/htb 队列\"]\n    end\n    \n    subgraph \"Cilium 方案\"\n        B1[\"使用 eBPF + EDT\"]\n        B2[\"在物理网卡限速\"]\n        B3[\"MQ + FQ 调度\"]\n    end\n```\n\n| 特性 | CNI bandwidth 插件 | Cilium 带宽管理 |\n|:---|:---|:---|\n| **限速位置** | veth 网卡 | 物理网卡 |\n| **实现方式** | tc (tbf/htb) | eBPF + EDT |\n| **性能影响** | 较大 | 较小 |\n| **精度** | 一般 | 高 |\n| **TCP 优化** | 无 | TSQ 支持 |\n\n#### 22.7 重要限制\n\n> [!CAUTION]\n> **使用限制**：\n>\n> 1. **不支持 Kind 环境**：Kind 使用 veth pair，无法正确限速\n> 2. **需要物理/虚拟机环境**：必须有真正的物理网卡驱动\n> 3. **内核版本要求**：需要支持 EDT 的内核（5.x+）\n> 4. **主要限制 egress**：入站限速场景较少\n\n#### 22.8 注意事项\n\n##### 22.8.1 环境要求\n\n```mermaid\ngraph LR\n    subgraph \"支持的环境\"\n        A[\"物理服务器\"]\n        B[\"VMware/KVM 虚拟机\"]\n        C[\"云服务器\"]\n    end\n    \n    subgraph \"不支持的环境\"\n        D[\"Kind 集群\"]\n        E[\"Docker Desktop\"]\n    end\n```\n\n##### 22.8.2 驱动检查\n\n```bash\n# 查看网卡驱动\nethtool -i eth0 | grep driver\n\n# 物理网卡驱动示例\ndriver: vmxnet3     # VMware\ndriver: virtio_net  # KVM\ndriver: ixgbe       # Intel 万兆\n```\n\n#### 22.9 章节小结\n\n```mermaid\nmindmap\n  root((带宽管理))\n    原理\n      EDT时间戳\n      物理网卡限速\n      MQ+FQ队列\n    配置\n      bandwidthManager.enabled\n      Pod注解方式\n    限速注解\n      egress-bandwidth\n      ingress-bandwidth\n    限制\n      不支持Kind\n      需要真实网卡\n      内核5.x+\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **为什么不在 veth 限速**：Buffer Bloat、队列受限、精度差\n>\n> 2. **Cilium 方案**：在物理网卡使用 EDT 时间戳限速\n>\n> 3. **启用方式**：\n>    - Helm: `bandwidthManager.enabled=true`\n>    - Pod: `kubernetes.io/egress-bandwidth: \"50M\"`\n>\n> 4. **工作原理**：\n>    - eBPF 为数据包打上 EDT 时间戳\n>    - FQ 调度器根据 EDT 控制发包时机\n>\n> 5. **MQ + FQ 协作**：\n>    - MQ（多队列）分散流量\n>    - FQ（公平队列）按时间调度\n>\n> 6. **环境要求**：\n>    - 需要真实物理/虚拟网卡\n>    - 不支持 Kind（veth pair）\n>    - 内核版本 5.x+\n\n---", "subs": ["22.1 背景与问题", "22.2 核心原理", "22.3 配置方法", "22.4 实现原理详解", "22.5 测试验证", "22.6 与传统方案对比", "22.7 重要限制", "22.8 注意事项", "22.9 章节小结"]}, {"title": "第二十三章 Cilium Ingress Controller", "content": "本章介绍 Cilium 原生的 Ingress Controller 功能，无需部署额外的 Ingress 控制器（如 Nginx Ingress），Cilium 可以直接提供七层负载均衡能力。\n\n#### 23.1 背景与概念\n\n##### 23.1.1 Ingress 回顾\n\nIngress 是 Kubernetes 中用于管理七层（HTTP/HTTPS）流量入口的资源：\n\n```mermaid\ngraph LR\n    Client[\"外部客户端\"] --> LB[\"LoadBalancer<br/>L4 负载均衡\"]\n    LB --> IC[\"Ingress Controller<br/>L7 负载均衡\"]\n    IC --> |\"基于 URI 路由\"| Svc1[\"Service A\"]\n    IC --> |\"基于 URI 路由\"| Svc2[\"Service B\"]\n    Svc1 --> Pod1[\"Pod A\"]\n    Svc2 --> Pod2[\"Pod B\"]\n```\n\n**四层 vs 七层负载均衡**：\n\n| 特性 | 四层（L4） | 七层（L7） |\n|:---|:---|:---|\n| **工作层** | 传输层（TCP/UDP） | 应用层（HTTP/HTTPS） |\n| **路由依据** | IP + 端口 | URL 路径、Host 头 |\n| **SSL 卸载** | ❌ | ✅ |\n| **典型场景** | Service LoadBalancer | Ingress |\n\n##### 23.1.2 传统 Ingress 架构\n\n```mermaid\ngraph TB\n    subgraph \"传统方案\"\n        Nginx[\"Nginx Ingress Controller\"]\n        Rules[\"Ingress Rules\"]\n        Backend[\"后端 Service/Pod\"]\n        \n        Nginx --> |\"解析 Rules\"| Rules\n        Rules --> |\"路由到\"| Backend\n    end\n```\n\n需要额外部署 Nginx Ingress、Traefik 等控制器。\n\n##### 23.1.3 Cilium Ingress Controller\n\nCilium 内置 Ingress Controller，无需额外组件：\n\n```mermaid\ngraph TB\n    subgraph \"Cilium 方案\"\n        Cilium[\"Cilium Agent<br/>内置 Ingress Controller\"]\n        Envoy[\"Envoy L7 Proxy\"]\n        Rules[\"Ingress Rules\"]\n        Backend[\"后端 Service/Pod\"]\n        \n        Cilium --> Envoy\n        Envoy --> |\"解析 Rules\"| Rules\n        Rules --> |\"路由到\"| Backend\n    end\n```\n\n> [!TIP]\n> Cilium 使用 Envoy 作为七层代理，提供 Ingress Controller 能力，同时为 Service Mesh 功能奠定基础。\n\n#### 23.2 前置要求\n\n##### 23.2.1 配置要求\n\n| 要求 | 说明 |\n|:---|:---|\n| **kubeProxyReplacement** | 必须为 `strict` 或 `true` |\n| **L7 Proxy** | 默认启用 |\n| **Kubernetes 版本** | ≥ 1.19 |\n| **Cilium 版本** | ≥ 1.13 |\n\n##### 23.2.2 启用 Ingress Controller\n\n```bash\nhelm install cilium cilium/cilium --namespace kube-system \\\n  --set kubeProxyReplacement=true \\\n  --set ingressController.enabled=true \\\n  --set ingressController.loadbalancerMode=dedicated\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| `ingressController.enabled=true` | 启用 Ingress Controller |\n| `ingressController.loadbalancerMode` | `dedicated`（专用）或 `shared`（共享） |\n\n#### 23.3 HTTP 模式\n\n##### 23.3.1 工作流程\n\n```mermaid\nsequenceDiagram\n    participant Client as 客户端\n    participant LB as LoadBalancer\n    participant Envoy as Cilium Envoy\n    participant Svc as Service\n    participant Pod as Pod\n    \n    Client->>LB: HTTP 请求 (pass: /details)\n    LB->>Envoy: 转发请求\n    Envoy->>Envoy: 解析 Ingress Rules\n    Envoy->>Svc: 匹配后端服务\n    Svc->>Pod: 路由到 Pod\n    Pod->>Client: 返回响应\n```\n\n##### 23.3.2 创建后端服务\n\n```yaml\n# 部署后端应用\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: productpage\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: productpage\n  template:\n    metadata:\n      labels:\n        app: productpage\n    spec:\n      containers:\n        - name: productpage\n          image: docker.io/istio/examples-bookinfo-productpage-v1:1.16.2\n          ports:\n            - containerPort: 9080\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: productpage\nspec:\n  selector:\n    app: productpage\n  ports:\n    - port: 9080\n```\n\n##### 23.3.3 创建 Ingress 资源\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: basic-ingress\nspec:\n  ingressClassName: cilium    # 使用 Cilium Ingress Controller\n  rules:\n    - http:\n        paths:\n          - path: /details\n            pathType: Prefix\n            backend:\n              service:\n                name: details\n                port:\n                  number: 9080\n          - path: /\n            pathType: Prefix\n            backend:\n              service:\n                name: productpage\n                port:\n                  number: 9080\n```\n\n##### 23.3.4 验证配置\n\n```bash\n# 查看 Ingress\nkubectl get ingress\n\n# 输出示例\nNAME            CLASS    HOSTS   ADDRESS        PORTS\nbasic-ingress   cilium   *       172.18.0.200   80\n\n# 测试访问\ncurl http://172.18.0.200/details | jq\n```\n\n#### 23.4 HTTPS 模式\n\n##### 23.4.1 TLS 卸载原理\n\n```mermaid\nsequenceDiagram\n    participant Client as 客户端\n    participant Envoy as Cilium Envoy\n    participant Pod as 后端 Pod\n    \n    Client->>Envoy: HTTPS (TLS 加密)\n    Note over Envoy: TLS 卸载（解密）\n    Envoy->>Pod: HTTP (明文)\n    Pod->>Envoy: HTTP 响应\n    Note over Envoy: TLS 加密\n    Envoy->>Client: HTTPS 响应\n```\n\n> [!NOTE]\n> **信任域划分**：\n>\n> - **非信任域**：客户端 ↔ Ingress Controller（HTTPS）\n> - **信任域**：Ingress Controller ↔ 后端 Pod（HTTP）\n\n##### 23.4.2 创建 TLS 证书\n\n**方式一：使用 minica**\n\n```bash\n# 安装 minica\ngo install github.com/jsha/minica@latest\n\n# 生成证书\nminica --domains demo.cilium.rocks\n\n# 创建 Secret\nkubectl create secret tls demo-cert \\\n  --cert=demo.cilium.rocks/cert.pem \\\n  --key=demo.cilium.rocks/key.pem\n```\n\n**方式二：使用 OpenSSL**\n\n```bash\n# 生成自签名证书\nopenssl req -x509 -nodes -days 365 -newkey rsa:2048 \\\n  -keyout tls.key -out tls.crt \\\n  -subj \"/CN=demo.cilium.rocks\"\n\n# 创建 Secret\nkubectl create secret tls demo-cert \\\n  --cert=tls.crt --key=tls.key\n```\n\n**方式三：使用 cert-manager**\n\n```yaml\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: demo-cert\nspec:\n  secretName: demo-cert\n  dnsNames:\n    - demo.cilium.rocks\n  issuerRef:\n    name: letsencrypt-prod\n    kind: ClusterIssuer\n```\n\n##### 23.4.3 创建 HTTPS Ingress\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: tls-ingress\nspec:\n  ingressClassName: cilium\n  tls:\n    - hosts:\n        - demo.cilium.rocks\n      secretName: demo-cert     # 引用 TLS Secret\n  rules:\n    - host: demo.cilium.rocks   # 指定 Host\n      http:\n        paths:\n          - path: /\n            pathType: Prefix\n            backend:\n              service:\n                name: productpage\n                port:\n                  number: 9080\n```\n\n##### 23.4.4 验证 HTTPS\n\n```bash\n# 添加 hosts 解析\necho \"172.18.0.200 demo.cilium.rocks\" >> /etc/hosts\n\n# 测试 HTTPS 访问\ncurl -k -v https://demo.cilium.rocks/\n\n# 查看 TLS 握手信息\ncurl -k -v https://demo.cilium.rocks/ 2>&1 | grep -A5 \"SSL connection\"\n```\n\n#### 23.5 与 LoadBalancer 配合\n\n##### 23.5.1 MetalLB 集成\n\nIngress Controller 需要 LoadBalancer 类型的 Service 暴露外部访问：\n\n```mermaid\ngraph LR\n    Client[\"外部客户端\"] --> MetalLB[\"MetalLB<br/>L2/BGP 模式\"]\n    MetalLB --> |\"External IP\"| Ingress[\"Cilium Ingress<br/>Controller\"]\n    Ingress --> Pod[\"后端 Pod\"]\n```\n\n##### 23.5.2 MetalLB 配置\n\n```yaml\n# MetalLB L2 模式配置\napiVersion: metallb.io/v1beta1\nkind: IPAddressPool\nmetadata:\n  name: default\n  namespace: metallb-system\nspec:\n  addresses:\n    - 172.18.0.200-172.18.0.254\n---\napiVersion: metallb.io/v1beta1\nkind: L2Advertisement\nmetadata:\n  name: default\n  namespace: metallb-system\n```\n\n#### 23.6 Ingress 资源详解\n\n##### 23.6.1 资源结构\n\n```mermaid\ngraph TB\n    subgraph \"Ingress 结构\"\n        Ingress[\"Ingress\"]\n        Class[\"ingressClassName: cilium\"]\n        TLS[\"tls（可选）\"]\n        Rules[\"rules\"]\n        Host[\"host\"]\n        Paths[\"paths\"]\n        Backend[\"backend\"]\n        \n        Ingress --> Class\n        Ingress --> TLS\n        Ingress --> Rules\n        Rules --> Host\n        Rules --> Paths\n        Paths --> Backend\n    end\n```\n\n##### 23.6.2 关键字段\n\n| 字段 | 说明 |\n|:---|:---|\n| `ingressClassName` | 指定使用的 Ingress Controller |\n| `tls.hosts` | TLS 证书适用的域名 |\n| `tls.secretName` | 包含证书的 Secret 名称 |\n| `rules.host` | 匹配的 Host 头（可选） |\n| `rules.http.paths` | URL 路径匹配规则 |\n| `backend.service` | 后端 Service 配置 |\n\n#### 23.7 与传统方案对比\n\n##### 23.7.1 功能对比\n\n| 特性 | Nginx Ingress | Cilium Ingress |\n|:---|:---|:---|\n| **部署方式** | 独立 Deployment | CNI 内置 |\n| **L7 代理** | Nginx | Envoy |\n| **配置方式** | 注解 + ConfigMap | 标准 Ingress |\n| **与 CNI 集成** | 独立 | 原生集成 |\n| **Service Mesh** | 需额外组件 | 原生支持 |\n\n##### 23.7.2 选择建议\n\n```mermaid\ngraph TB\n    Q1[\"使用 Cilium CNI?\"]\n    Q2[\"需要 Service Mesh?\"]\n    A1[\"Cilium Ingress<br/>原生集成\"]\n    A2[\"Nginx/Traefik<br/>成熟稳定\"]\n    \n    Q1 -->|\"是\"| Q2\n    Q1 -->|\"否\"| A2\n    Q2 -->|\"是\"| A1\n    Q2 -->|\"否\"| A1\n```\n\n#### 23.8 注意事项\n\n> [!WARNING]\n> **使用注意**：\n>\n> 1. **HTTP 模式异常**：部分版本可能出现 503 错误，建议创建资源后等待 2-3 分钟\n> 2. **Host 必填（HTTPS）**：TLS 模式必须指定 host 字段\n> 3. **LoadBalancer 依赖**：需要 MetalLB 或云厂商 LB 提供 External IP\n> 4. **证书有效期**：自签证书需注意过期问题，生产环境建议使用 cert-manager\n\n#### 23.9 章节小结\n\n```mermaid\nmindmap\n  root((Cilium Ingress))\n    概念\n      Cilium内置L7代理\n      基于Envoy\n    启用\n      ingressController.enabled\n      kubeProxyReplacement\n    HTTP模式\n      ingressClassName: cilium\n      path路由\n    HTTPS模式\n      TLS证书\n      SSL卸载\n    依赖\n      LoadBalancer\n      MetalLB/云LB\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **什么是 Cilium Ingress**：Cilium 内置的七层 Ingress Controller，基于 Envoy\n>\n> 2. **前置要求**：\n>    - `kubeProxyReplacement=true`\n>    - `ingressController.enabled=true`\n>\n> 3. **HTTP 模式**：\n>    - `ingressClassName: cilium`\n>    - 定义 path 和后端 Service\n>\n> 4. **HTTPS 模式**：\n>    - 添加 `tls` 字段配置证书\n>    - 必须指定 `host` 字段\n>\n> 5. **TLS 证书创建**：\n>    - minica / OpenSSL / cert-manager\n>    - 创建为 Kubernetes Secret\n>\n> 6. **依赖组件**：\n>    - 需要 LoadBalancer（MetalLB/云 LB）提供外部 IP\n\n---", "subs": ["23.1 背景与概念", "23.2 前置要求", "23.3 HTTP 模式", "23.4 HTTPS 模式", "23.5 与 LoadBalancer 配合", "23.6 Ingress 资源详解", "23.7 与传统方案对比", "23.8 注意事项", "23.9 章节小结"]}, {"title": "第二十四章 Cilium Gateway API", "content": "本章介绍 Cilium 对 Kubernetes Gateway API 的支持。Gateway API 是 Ingress 的下一代替代方案，提供更强大、更标准化的七层流量管理能力。\n\n#### 24.1 背景与概念\n\n##### 24.1.1 什么是 Gateway API\n\nGateway API 是 Kubernetes SIG-Network 设计的新一代流量管理 API，目标是替代 Ingress：\n\n```mermaid\ngraph TB\n    subgraph \"演进历程\"\n        Ingress[\"Ingress<br/>（传统方式）\"] --> GatewayAPI[\"Gateway API<br/>（新一代）\"]\n    end\n    \n    subgraph \"Gateway API 特点\"\n        A[\"更强表达能力\"]\n        B[\"角色分离\"]\n        C[\"跨命名空间\"]\n        D[\"可扩展性\"]\n    end\n```\n\n> [!NOTE]\n> **Gateway API** 是 Kubernetes 官方推荐的 Ingress 替代方案，Cilium 通过 Envoy 原生支持 Gateway API。\n\n##### 24.1.2 与 Ingress 对比\n\n| 特性 | Ingress | Gateway API |\n|:---|:---|:---|\n| **API 成熟度** | 稳定（GA） | 逐步稳定（部分 Beta） |\n| **表达能力** | 有限 | 更丰富 |\n| **角色分离** | 无 | 支持（Infra/Cluster/App） |\n| **TLS 管理** | 简单 | 更灵活 |\n| **跨命名空间** | 复杂 | 原生支持 |\n| **扩展性** | 注解（非标准） | 标准化扩展 |\n\n##### 24.1.3 核心资源对象\n\n```mermaid\ngraph TB\n    subgraph \"Gateway API 资源\"\n        GC[\"GatewayClass<br/>定义控制器类型\"]\n        GW[\"Gateway<br/>定义入口网关\"]\n        HR[\"HTTPRoute<br/>定义路由规则\"]\n        \n        GC --> GW\n        GW --> HR\n        HR --> Svc[\"后端 Service\"]\n    end\n```\n\n| 资源 | 说明 |\n|:---|:---|\n| **GatewayClass** | 定义使用的 Gateway 控制器（如 Cilium） |\n| **Gateway** | 定义入口网关（监听端口、TLS 配置） |\n| **HTTPRoute** | 定义 HTTP 路由规则（类似 Ingress Rules） |\n\n#### 24.2 前置要求\n\n##### 24.2.1 配置要求\n\n| 要求 | 说明 |\n|:---|:---|\n| **kubeProxyReplacement** | 必须为 `strict` 或 `true` |\n| **L7 Proxy** | 默认启用 |\n| **Gateway API CRDs** | 必须预先安装 |\n\n##### 24.2.2 安装 Gateway API CRDs\n\n**必须预先安装四个 CRD**：\n\n```bash\n# 安装 Gateway API CRDs\nkubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml\nkubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_gateways.yaml\nkubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml\nkubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml\n```\n\n> [!CAUTION]\n> **必须先安装 CRDs**！如果不预先安装 Gateway API CRDs，Cilium 将无法启用 Gateway API 功能。\n\n##### 24.2.3 启用 Gateway API\n\n```bash\nhelm install cilium cilium/cilium --namespace kube-system \\\n  --set kubeProxyReplacement=true \\\n  --set gatewayAPI.enabled=true\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| `gatewayAPI.enabled=true` | 启用 Gateway API 支持 |\n\n#### 24.3 HTTP 模式\n\n##### 24.3.1 工作流程\n\n```mermaid\nsequenceDiagram\n    participant Client as 客户端\n    participant GW as Gateway\n    participant Route as HTTPRoute\n    participant Svc as Service\n    participant Pod as Pod\n    \n    Client->>GW: HTTP 请求\n    GW->>Route: 匹配路由规则\n    Route->>Svc: 转发到后端\n    Svc->>Pod: 路由到 Pod\n    Pod->>Client: 返回响应\n```\n\n##### 24.3.2 创建 Gateway\n\n```yaml\napiVersion: gateway.networking.k8s.io/v1\nkind: Gateway\nmetadata:\n  name: cilium-gateway\nspec:\n  gatewayClassName: cilium    # 使用 Cilium 作为控制器\n  listeners:\n    - name: http\n      protocol: HTTP\n      port: 80\n      allowedRoutes:\n        namespaces:\n          from: Same\n```\n\n##### 24.3.3 创建 HTTPRoute\n\n```yaml\napiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: http-route\nspec:\n  parentRefs:\n    - name: cilium-gateway     # 关联 Gateway\n  rules:\n    - matches:\n        - path:\n            type: PathPrefix\n            value: /details\n      backendRefs:\n        - name: details\n          port: 9080\n    - matches:\n        - path:\n            type: PathPrefix\n            value: /\n      backendRefs:\n        - name: productpage\n          port: 9080\n```\n\n##### 24.3.4 验证配置\n\n```bash\n# 查看 Gateway\nkubectl get gateway\n\n# 输出示例\nNAME             CLASS    ADDRESS        READY\ncilium-gateway   cilium   172.18.0.200   True\n\n# 查看 HTTPRoute\nkubectl get httproute\n\n# 测试访问\nLB_IP=$(kubectl get gateway cilium-gateway -o jsonpath='{.status.addresses[0].value}')\ncurl http://$LB_IP/details | jq\n```\n\n#### 24.4 HTTPS 模式\n\n##### 24.4.1 TLS 配置架构\n\n```mermaid\ngraph LR\n    Client[\"客户端\"] -->|\"HTTPS\"| GW[\"Gateway<br/>TLS 终结\"]\n    GW -->|\"HTTP\"| Route[\"HTTPRoute\"]\n    Route --> Pod[\"后端 Pod\"]\n```\n\n##### 24.4.2 创建 TLS 证书\n\n```bash\n# 使用 minica 生成证书\nminica --domains bookinfo.cilium.rocks\n\n# 创建 Secret\nkubectl create secret tls bookinfo-cert \\\n  --cert=bookinfo.cilium.rocks/cert.pem \\\n  --key=bookinfo.cilium.rocks/key.pem\n```\n\n##### 24.4.3 创建 HTTPS Gateway\n\n```yaml\napiVersion: gateway.networking.k8s.io/v1\nkind: Gateway\nmetadata:\n  name: tls-gateway\nspec:\n  gatewayClassName: cilium\n  listeners:\n    - name: https\n      protocol: HTTPS\n      port: 443\n      hostname: bookinfo.cilium.rocks\n      tls:\n        mode: Terminate\n        certificateRefs:\n          - name: bookinfo-cert    # 引用 TLS Secret\n      allowedRoutes:\n        namespaces:\n          from: Same\n```\n\n##### 24.4.4 创建 HTTPS HTTPRoute\n\n```yaml\napiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: https-route\nspec:\n  parentRefs:\n    - name: tls-gateway\n  hostnames:\n    - bookinfo.cilium.rocks      # 必须匹配 Gateway 的 hostname\n  rules:\n    - matches:\n        - path:\n            type: PathPrefix\n            value: /\n      backendRefs:\n        - name: productpage\n          port: 9080\n```\n\n##### 24.4.5 验证 HTTPS\n\n```bash\n# 添加 hosts 解析\nLB_IP=$(kubectl get gateway tls-gateway -o jsonpath='{.status.addresses[0].value}')\necho \"$LB_IP bookinfo.cilium.rocks\" >> /etc/hosts\n\n# 测试 HTTPS 访问\ncurl -k -v https://bookinfo.cilium.rocks/\n```\n\n#### 24.5 资源关系详解\n\n##### 24.5.1 资源层级\n\n```mermaid\ngraph TB\n    subgraph \"Gateway API 层级\"\n        GC[\"GatewayClass<br/>⬇ 定义控制器\"]\n        GW[\"Gateway<br/>⬇ 定义入口\"]\n        HR[\"HTTPRoute<br/>⬇ 定义路由\"]\n        Svc[\"Service<br/>⬇ 后端\"]\n        Pod[\"Pod\"]\n        \n        GC --> GW\n        GW --> HR\n        HR --> Svc\n        Svc --> Pod\n    end\n```\n\n##### 24.5.2 与 Ingress 映射\n\n| Ingress | Gateway API |\n|:---|:---|\n| `ingressClassName` | `GatewayClass` + `Gateway.gatewayClassName` |\n| Ingress 资源 | `Gateway` + `HTTPRoute` |\n| `rules.host` | `Gateway.listeners.hostname` |\n| `rules.http.paths` | `HTTPRoute.rules.matches` |\n| `tls` | `Gateway.listeners.tls` |\n\n#### 24.6 与 Ingress 对比\n\n##### 24.6.1 配置对比\n\n```mermaid\ngraph TB\n    subgraph \"Ingress 方式\"\n        I1[\"Ingress<br/>（单一资源）\"]\n    end\n    \n    subgraph \"Gateway API 方式\"\n        G1[\"GatewayClass\"]\n        G2[\"Gateway\"]\n        G3[\"HTTPRoute\"]\n        G1 --> G2 --> G3\n    end\n```\n\n##### 24.6.2 功能对比\n\n| 场景 | Ingress | Gateway API |\n|:---|:---|:---|\n| **基础 HTTP 路由** | ✅ | ✅ |\n| **TLS 终结** | ✅ | ✅ |\n| **Header 匹配** | 注解 | 原生支持 |\n| **请求重写** | 注解 | 原生支持 |\n| **流量拆分** | 注解 | 原生支持 |\n| **跨命名空间** | 困难 | 简单 |\n\n#### 24.7 实际应用场景\n\n##### 24.7.1 场景一：多团队共享网关\n\n```mermaid\ngraph TB\n    GW[\"Gateway<br/>（Infra Team 管理）\"]\n    \n    subgraph \"Team A 命名空间\"\n        HR1[\"HTTPRoute A\"]\n        Svc1[\"Service A\"]\n    end\n    \n    subgraph \"Team B 命名空间\"\n        HR2[\"HTTPRoute B\"]\n        Svc2[\"Service B\"]\n    end\n    \n    GW --> HR1\n    GW --> HR2\n    HR1 --> Svc1\n    HR2 --> Svc2\n```\n\n##### 24.7.2 场景二：Service Mesh 集成\n\n```mermaid\ngraph LR\n    GW[\"Gateway API\"] --> Envoy[\"Cilium Envoy\"]\n    Envoy --> SM[\"Service Mesh<br/>流量管理\"]\n```\n\n> [!TIP]\n> Gateway API 是 Service Mesh 的基础组件，Cilium 的 Gateway API 实现与其 Service Mesh 功能无缝集成。\n\n#### 24.8 注意事项\n\n> [!WARNING]\n> **使用注意**：\n>\n> 1. **CRDs 必须预装**：Gateway API CRDs 必须在安装 Cilium 之前安装\n> 2. **版本兼容性**：确保 CRDs 版本与 Cilium 版本兼容\n> 3. **LoadBalancer 依赖**：Gateway 会创建 LoadBalancer 类型的 Service\n> 4. **hostname 匹配**：HTTPS 模式下，HTTPRoute 的 hostnames 必须匹配 Gateway 的 hostname\n\n#### 24.9 章节小结\n\n```mermaid\nmindmap\n  root((Gateway API))\n    概念\n      Ingress替代\n      更强表达能力\n    核心资源\n      GatewayClass\n      Gateway\n      HTTPRoute\n    前置要求\n      CRDs预装\n      gatewayAPI.enabled\n    HTTP模式\n      Gateway定义入口\n      HTTPRoute定义路由\n    HTTPS模式\n      TLS配置\n      hostname匹配\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **什么是 Gateway API**：Ingress 的下一代替代方案，更强大的七层流量管理\n>\n> 2. **核心资源**：\n>    - `GatewayClass`：定义控制器\n>    - `Gateway`：定义入口网关\n>    - `HTTPRoute`：定义路由规则\n>\n> 3. **前置要求**：\n>    - 必须预装 Gateway API CRDs\n>    - `gatewayAPI.enabled=true`\n>\n> 4. **HTTP 模式**：\n>    - 创建 Gateway + HTTPRoute\n>    - `gatewayClassName: cilium`\n>\n> 5. **HTTPS 模式**：\n>    - Gateway 配置 TLS 证书\n>    - HTTPRoute 配置 hostnames\n>\n> 6. **与 Ingress 区别**：\n>    - 更丰富的表达能力\n>    - 原生支持流量拆分、Header 匹配等\n>    - 更好的跨命名空间支持\n\n---", "subs": ["24.1 背景与概念", "24.2 前置要求", "24.3 HTTP 模式", "24.4 HTTPS 模式", "24.5 资源关系详解", "24.6 与 Ingress 对比", "24.7 实际应用场景", "24.8 注意事项", "24.9 章节小结"]}, {"title": "第二十五章 BGP 基础知识", "content": "本章介绍 BGP（Border Gateway Protocol）协议的基础知识。BGP 是 Cilium 实现跨网络路由通告的核心技术，理解 BGP 原理对于配置 Cilium BGP 功能至关重要。\n\n#### 25.1 背景与概念\n\n##### 25.1.1 为什么需要 BGP\n\n在 Kubernetes 环境中，每个 Pod 都有独立的 IP 地址，导致路由条目数量急剧增加：\n\n```mermaid\ngraph LR\n    subgraph \"传统虚拟机\"\n        VM1[\"VM1: 1 IP\"]\n        VM2[\"VM2: 1 IP\"]\n    end\n    \n    subgraph \"Kubernetes Pod\"\n        Pod1[\"Pod1: 独立 IP\"]\n        Pod2[\"Pod2: 独立 IP\"]\n        Pod3[\"Pod3: 独立 IP\"]\n        PodN[\"Pod N: 独立 IP\"]\n    end\n```\n\n**路由条目膨胀**：\n\n| 场景 | 节点数 | 路由条目数 |\n|:---|:---|:---|\n| 传统虚拟机 | 200 | ~200 |\n| Kubernetes（100 Pod/节点） | 200 | ~20,000 |\n\n> [!NOTE]\n> 当路由条目达到数万甚至数十万时，传统 IGP 协议（如 OSPF）难以高效管理，需要使用 BGP 协议。\n\n##### 25.1.2 路由协议分类\n\n```mermaid\ngraph TB\n    subgraph \"路由协议\"\n        Static[\"静态路由<br/>手动配置\"]\n        IGP[\"IGP 内部网关协议<br/>OSPF / IS-IS\"]\n        BGP[\"BGP 边界网关协议<br/>iBGP / eBGP\"]\n    end\n    \n    Static --> |\"简单场景\"| IGP\n    IGP --> |\"大规模场景\"| BGP\n```\n\n| 协议类型 | 代表 | 适用规模 | 特点 |\n|:---|:---|:---|:---|\n| **静态路由** | - | 小型 | 手动配置，简单直观 |\n| **IGP** | OSPF、IS-IS | 中型园区网 | 自动学习，成百上千条 |\n| **BGP** | iBGP、eBGP | 大型互联网 | 成千上万条，更灵活 |\n\n##### 25.1.3 BGP 定义\n\n**BGP（Border Gateway Protocol）**：边界网关协议\n\n```mermaid\ngraph TB\n    AS1[\"自治系统 AS 100<br/>（如：电信）\"]\n    AS2[\"自治系统 AS 200<br/>（如：联通）\"]\n    \n    AS1 <-->|\"BGP 邻居\"| AS2\n```\n\n- **边界**：用于不同自治系统（AS）之间的路由交换\n- **网关**：运行 BGP 的路由器称为 BGP 网关\n- **协议**：基于 TCP 179 端口通信\n\n#### 25.2 核心概念\n\n##### 25.2.1 自治系统（AS）\n\n**AS（Autonomous System）**：自治系统号，用于标识一个独立管理的网络域。\n\n```mermaid\ngraph TB\n    subgraph AS123[\"AS 123\"]\n        R1[\"Router 1\"]\n        R2[\"Router 2\"]\n        R3[\"Router 3\"]\n    end\n    \n    subgraph AS456[\"AS 456\"]\n        R4[\"Router 4\"]\n        R5[\"Router 5\"]\n    end\n    \n    R3 <-->|\"eBGP\"| R4\n```\n\n| 概念 | 说明 |\n|:---|:---|\n| **AS 号** | 全局唯一标识符（如 AS 100、AS 65000） |\n| **私有 AS** | 64512 - 65534（类似私有 IP） |\n| **公有 AS** | 需向 IANA 申请 |\n\n##### 25.2.2 iBGP 与 eBGP\n\n```mermaid\ngraph TB\n    subgraph AS123[\"AS 123\"]\n        R1[\"R1\"] <-->|\"iBGP\"| R2[\"R2\"]\n        R2 <-->|\"iBGP\"| R3[\"R3\"]\n    end\n    \n    subgraph AS456[\"AS 456\"]\n        R4[\"R4\"]\n    end\n    \n    R3 <-->|\"eBGP\"| R4\n```\n\n| 类型 | 全称 | 说明 |\n|:---|:---|:---|\n| **iBGP** | Internal BGP | 同一 AS 内部的 BGP 邻居 |\n| **eBGP** | External BGP | 不同 AS 之间的 BGP 邻居 |\n\n**关键区别**：\n\n| 特性 | iBGP | eBGP |\n|:---|:---|:---|\n| **AS 号** | 相同 | 不同 |\n| **直连要求** | 不需要直连 | 通常需要直连 |\n| **TTL** | 大于 1（可跨路由器） | 默认 1（直连） |\n| **Next-Hop** | 不修改 | 修改为自己 |\n\n##### 25.2.3 BGP 邻居建立\n\nBGP 使用 **TCP 179 端口**建立邻居关系：\n\n```mermaid\nsequenceDiagram\n    participant R1 as Router 1\n    participant R2 as Router 2\n    \n    R1->>R2: TCP 三次握手 (port 179)\n    R1->>R2: Open 消息\n    R2->>R1: Open 消息\n    R1-->>R2: Keepalive\n    R2-->>R1: Keepalive\n    Note over R1,R2: 邻居关系建立 (Established)\n```\n\n> [!TIP]\n> BGP 邻居不要求物理直连，只要 TCP 179 端口可达即可。这是 BGP 的重要特性。\n\n#### 25.3 水平分割原则\n\n##### 25.3.1 问题背景\n\n**水平分割（Split Horizon）**：从 iBGP 对等体学习到的路由，不再通告给其他 iBGP 对等体。\n\n```mermaid\ngraph LR\n    R1[\"R1\"] <-->|\"iBGP\"| R2[\"R2\"]\n    R2 <-->|\"iBGP\"| R3[\"R3\"]\n    \n    R2 -.->|\"❌ 不传递\"| R1\n```\n\n**目的**：防止路由环路\n\n**问题**：R1 无法学习到 R3 的路由\n\n##### 25.3.2 解决方案\n\n为了让所有路由器学习到完整路由，需要建立**全互联（Full Mesh）**：\n\n```mermaid\ngraph TB\n    R1[\"R1\"] <--> R2[\"R2\"]\n    R2 <--> R3[\"R3\"]\n    R1 <--> R3\n```\n\n**问题**：邻居数量 = N × (N-1) / 2，规模增大时开销巨大\n\n#### 25.4 路由反射器\n\n##### 25.4.1 概念\n\n**RR（Route Reflector）**：路由反射器，用于解决 iBGP 全互联问题。\n\n```mermaid\ngraph TB\n    RR[\"RR 路由反射器\"]\n    \n    subgraph \"RR Clients\"\n        C1[\"Client 1\"]\n        C2[\"Client 2\"]\n        C3[\"Client 3\"]\n    end\n    \n    NonC[\"Non-Client\"]\n    \n    RR <--> C1\n    RR <--> C2\n    RR <--> C3\n    RR <--> NonC\n```\n\n| 角色 | 说明 |\n|:---|:---|\n| **RR（Route Reflector）** | 路由反射器 |\n| **Client** | RR 的客户端 |\n| **Non-Client** | 非客户端的普通 iBGP 邻居 |\n\n##### 25.4.2 反射规则\n\n```mermaid\ngraph TB\n    subgraph \"路由反射规则\"\n        Rule1[\"规则 1：Non-Client → 反射给所有 Client\"]\n        Rule2[\"规则 2：Client → 反射给 Non-Client + 其他 Client\"]\n        Rule3[\"规则 3：eBGP → 反射给所有 Client + Non-Client\"]\n    end\n```\n\n| 路由来源 | 反射目标 |\n|:---|:---|\n| **Non-Client** | 所有 Client（不包括其他 Non-Client） |\n| **Client** | Non-Client + 其他 Client |\n| **eBGP Peer** | 所有 Client + Non-Client |\n\n##### 25.4.3 反射示例\n\n```mermaid\ngraph TB\n    subgraph \"AS 100\"\n        R2[\"R2<br/>RR\"]\n        R3[\"R3<br/>Client\"]\n        R4[\"R4<br/>Client\"]\n        R5[\"R5<br/>Non-Client\"]\n    end\n    \n    subgraph \"AS 200\"\n        R1[\"R1\"]\n    end\n    \n    R1 <-->|\"eBGP\"| R2\n    R2 <-->|\"iBGP\"| R3\n    R2 <-->|\"iBGP\"| R4\n    R2 <-->|\"iBGP\"| R5\n```\n\n**路由流向**：\n\n| 场景 | 路由来源 | 反射目标 |\n|:---|:---|:---|\n| R5 → R2 | Non-Client | R3、R4（Client） |\n| R3 → R2 | Client | R4（Client）+ R5（Non-Client） |\n| R1 → R2 | eBGP | R3、R4、R5（所有） |\n\n##### 25.4.4 理解技巧\n\n> [!TIP]\n> **记忆技巧**：\n>\n> - **Client = RR 的一部分**（对内分彼此，对外是整体）\n> - **Non-Client = 普通邻居**（遵守水平分割）\n> - **eBGP = 外部来源**（无水平分割限制）\n\n#### 25.5 BGP 在 Kubernetes 中的应用\n\n##### 25.5.1 典型拓扑\n\n```mermaid\ngraph TB\n    subgraph \"数据中心\"\n        ToR1[\"ToR Switch 1<br/>AS 65001\"]\n        ToR2[\"ToR Switch 2<br/>AS 65002\"]\n        \n        subgraph \"Kubernetes Cluster\"\n            Node1[\"Node 1<br/>AS 65010\"]\n            Node2[\"Node 2<br/>AS 65010\"]\n            Node3[\"Node 3<br/>AS 65010\"]\n        end\n    end\n    \n    ToR1 <-->|\"eBGP\"| Node1\n    ToR1 <-->|\"eBGP\"| Node2\n    ToR2 <-->|\"eBGP\"| Node3\n```\n\n##### 25.5.2 Cilium BGP 实现\n\nCilium 支持多种 BGP 后端：\n\n| 后端 | 说明 |\n|:---|:---|\n| **GoBGP** | 当前推荐，原生 Go 实现 |\n| **BIRD** | 早期版本使用 |\n| **MetalLB BGP** | 与 MetalLB 集成 |\n\n#### 25.6 章节小结\n\n```mermaid\nmindmap\n  root((BGP 基础))\n    概念\n      边界网关协议\n      TCP 179 端口\n    自治系统\n      AS 号\n      私有/公有\n    邻居类型\n      iBGP 内部\n      eBGP 外部\n    水平分割\n      防止环路\n      全互联问题\n    路由反射器\n      RR\n      Client\n      Non-Client\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **什么是 BGP**：\n>    - 边界网关协议，用于大规模路由管理\n>    - 基于 TCP 179 端口\n>\n> 2. **AS 自治系统**：\n>    - 独立管理的网络域\n>    - 私有 AS：64512 - 65534\n>\n> 3. **iBGP vs eBGP**：\n>    - iBGP：同一 AS 内部\n>    - eBGP：不同 AS 之间\n>\n> 4. **水平分割**：\n>    - 防止路由环路\n>    - 导致全互联问题\n>\n> 5. **路由反射器**：\n>    - 解决全互联问题\n>    - Client 和 Non-Client 角色区分\n>    - 三条反射规则\n>\n> 6. **Kubernetes 应用**：\n>    - 用于 Pod/Service IP 通告\n>    - Cilium 使用 GoBGP 实现\n\n---", "subs": ["25.1 背景与概念", "25.2 核心概念", "25.3 水平分割原则", "25.4 路由反射器", "25.5 BGP 在 Kubernetes 中的应用", "25.6 章节小结"]}, {"title": "第二十六章 Cilium BGP Control Plane", "content": "本章介绍 Cilium BGP Control Plane 的配置与实践。通过 Kind + ContainerLab 构建完整的 BGP 测试环境，实现 Kubernetes Pod 网络与数据中心网络的互通。\n\n#### 26.1 背景与架构\n\n##### 26.1.1 Spine-Leaf 网络架构\n\n现代数据中心普遍采用 Spine-Leaf 架构：\n\n```mermaid\ngraph TB\n    subgraph \"Spine 层\"\n        Spine0[\"Spine 0<br/>AS 500\"]\n        Spine1[\"Spine 1<br/>AS 800\"]\n    end\n    \n    subgraph \"Leaf 层\"\n        Leaf0[\"Leaf 0<br/>AS 65005\"]\n        Leaf1[\"Leaf 1<br/>AS 65008\"]\n    end\n    \n    subgraph \"Kubernetes Nodes\"\n        Node0[\"Node 0<br/>10.1.5.10\"]\n        Node1[\"Node 1<br/>10.1.5.11\"]\n        Node2[\"Node 2<br/>10.1.8.10\"]\n        Node3[\"Node 3<br/>10.1.8.11\"]\n    end\n    \n    Spine0 <-->|\"eBGP\"| Leaf0\n    Spine0 <-->|\"eBGP\"| Leaf1\n    Spine1 <-->|\"eBGP\"| Leaf0\n    Spine1 <-->|\"eBGP\"| Leaf1\n    \n    Leaf0 <-->|\"iBGP\"| Node0\n    Leaf0 <-->|\"iBGP\"| Node1\n    Leaf1 <-->|\"iBGP\"| Node2\n    Leaf1 <-->|\"iBGP\"| Node3\n```\n\n| 层级 | 角色 | 说明 |\n|:---|:---|:---|\n| **Spine** | 核心交换机 | 负责跨 Leaf 流量转发 |\n| **Leaf** | 接入交换机 | 连接服务器、充当 BGP RR |\n| **Node** | K8s 节点 | 运行 Cilium BGP |\n\n##### 26.1.2 BGP 邻居关系\n\n```mermaid\ngraph LR\n    subgraph \"AS 65005\"\n        Leaf0[\"Leaf 0<br/>RR\"]\n        Node0[\"Node 0\"]\n        Node1[\"Node 1\"]\n    end\n    \n    subgraph \"AS 500\"\n        Spine0[\"Spine 0\"]\n    end\n    \n    Leaf0 <-->|\"iBGP\"| Node0\n    Leaf0 <-->|\"iBGP\"| Node1\n    Leaf0 <-->|\"eBGP\"| Spine0\n```\n\n| 邻居类型 | 场景 | AS 关系 |\n|:---|:---|:---|\n| **iBGP** | Leaf ↔ Node | 同一 AS |\n| **eBGP** | Spine ↔ Leaf | 不同 AS |\n\n#### 26.2 环境搭建\n\n##### 26.2.1 整体架构\n\n```mermaid\ngraph TB\n    subgraph \"ContainerLab\"\n        Spine[\"Spine 交换机\"]\n        Leaf[\"Leaf 交换机\"]\n    end\n    \n    subgraph \"Kind Cluster\"\n        CP[\"Control Plane\"]\n        Worker[\"Worker Nodes\"]\n    end\n    \n    subgraph \"网络桥接\"\n        BR[\"Linux Bridge\"]\n    end\n    \n    Leaf <--> BR\n    BR <--> CP\n    BR <--> Worker\n```\n\n##### 26.2.2 网络复用原理\n\nKind 创建的容器通过网络复用方式与 ContainerLab 连接：\n\n```mermaid\nsequenceDiagram\n    participant Kind as Kind 容器\n    participant Server as ContainerLab Server\n    participant Leaf as Leaf 交换机\n    \n    Note over Kind: eth0: 172.18.0.x<br/>（管理网络）\n    Server->>Kind: 共享网络命名空间\n    Server->>Kind: 添加 net0 网卡\n    Note over Kind: net0: 10.1.5.x<br/>（业务网络）\n    Kind->>Leaf: 通过 net0 通信\n```\n\n**关键配置**：\n\n```yaml\n# ContainerLab Server 配置\nnetwork-mode: container:clab-bgp-control-plane\nexec:\n  - ip route replace default via 10.1.5.1  # 替换默认路由\n```\n\n> [!NOTE]\n> **核心原理**：通过 `container` 网络模式复用 Kind 容器的网络命名空间，再添加新网卡并替换默认路由，实现流量从 Kind 到 ContainerLab 的引导。\n\n#### 26.3 Cilium BGP 配置\n\n##### 26.3.1 Helm 安装参数\n\n```bash\nhelm install cilium cilium/cilium --namespace kube-system \\\n  --set bgpControlPlane.enabled=true \\\n  --set ipam.mode=kubernetes \\\n  --set ipv4NativeRoutingCIDR=10.0.0.0/8 \\\n  --set tunnel=disabled\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| `bgpControlPlane.enabled=true` | 启用 BGP Control Plane |\n| `ipam.mode=kubernetes` | 使用 Kubernetes IPAM |\n| `ipv4NativeRoutingCIDR` | 直接路由的 CIDR |\n| `tunnel=disabled` | 禁用隧道模式 |\n\n##### 26.3.2 CiliumBGPPeeringPolicy\n\n```yaml\napiVersion: cilium.io/v2alpha1\nkind: CiliumBGPPeeringPolicy\nmetadata:\n  name: bgp-peering-policy\nspec:\n  nodeSelector:\n    matchLabels:\n      rack: rack0                      # 选择节点\n  virtualRouters:\n    - localASN: 65005                   # 本地 AS 号\n      exportPodCIDR: true               # 宣告 Pod CIDR\n      neighbors:\n        - peerAddress: 10.1.5.1/32      # 邻居地址\n          peerASN: 65005                # 邻居 AS 号\n```\n\n**关键字段说明**：\n\n| 字段 | 说明 |\n|:---|:---|\n| `nodeSelector` | 选择应用策略的节点 |\n| `localASN` | 本节点的 AS 号 |\n| `exportPodCIDR` | 是否宣告 Pod CIDR |\n| `peerAddress` | BGP 邻居地址 |\n| `peerASN` | BGP 邻居的 AS 号 |\n\n#### 26.4 交换机配置\n\n##### 26.4.1 Leaf 交换机（路由反射器）\n\n```bash\n# Leaf 0 配置示例\nrouter bgp 65005\n  router-id 10.1.5.1\n  \n  # iBGP 邻居 - K8s 节点（作为 RR Client）\n  neighbor 10.1.5.10 remote-as 65005\n  neighbor 10.1.5.10 route-reflector-client\n  \n  neighbor 10.1.5.11 remote-as 65005\n  neighbor 10.1.5.11 route-reflector-client\n  \n  # eBGP 邻居 - Spine 交换机\n  neighbor 10.1.10.2 remote-as 500\n  neighbor 10.1.12.2 remote-as 800\n```\n\n##### 26.4.2 Spine 交换机\n\n```bash\n# Spine 0 配置示例\nrouter bgp 500\n  router-id 10.1.10.1\n  \n  # eBGP 邻居 - Leaf 交换机\n  neighbor 10.1.10.1 remote-as 65005\n  neighbor 10.1.11.1 remote-as 65008\n```\n\n#### 26.5 ECMP 负载分担\n\n##### 26.5.1 工作原理\n\n```mermaid\ngraph TB\n    subgraph \"Leaf 0\"\n        L0[\"Leaf 0\"]\n    end\n    \n    subgraph \"Spine 层\"\n        S0[\"Spine 0\"]\n        S1[\"Spine 1\"]\n    end\n    \n    subgraph \"Leaf 1\"\n        L1[\"Leaf 1\"]\n    end\n    \n    L0 -->|\"路径 1\"| S0\n    L0 -->|\"路径 2\"| S1\n    S0 --> L1\n    S1 --> L1\n```\n\n**ECMP（Equal-Cost Multi-Path）**：当有多条等价路径时，进行负载分担。\n\n##### 26.5.2 配置启用\n\n```bash\n# 在 Leaf 交换机上启用\nrouter bgp 65005\n  maximum-paths 2\n  bestpath as-path multipath-relax\n```\n\n##### 26.5.3 验证 ECMP\n\n```bash\n# 查看路由表\nip route show\n\n# 输出示例 - 多个 nexthop\n10.98.1.0/24 proto bgp \n    nexthop via 10.1.10.2 dev eth1 weight 1\n    nexthop via 10.1.12.2 dev eth2 weight 1\n```\n\n#### 26.6 验证与测试\n\n##### 26.6.1 查看 BGP 邻居状态\n\n```bash\n# 在 Leaf 交换机上\nshow ip bgp summary\n\n# 或在 K8s 节点上\ncilium bgp peers\n```\n\n##### 26.6.2 查看路由表\n\n```bash\n# 查看 BGP 路由\nshow ip bgp\n\n# 验证 Pod 网络路由\nip route | grep 10.98\n```\n\n##### 26.6.3 跨节点 Pod 通信测试\n\n```bash\n# 从一个节点的 Pod ping 另一个节点的 Pod\nkubectl exec -it test-pod -- ping <target-pod-ip>\n```\n\n#### 26.7 生产环境考量\n\n##### 26.7.1 网络规划\n\n```mermaid\ngraph TB\n    subgraph \"网络分离\"\n        Mgmt[\"管理网络<br/>eth0: 172.x.x.x\"]\n        Data[\"业务网络<br/>net0: 10.x.x.x\"]\n    end\n```\n\n| 网络类型 | 用途 | 示例 |\n|:---|:---|:---|\n| **管理网络** | SSH、监控 | 172.18.0.0/16 |\n| **业务网络** | Pod 流量 | 10.1.0.0/16 |\n\n##### 26.7.2 高可用设计\n\n```mermaid\ngraph TB\n    Node[\"K8s Node\"]\n    L0[\"Leaf 0\"]\n    L1[\"Leaf 1\"]\n    S0[\"Spine 0\"]\n    S1[\"Spine 1\"]\n    \n    Node -->|\"主路径\"| L0\n    Node -->|\"备路径\"| L1\n    L0 --> S0\n    L0 --> S1\n    L1 --> S0\n    L1 --> S1\n```\n\n#### 26.8 章节小结\n\n```mermaid\nmindmap\n  root((BGP Control Plane))\n    架构\n      Spine-Leaf\n      iBGP/eBGP\n    环境\n      Kind + ContainerLab\n      网络复用\n    配置\n      CiliumBGPPeeringPolicy\n      localASN/peerASN\n    交换机\n      RR 路由反射器\n      ECMP 多路径\n    验证\n      BGP 邻居状态\n      路由表检查\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **Spine-Leaf 架构**：\n>    - Spine 负责跨 Leaf 转发\n>    - Leaf 作为 BGP RR\n>\n> 2. **环境搭建**：\n>    - Kind + ContainerLab 联合\n>    - 网络复用实现流量引导\n>\n> 3. **Cilium 配置**：\n>    - `bgpControlPlane.enabled=true`\n>    - `CiliumBGPPeeringPolicy` 定义邻居\n>\n> 4. **关键参数**：\n>    - `localASN`：本地 AS 号\n>    - `peerASN`：邻居 AS 号\n>    - `exportPodCIDR`：宣告 Pod 网络\n>\n> 5. **交换机配置**：\n>    - Leaf 作为 RR，配置 `route-reflector-client`\n>    - 启用 `maximum-paths` 实现 ECMP\n>\n> 6. **生产考量**：\n>    - 管理网络与业务网络分离\n>    - 多路径高可用设计\n\n---", "subs": ["26.1 背景与架构", "26.2 环境搭建", "26.3 Cilium BGP 配置", "26.4 交换机配置", "26.5 ECMP 负载分担", "26.6 验证与测试", "26.7 生产环境考量", "26.8 章节小结"]}, {"title": "第二十七章 Cilium BGP with LB-IPAM", "content": "本章介绍如何将 Cilium BGP Control Plane 与 LoadBalancer IPAM 结合，实现 Service 的 External IP 可路由，从而让外部网络能够直接访问 Kubernetes 集群内的服务。\n\n#### 27.1 背景与问题\n\n##### 27.1.1 问题场景\n\n在生产环境中，外部客户端需要访问 Kubernetes 集群内的服务：\n\n```mermaid\ngraph LR\n    Client[\"外部客户端\"] --> |\"访问 LB IP\"| Router[\"网络设备\"]\n    Router --> |\"?????\"| Service[\"K8s Service\"]\n    Service --> Pod[\"Pod\"]\n```\n\n**核心问题**：外部网络设备如何知道 Service 的 LB IP 在哪里？\n\n##### 27.1.2 传统方案对比\n\n| 方案 | 工作层级 | 说明 |\n|:---|:---|:---|\n| **MetalLB L2** | 二层 | ARP 响应，仅限同一子网 |\n| **MetalLB BGP** | 三层 | 需要额外部署 |\n| **Cilium BGP** | 三层 | CNI 原生集成 |\n\n#### 27.2 Service Announcement 原理\n\n##### 27.2.1 工作流程\n\n```mermaid\nsequenceDiagram\n    participant Svc as LoadBalancer Service\n    participant Cilium as Cilium Agent\n    participant BGP as BGP 邻居\n    participant Router as 外部路由器\n    \n    Svc->>Svc: 分配 External IP\n    Cilium->>Cilium: 检测 Service 变化\n    Cilium->>BGP: 宣告 LB IP 路由\n    BGP->>Router: 路由传播\n    Note over Router: 现在知道<br/>LB IP 怎么走了！\n```\n\n##### 27.2.2 核心概念\n\n| 概念 | 说明 |\n|:---|:---|\n| **Service Announcement** | 将 Service 的 LB IP 通过 BGP 宣告 |\n| **serviceSelector** | 选择哪些 Service 进行宣告 |\n| **exportPodCIDR** | 宣告 Pod 网段（已在 26 章介绍） |\n\n#### 27.3 CiliumBGPPeeringPolicy 配置\n\n##### 27.3.1 完整配置示例\n\n```yaml\napiVersion: cilium.io/v2alpha1\nkind: CiliumBGPPeeringPolicy\nmetadata:\n  name: bgp-peering-policy\nspec:\n  nodeSelector:\n    matchLabels:\n      rack: rack0\n  virtualRouters:\n    - localASN: 65005\n      exportPodCIDR: true\n      \n      # 服务宣告配置（1.13+ 新增）\n      serviceSelector:\n        matchExpressions:\n          - key: somekey\n            operator: NotIn\n            values:\n              - never-used-value\n      \n      neighbors:\n        - peerAddress: 10.1.5.1/32\n          peerASN: 65005\n```\n\n##### 27.3.2 serviceSelector 详解\n\n**宣告所有 LoadBalancer Service**：\n\n```yaml\nserviceSelector:\n  matchExpressions:\n    - key: somekey\n      operator: NotIn\n      values:\n        - never-used-value\n```\n\n> [!NOTE]\n> **原理解释**：使用一个不存在的 key-value 组合，`NotIn` 表示\"不在列表中\"，由于没有 Service 有这个标签，所以所有 Service 都满足条件。\n\n**只宣告特定 Service**：\n\n```yaml\nserviceSelector:\n  matchLabels:\n    expose-bgp: \"true\"    # 只宣告带此标签的 Service\n```\n\n#### 27.4 MetalLB 集成方案\n\n##### 27.4.1 架构图\n\n```mermaid\ngraph TB\n    subgraph \"IP 分配\"\n        MetalLB[\"MetalLB<br/>分配 LB IP\"]\n    end\n    \n    subgraph \"路由宣告\"\n        Cilium[\"Cilium BGP<br/>宣告路由\"]\n    end\n    \n    subgraph \"外部网络\"\n        Router[\"路由器<br/>学习路由\"]\n    end\n    \n    MetalLB -->|\"分配 172.18.0.200\"| Service[\"LoadBalancer<br/>Service\"]\n    Service -->|\"通知\"| Cilium\n    Cilium -->|\"BGP Update\"| Router\n```\n\n##### 27.4.2 配置步骤\n\n**1. 安装 MetalLB**：\n\n```bash\nkubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml\n```\n\n**2. 配置 IP 池**：\n\n```yaml\napiVersion: metallb.io/v1beta1\nkind: IPAddressPool\nmetadata:\n  name: default\n  namespace: metallb-system\nspec:\n  addresses:\n    - 172.18.0.200-172.18.0.254\n```\n\n**3. 创建 LoadBalancer Service**：\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: my-service\nspec:\n  type: LoadBalancer\n  selector:\n    app: my-app\n  ports:\n    - port: 80\n      targetPort: 8080\n```\n\n**4. 应用 BGP Peering Policy**（包含 serviceSelector）\n\n##### 27.4.3 验证路由宣告\n\n```bash\n# 在路由器上查看路由表\nshow ip route\n\n# 应能看到类似输出\nB    172.18.0.200/32 via 10.1.5.10 ...\n```\n\n#### 27.5 Cilium LB-IPAM 方案\n\n##### 27.5.1 与 MetalLB 的区别\n\n```mermaid\ngraph LR\n    subgraph \"MetalLB 方案\"\n        ML[\"MetalLB\"] -->|\"分配 IP\"| Svc1[\"Service\"]\n        ML -->|\"ARP/BGP\"| Net1[\"网络\"]\n    end\n    \n    subgraph \"Cilium LB-IPAM 方案\"\n        IPAM[\"Cilium LB-IPAM\"] -->|\"分配 IP\"| Svc2[\"Service\"]\n        BGP[\"Cilium BGP\"] -->|\"宣告路由\"| Net2[\"网络\"]\n    end\n```\n\n| 特性 | MetalLB | Cilium LB-IPAM |\n|:---|:---|:---|\n| **IP 分配** | MetalLB 管理 | Cilium 管理 |\n| **路由宣告** | MetalLB BGP 或 Cilium | Cilium BGP |\n| **组件数量** | 需要额外部署 | CNI 原生 |\n\n##### 27.5.2 配置 Cilium LB-IPAM\n\n**1. 创建 IP Pool**：\n\n```yaml\napiVersion: cilium.io/v2alpha1\nkind: CiliumLoadBalancerIPPool\nmetadata:\n  name: blue-pool\nspec:\n  blocks:\n    - cidr: 30.0.10.0/24\n  serviceSelector:\n    matchLabels:\n      color: blue\n```\n\n**2. 创建 Service 使用指定池**：\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: test-service\n  labels:\n    color: blue    # 匹配 IP Pool 的 serviceSelector\nspec:\n  type: LoadBalancer\n  selector:\n    app: test\n  ports:\n    - port: 80\n```\n\n**3. BGP 自动宣告**：\n\n```bash\n# 在路由器上验证\nshow ip route | grep 30.0\n\n# 输出示例\nB    30.0.10.22/32 via 10.1.5.10 ...\n```\n\n#### 27.6 完整流程演示\n\n##### 27.6.1 从创建到访问\n\n```mermaid\nsequenceDiagram\n    participant Admin as 管理员\n    participant K8s as Kubernetes\n    participant Cilium as Cilium\n    participant Router as 路由器\n    participant Client as 客户端\n    \n    Admin->>K8s: 创建 LoadBalancer Service\n    K8s->>Cilium: 通知 Service 创建\n    Note over Cilium: LB-IPAM 分配 IP<br/>30.0.10.22\n    Cilium->>Router: BGP Update<br/>宣告 30.0.10.22/32\n    Router->>Router: 更新路由表\n    Client->>Router: 访问 30.0.10.22:80\n    Router->>Cilium: 根据路由转发\n    Cilium->>K8s: 到达 Service\n    K8s->>Client: 返回响应\n```\n\n##### 27.6.2 验证命令\n\n```bash\n# 1. 查看 Service External IP\nkubectl get svc\n\n# 输出示例\nNAME         TYPE           EXTERNAL-IP    PORT(S)\nmy-service   LoadBalancer   30.0.10.22     80:31234/TCP\n\n# 2. 在路由器上验证路由\nshow ip bgp\n\n# 3. 从外部访问测试\ncurl http://30.0.10.22/\n```\n\n#### 27.7 生产环境考量\n\n##### 27.7.1 宣告策略选择\n\n```mermaid\ngraph TB\n    Q1[\"需要对外暴露?\"]\n    Q2[\"需要精细控制?\"]\n    A1[\"不配置 serviceSelector\"]\n    A2[\"配置 matchLabels\"]\n    A3[\"配置 matchExpressions<br/>宣告所有 LB\"]\n    \n    Q1 -->|\"否\"| A1\n    Q1 -->|\"是\"| Q2\n    Q2 -->|\"是\"| A2\n    Q2 -->|\"否\"| A3\n```\n\n##### 27.7.2 安全建议\n\n| 建议 | 说明 |\n|:---|:---|\n| **精准宣告** | 只宣告需要对外的 Service |\n| **网络隔离** | LB IP 与内部 IP 分开规划 |\n| **访问控制** | 配合防火墙/NetworkPolicy |\n\n#### 27.8 Cluster IP vs LB IP 宣告对比\n\n##### 27.8.1 两种方式对比\n\n| 项目 | Calico 方式 | Cilium 方式 |\n|:---|:---|:---|\n| **宣告内容** | Cluster IP | LoadBalancer IP |\n| **适用场景** | 内部互通 | 对外服务 |\n| **安全性** | 较低 | 较高 |\n| **推荐程度** | ⭐⭐ | ⭐⭐⭐⭐ |\n\n> [!WARNING]\n> Cluster IP 本身是集群内部 IP，将其通过 BGP 宣告到外部网络存在安全隐患，不推荐在生产环境使用。\n\n#### 27.9 章节小结\n\n```mermaid\nmindmap\n  root((BGP + LB-IPAM))\n    问题\n      LB IP 不可路由\n      外部无法访问\n    方案\n      Service Announcement\n      BGP 宣告\n    配置\n      serviceSelector\n      matchExpressions\n    集成\n      MetalLB\n      Cilium LB-IPAM\n    验证\n      路由表检查\n      外部访问测试\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **问题本质**：\n>    - LoadBalancer IP 默认只在集群内有效\n>    - 外部网络设备不知道如何路由\n>\n> 2. **解决方案**：\n>    - 使用 BGP 将 LB IP 宣告到网络\n>    - Cilium 1.13+ 支持 Service Announcement\n>\n> 3. **配置要点**：\n>    - `serviceSelector` 控制宣告哪些 Service\n>    - 使用 `NotIn` + 不存在的值宣告所有\n>\n> 4. **两种集成**：\n>    - MetalLB（分配 IP）+ Cilium BGP（宣告）\n>    - Cilium LB-IPAM（分配）+ Cilium BGP（宣告）\n>\n> 5. **验证方法**：\n>    - 路由器查看 `show ip route`\n>    - 外部 `curl` 测试访问\n>\n> 6. **最佳实践**：\n>    - 宣告 LB IP 而非 Cluster IP\n>    - 配合标签精细控制宣告范围\n\n---", "subs": ["27.1 背景与问题", "27.2 Service Announcement 原理", "27.3 CiliumBGPPeeringPolicy 配置", "27.4 MetalLB 集成方案", "27.5 Cilium LB-IPAM 方案", "27.6 完整流程演示", "27.7 生产环境考量", "27.8 Cluster IP vs LB IP 宣告对比", "27.9 章节小结"]}, {"title": "第二十八章 Cilium ClusterMesh", "content": "本章介绍 Cilium ClusterMesh 多集群网络互联功能。通过 ClusterMesh，多个 Kubernetes 集群可以形成逻辑上的统一集群，实现跨集群的服务发现、负载均衡和故障切换。\n\n#### 28.1 背景与概念\n\n##### 28.1.1 什么是 ClusterMesh\n\nClusterMesh 是 Cilium 提供的多集群连接方案：\n\n```mermaid\ngraph LR\n    subgraph \"Cluster 1\"\n        Pod1A[\"Pod A\"]\n        Pod1B[\"Pod B\"]\n        Svc1[\"Service\"]\n    end\n    \n    subgraph \"Cluster 2\"\n        Pod2A[\"Pod A\"]\n        Pod2B[\"Pod B\"]\n        Svc2[\"Service\"]\n    end\n    \n    Svc1 <-->|\"ClusterMesh\"| Svc2\n```\n\n| 特性 | 说明 |\n|:---|:---|\n| **多集群连接** | 多个物理集群形成逻辑统一 |\n| **跨集群服务发现** | Service 可发现其他集群的 Pod |\n| **统一负载均衡** | 请求可负载到多集群的 Pod |\n\n##### 28.1.2 应用场景\n\n```mermaid\ngraph TB\n    subgraph \"场景\"\n        HA[\"高可用容灾\"]\n        GEO[\"地理分布\"]\n        SCALE[\"水平扩展\"]\n    end\n```\n\n| 场景 | 说明 |\n|:---|:---|\n| **高可用容灾** | 一个集群故障，自动切换到另一个 |\n| **地理分布** | 多地域部署，就近访问 |\n| **水平扩展** | 突破单集群规模限制 |\n\n#### 28.2 架构原理\n\n##### 28.2.1 核心组件\n\n```mermaid\ngraph TB\n    subgraph \"Cluster 1\"\n        API1[\"ClusterMesh API Server\"]\n        ETCD1[\"etcd\"]\n        Agent1[\"Cilium Agent\"]\n        Operator1[\"Cilium Operator\"]\n    end\n    \n    subgraph \"Cluster 2\"\n        API2[\"ClusterMesh API Server\"]\n        ETCD2[\"etcd\"]\n        Agent2[\"Cilium Agent\"]\n        Operator2[\"Cilium Operator\"]\n    end\n    \n    Agent1 <-->|\"NodePort/LB\"| API2\n    Agent2 <-->|\"NodePort/LB\"| API1\n```\n\n| 组件 | 作用 |\n|:---|:---|\n| **ClusterMesh API Server** | 提供跨集群状态同步接口 |\n| **etcd** | 存储集群状态信息 |\n| **Cilium Agent** | 同步信息到本地 |\n\n##### 28.2.2 信息同步原理\n\n```mermaid\nsequenceDiagram\n    participant Agent1 as Cluster1 Agent\n    participant API1 as Cluster1 API\n    participant API2 as Cluster2 API\n    participant Agent2 as Cluster2 Agent\n    \n    Note over Agent2: 创建 Pod/Service\n    Agent2->>API2: 上报状态\n    API2->>API1: 同步信息\n    API1->>Agent1: 推送更新\n    Note over Agent1: 更新本地 Endpoint 列表\n```\n\n**核心要点**：\n\n- 每个集群的 Agent 将本地 Pod/Service 信息上报到 ClusterMesh API\n- API Server 之间相互同步\n- Service 因此能\"知道\"其他集群的后端 Pod\n\n#### 28.3 Global Service\n\n##### 28.3.1 普通 Service vs Global Service\n\n```mermaid\ngraph LR\n    subgraph \"普通 Service\"\n        LocalSvc[\"Service\"]\n        LocalPod1[\"Pod 1\"]\n        LocalPod2[\"Pod 2\"]\n        LocalSvc --> LocalPod1\n        LocalSvc --> LocalPod2\n    end\n    \n    subgraph \"Global Service\"\n        GlobalSvc[\"Service\"]\n        GlobalPod1[\"Cluster1 Pod\"]\n        GlobalPod2[\"Cluster2 Pod\"]\n        GlobalSvc --> GlobalPod1\n        GlobalSvc --> GlobalPod2\n    end\n```\n\n##### 28.3.2 配置方式\n\n只需在 Service 上添加注解：\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: my-service\n  annotations:\n    # 标记为 Global Service\n    io.cilium/global-service: \"true\"\nspec:\n  selector:\n    app: my-app\n  ports:\n    - port: 80\n```\n\n> [!NOTE]\n> 只有添加了 `io.cilium/global-service: \"true\"` 注解的 Service 才会享有跨集群能力。普通 Service 仍然只在本集群内有效。\n\n#### 28.4 Service Affinity（服务亲和性）\n\n##### 28.4.1 三种模式\n\n```mermaid\ngraph TB\n    subgraph \"Affinity 模式\"\n        Local[\"local<br/>本地优先\"]\n        Remote[\"remote<br/>远端优先\"]\n        None[\"无标注<br/>随机负载\"]\n    end\n```\n\n| 模式 | 注解值 | 行为 |\n|:---|:---|:---|\n| **Local** | `local` | 优先访问本集群 Pod |\n| **Remote** | `remote` | 优先访问远端集群 Pod |\n| **无标注** | 不设置 | 所有 Pod 随机负载 |\n\n##### 28.4.2 配置示例\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: echo-local\n  annotations:\n    io.cilium/global-service: \"true\"\n    io.cilium/service-affinity: \"local\"    # 本地优先\nspec:\n  selector:\n    app: echo\n  ports:\n    - port: 80\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: echo-remote  \n  annotations:\n    io.cilium/global-service: \"true\"\n    io.cilium/service-affinity: \"remote\"   # 远端优先\nspec:\n  selector:\n    app: echo\n  ports:\n    - port: 80\n```\n\n##### 28.4.3 应用场景\n\n```mermaid\ngraph TB\n    Q1[\"需要降低延迟?\"]\n    Q2[\"需要测试远端?\"]\n    A1[\"使用 local\"]\n    A2[\"使用 remote\"]\n    A3[\"不设置（随机）\"]\n    \n    Q1 -->|\"是\"| A1\n    Q1 -->|\"否\"| Q2\n    Q2 -->|\"是\"| A2\n    Q2 -->|\"否\"| A3\n```\n\n#### 28.5 故障切换（Failover）\n\n##### 28.5.1 工作原理\n\n```mermaid\nsequenceDiagram\n    participant Client as 客户端\n    participant Svc as Global Service\n    participant C1 as Cluster1 Pods\n    participant C2 as Cluster2 Pods\n    \n    Note over C1, C2: 正常状态：两集群都有 Pod\n    Client->>Svc: 请求\n    Svc->>C1: 负载到 Cluster1\n    Svc->>C2: 负载到 Cluster2\n    \n    Note over C1: Cluster1 故障！\n    Client->>Svc: 请求\n    Svc->>C2: 全部负载到 Cluster2\n```\n\n##### 28.5.2 测试验证\n\n```bash\n# 1. 正常状态 - 两个集群都响应\nfor i in {1..10}; do curl http://service; done\n# 输出: Cluster1, Cluster2, Cluster1, Cluster2...\n\n# 2. 模拟 Cluster2 故障（缩容到 0）\nkubectl --context=cluster2 scale deploy backend --replicas=0\n\n# 3. 再次测试 - 只有 Cluster1 响应\nfor i in {1..10}; do curl http://service; done\n# 输出: Cluster1, Cluster1, Cluster1...\n```\n\n#### 28.6 环境搭建\n\n##### 28.6.1 前置条件\n\n| 要求 | 说明 |\n|:---|:---|\n| **Pod CIDR** | 各集群不能重叠 |\n| **网络互通** | 集群间需能相互访问 |\n| **CA 证书** | 需共享或继承 |\n\n##### 28.6.2 安装步骤\n\n**1. 安装 Cluster 1**：\n\n```bash\ncilium install --context kind-cluster1 --cluster-name cluster1 --cluster-id 1\n```\n\n**2. 安装 Cluster 2（继承 CA）**：\n\n```bash\ncilium install --context kind-cluster2 --cluster-name cluster2 --cluster-id 2 \\\n  --inherit-ca kind-cluster1\n```\n\n> [!NOTE]\n> `--inherit-ca` 参数让 Cluster2 继承 Cluster1 的 CA 证书，这是最简单的方式。如果使用 Helm 安装则需要手动配置证书。\n\n**3. 启用 ClusterMesh**：\n\n```bash\n# 在两个集群上启用\ncilium clustermesh enable --context kind-cluster1 --service-type NodePort\ncilium clustermesh enable --context kind-cluster2 --service-type NodePort\n```\n\n**4. 连接集群**：\n\n```bash\ncilium clustermesh connect --context kind-cluster1 --destination-context kind-cluster2\n```\n\n**5. 验证状态**：\n\n```bash\ncilium clustermesh status --context kind-cluster1\n```\n\n##### 28.6.3 连接方式\n\n| 方式 | 适用场景 |\n|:---|:---|\n| **NodePort** | 开发测试环境 |\n| **LoadBalancer** | 生产环境（需要 MetalLB 等） |\n\n#### 28.7 网络通信模式\n\n##### 28.7.1 两种模式\n\n```mermaid\ngraph LR\n    subgraph \"隧道模式\"\n        T1[\"Pod A\"] -->|\"VXLAN 封装\"| T2[\"Pod B\"]\n    end\n    \n    subgraph \"直接路由\"\n        R1[\"Pod A\"] -->|\"BGP/静态路由\"| R2[\"Pod B\"]\n    end\n```\n\n| 模式 | 说明 | 适用 |\n|:---|:---|:---|\n| **VXLAN** | Overlay 封装 | 网络设备无法配置 |\n| **直接路由** | 需要底层路由支持 | 可控制网络设备 |\n\n##### 28.7.2 跨集群通信\n\n从 ClusterMesh 角度看，两个集群相当于一个逻辑集群，Pod 间通信与单集群内跨节点通信类似。\n\n```bash\n# 查看 tunnel 信息\ncilium bpf tunnel list\n\n# 会显示所有节点（包括其他集群的节点）\n```\n\n#### 28.8 验证与调试\n\n##### 28.8.1 查看 ClusterMesh 状态\n\n```bash\n# 查看连接状态\ncilium clustermesh status\n\n# 查看节点列表（包含所有集群）\ncilium node list\n```\n\n##### 28.8.2 查看 Service 后端\n\n```bash\n# 登录 Cilium Pod\nkubectl exec -it cilium-xxx -- bash\n\n# 查看 Service 后端列表\ncilium service list\n\n# 查看 Endpoint 详情（会显示 preferred 状态）\ncilium bpf lb list\n```\n\n##### 28.8.3 验证输出示例\n\n```\n# preferred = 本集群的 Pod（affinity=local 时优先）\nBackend         State\n10.1.1.1:80     active, preferred\n10.1.1.2:80     active, preferred\n10.2.1.1:80     active              # 其他集群的 Pod\n10.2.1.2:80     active\n```\n\n#### 28.9 限制与注意事项\n\n| 限制 | 说明 |\n|:---|:---|\n| **集群数量** | 最多 255 个集群 |\n| **Pod CIDR** | 不能重叠 |\n| **Cluster ID** | 每个集群需唯一 |\n| **CNI 要求** | 必须使用 Cilium |\n\n#### 28.10 章节小结\n\n```mermaid\nmindmap\n  root((ClusterMesh))\n    概念\n      多集群融合\n      逻辑统一\n    配置\n      Global Service 注解\n      Service Affinity\n    功能\n      跨集群发现\n      故障切换\n    部署\n      inherit-ca\n      clustermesh enable/connect\n    模式\n      VXLAN\n      直接路由\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **ClusterMesh 本质**：\n>    - 多个物理集群 → 一个逻辑集群\n>    - Service 能发现所有集群的 Pod\n>\n> 2. **Global Service**：\n>    - 注解：`io.cilium/global-service: \"true\"`\n>    - 必须添加才有跨集群能力\n>\n> 3. **Service Affinity**：\n>    - `local`：本地优先，降低延迟\n>    - `remote`：远端优先，测试用途\n>    - 无标注：随机负载\n>\n> 4. **故障切换**：\n>    - 一个集群 Pod 消失\n>    - 自动切换到其他集群\n>\n> 5. **部署关键**：\n>    - Pod CIDR 不能重叠\n>    - 使用 `--inherit-ca` 共享证书\n>    - `clustermesh enable` + `connect`\n>\n> 6. **Cilium 独有**：\n>    - ClusterMesh 是 Cilium CNI 特有功能\n>    - 其他 CNI 不具备此能力\n\n---", "subs": ["28.1 背景与概念", "28.2 架构原理", "28.3 Global Service", "28.4 Service Affinity（服务亲和性）", "28.5 故障切换（Failover）", "28.6 环境搭建", "28.7 网络通信模式", "28.8 验证与调试", "28.9 限制与注意事项", "28.10 章节小结"]}, {"title": "Cilium CNI 部分总结", "content": "至此，Cilium CNI 的全部章节已完成。以下是 Cilium 各功能模块的概览：\n\n```mermaid\nmindmap\n  root((Cilium CNI))\n    基础\n      eBPF 原理\n      安装配置\n      kube-proxy 替代\n    网络模式\n      VXLAN 隧道\n      直接路由\n      Native Routing\n    Service\n      ClusterIP\n      NodePort\n      LoadBalancer\n      ExternalIPs\n    高级功能\n      Network Policy\n      Hubble 可观测性\n      带宽管理\n      XDP 加速\n    七层功能\n      Ingress Controller\n      Gateway API\n    BGP\n      BGP 基础\n      Control Plane\n      LB-IPAM 集成\n    多集群\n      ClusterMesh\n```\n\n---", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

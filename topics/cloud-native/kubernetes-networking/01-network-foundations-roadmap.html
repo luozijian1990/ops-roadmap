@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 容器网络学习笔记 · 第一册：网络基础 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 容器网络学习笔记 · 第一册：网络基础</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 容器网络学习笔记 · 第一册：网络基础", "intro": "> 本文档是基于容器网络课程整理的系统性学习笔记，面向运维工程师/SRE，帮助深入理解 Kubernetes 容器网络。\n\n---", "parts": [{"title": "网络基础", "sections": [{"title": "第1章 TCP/IP 协议栈", "content": "#### 🎯 学习目标\n\n- 理解 OSI 七层模型与 TCP/IP 四层模型的区别与联系\n- 掌握网络分层架构的设计思想\n- 理解 TCP 和 UDP 协议的核心差异\n- 学会使用 tcpdump 和 Wireshark 进行网络抓包分析\n\n---\n\n#### 1.1 OSI 七层模型与 TCP/IP 四层模型\n\n##### 背景\n\n在计算机网络发展早期，不同厂商的网络设备和协议互不兼容，导致设备之间无法互联互通。为了解决这个问题，国际标准化组织（ISO）提出了 **OSI（Open Systems Interconnection）参考模型**，将网络通信划分为七个层次，每一层负责特定的功能。\n\n> [!NOTE]\n> OSI 模型是一个**理论参考模型**，而实际生产环境中更多使用的是简化后的 **TCP/IP 四层模型**。\n\n##### 原理\n\n**分层架构的核心思想：术业有专攻**\n\n网络分层的本质是**解耦**，使得：\n\n- 每一层专注于自身的协议实现\n- 不同厂商的设备只要遵循同一标准，就可以互联互通\n- 便于问题定位和排查\n\n```mermaid\ngraph TD\n    subgraph OSI[\"OSI 七层模型\"]\n        L7[应用层<br/>Application]\n        L6[表示层<br/>Presentation]\n        L5[会话层<br/>Session]\n        L4[传输层<br/>Transport]\n        L3[网络层<br/>Network]\n        L2[数据链路层<br/>Data Link]\n        L1[物理层<br/>Physical]\n        \n        L7 --> L6 --> L5 --> L4 --> L3 --> L2 --> L1\n    end\n    \n    subgraph TCPIP[\"TCP/IP 四层模型\"]\n        T4[应用层]\n        T3[传输层]\n        T2[网络层]\n        T1[网络接口层]\n        \n        T4 --> T3 --> T2 --> T1\n    end\n    \n    L7 -.-> T4\n    L6 -.-> T4\n    L5 -.-> T4\n    L4 -.-> T3\n    L3 -.-> T2\n    L2 -.-> T1\n    L1 -.-> T1\n```\n\n**图解说明**：\n\n上图展示了 OSI 七层模型与 TCP/IP 四层模型的对应关系：\n\n- OSI 的**应用层、表示层、会话层**统一为 TCP/IP 的**应用层**\n- OSI 的**传输层**对应 TCP/IP 的**传输层**\n- OSI 的**网络层**对应 TCP/IP 的**网络层**\n- OSI 的**数据链路层、物理层**合并为 TCP/IP 的**网络接口层**\n\n##### 各层功能与核心协议\n\n| 层级 | OSI 模型 | TCP/IP 模型 | 核心功能 | 代表协议/设备 |\n|:---:|:---:|:---:|:---|:---|\n| 7 | 应用层 | 应用层 | 为用户提供网络服务 | HTTP、FTP、DNS、DHCP |\n| 6 | 表示层 | 应用层 | 数据编解码、压缩、加密 | SSL/TLS、JPEG |\n| 5 | 会话层 | 应用层 | 建立、管理、终止会话 | RPC、NetBIOS |\n| 4 | 传输层 | 传输层 | 端到端的可靠传输 | **TCP**、**UDP**、SCTP |\n| 3 | 网络层 | 网络层 | 路由选择、逻辑寻址 | **IP**、ICMP、路由器 |\n| 2 | 数据链路层 | 网络接口层 | 物理寻址、帧封装 | **MAC**、交换机、ARP |\n| 1 | 物理层 | 网络接口层 | 比特流传输 | 光纤、双绞线、无线 |\n\n**要点解读**：\n\n对于容器网络学习，我们需要重点关注以下三层：\n\n1. **传输层（L4）**：TCP/UDP 端口，这是应用开发最常接触的层\n2. **网络层（L3）**：IP 地址、路由表，跨节点通信主要依赖此层\n3. **数据链路层（L2）**：MAC 地址、交换机，同网段通信的基础\n\n##### 关键点\n\n> [!IMPORTANT]\n> **运维排障思路**：当服务不可达时，应该逐层排查：\n>\n> 1. 物理层：网线是否连接正常？\n> 2. 数据链路层：MAC 地址是否正确？ARP 表是否正确？\n> 3. 网络层：IP 是否可达？路由表是否正确？\n> 4. 传输层：端口是否监听？防火墙是否放行？\n> 5. 应用层：服务是否正常启动？\n\n---\n\n#### 1.2 数据封装与解封装流程\n\n##### 背景\n\n当应用程序需要发送数据时，数据会从上层向下层逐级传递，每经过一层都会添加该层的**头部信息（Header）**，这个过程称为**封装（Encapsulation）**。接收端则进行相反的操作，称为**解封装（Decapsulation）**。\n\n##### 原理\n\n```mermaid\ngraph TB\n    subgraph 发送端[\"发送端封装过程\"]\n        direction TB\n        A1[应用数据] --> A2[TCP/UDP 头 + 数据<br/>段 Segment]\n        A2 --> A3[IP 头 + 段<br/>包 Packet]\n        A3 --> A4[MAC 头 + 包 + MAC 尾<br/>帧 Frame]\n        A4 --> A5[比特流 Bits]\n    end\n    \n    subgraph 接收端[\"接收端解封装过程\"]\n        direction TB\n        B5[比特流 Bits] --> B4[帧 Frame]\n        B4 --> B3[包 Packet]\n        B3 --> B2[段 Segment]\n        B2 --> B1[应用数据]\n    end\n    \n    A5 -->|网络传输| B5\n```\n\n**图解说明**：\n\n数据在发送端逐层封装，每层添加自己的协议头：\n\n- **应用层**：生成原始数据\n- **传输层**：添加 TCP/UDP 头（包含源端口、目的端口）\n- **网络层**：添加 IP 头（包含源 IP、目的 IP、TTL）\n- **数据链路层**：添加 MAC 头和尾（包含源 MAC、目的 MAC）\n- **物理层**：转换为 0/1 比特流进行传输\n\n##### 数据包结构示意\n\n```\n+------------------+----------+--------+----------+-----------------+\n|   以太网帧头     |  IP 头   | TCP 头 |  数据    |   以太网帧尾    |\n|  14 字节         | 20 字节  | 20 字节|  N 字节  |   4 字节        |\n+------------------+----------+--------+----------+-----------------+\n|←-- 二层 MAC --→|←-三层IP-→|←-四层-→|          |\n```\n\n**代码说明**：\n\n以上结构展示了一个完整的以太网帧：\n\n- **以太网帧头（14 字节）**：包含目的 MAC（6B）+ 源 MAC（6B）+ 类型（2B）\n- **IP 头（20 字节）**：包含版本、TTL、源 IP、目的 IP 等\n- **TCP 头（20 字节）**：包含源端口、目的端口、序列号、标志位等\n- **以太网帧尾（4 字节）**：FCS 帧校验序列\n\n---\n\n#### 1.3 TCP 协议详解\n\n##### 背景\n\nTCP（Transmission Control Protocol，传输控制协议）是一种**面向连接**的、**可靠**的传输层协议。它通过三次握手建立连接、四次挥手断开连接，并提供流量控制、拥塞控制等机制来保证数据可靠传输。\n\n##### 原理\n\n###### 1.3.1 套接字（Socket）概念\n\n**套接字 = IP 地址 + 端口号**\n\n例如：`192.168.1.100:8080` 表示一个套接字\n\n> [!NOTE]\n> TCP 端口和 UDP 端口是独立的。同一个端口号（如 53）可以同时被 TCP 和 UDP 监听，因为它们属于不同的协议。\n\n###### 1.3.2 TCP 三次握手\n\n```mermaid\nsequenceDiagram\n    participant C as 客户端\n    participant S as 服务端\n    \n    Note over S: LISTEN 状态\n    C->>S: SYN (seq=x)\n    Note over C: SYN_SENT\n    S->>C: SYN + ACK (seq=y, ack=x+1)\n    Note over S: SYN_RCVD\n    C->>S: ACK (ack=y+1)\n    Note over C,S: ESTABLISHED 连接建立\n```\n\n**图解说明**：\n\n三次握手的过程：\n\n1. **第一次握手**：客户端发送 SYN 包（同步序列号），进入 SYN_SENT 状态\n2. **第二次握手**：服务端收到 SYN 后，回复 SYN+ACK 包，进入 SYN_RCVD 状态\n3. **第三次握手**：客户端收到后回复 ACK，双方进入 ESTABLISHED 状态，连接建立\n\n###### 1.3.3 TCP 标志位\n\n| 标志位 | 名称 | 作用 |\n|:---:|:---:|:---|\n| SYN | Synchronize | 发起连接，同步序列号 |\n| ACK | Acknowledge | 确认收到数据 |\n| FIN | Finish | 请求关闭连接 |\n| RST | Reset | 重置连接（异常终止） |\n| PSH | Push | 立即推送数据给应用层 |\n| URG | Urgent | 紧急数据 |\n\n###### 1.3.4 MSS 与分片机制\n\n**MSS（Maximum Segment Size）**：最大报文段长度，指 TCP 数据部分的最大长度。\n\n```\nMTU = 1500 字节（以太网默认）\nMSS = MTU - IP头(20) - TCP头(20) = 1460 字节\n```\n\n**要点解读**：\n\n> [!IMPORTANT]\n> **为什么分片在 TCP 层做而不是 IP 层？**\n>\n> - TCP 有**序列号**，可以精确知道哪个片丢失，只需重传丢失的片\n> - IP 没有重传机制，如果一个分片丢失，需要重传整个原始数据\n> - 在 TCP 层分片可以**减少重传开销**\n\n###### 1.3.5 TCP 卸载技术\n\n当数据量较大时，TCP 分片等操作会消耗大量 CPU 资源。现代网卡支持将这些操作**卸载（Offload）**到硬件，减轻 CPU 负担：\n\n| 技术 | 全称 | 作用 |\n|:---:|:---|:---|\n| TSO | TCP Segmentation Offload | 将 TCP 分片卸载到网卡 |\n| GSO | Generic Segmentation Offload | 通用分片卸载 |\n| GRO | Generic Receive Offload | 接收端合并小包 |\n| LRO | Large Receive Offload | 大包接收卸载 |\n\n**代码说明**：\n\n查看网卡 offload 状态：\n\n```bash\n# 查看网卡 offload 配置\nethtool -k eth0\n\n# 输出示例：\n# tcp-segmentation-offload: on\n# generic-segmentation-offload: on\n# generic-receive-offload: on\n# large-receive-offload: off\n```\n\n---\n\n#### 1.4 UDP 协议特点\n\n##### 背景\n\nUDP（User Datagram Protocol，用户数据报协议）是一种**无连接**的、**不可靠**的传输层协议。它没有握手过程，发送数据时不保证对方能收到。\n\n##### TCP 与 UDP 对比\n\n| 特性 | TCP | UDP |\n|:---:|:---:|:---:|\n| 连接性 | 面向连接 | 无连接 |\n| 可靠性 | 可靠（有确认、重传） | 不可靠 |\n| 有序性 | 保证顺序 | 不保证 |\n| 速度 | 较慢（握手开销） | 较快 |\n| 头部大小 | 20 字节 | 8 字节 |\n| 应用场景 | HTTP、数据库、文件传输 | DNS、视频流、游戏 |\n\n```mermaid\ngraph LR\n    subgraph TCP[\"TCP 通信\"]\n        C1[客户端] -->|1. SYN| S1[服务端]\n        S1 -->|2. SYN+ACK| C1\n        C1 -->|3. ACK| S1\n        C1 -->|4. 数据| S1\n    end\n    \n    subgraph UDP[\"UDP 通信\"]\n        C2[客户端] -->|直接发送数据| S2[服务端]\n    end\n```\n\n**图解说明**：\n\n- **TCP**：需要三次握手建立连接后才能传输数据\n- **UDP**：直接发送数据，无需建立连接，简单高效但不可靠\n\n---\n\n#### 1.5 使用 nc 工具进行网络测试\n\n##### 背景\n\n`nc`（netcat）是一个功能强大的网络工具，可以用于 TCP/UDP 端口监听、网络调试、数据传输等场景。\n\n##### 常用命令\n\n```bash\n# ============ TCP 监听与连接 ============\n# 服务端：监听 TCP 8088 端口（-l 表示 listen，-k 表示保持监听）\nnc -lk 192.168.1.100 8088\n\n# 客户端：连接 TCP 8088 端口\nnc 192.168.1.100 8088\n\n# ============ UDP 监听与连接 ============\n# 服务端：监听 UDP 8088 端口（-u 表示使用 UDP）\nnc -lu 192.168.1.100 8088\n\n# 客户端：连接 UDP 8088 端口\nnc -u 192.168.1.100 8088\n```\n\n**代码说明**：\n\n- `-l`：listen 模式，作为服务端监听端口\n- `-k`：keep-open，连接断开后保持监听\n- `-u`：使用 UDP 协议（默认为 TCP）\n\n---\n\n#### 1.6 使用 tcpdump 和 Wireshark 进行抓包分析\n\n##### 背景\n\n网络抓包是排查网络问题的核心技能。`tcpdump` 是 Linux 下的命令行抓包工具，`Wireshark` 是图形化的抓包分析工具。\n\n##### tcpdump 常用命令\n\n```bash\n# 基础抓包：在 eth0 接口抓包并保存到文件\ntcpdump -i eth0 -w capture.pcap\n\n# 抓取指定端口的 TCP 包\ntcpdump -i eth0 port 8088\n\n# 抓取指定 IP 的包\ntcpdump -i eth0 host 192.168.1.100\n\n# 详细显示包内容（-nn 不解析主机名和端口名）\ntcpdump -i eth0 -nn -vv port 8088\n```\n\n**代码说明**：\n\n| 选项 | 说明 |\n|:---:|:---|\n| `-i` | 指定网络接口 |\n| `-w` | 写入文件（.pcap 格式） |\n| `-nn` | 不解析主机名和端口名 |\n| `-vv` | 详细输出 |\n\n##### Wireshark 过滤技巧\n\n| 过滤条件 | 说明 |\n|:---|:---|\n| `tcp.port == 8088` | 过滤 TCP 8088 端口 |\n| `tcp.stream eq 0` | 过滤第一个 TCP 流 |\n| `tcp.flags.syn == 1` | 过滤 SYN 包 |\n| `tcp.len == 0` | 过滤无数据的 TCP 包（握手包） |\n| `ip.addr == 192.168.1.100` | 过滤指定 IP |\n\n---\n\n#### 1.7 实战：TCP 与 UDP 抓包分析\n\n##### 实验目的\n\n通过 nc 工具模拟 TCP 和 UDP 通信，使用 tcpdump 抓包，用 Wireshark 分析数据包结构。\n\n##### 实验步骤\n\n**步骤一：TCP 抓包实验**\n\n```bash\n# 终端 1：启动 tcpdump 抓包\ntcpdump -i eth0 -w tcp_capture.pcap port 8088\n\n# 终端 2：启动 TCP 服务端\nnc -lk 192.168.1.100 8088\n\n# 终端 3：启动 TCP 客户端并发送数据\nnc 192.168.1.100 8088\n# 输入：hello CNI\n```\n\n**步骤二：用 Wireshark 分析 TCP 包**\n\n使用 Wireshark 打开 `tcp_capture.pcap`，可以看到：\n\n1. **三次握手**：前三个包（SYN → SYN+ACK → ACK）\n2. **数据传输**：带有 PSH 标志的包，包含 \"hello CNI\" 数据\n3. **四次挥手**：断开连接的 FIN 包\n\n**步骤三：UDP 抓包实验**\n\n```bash\n# 终端 1：启动 tcpdump 抓包\ntcpdump -i eth0 -w udp_capture.pcap udp port 8088\n\n# 终端 2：启动 UDP 服务端\nnc -lu 192.168.1.100 8088\n\n# 终端 3：启动 UDP 客户端并发送数据\nnc -u 192.168.1.100 8088\n# 输入：hello UDP\n```\n\n**步骤四：对比分析**\n\n| 对比项 | TCP | UDP |\n|:---:|:---:|:---:|\n| 握手过程 | 有三次握手 | **无握手** |\n| 数据发送 | 有确认机制 | 直接发送 |\n| 包数量 | 多（握手 + 数据 + 确认） | 少（仅数据包） |\n\n---\n\n#### 📝 章节小结\n\n本章介绍了网络通信的基础知识：\n\n1. **OSI 七层模型与 TCP/IP 四层模型**：理解网络分层架构的设计思想，掌握各层的职责\n2. **数据封装与解封装**：理解数据在网络中传输时的打包和拆包过程\n3. **TCP 协议**：掌握三次握手、四次挥手、标志位、MSS 分片等核心概念\n4. **UDP 协议**：理解无连接、不可靠传输的特点和应用场景\n5. **网络抓包**：学会使用 tcpdump 和 Wireshark 进行网络问题分析\n\n> [!TIP]\n> **学习建议**：\n>\n> 1. 动手实践 nc 和 tcpdump 命令\n> 2. 使用 Wireshark 分析真实的网络包\n> 3. 理解每一层的头部信息，这对后续学习容器网络非常重要\n\n---", "subs": ["🎯 学习目标", "1.1 OSI 七层模型与 TCP/IP 四层模型", "1.2 数据封装与解封装流程", "1.3 TCP 协议详解", "1.4 UDP 协议特点", "1.5 使用 nc 工具进行网络测试", "1.6 使用 tcpdump 和 Wireshark 进行抓包分析", "1.7 实战：TCP 与 UDP 抓包分析", "📝 章节小结"]}, {"title": "第2章 IP 地址与 MAC 地址精讲", "content": "#### 🎯 学习目标\n\n- 掌握 IP 地址的点分十进制表示与二进制转换\n- 理解有类地址（A/B/C/D/E）与无类地址（CIDR）的区别\n- 熟练掌握 VLSM（可变长子网掩码）的计算方法\n- 理解 MAC 地址的结构与 OUI 厂商标识\n- 掌握二层交换与三层路由的核心区别\n- 理解路由转发过程中 IP 和 MAC 地址的变化规律\n\n---\n\n#### 2.1 IP 地址基础\n\n##### 背景\n\nIP 地址是网络层的核心标识，用于在互联网中唯一标识一台设备的逻辑位置。与 MAC 地址不同，IP 地址是**逻辑地址**，可以根据网络规划进行分配和更改。\n\n> [!NOTE]\n> IP 地址是逻辑地址，它不与设备绑定。例如，你的手机今天在家获得 `192.168.1.100`，明天同事来你家用他的手机也可能获得这个地址。\n\n##### 原理\n\n###### 2.1.1 点分十进制与二进制转换\n\nIPv4 地址是一个 **32 位的二进制数**，为了便于人类阅读，将其分为 4 组，每组 8 位（1 字节），转换为十进制后用点分隔，称为**点分十进制**。\n\n```mermaid\ngraph LR\n    subgraph Binary[\"二进制表示 (32位)\"]\n        B1[\"11000000\"] --- B2[\"10101000\"] --- B3[\"00000010\"] --- B4[\"01001000\"]\n    end\n    \n    subgraph Decimal[\"点分十进制\"]\n        D1[\"192\"] --- D2[\"168\"] --- D3[\"2\"] --- D4[\"72\"]\n    end\n    \n    B1 --> D1\n    B2 --> D2\n    B3 --> D3\n    B4 --> D4\n```\n\n**图解说明**：\n\n上图展示了 IP 地址 `192.168.2.72` 的二进制与十进制转换：\n\n- 每 8 位二进制对应一个十进制数\n- 每个十进制数的范围是 0-255\n\n**二进制权重计算表**：\n\n| 位置 | 第7位 | 第6位 | 第5位 | 第4位 | 第3位 | 第2位 | 第1位 | 第0位 |\n|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n| 权重 | 128 | 64 | 32 | 16 | 8 | 4 | 2 | 1 |\n| 示例 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |\n| 计算 | 128 | 64 | 0 | 0 | 0 | 0 | 0 | 0 |\n\n**结果**：128 + 64 = **192**\n\n###### 2.1.2 IP 地址分类（有类地址）\n\n早期的 IP 地址按照**有类**方式划分为 A、B、C、D、E 五类：\n\n| 类别 | 首位模式 | 网络位 | 主机位 | 地址范围 | 用途 |\n|:---:|:---:|:---:|:---:|:---|:---|\n| A 类 | 0xxxxxxx | 8 位 | 24 位 | 1.0.0.0 ~ 127.255.255.255 | 大型网络 |\n| B 类 | 10xxxxxx | 16 位 | 16 位 | 128.0.0.0 ~ 191.255.255.255 | 中型网络 |\n| C 类 | 110xxxxx | 24 位 | 8 位 | 192.0.0.0 ~ 223.255.255.255 | 小型网络 |\n| D 类 | 1110xxxx | - | - | 224.0.0.0 ~ 239.255.255.255 | 组播地址 |\n| E 类 | 1111xxxx | - | - | 240.0.0.0 ~ 255.255.255.255 | 保留/实验 |\n\n**要点解读**：\n\n> [!NOTE]\n> 有类地址划分已经过时，现代网络普遍使用**无类域间路由（CIDR）**。但理解有类地址有助于理解网络发展历史和一些遗留配置。\n\n###### 2.1.3 公有地址与私有地址\n\n| 类别 | 私有地址范围 | 可用主机数 |\n|:---:|:---|:---:|\n| A 类 | 10.0.0.0 ~ 10.255.255.255 | 约 1677 万 |\n| B 类 | 172.16.0.0 ~ 172.31.255.255 | 约 104 万 |\n| C 类 | 192.168.0.0 ~ 192.168.255.255 | 约 6.5 万 |\n\n**要点解读**：\n\n- **私有地址**只能在内网使用，不能直接访问互联网\n- 家庭路由器通常使用 `192.168.0.x` 或 `192.168.1.x`\n- 大型企业通常使用 `10.x.x.x` 段，因为地址空间更大\n\n---\n\n#### 2.2 子网划分与 VLSM\n\n##### 背景\n\n在实际网络规划中，很少严格按照 A/B/C 类来划分网络。**VLSM（Variable Length Subnet Mask，可变长子网掩码）**允许我们根据实际需求灵活划分子网，这就是**无类域间路由（CIDR）**的核心思想。\n\n##### 原理\n\n###### 2.2.1 网络位与主机位\n\n一个 IP 地址由两部分组成：\n\n- **网络位**：标识所属网络（固定不变的部分）\n- **主机位**：标识网络内的具体主机（可变的部分）\n\n```mermaid\ngraph TD\n    subgraph IP[\"IP 地址: 192.168.1.72/24\"]\n        NET[\"网络位: 192.168.1\"] --- HOST[\"主机位: 72\"]\n    end\n    \n    subgraph Mask[\"子网掩码: 255.255.255.0\"]\n        M1[\"255\"] --- M2[\"255\"] --- M3[\"255\"] --- M4[\"0\"]\n        M1_B[\"11111111\"] --- M2_B[\"11111111\"] --- M3_B[\"11111111\"] --- M4_B[\"00000000\"]\n    end\n    \n    NET -.-> |\"前 24 位固定\"| M1\n    HOST -.-> |\"后 8 位可变\"| M4\n```\n\n**图解说明**：\n\n- `/24` 表示前 24 位是网络位（固定），后 8 位是主机位（可变）\n- 子网掩码 `255.255.255.0` 的二进制表示中，`1` 表示网络位，`0` 表示主机位\n\n###### 2.2.2 VLSM 计算实例\n\n**问题**：如何将一个 /24 网络 `192.168.1.0/24` 划分为两个子网？\n\n**解答**：\n\n将掩码从 /24 变为 /25，即多借用 1 位作为网络位：\n\n| 子网 | 网络地址 | 地址范围 | 广播地址 | 可用主机数 |\n|:---:|:---|:---|:---|:---:|\n| 子网1 | 192.168.1.0/25 | 192.168.1.1 ~ 192.168.1.126 | 192.168.1.127 | 126 |\n| 子网2 | 192.168.1.128/25 | 192.168.1.129 ~ 192.168.1.254 | 192.168.1.255 | 126 |\n\n**计算过程**：\n\n```text\n/24 掩码：11111111.11111111.11111111.00000000\n/25 掩码：11111111.11111111.11111111.10000000\n                                      ↑\n                                   多借 1 位\n\n第 25 位 = 0 → 子网1：主机位范围 0~127（0000000 ~ 1111111）\n第 25 位 = 1 → 子网2：主机位范围 128~255（10000000 ~ 11111111）\n```\n\n###### 2.2.3 常用掩码速查表\n\n| CIDR | 子网掩码 | 可用主机数 | 常用场景 |\n|:---:|:---|:---:|:---|\n| /30 | 255.255.255.252 | 2 | 点对点链路（路由器互联） |\n| /29 | 255.255.255.248 | 6 | 小型服务器组 |\n| /28 | 255.255.255.240 | 14 | 小型 VLAN |\n| /27 | 255.255.255.224 | 30 | 小型办公室 |\n| /26 | 255.255.255.192 | 62 | 中型 VLAN |\n| /25 | 255.255.255.128 | 126 | 大型 VLAN |\n| /24 | 255.255.255.0 | 254 | 标准子网 |\n| /16 | 255.255.0.0 | 65534 | 大型网络 |\n\n##### 关键点\n\n> [!IMPORTANT]\n> **CNI 中的 /32 掩码**\n>\n> 在 Kubernetes CNI 中，Pod IP 经常使用 `/32` 掩码。这意味着：\n>\n> - 所有 32 位都是网络位，没有主机位\n> - 每个 Pod IP 都是一个独立的\"网络\"\n> - **同节点的两个 Pod 之间也需要通过路由通信，而非二层交换**\n>\n> 这是理解 Calico 等 CNI 路由模式的关键！\n\n---\n\n#### 2.3 MAC 地址详解\n\n##### 背景\n\nMAC（Media Access Control）地址是**数据链路层**的物理地址，用于在同一局域网内唯一标识一个网络设备。与 IP 地址不同，MAC 地址通常与网卡硬件绑定，也称为**硬件地址**或**物理地址**。\n\n##### 原理\n\n###### 2.3.1 MAC 地址结构\n\nMAC 地址是一个 **48 位（6 字节）** 的地址，通常用**冒号分十六进制**表示：\n\n```text\nAA:BB:CC:DD:EE:FF\n└──┬──┘ └──┬──┘\n  OUI     设备标识\n(厂商)   (序列号)\n```\n\n| 部分 | 位数 | 说明 |\n|:---:|:---:|:---|\n| OUI | 前 24 位 | Organizationally Unique Identifier，厂商标识 |\n| 设备标识 | 后 24 位 | 由厂商分配的设备序列号 |\n\n**常见厂商 OUI**：\n\n| OUI 前缀 | 厂商 |\n|:---|:---|\n| `00:50:56` | VMware |\n| `FA:16:3E` | OpenStack |\n| `52:54:00` | QEMU/KVM |\n| `00:0C:29` | VMware |\n| `00:1A:A0` | Dell |\n\n###### 2.3.2 特殊 MAC 地址\n\n| 类型 | 地址 | 说明 |\n|:---:|:---|:---|\n| 广播 MAC | `FF:FF:FF:FF:FF:FF` | 发送给同一广播域内所有设备 |\n| 组播 MAC | `01:xx:xx:xx:xx:xx` | 第 8 位为 1，发送给一组设备 |\n\n###### 2.3.3 MAC 地址表与学习机制\n\n交换机通过**MAC 地址表**来转发数据帧：\n\n```mermaid\ngraph TD\n    subgraph Switch[\"交换机 MAC 地址表\"]\n        T[MAC 地址表]\n        E1[\"端口1 → AA:BB:CC:11:22:33\"]\n        E2[\"端口2 → AA:BB:CC:44:55:66\"]\n        E3[\"端口3 → AA:BB:CC:77:88:99\"]\n    end\n    \n    P1[主机 A] -->|端口1| Switch\n    P2[主机 B] -->|端口2| Switch\n    P3[主机 C] -->|端口3| Switch\n```\n\n**图解说明**：\n\n交换机的学习过程：\n\n1. 收到数据帧后，记录**源 MAC 地址**与**入端口**的对应关系\n2. 查找**目的 MAC 地址**对应的端口，从该端口转发\n3. 如果找不到目的 MAC，则**泛洪**到所有端口（除入端口外）\n4. 表项有**老化时间**，长时间无流量会被删除\n\n---\n\n#### 2.4 二层交换与三层路由\n\n##### 背景\n\n网络通信的核心问题是：**数据包应该发给谁？如何到达目的地？**\n\n根据通信双方是否在**同一网段**，分为：\n\n- **同网段通信**：走二层交换（基于 MAC 地址）\n- **跨网段通信**：走三层路由（基于 IP 地址）\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph Layer2[\"二层交换（同网段）\"]\n        H1[\"主机 A<br/>192.168.1.10\"] <-->|MAC 直接通信| SW[交换机]\n        SW <-->|MAC 直接通信| H2[\"主机 B<br/>192.168.1.20\"]\n    end\n    \n    subgraph Layer3[\"三层路由（跨网段）\"]\n        H3[\"主机 C<br/>192.168.1.10\"] -->|经过网关| R[路由器]\n        R -->|路由转发| H4[\"主机 D<br/>192.168.2.20\"]\n    end\n```\n\n**图解说明**：\n\n| 场景 | 判断依据 | 转发方式 | 地址变化 |\n|:---:|:---|:---|:---|\n| 同网段 | 目的 IP 与源 IP 在同一子网 | 二层交换 | MAC 不变 |\n| 跨网段 | 目的 IP 与源 IP 不在同一子网 | 三层路由 | **MAC 每跳改变** |\n\n###### 判断是否同网段的方法\n\n已知：\n\n- 主机 A：`192.168.1.2/24`\n- 主机 B：`192.168.1.130/24`\n- 主机 C：`192.168.1.130/25`\n\n**分析**：\n\n| 比较 | A 的网段 | B 的网段 | 是否同网段 |\n|:---|:---|:---|:---:|\n| A 和 B（/24） | 192.168.1.0 | 192.168.1.0 | ✅ 是 |\n| A 和 C（不同掩码） | - | - | 需按各自掩码计算 |\n\n**如果 A 使用 /25 掩码**：\n\n- A (192.168.1.2/25)：网段 192.168.1.0，范围 0~127\n- C (192.168.1.130/25)：网段 192.168.1.128，范围 128~255\n- **结论：A 和 C 不在同一网段！**\n\n---\n\n#### 2.5 ARP 协议与 IP-MAC 映射\n\n##### 背景\n\n当主机知道目的 IP 但不知道目的 MAC 时，需要通过 **ARP（Address Resolution Protocol）** 协议来获取 MAC 地址。\n\n##### 原理\n\n```mermaid\nsequenceDiagram\n    participant A as 主机 A<br/>192.168.1.10\n    participant B as 主机 B<br/>192.168.1.20\n    \n    Note over A: 我要发数据给 192.168.1.20<br/>但不知道它的 MAC 地址\n    A->>B: ARP Request 广播<br/>谁是 192.168.1.20？\n    Note over B: 是我！\n    B->>A: ARP Reply 单播<br/>我是 192.168.1.20<br/>我的 MAC 是 AA:BB:CC:DD:EE:FF\n    Note over A: 记录到 ARP 缓存表<br/>192.168.1.20 → AA:BB:CC:DD:EE:FF\n```\n\n**图解说明**：\n\n1. 主机 A 发送 **ARP 请求广播**，询问 `192.168.1.20` 的 MAC 地址\n2. 主机 B 收到请求后，**单播回复**自己的 MAC 地址\n3. 主机 A 将 IP-MAC 映射**缓存到 ARP 表**，后续通信直接使用\n\n**查看 ARP 缓存**：\n\n```bash\n# Linux 查看 ARP 表\nip neigh show\n\n# 或使用传统命令\narp -a\n```\n\n---\n\n#### 2.6 路由转发过程中的 IP/MAC 变化规律\n\n##### 背景\n\n这是理解网络转发的**最核心知识点**。很多从业多年的工程师也不一定能说清楚：在路由转发过程中，哪些地址在变化，哪些不变？\n\n##### 原理\n\n**核心结论（非 NAT 场景）**：\n\n| 地址类型 | 是否变化 | 说明 |\n|:---:|:---:|:---|\n| 源 IP | **不变** | 始终是发送方的 IP |\n| 目的 IP | **不变** | 始终是接收方的 IP |\n| 源 MAC | **每跳改变** | 变为上一跳设备的出接口 MAC |\n| 目的 MAC | **每跳改变** | 变为下一跳设备的入接口 MAC |\n\n```mermaid\ngraph LR\n    subgraph S1[\"Server 1\"]\n        IP1[\"IP: 10.1.5.10\"]\n        MAC1[\"MAC: AA:11\"]\n    end\n    \n    subgraph R[\"Router\"]\n        R_E1[\"eth1<br/>MAC: BB:11\"]\n        R_E2[\"eth2<br/>MAC: BB:22\"]\n    end\n    \n    subgraph S2[\"Server 2\"]\n        IP2[\"IP: 10.1.8.10\"]\n        MAC2[\"MAC: CC:11\"]\n    end\n    \n    S1 -->|1| R\n    R -->|2| S2\n```\n\n**图解说明**：\n\n当 Server 1 ping Server 2 时：\n\n| 阶段 | 源 IP | 目的 IP | 源 MAC | 目的 MAC |\n|:---:|:---:|:---:|:---:|:---:|\n| S1 → R (eth1) | 10.1.5.10 | 10.1.8.10 | **AA:11** | **BB:11** |\n| R (eth2) → S2 | 10.1.5.10 | 10.1.8.10 | **BB:22** | **CC:11** |\n\n**要点解读**：\n\n> [!IMPORTANT]\n> **关键理解**：\n>\n> 1. **IP 地址决定最终目的地**，在整个路由过程中始终不变（NAT 除外）\n> 2. **MAC 地址决定下一跳**，每经过一个路由器都会改变\n> 3. 发送数据时，**目的 MAC 是网关的 MAC**，不是最终目标的 MAC\n> 4. 这就是为什么同网段走交换（MAC 直达），跨网段走路由（MAC 逐跳变化）\n\n##### 实验验证\n\n**步骤一：创建测试环境（使用 Containerlab）**\n\n```yaml\nname: routing-lab\ntopology:\n  nodes:\n    router:\n      kind: linux\n      image: vyos/vyos:1.2.8\n    server1:\n      kind: linux\n    server2:\n      kind: linux\n  links:\n    - endpoints: [\"router:eth1\", \"server1:net0\"]\n    - endpoints: [\"router:eth2\", \"server2:net0\"]\n```\n\n**步骤二：在 Server 2 上抓包**\n\n```bash\n# 在 Server 2 的 net0 接口抓包\ntcpdump -i net0 -e -nn icmp\n\n# 输出示例：\n# 12:00:00.001 BB:22 > CC:11, 10.1.5.10 > 10.1.8.10: ICMP echo request\n# 12:00:00.002 CC:11 > BB:22, 10.1.8.10 > 10.1.5.10: ICMP echo reply\n```\n\n**步骤三：分析结果**\n\n- **源 MAC（BB:22）**：是路由器 eth2 的 MAC，不是 Server 1 的 MAC\n- **源 IP（10.1.5.10）**：仍然是 Server 1 的 IP，没有变化\n\n##### TTL 值的变化\n\n**TTL（Time To Live）**：数据包的生存时间，每经过一个路由器减 1。\n\n| 场景 | TTL 变化 | 说明 |\n|:---:|:---:|:---|\n| 二层交换 | 不变 | 不经过路由器 |\n| 三层路由 | 减 1 | 每跳减 1 |\n\n**作用**：防止数据包在网络中无限循环。当 TTL 减为 0 时，路由器丢弃该数据包。\n\n```bash\n# 通过 TTL 判断是否经过路由\nping 10.1.8.10\n\n# 同网段：TTL = 64（Linux 默认）\n# 跨一跳：TTL = 63\n# 跨两跳：TTL = 62\n```\n\n---\n\n#### 2.7 使用 Containerlab 进行网络实验\n\n##### 背景\n\nContainerlab 是一个强大的容器化网络实验工具，可以快速搭建包含路由器、交换机、主机的复杂网络拓扑，非常适合学习和验证网络知识。\n\n##### 实验：二层交换 vs 三层路由\n\n**二层交换拓扑**：\n\n```yaml\nname: layer2-lab\ntopology:\n  nodes:\n    bridge:\n      kind: bridge\n    server1:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.10/24 dev net0\n    server2:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.11/24 dev net0\n  links:\n    - endpoints: [\"bridge:eth1\", \"server1:net0\"]\n    - endpoints: [\"bridge:eth2\", \"server2:net0\"]\n```\n\n**验证**：\n\n```bash\n# 在 server1 ping server2\nping 10.1.5.11\n\n# TTL = 64，说明没有经过路由器，走的二层交换\n```\n\n**三层路由拓扑**：\n\n```yaml\nname: layer3-lab\ntopology:\n  nodes:\n    router:\n      kind: linux\n      image: vyos/vyos:1.2.8\n    server1:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.10/24 dev net0\n        - ip route add default via 10.1.5.1\n    server2:\n      kind: linux\n      exec:\n        - ip addr add 10.1.8.10/24 dev net0\n        - ip route add default via 10.1.8.1\n  links:\n    - endpoints: [\"router:eth1\", \"server1:net0\"]\n    - endpoints: [\"router:eth2\", \"server2:net0\"]\n```\n\n**验证**：\n\n```bash\n# 在 server1 ping server2\nping 10.1.8.10\n\n# TTL = 63，说明经过了一跳路由器\n```\n\n---\n\n#### 📝 章节小结\n\n本章深入讲解了 IP 地址和 MAC 地址的核心知识：\n\n1. **IP 地址基础**：点分十进制、二进制转换、有类地址分类\n2. **VLSM 子网划分**：掌握网络位/主机位计算、快速确定地址范围\n3. **MAC 地址结构**：48 位硬件地址、OUI 厂商标识\n4. **二层交换 vs 三层路由**：\n   - 同网段走交换，MAC 不变\n   - 跨网段走路由，MAC 每跳改变\n5. **路由转发中的地址变化**：\n   - **IP 不变**（NAT 除外）\n   - **MAC 每跳改变**\n\n> [!TIP]\n> **学习建议**：\n>\n> 1. 熟练掌握 VLSM 计算，这是网络工程师的基本功\n> 2. 使用 Containerlab 动手搭建实验环境\n> 3. 通过抓包验证 IP/MAC 地址的变化规律\n> 4. 理解 `/32` 掩码在 CNI 中的应用场景\n\n> [!CAUTION]\n> **常见误区**：\n>\n> - ❌ 认为目的 MAC 就是目标主机的 MAC\n> - ✅ 目的 MAC 是**下一跳**设备的 MAC（可能是网关）\n>\n> - ❌ 认为 IP 地址在路由过程中会变化\n> - ✅ 在非 NAT 场景下，IP 地址**始终不变**\n\n---", "subs": ["🎯 学习目标", "2.1 IP 地址基础", "2.2 子网划分与 VLSM", "2.3 MAC 地址详解", "2.4 二层交换与三层路由", "2.5 ARP 协议与 IP-MAC 映射", "2.6 路由转发过程中的 IP/MAC 变化规律", "2.7 使用 Containerlab 进行网络实验", "📝 章节小结"]}, {"title": "第3章 VETH 虚拟网络设备", "content": "#### 🎯 学习目标\n\n- 理解 VETH Pair 的概念与工作原理\n- 掌握 Linux 网络命名空间（Network Namespace）的基本操作\n- 学会手工创建和配置 VETH Pair\n- 理解 Linux Bridge 与 VETH 的结合使用\n- 掌握 VETH 在容器网络（CNI）中的核心应用\n\n---\n\n#### 3.1 VETH Pair 概念与原理\n\n##### 背景\n\n在容器网络中，每个容器（Pod）都运行在独立的**网络命名空间（Network Namespace）**中，与宿主机的网络隔离。那么，容器如何与外界通信呢？\n\n答案是：**VETH Pair（虚拟以太网设备对）**。\n\n##### 原理\n\n**VETH Pair** 是 Linux 内核提供的一种虚拟网络设备，它**总是成对出现**，就像一根虚拟的网线，一端插在容器内，一端插在宿主机上。\n\n```mermaid\ngraph LR\n    subgraph NS1[\"容器网络命名空间\"]\n        V1[\"veth0<br/>10.1.5.10\"]\n    end\n    \n    subgraph ROOT[\"宿主机 Root Namespace\"]\n        V2[\"veth1\"]\n    end\n    \n    V1 ---|\"VETH Pair<br/>虚拟网线\"| V2\n```\n\n**图解说明**：\n\n- VETH Pair 由两个虚拟网卡组成，它们**总是成对创建**\n- 从一端发送的数据包，会**立即出现在另一端**\n- 通过 VETH Pair，可以实现**跨网络命名空间的通信**\n\n##### 核心特性\n\n| 特性 | 说明 |\n|:---|:---|\n| 成对出现 | 一个 VETH 设备必定有一个 Peer 设备 |\n| 双向通信 | 从一端发送的包会从另一端收到 |\n| 跨命名空间 | 两端可以分别位于不同的网络命名空间 |\n| 即时传输 | 数据包在内核中直接传递，无需经过物理网络 |\n\n> [!NOTE]\n> **形象理解**：VETH Pair 就像一根虚拟网线，把容器内部和宿主机连接起来。从网线一端发送的数据，必然从另一端出来。\n\n---\n\n#### 3.2 VETH 在容器网络中的应用\n\n##### 背景\n\n在 Kubernetes 中，每个 Pod 都有自己独立的网络命名空间。Pod 内的应用要与外界通信，必须先将流量从 Pod 的网络命名空间\"引出\"到宿主机的 Root Namespace，然后才能进行后续的路由或转发。\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph Host[\"宿主机 (Root Namespace)\"]\n        direction TB\n        ETH0[\"eth0<br/>物理网卡\"]\n        ROUTING[\"路由/转发\"]\n        V2[\"veth-host\"]\n        \n        ETH0 --- ROUTING --- V2\n    end\n    \n    subgraph Pod[\"Pod 网络命名空间\"]\n        V1[\"eth0<br/>10.244.1.10/32\"]\n    end\n    \n    V1 ---|\"VETH Pair\"| V2\n    \n    ROUTING -->|\"南北向流量<br/>SNAT\"| INTERNET[\"外部网络\"]\n    ROUTING -->|\"东西向流量<br/>Pod to Pod\"| OTHER[\"其他节点\"]\n```\n\n**图解说明**：\n\n1. **Pod 网络命名空间**：Pod 内的 eth0 是 VETH Pair 的一端\n2. **宿主机 Root Namespace**：VETH Pair 的另一端在宿主机上\n3. **流量转发**：\n   - **南北向流量**（Pod ↔ 外网）：从 VETH 到宿主机，经过 SNAT 后发出\n   - **东西向流量**（Pod ↔ Pod）：从 VETH 到宿主机，根据路由转发到目标节点\n\n##### CNI 实现模式\n\n不同的 CNI 插件使用 VETH 的方式略有不同：\n\n| CNI | VETH 使用方式 | 说明 |\n|:---:|:---|:---|\n| Flannel | VETH + Bridge | Pod 的 VETH 插入到 cni0 网桥 |\n| Calico | VETH + Routing | Pod 的 VETH 直接路由，使用 /32 掩码 |\n| Cilium | VETH + eBPF | 使用 eBPF 加速，可绕过部分内核协议栈 |\n\n---\n\n#### 3.3 手工创建 VETH Pair\n\n##### 背景\n\n理解 VETH Pair 的最好方式是亲手创建一个。通过手工操作，可以深入理解容器网络的底层实现。\n\n##### 实现步骤\n\n###### 步骤一：创建网络命名空间\n\n```bash\n# 创建两个网络命名空间\nip netns add ns1\nip netns add ns2\n\n# 查看已创建的命名空间\nip netns list\n```\n\n**代码说明**：\n\n- `ip netns add`：创建网络命名空间\n- `ip netns list`：列出所有网络命名空间\n\n###### 步骤二：创建 VETH Pair\n\n```bash\n# 创建 VETH Pair：veth01 和 veth10\nip link add veth01 type veth peer name veth10\n\n# 查看创建的设备\nip link show type veth\n```\n\n**代码说明**：\n\n- `ip link add ... type veth peer name ...`：创建一对 VETH 设备\n- 此时两个设备都在 Root Namespace 中\n\n###### 步骤三：分配到不同命名空间\n\n```bash\n# 将 veth01 移动到 ns1\nip link set veth01 netns ns1\n\n# 将 veth10 移动到 ns2\nip link set veth10 netns ns2\n```\n\n###### 步骤四：配置 IP 地址并启用\n\n```bash\n# 在 ns1 中配置 IP 并启用接口\nip netns exec ns1 ip addr add 10.1.5.10/24 dev veth01\nip netns exec ns1 ip link set veth01 up\nip netns exec ns1 ip link set lo up\n\n# 在 ns2 中配置 IP 并启用接口\nip netns exec ns2 ip addr add 10.1.5.11/24 dev veth10\nip netns exec ns2 ip link set veth10 up\nip netns exec ns2 ip link set lo up\n```\n\n###### 步骤五：测试连通性\n\n```bash\n# 从 ns1 ping ns2\nip netns exec ns1 ping 10.1.5.11\n\n# 应该能够 ping 通，输出类似：\n# PING 10.1.5.11 (10.1.5.11) 56(84) bytes of data.\n# 64 bytes from 10.1.5.11: icmp_seq=1 ttl=64 time=0.050 ms\n```\n\n###### 步骤六：查看 VETH Pair 关系\n\n```bash\n# 在 ns1 中查看 veth01 的 peer index\nip netns exec ns1 ethtool -S veth01\n\n# 输出示例：\n# NIC statistics:\n#      peer_ifindex: 12  # peer 的接口索引\n\n# 在 ns2 中查看 veth10 的接口索引\nip netns exec ns2 ip link show veth10\n# 应该显示接口索引为 12\n```\n\n###### 清理环境\n\n```bash\n# 删除命名空间（会自动删除其中的 VETH 设备）\nip netns del ns1\nip netns del ns2\n```\n\n---\n\n#### 3.4 Linux Bridge 与 VETH\n\n##### 背景\n\n在 Flannel 等 CNI 插件中，同一节点上的多个 Pod 需要互相通信。如果每对 Pod 之间都创建一个 VETH Pair，网络结构会非常复杂。\n\n解决方案：引入 **Linux Bridge（网桥）**，让所有 Pod 的 VETH 都\"插\"在同一个网桥上。\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph Host[\"宿主机\"]\n        BRIDGE[\"Linux Bridge (cni0)\"]\n        ETH0[\"eth0<br/>物理网卡\"]\n        \n        V1H[\"veth-pod1\"]\n        V2H[\"veth-pod2\"]\n        V3H[\"veth-pod3\"]\n        \n        V1H --> BRIDGE\n        V2H --> BRIDGE\n        V3H --> BRIDGE\n        BRIDGE --> ETH0\n    end\n    \n    subgraph Pod1[\"Pod 1\"]\n        V1P[\"eth0\"]\n    end\n    \n    subgraph Pod2[\"Pod 2\"]\n        V2P[\"eth0\"]\n    end\n    \n    subgraph Pod3[\"Pod 3\"]\n        V3P[\"eth0\"]\n    end\n    \n    V1P ---|VETH| V1H\n    V2P ---|VETH| V2H\n    V3P ---|VETH| V3H\n```\n\n**图解说明**：\n\n- 每个 Pod 的 VETH 一端在 Pod 内（eth0），另一端插在宿主机的 cni0 网桥上\n- 同节点的 Pod 之间通信：通过 cni0 网桥的**二层交换**完成\n- 跨节点的 Pod 通信：从网桥经路由转发到物理网卡\n\n##### 手工实现 Bridge + VETH\n\n```bash\n# 1. 创建两个命名空间\nip netns add ns1\nip netns add ns2\n\n# 2. 创建 Linux Bridge\nip link add br0 type bridge\nip link set br0 up\n\n# 3. 创建两对 VETH\nip link add int0 type veth peer name br-int0\nip link add int1 type veth peer name br-int1\n\n# 4. 将 VETH 一端移入命名空间\nip link set int0 netns ns1\nip link set int1 netns ns2\n\n# 5. 将 VETH 另一端插入 Bridge\nip link set br-int0 master br0\nip link set br-int1 master br0\nip link set br-int0 up\nip link set br-int1 up\n\n# 6. 配置命名空间内的 IP\nip netns exec ns1 ip addr add 10.1.5.10/24 dev int0\nip netns exec ns1 ip link set int0 up\nip netns exec ns1 ip link set lo up\n\nip netns exec ns2 ip addr add 10.1.5.11/24 dev int1\nip netns exec ns2 ip link set int1 up\nip netns exec ns2 ip link set lo up\n\n# 7. 测试连通性\nip netns exec ns1 ping 10.1.5.11\n```\n\n**代码说明**：\n\n- `ip link set ... master br0`：将接口插入网桥，相当于把网线插入交换机\n- 插入网桥后，该接口会显示 `master br0` 标识\n\n##### 查看 Bridge 状态\n\n```bash\n# 查看所有网桥\nbrctl show\n\n# 输出示例：\n# bridge name     bridge id               STP enabled     interfaces\n# br0             8000.aabbccdd1122       no              br-int0\n#                                                         br-int1\n\n# 查看网桥的 MAC 地址表\nbrctl showmacs br0\n```\n\n---\n\n#### 3.5 VETH 在不同 CNI 中的应用\n\n##### 背景\n\n不同的 CNI 插件虽然都使用 VETH，但实现方式和网络模型有明显区别。\n\n##### Flannel 的 Bridge 模式\n\n```mermaid\ngraph TD\n    subgraph Node[\"Kubernetes 节点\"]\n        CNI0[\"cni0 网桥<br/>10.244.1.1/24\"]\n        FLANNEL[\"flannel.1<br/>VxLAN 设备\"]\n        ETH0[\"eth0\"]\n        \n        V1[\"veth-pod1\"] --> CNI0\n        V2[\"veth-pod2\"] --> CNI0\n        CNI0 --> FLANNEL\n        FLANNEL --> ETH0\n    end\n    \n    subgraph Pod1[\"Pod 1<br/>10.244.1.10\"]\n        E1[\"eth0\"]\n    end\n    \n    subgraph Pod2[\"Pod 2<br/>10.244.1.11\"]\n        E2[\"eth0\"]\n    end\n    \n    E1 ---|VETH| V1\n    E2 ---|VETH| V2\n```\n\n**要点解读**：\n\n| 特性 | Flannel Bridge 模式 |\n|:---|:---|\n| Pod 掩码 | **/24**（同节点 Pod 同网段） |\n| 同节点通信 | 通过 cni0 网桥**二层交换** |\n| 跨节点通信 | 通过 flannel.1 VxLAN 封装 |\n| 优点 | 配置简单，同节点通信高效 |\n| 缺点 | 二层广播域可能导致广播风暴 |\n\n##### Calico 的路由模式\n\n```mermaid\ngraph TD\n    subgraph Node[\"Kubernetes 节点\"]\n        ROUTING[\"路由表\"]\n        ETH0[\"eth0\"]\n        \n        V1[\"cali-xxx1\"] --> ROUTING\n        V2[\"cali-xxx2\"] --> ROUTING\n        ROUTING --> ETH0\n    end\n    \n    subgraph Pod1[\"Pod 1<br/>10.244.1.10/32\"]\n        E1[\"eth0\"]\n    end\n    \n    subgraph Pod2[\"Pod 2<br/>10.244.1.11/32\"]\n        E2[\"eth0\"]\n    end\n    \n    E1 ---|VETH| V1\n    E2 ---|VETH| V2\n```\n\n**要点解读**：\n\n| 特性 | Calico 路由模式 |\n|:---|:---|\n| Pod 掩码 | **/32**（每个 Pod 独立网络） |\n| 同节点通信 | 通过**路由表**三层转发 |\n| 跨节点通信 | BGP 协议或 IPIP/VxLAN 封装 |\n| 优点 | 无广播风暴，支持网络策略 |\n| 缺点 | 需要维护路由表，配置较复杂 |\n\n> [!IMPORTANT]\n> **Calico 使用 /32 掩码的关键意义**：\n>\n> - 使用 /32 掩码意味着**没有任何 IP 与该 Pod 同网段**\n> - 因此同节点的 Pod 之间也**必须走路由**，而非二层交换\n> - 这使得 Calico 可以在**路由层面实施网络策略**\n\n---\n\n#### 3.6 使用 Containerlab 模拟 VETH 网络\n\n##### 简单 VETH 拓扑\n\n```yaml\nname: veth-demo\ntopology:\n  nodes:\n    server1:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.10/24 dev net0\n    server2:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.11/24 dev net0\n  links:\n    - endpoints: [\"server1:net0\", \"server2:net0\"]\n```\n\n**代码说明**：\n\n- `links` 定义的连接会自动创建 VETH Pair\n- server1 的 net0 和 server2 的 net0 通过 VETH 直连\n\n##### Bridge + VETH 拓扑\n\n```yaml\nname: bridge-veth-demo\ntopology:\n  nodes:\n    bridge:\n      kind: bridge\n    server1:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.10/24 dev net0\n    server2:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.11/24 dev net0\n  links:\n    - endpoints: [\"bridge:eth1\", \"server1:net0\"]\n    - endpoints: [\"bridge:eth2\", \"server2:net0\"]\n```\n\n**代码说明**：\n\n- `kind: bridge` 创建一个 Linux Bridge\n- server1 和 server2 都通过 VETH 连接到这个 Bridge\n- 可以使用 `brctl show` 查看 Bridge 上的接口\n\n##### 部署与验证\n\n```bash\n# 部署拓扑\nclab deploy -t veth-demo.yaml\n\n# 进入容器测试\ndocker exec -it clab-veth-demo-server1 ping 10.1.5.11\n\n# 查看 VETH Pair 关系\ndocker exec -it clab-veth-demo-server1 ethtool -S net0\n\n# 清理环境\nclab destroy -t veth-demo.yaml\n```\n\n---\n\n#### 3.7 常见问题与排障\n\n##### 问题1：ping 自己不通\n\n**现象**：在命名空间内 ping 自己的 IP 地址不通\n\n**原因**：loopback 接口（lo）未启用\n\n**解决**：\n\n```bash\nip netns exec ns1 ip link set lo up\n```\n\n> [!TIP]\n> 创建网络命名空间后，记得启用 lo 接口。虽然 ping 自己通常不经过 lo，但某些协议栈处理需要 lo 处于 UP 状态。\n\n##### 问题2：如何判断两个接口是否为 VETH Pair\n\n**方法**：使用 `ethtool -S` 查看 peer_ifindex\n\n```bash\n# 查看 veth0 的 peer 接口索引\nethtool -S veth0 | grep peer_ifindex\n\n# 对比另一端的接口索引\nip link show | grep \"12:\"  # 假设 peer_ifindex 是 12\n```\n\n##### 问题3：如何查看接口属于哪个 Bridge\n\n**方法**：查看接口的 `master` 属性\n\n```bash\nip link show veth0\n\n# 输出中如果包含 master br0，说明该接口插在 br0 网桥上\n# 例如：5: veth0@eth0: <BROADCAST,MULTICAST,UP> ... master br0 state UP\n```\n\n---\n\n#### 📝 章节小结\n\n本章深入讲解了 VETH 虚拟网络设备：\n\n1. **VETH Pair 概念**：成对出现的虚拟网卡，用于跨网络命名空间通信\n2. **CNI 中的应用**：所有主流 CNI 都使用 VETH 将 Pod 流量引入宿主机\n3. **手工创建 VETH**：掌握 `ip link add ... type veth peer name ...` 命令\n4. **Linux Bridge**：多个 VETH 可以插入同一个 Bridge，实现二层交换\n5. **CNI 实现差异**：\n   - Flannel：VETH + Bridge，同节点走二层\n   - Calico：VETH + Routing（/32 掩码），同节点也走三层\n\n> [!TIP]\n> **学习建议**：\n>\n> 1. 动手执行手工创建 VETH 的全部步骤\n> 2. 使用 Containerlab 快速搭建各种 VETH 拓扑\n> 3. 对比 Flannel 和 Calico 的 VETH 使用方式\n> 4. 理解 \"VETH 是容器网络的基石\" 这一核心概念\n\n---", "subs": ["🎯 学习目标", "3.1 VETH Pair 概念与原理", "3.2 VETH 在容器网络中的应用", "3.3 手工创建 VETH Pair", "3.4 Linux Bridge 与 VETH", "3.5 VETH 在不同 CNI 中的应用", "3.6 使用 Containerlab 模拟 VETH 网络", "3.7 常见问题与排障", "📝 章节小结"]}, {"title": "第4章 Host-Gateway 网络模式", "content": "#### 🎯 学习目标\n\n- 理解 Host-Gateway（主机网关）模式的核心概念\n- 掌握静态路由在容器网络中的应用\n- 学会使用 Containerlab 模拟 Host-GW 网络\n- 掌握手工配置 Host-GW 模式的完整步骤\n- 理解 Host-GW 与 Overlay 网络的优劣对比\n\n---\n\n#### 4.1 Host-Gateway 概念与原理\n\n##### 背景\n\n在容器网络中，Pod 需要与其他节点上的 Pod 通信。实现跨节点通信有两种主要方式：\n\n1. **Overlay 网络**：将容器网络封装在底层网络之上（如 VxLAN、IPIP）\n2. **Host-Gateway**：利用主机的路由功能直接转发容器流量\n\n**Host-Gateway（主机网关）**是最简单、性能最高的容器网络模式之一。\n\n##### 原理\n\n**Host-Gateway** 的核心思想：**把宿主机当作 Pod 的网关**。\n\n```mermaid\ngraph TD\n    subgraph Node1[\"节点1 (192.168.2.71)\"]\n        GW1[\"cni0 网桥<br/>10.244.1.1\"]\n        P1[\"Pod1<br/>10.244.1.10\"]\n        P1 -->|\"默认网关\"| GW1\n    end\n    \n    subgraph Node2[\"节点2 (192.168.2.73)\"]\n        GW2[\"cni0 网桥<br/>10.244.2.1\"]\n        P2[\"Pod2<br/>10.244.2.10\"]\n        P2 -->|\"默认网关\"| GW2\n    end\n    \n    GW1 -->|\"路由: 10.244.2.0/24 via 192.168.2.73\"| GW2\n    GW2 -->|\"路由: 10.244.1.0/24 via 192.168.2.71\"| GW1\n```\n\n**图解说明**：\n\n1. Pod1 发送数据包到 Pod2（目的地址 10.244.2.10）\n2. Pod1 的默认网关是 cni0 网桥（10.244.1.1）\n3. 节点1 查询路由表：去往 10.244.2.0/24 的下一跳是 192.168.2.73\n4. 数据包发送到节点2，节点2 将其转发给 Pod2\n\n**关键理解**：\n\n> [!NOTE]\n> **Host-Gateway = 把主机当网关**\n>\n> 就像你家的无线路由器是你手机的网关一样，Pod 把宿主机当作自己的网关。所有出站流量都先发给宿主机，由宿主机负责路由转发。\n\n---\n\n#### 4.2 Host-GW 与 Overlay 网络对比\n\n##### 原理对比\n\n```mermaid\ngraph LR\n    subgraph HostGW[\"Host-Gateway 模式\"]\n        H1[\"节点1\"] -->|\"直接路由<br/>原始包\"| H2[\"节点2\"]\n    end\n    \n    subgraph Overlay[\"Overlay 模式 (VxLAN)\"]\n        O1[\"节点1\"] -->|\"封装<br/>外层包+内层包\"| O2[\"节点2\"]\n    end\n```\n\n**图解说明**：\n\n| 特性 | Host-Gateway | Overlay (VxLAN/IPIP) |\n|:---|:---|:---|\n| **性能** | ⭐⭐⭐⭐⭐ 最高 | ⭐⭐⭐ 有封装开销 |\n| **MTU** | 无损耗（1500） | 有损耗（1450左右） |\n| **配置复杂度** | 简单 | 中等 |\n| **对底层网络要求** | 节点必须二层可达 | 节点只需三层可达 |\n| **Pod IP 暴露** | 暴露在物理网络 | 封装隐藏 |\n| **跨子网** | ❌ 不支持 | ✅ 支持 |\n\n##### 适用场景\n\n| 场景 | 推荐模式 |\n|:---|:---|\n| 节点在同一二层网络 | **Host-Gateway**（性能最优） |\n| 节点跨子网/跨机房 | **Overlay**（必须封装） |\n| 对性能敏感的业务 | **Host-Gateway** |\n| 多云/混合云环境 | **Overlay** |\n\n> [!IMPORTANT]\n> **Host-GW 的限制**：\n>\n> 节点之间必须**二层可达**（在同一个广播域）。如果节点跨子网，数据包无法直接路由，必须使用 Overlay 封装。\n\n---\n\n#### 4.3 使用 Containerlab 实现 Host-GW\n\n##### 背景\n\nContainerlab 可以快速搭建包含路由器和主机的网络拓扑，非常适合理解 Host-GW 的工作原理。\n\n##### 网络拓扑设计\n\n```mermaid\ngraph TD\n    subgraph Topology[\"Host-GW 实验拓扑\"]\n        GW0[\"GW0 路由器<br/>10.1.5.1\"]\n        GW1[\"GW1 路由器<br/>10.1.8.1\"]\n        S1[\"Server1<br/>10.1.5.10\"]\n        S2[\"Server2<br/>10.1.8.10\"]\n        \n        S1 -->|\"网关\"| GW0\n        S2 -->|\"网关\"| GW1\n        GW0 <-->|\"172.12.1.x\"| GW1\n    end\n```\n\n**图解说明**：\n\n- Server1 的网关是 GW0（10.1.5.1）\n- Server2 的网关是 GW1（10.1.8.1）\n- GW0 和 GW1 通过 172.12.1.x 互联\n- GW0 需要知道如何到达 10.1.8.0/24，GW1 需要知道如何到达 10.1.5.0/24\n\n##### Containerlab 配置文件\n\n```yaml\nname: host-gw-lab\ntopology:\n  nodes:\n    # 路由器 GW0\n    gw0:\n      kind: linux\n      image: vyos/vyos:1.2.8\n      startup-config: gw0.cfg\n    \n    # 路由器 GW1  \n    gw1:\n      kind: linux\n      image: vyos/vyos:1.2.8\n      startup-config: gw1.cfg\n    \n    # 服务器 Server1\n    server1:\n      kind: linux\n      exec:\n        - ip addr add 10.1.5.10/24 dev net0\n        - ip route add default via 10.1.5.1\n    \n    # 服务器 Server2\n    server2:\n      kind: linux\n      exec:\n        - ip addr add 10.1.8.10/24 dev net0\n        - ip route add default via 10.1.8.1\n  \n  links:\n    # Server1 连接 GW0\n    - endpoints: [\"gw0:eth1\", \"server1:net0\"]\n    # Server2 连接 GW1\n    - endpoints: [\"gw1:eth1\", \"server2:net0\"]\n    # GW0 和 GW1 互联\n    - endpoints: [\"gw0:eth2\", \"gw1:eth2\"]\n```\n\n##### GW0 路由配置 (gw0.cfg)\n\n```text\n# 接口配置\nset interfaces ethernet eth1 address 10.1.5.1/24\nset interfaces ethernet eth2 address 172.12.1.10/24\n\n# 静态路由：去往 10.1.8.0/24 的下一跳是 GW1\nset protocols static route 10.1.8.0/24 next-hop 172.12.1.11\n```\n\n##### GW1 路由配置 (gw1.cfg)\n\n```text\n# 接口配置\nset interfaces ethernet eth1 address 10.1.8.1/24\nset interfaces ethernet eth2 address 172.12.1.11/24\n\n# 静态路由：去往 10.1.5.0/24 的下一跳是 GW0\nset protocols static route 10.1.5.0/24 next-hop 172.12.1.10\n```\n\n##### 验证连通性\n\n```bash\n# 部署拓扑\nclab deploy -t host-gw-lab.yaml\n\n# 从 Server1 ping Server2\ndocker exec -it clab-host-gw-lab-server1 ping 10.1.8.10\n\n# 观察 TTL 变化\n# TTL = 62（经过两个路由器，从 64 减 2）\n\n# 清理\nclab destroy -t host-gw-lab.yaml\n```\n\n---\n\n#### 4.4 手工实现 Host-GW 模式\n\n##### 背景\n\n理解 Host-GW 最好的方式是手工实现一个完整的配置，模拟 Flannel 的 Host-GW 模式。\n\n##### 实验拓扑\n\n```mermaid\ngraph TD\n    subgraph BPF71[\"节点 192.168.2.71\"]\n        BR0_1[\"br0 网桥<br/>10.1.5.1\"]\n        NS1[\"ns1 命名空间<br/>10.1.5.10\"]\n        NS1 --> BR0_1\n    end\n    \n    subgraph BPF73[\"节点 192.168.2.73\"]\n        BR0_2[\"br0 网桥<br/>10.1.8.1\"]\n        NS2[\"ns2 命名空间<br/>10.1.8.10\"]\n        NS2 --> BR0_2\n    end\n    \n    BR0_1 <-->|\"路由\"| BR0_2\n```\n\n##### 实现步骤（节点1: 192.168.2.71）\n\n###### 步骤一：创建网络基础设施\n\n```bash\n# 创建网络命名空间（模拟 Pod）\nip netns add ns1\n\n# 创建 Linux Bridge（模拟 cni0 网桥）\nip link add br0 type bridge\nip link set br0 up\n\n# 创建 VETH Pair\nip link add int0 type veth peer name br-int0\n```\n\n###### 步骤二：配置命名空间内的网络\n\n```bash\n# 将 VETH 一端移入命名空间\nip link set int0 netns ns1\n\n# 配置命名空间内的接口\nip netns exec ns1 ip addr add 10.1.5.10/24 dev int0\nip netns exec ns1 ip link set int0 up\nip netns exec ns1 ip link set lo up\n\n# 配置默认路由（指向网关）\nip netns exec ns1 ip route add default via 10.1.5.1\n```\n\n###### 步骤三：配置宿主机网桥\n\n```bash\n# 将 VETH 另一端插入网桥\nip link set br-int0 master br0\nip link set br-int0 up\n\n# 给网桥配置 IP（作为 Pod 的网关）\nip addr add 10.1.5.1/24 dev br0\n```\n\n###### 步骤四：添加跨节点路由\n\n```bash\n# 添加静态路由：去往 10.1.8.0/24 的下一跳是节点2\nip route add 10.1.8.0/24 via 192.168.2.73 dev ens160\n```\n\n##### 实现步骤（节点2: 192.168.2.73）\n\n```bash\n# 创建网络命名空间\nip netns add ns2\n\n# 创建网桥\nip link add br0 type bridge\nip link set br0 up\n\n# 创建 VETH Pair 并配置\nip link add int0 type veth peer name br-int0\nip link set int0 netns ns2\n\n# 配置命名空间\nip netns exec ns2 ip addr add 10.1.8.10/24 dev int0\nip netns exec ns2 ip link set int0 up\nip netns exec ns2 ip link set lo up\nip netns exec ns2 ip route add default via 10.1.8.1\n\n# 配置网桥\nip link set br-int0 master br0\nip link set br-int0 up\nip addr add 10.1.8.1/24 dev br0\n\n# 添加跨节点路由\nip route add 10.1.5.0/24 via 192.168.2.71 dev ens160\n```\n\n##### 验证测试\n\n```bash\n# 从节点1的 ns1 ping 节点2的 ns2\nip netns exec ns1 ping 10.1.8.10\n\n# 应该能够 ping 通，TTL = 62（经过两跳）\n```\n\n##### 查看路由表\n\n```bash\n# 节点1 路由表\nip route show\n\n# 输出类似：\n# 10.1.5.0/24 dev br0 proto kernel scope link src 10.1.5.1\n# 10.1.8.0/24 via 192.168.2.73 dev ens160  # Host-GW 关键路由\n```\n\n**代码说明**：\n\n- `10.1.8.0/24 via 192.168.2.73`：这就是 Host-GW 的核心路由\n- 去往 Pod 网段（10.1.8.0/24）的流量，下一跳是对端节点（192.168.2.73）\n- 这与 Flannel Host-GW 模式自动创建的路由完全一致\n\n---\n\n#### 4.5 Host-GW 在 Flannel 中的实现\n\n##### 背景\n\nFlannel 是 Kubernetes 中最常用的 CNI 插件之一。它支持多种后端模式，其中 Host-GW 是性能最高的模式。\n\n##### Flannel Host-GW 架构\n\n```mermaid\ngraph TD\n    subgraph Node1[\"节点1\"]\n        CNI0_1[\"cni0<br/>10.244.1.1/24\"]\n        FLANNELD1[\"flanneld\"]\n        P1[\"Pod<br/>10.244.1.x\"]\n        P1 --> CNI0_1\n        FLANNELD1 -.->|\"监听 etcd<br/>更新路由\"| CNI0_1\n    end\n    \n    subgraph Node2[\"节点2\"]\n        CNI0_2[\"cni0<br/>10.244.2.1/24\"]\n        FLANNELD2[\"flanneld\"]\n        P2[\"Pod<br/>10.244.2.x\"]\n        P2 --> CNI0_2\n        FLANNELD2 -.->|\"监听 etcd<br/>更新路由\"| CNI0_2\n    end\n    \n    FLANNELD1 <-->|\"etcd 同步\"| FLANNELD2\n    CNI0_1 <-->|\"静态路由\"| CNI0_2\n```\n\n**图解说明**：\n\n1. **flanneld** 进程监听 etcd 中的网络配置\n2. 当新节点加入或 Pod 网段变化时，flanneld 自动更新路由表\n3. 每个节点的路由表包含所有其他节点的 Pod 网段路由\n\n##### Flannel Host-GW 配置\n\n```json\n{\n  \"Network\": \"10.244.0.0/16\",\n  \"Backend\": {\n    \"Type\": \"host-gw\"\n  }\n}\n```\n\n##### 查看 Flannel 创建的路由\n\n```bash\n# 在 Kubernetes 节点上查看路由表\nip route show | grep 10.244\n\n# 输出示例（假设有三个节点）：\n# 10.244.0.0/24 via 192.168.1.10 dev eth0  # 节点1 的 Pod 网段\n# 10.244.1.0/24 dev cni0 proto kernel scope link src 10.244.1.1  # 本节点\n# 10.244.2.0/24 via 192.168.1.12 dev eth0  # 节点3 的 Pod 网段\n```\n\n**要点解读**：\n\n> [!IMPORTANT]\n> **Flannel Host-GW 的路由特征**：\n>\n> - 本节点的 Pod 网段：`dev cni0`（直连）\n> - 其他节点的 Pod 网段：`via <节点IP>`（通过节点路由）\n> - flanneld 自动维护这些路由，无需手工配置\n\n---\n\n#### 4.6 Next Hop 的核心作用\n\n##### 背景\n\n在 Host-GW 模式中，**Next Hop（下一跳）**是最关键的概念。理解 Next Hop 对于排障和网络设计至关重要。\n\n##### 原理\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>10.244.1.10\n    participant Node1 as 节点1<br/>192.168.2.71\n    participant Node2 as 节点2<br/>192.168.2.73\n    participant Pod2 as Pod2<br/>10.244.2.10\n    \n    Pod1->>Node1: 目的: 10.244.2.10<br/>下一跳: 10.244.1.1 (网关)\n    Note over Node1: 查路由表:<br/>10.244.2.0/24 via 192.168.2.73\n    Node1->>Node2: 目的: 10.244.2.10<br/>下一跳: 192.168.2.73\n    Note over Node2: 查路由表:<br/>10.244.2.0/24 dev cni0\n    Node2->>Pod2: 目的: 10.244.2.10<br/>直接投递\n```\n\n**图解说明**：\n\n1. **Pod1 → Node1**：Pod1 把所有出站流量发给默认网关\n2. **Node1 查路由表**：发现去往 10.244.2.0/24 的下一跳是 192.168.2.73\n3. **Node1 → Node2**：数据包发送到 Node2\n4. **Node2 → Pod2**：Node2 发现目的地址在本地 cni0，直接投递\n\n##### 关键点\n\n| 概念 | 说明 |\n|:---|:---|\n| **默认网关** | Pod 的\"下一跳\"，通常是 cni0 网桥 |\n| **静态路由** | 节点路由表中的跨节点路由 |\n| **Next Hop** | 静态路由指定的下一跳地址 |\n| **出接口** | 发送数据包的网卡接口 |\n\n```bash\n# 完整的路由条目格式\nip route add 10.244.2.0/24 via 192.168.2.73 dev eth0\n#           ↑目的网段        ↑下一跳地址     ↑出接口\n```\n\n> [!CAUTION]\n> **Next Hop 必须可达**：\n>\n> 如果 Next Hop 地址不可达（如跨子网），Host-GW 模式将无法工作。此时必须使用 Overlay 模式。\n\n---\n\n#### 4.7 常见问题与排障\n\n##### 问题1：跨节点 Pod 通信失败\n\n**检查步骤**：\n\n```bash\n# 1. 检查路由表是否正确\nip route show | grep 10.244\n\n# 2. 检查下一跳是否可达\nping <下一跳IP>\n\n# 3. 检查是否开启 IP 转发\ncat /proc/sys/net/ipv4/ip_forward\n# 如果是 0，需要开启：\necho 1 > /proc/sys/net/ipv4/ip_forward\n```\n\n##### 问题2：Host-GW 模式下节点跨子网\n\n**现象**：节点在不同子网，Host-GW 无法工作\n\n**原因**：Next Hop 不可达，ARP 无法解析\n\n**解决方案**：改用 Overlay 模式（VxLAN 或 IPIP）\n\n```json\n{\n  \"Network\": \"10.244.0.0/16\",\n  \"Backend\": {\n    \"Type\": \"vxlan\"\n  }\n}\n```\n\n##### 问题3：路由条目丢失\n\n**现象**：flanneld 重启后路由丢失\n\n**检查**：\n\n```bash\n# 检查 flanneld 是否正常运行\nkubectl get pods -n kube-flannel\n\n# 查看 flanneld 日志\nkubectl logs -n kube-flannel <flannel-pod-name>\n```\n\n---\n\n#### 📝 章节小结\n\n本章深入讲解了 Host-Gateway 网络模式：\n\n1. **核心概念**：把宿主机当作 Pod 的网关，利用路由转发容器流量\n2. **工作原理**：Pod → 默认网关 → 查路由表 → 下一跳 → 目标节点\n3. **优势**：性能最高、配置简单、无封装开销\n4. **限制**：节点必须二层可达（同一广播域）\n5. **实现方式**：\n   - Flannel Host-GW 模式\n   - Calico BGP 模式（类似原理）\n   - 手工静态路由配置\n\n> [!TIP]\n> **学习建议**：\n>\n> 1. 使用 Containerlab 搭建 Host-GW 实验环境\n> 2. 手工配置一次完整的 Host-GW 网络\n> 3. 在真实 Kubernetes 集群中查看 Flannel 路由表\n> 4. 理解 \"Next Hop 必须可达\" 这一核心约束\n\n> [!IMPORTANT]\n> **选择 Host-GW 还是 Overlay？**\n>\n> - **同一二层网络** → 优先选择 **Host-GW**（性能更好）\n> - **跨子网/跨机房** → 必须使用 **Overlay**（VxLAN/IPIP）\n> - **混合场景** → 可以使用 Calico 的 **ipip: CrossSubnet** 模式\n\n---", "subs": ["🎯 学习目标", "4.1 Host-Gateway 概念与原理", "4.2 Host-GW 与 Overlay 网络对比", "4.3 使用 Containerlab 实现 Host-GW", "4.4 手工实现 Host-GW 模式", "4.5 Host-GW 在 Flannel 中的实现", "4.6 Next Hop 的核心作用", "4.7 常见问题与排障", "📝 章节小结"]}, {"title": "第5章 CNI 网络模型", "content": "#### 🎯 学习目标\n\n- 理解 CNI 网络的四大分类：Overlay、Underlay、Routing、高性能\n- 掌握 Pod 数据包在宿主机上的转发路径\n- 理解网卡复用技术（IPVLAN、MACVLAN）的原理与应用\n- 了解高性能网络（SR-IOV、DPDK、VPP）的核心概念\n- 掌握 Cilium eBPF 的优化原理\n\n---\n\n#### 5.1 CNI 网络模型概述\n\n##### 背景\n\n在 Kubernetes 中，CNI（Container Network Interface）负责为 Pod 配置网络。不同的 CNI 插件采用不同的网络模型，各有优劣。\n\n##### 四大网络模型\n\n```mermaid\ngraph TD\n    CNI[\"CNI 网络模型\"] --> Overlay[\"Overlay 网络<br/>叠加网络\"]\n    CNI --> Underlay[\"Underlay 网络<br/>底层网络\"]\n    CNI --> Routing[\"Routing 网络<br/>路由网络\"]\n    CNI --> HighPerf[\"高性能网络<br/>内核 Bypass\"]\n    \n    Overlay --> VxLAN[\"VxLAN\"]\n    Overlay --> IPIP[\"IPIP\"]\n    Overlay --> GRE[\"GRE\"]\n    \n    Underlay --> IPVLAN[\"IPVLAN\"]\n    Underlay --> MACVLAN[\"MACVLAN\"]\n    \n    Routing --> HostGW[\"Host-GW\"]\n    Routing --> BGP[\"BGP\"]\n    \n    HighPerf --> SRIOV[\"SR-IOV\"]\n    HighPerf --> DPDK[\"DPDK\"]\n    HighPerf --> eBPF[\"eBPF\"]\n```\n\n**图解说明**：\n\n| 类型 | 核心原理 | 代表性 CNI/技术 |\n|:---|:---|:---|\n| **Overlay** | 封装隧道，Pod IP 隐藏 | Flannel VxLAN、Calico IPIP |\n| **Underlay** | 网卡复用，Pod 与宿主机同平面 | IPVLAN、MACVLAN |\n| **Routing** | 路由转发，Pod IP 暴露 | Host-GW、Calico BGP |\n| **高性能** | 绕过内核协议栈 | SR-IOV、DPDK、Cilium eBPF |\n\n---\n\n#### 5.2 Pod 数据包转发路径\n\n##### 背景\n\n理解 Pod 数据包在宿主机上的转发路径，是掌握 CNI 网络模型的关键。\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph Pod[\"Pod 网络命名空间\"]\n        APP[\"应用进程\"]\n        STACK1[\"协议栈处理<br/>TCP/IP\"]\n        ETH0[\"eth0 (VETH)\"]\n        APP --> STACK1 --> ETH0\n    end\n    \n    subgraph Host[\"宿主机 Root Namespace\"]\n        VETH[\"veth-xxx\"]\n        BRIDGE[\"cni0 网桥\"]\n        STACK2[\"协议栈处理<br/>iptables/路由\"]\n        PHYS[\"物理网卡 eth0\"]\n        VETH --> BRIDGE --> STACK2 --> PHYS\n    end\n    \n    ETH0 ---|\"VETH Pair\"| VETH\n    PHYS --> EXT[\"外部网络\"]\n```\n\n**图解说明**：\n\n1. **Pod 内部协议栈**：应用发送数据包，经过 Pod 自己的 TCP/IP 协议栈\n2. **VETH Pair 传输**：数据包通过 VETH Pair 传到宿主机\n3. **宿主机协议栈**：再次经过宿主机的协议栈（iptables、路由查询等）\n4. **物理网卡发出**：最终从物理网卡发送到外部网络\n\n> [!IMPORTANT]\n> **关键理解**：Pod 发送一个数据包，需要经过**两次协议栈处理**：\n>\n> 1. Pod 自己的协议栈（一次）\n> 2. 宿主机的协议栈（一次）\n>\n> 这是容器网络相比传统网络有性能损耗的主要原因。\n\n---\n\n#### 5.3 Overlay 叠加网络\n\n##### 背景\n\nOverlay 网络通过**隧道封装**技术，将 Pod 网络\"叠加\"在物理网络之上，使 Pod IP 对外部网络不可见。\n\n##### 原理\n\n```mermaid\ngraph LR\n    subgraph Node1[\"节点1\"]\n        P1[\"Pod1<br/>10.244.1.10\"]\n        FLANNEL1[\"flannel.1<br/>VxLAN 封装\"]\n    end\n    \n    subgraph Node2[\"节点2\"]\n        P2[\"Pod2<br/>10.244.2.10\"]\n        FLANNEL2[\"flannel.1<br/>VxLAN 解封装\"]\n    end\n    \n    P1 --> FLANNEL1\n    FLANNEL1 -->|\"外层: Node1 IP → Node2 IP<br/>内层: Pod1 IP → Pod2 IP\"| FLANNEL2\n    FLANNEL2 --> P2\n```\n\n**图解说明**：\n\n| 特性 | 说明 |\n|:---|:---|\n| **封装方式** | VxLAN、IPIP、GRE、Geneve |\n| **外层报头** | 宿主机 IP（物理网络可路由） |\n| **内层报头** | Pod IP（物理网络不可见） |\n| **优点** | 跨子网、跨机房通信 |\n| **缺点** | 有封装开销、MTU 损耗 |\n\n##### 常见 Overlay 协议对比\n\n| 协议 | 封装开销 | 特点 | 使用场景 |\n|:---|:---|:---|:---|\n| **VxLAN** | 50 字节 | 基于 UDP，成熟稳定 | Flannel、Calico |\n| **IPIP** | 20 字节 | 封装最小，性能较好 | Calico |\n| **GRE** | 24+ 字节 | 支持多协议 | 较少使用 |\n| **Geneve** | 可变 | 可扩展，未来趋势 | OVN |\n\n> [!NOTE]\n> **MTU 问题**：Overlay 封装会增加报头大小，需要调整 Pod 网络的 MTU。\n>\n> - VxLAN：MTU = 1450（1500 - 50）\n> - IPIP：MTU = 1480（1500 - 20）\n\n---\n\n#### 5.4 Underlay 底层网络\n\n##### 背景\n\nUnderlay 网络通过**网卡复用**技术，让 Pod 网络与宿主机网络处于同一平面，减少协议栈处理次数。\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph Host[\"宿主机\"]\n        PHYS[\"物理网卡 eth0<br/>192.168.1.10\"]\n        \n        subgraph IPVLAN[\"IPVLAN 子接口\"]\n            IPV1[\"ipvlan0<br/>192.168.1.11\"]\n            IPV2[\"ipvlan1<br/>192.168.1.12\"]\n        end\n        \n        PHYS --> IPV1\n        PHYS --> IPV2\n    end\n    \n    subgraph Pod1[\"Pod1\"]\n        E1[\"eth0\"]\n    end\n    \n    subgraph Pod2[\"Pod2\"]\n        E2[\"eth0\"]\n    end\n    \n    IPV1 --> E1\n    IPV2 --> E2\n```\n\n**图解说明**：\n\n- 物理网卡通过 IPVLAN/MACVLAN 技术创建多个子接口\n- 每个子接口分配给一个 Pod\n- Pod 的 IP 地址与宿主机在同一网段\n- **绕过了 Pod 内部的协议栈处理**\n\n##### IPVLAN vs MACVLAN\n\n| 特性 | IPVLAN | MACVLAN |\n|:---|:---|:---|\n| **MAC 地址** | 子接口与父接口 MAC **相同** | 子接口有**独立** MAC |\n| **IP 地址** | 子接口有独立 IP | 子接口有独立 IP |\n| **二层通信** | 不支持（需要三层） | 支持 |\n| **适用场景** | IaaS 虚拟化环境 | 裸机 K8s 环境 |\n| **内核版本** | 4.2+ 稳定 | 3.x 即可 |\n\n##### 适用场景\n\n| 场景 | 推荐技术 |\n|:---|:---|\n| OpenStack + K8s 环境 | **IPVLAN** |\n| 裸机 K8s 环境 | **MACVLAN** |\n| 高吞吐量需求 | IPVLAN/MACVLAN（多网卡） |\n| 传统 Service 场景 | 不推荐（使用 Overlay/Routing） |\n\n> [!TIP]\n> **多网卡架构**：在实际生产中，Pod 通常有多张网卡：\n>\n> - **默认 CNI 网卡**：用于 Service 发现、K8s 网络\n> - **IPVLAN/MACVLAN 网卡**：用于高速数据通信\n\n---\n\n#### 5.5 Routing 路由网络\n\n##### 背景\n\nRouting 网络模式通过**路由协议**直接转发 Pod 流量，Pod IP 完全暴露在物理网络中。\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph Node1[\"节点1<br/>192.168.1.10\"]\n        P1[\"Pod<br/>10.244.1.10\"]\n        RT1[\"路由表\"]\n    end\n    \n    subgraph Node2[\"节点2<br/>192.168.1.11\"]\n        P2[\"Pod<br/>10.244.2.10\"]\n        RT2[\"路由表\"]\n    end\n    \n    subgraph Switch[\"物理交换机/路由器\"]\n        RT3[\"路由表\"]\n    end\n    \n    P1 --> RT1\n    RT1 -->|\"10.244.2.0/24 via 192.168.1.11\"| Switch\n    Switch -->|\"10.244.2.0/24 via 192.168.1.11\"| RT2\n    RT2 --> P2\n```\n\n**图解说明**：\n\n| 模式 | 路由来源 | 适用场景 |\n|:---|:---|:---|\n| **Host-GW** | 静态路由（flanneld 维护） | 同二层网络 |\n| **BGP** | 动态路由（BGP 协议） | 跨子网、大规模集群 |\n\n##### Host-GW vs BGP\n\n| 特性 | Host-GW | BGP |\n|:---|:---|:---|\n| **路由协议** | 静态路由 | BGP 动态路由 |\n| **跨子网** | ❌ 不支持 | ✅ 支持 |\n| **外部集成** | 不需要 | 需要与 ToR 交换机对接 |\n| **复杂度** | 简单 | 较复杂 |\n| **代表 CNI** | Flannel Host-GW | Calico BGP |\n\n> [!IMPORTANT]\n> **BGP 的核心价值**：\n>\n> 1. 可以将 Pod IP 发布到物理网络\n> 2. 外部设备可以直接访问 Pod IP（无需 NodePort/LoadBalancer）\n> 3. 支持 Service ClusterIP 的外部发布（Calico 特性）\n\n---\n\n#### 5.6 高性能网络\n\n##### 背景\n\n对于延迟敏感、高吞吐量的应用（如电信、视频流、金融交易），传统的内核协议栈处理已成为瓶颈。高性能网络技术通过**绕过内核协议栈**来实现极致性能。\n\n##### 技术分类\n\n```mermaid\ngraph TD\n    HP[\"高性能网络技术\"] --> SRIOV[\"SR-IOV<br/>网卡直通\"]\n    HP --> DPDK[\"DPDK<br/>用户态协议栈\"]\n    HP --> eBPF[\"eBPF<br/>内核优化\"]\n    \n    SRIOV --> VF[\"VF 虚拟网卡<br/>直接分配给 Pod\"]\n    DPDK --> VPP[\"VPP 用户态转发\"]\n    eBPF --> CILIUM[\"Cilium<br/>bpf_redirect\"]\n```\n\n##### SR-IOV（网卡直通）\n\n```mermaid\ngraph TD\n    subgraph Host[\"宿主机\"]\n        PF[\"物理网卡 PF<br/>e.g. Intel X710\"]\n        VF0[\"VF0\"]\n        VF1[\"VF1\"]\n        VF2[\"VF2\"]\n        \n        PF --> VF0\n        PF --> VF1\n        PF --> VF2\n    end\n    \n    VF0 -->|\"直通\"| Pod1[\"Pod1\"]\n    VF1 -->|\"直通\"| Pod2[\"Pod2\"]\n```\n\n**要点解读**：\n\n| 概念 | 说明 |\n|:---|:---|\n| **PF** | Physical Function，物理网卡 |\n| **VF** | Virtual Function，虚拟子网卡 |\n| **直通** | VF 直接分配给 Pod，绕过宿主机协议栈 |\n| **硬件要求** | 需要支持 SR-IOV 的网卡（Intel、Mellanox） |\n\n##### DPDK + VPP（用户态协议栈）\n\n```mermaid\ngraph LR\n    subgraph Traditional[\"传统模式\"]\n        A1[\"应用\"] --> K1[\"内核协议栈\"] --> N1[\"网卡驱动\"] --> HW1[\"网卡\"]\n    end\n    \n    subgraph DPDK[\"DPDK 模式\"]\n        A2[\"应用\"] --> VPP[\"VPP 用户态协议栈\"] --> PMD[\"PMD 轮询驱动\"] --> HW2[\"网卡\"]\n    end\n```\n\n**要点解读**：\n\n| 技术 | 说明 |\n|:---|:---|\n| **DPDK** | Data Plane Development Kit，Intel 开源的高速数据包处理框架 |\n| **VPP** | Vector Packet Processing，Cisco 开源的用户态协议栈 |\n| **PMD** | Poll Mode Driver，轮询模式驱动，避免中断开销 |\n| **性能** | 可达**千万级 PPS**，远超内核协议栈 |\n\n##### Cilium eBPF 优化\n\n```mermaid\ngraph TD\n    subgraph Traditional[\"传统模式\"]\n        P1_T[\"Pod1 协议栈\"] --> V1_T[\"veth1\"] --> HOST_T[\"宿主机协议栈<br/>iptables/路由\"] --> V2_T[\"veth2\"] --> P2_T[\"Pod2 协议栈\"]\n    end\n    \n    subgraph eBPF[\"Cilium eBPF Host Routing\"]\n        P1_E[\"Pod1 协议栈\"] --> V1_E[\"veth1<br/>TC hook\"]\n        V1_E -->|\"bpf_redirect_peer\"| V2_E[\"veth2\"]\n        V2_E --> P2_E[\"Pod2 协议栈\"]\n    end\n```\n\n**要点解读**：\n\n| 函数 | 作用 | 适用场景 |\n|:---|:---|:---|\n| **bpf_redirect_peer** | 同节点 Pod 间数据包重定向 | Pod ↔ Pod（同节点） |\n| **bpf_redirect_neigh** | 跨节点数据包直接发往物理网卡 | Pod → 外部网络 |\n\n> [!TIP]\n> **Cilium eBPF Host Routing 的效果**：\n>\n> - 同节点 Pod 通信：绕过宿主机协议栈和 iptables\n> - 抓包现象：在 veth 上只能看到单向流量（因为数据包被 redirect 了）\n\n---\n\n#### 5.7 CNI 模式对比与选型\n\n##### 综合对比\n\n| 特性 | Overlay | Underlay | Routing | 高性能 |\n|:---|:---|:---|:---|:---|\n| **性能** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |\n| **跨子网** | ✅ | ❌ | 部分支持 | 取决于具体技术 |\n| **配置复杂度** | 简单 | 中等 | 中等 | 复杂 |\n| **Pod IP 可见性** | 隐藏 | 暴露 | 暴露 | 暴露 |\n| **硬件要求** | 无 | 无 | 无 | SR-IOV 需要特定网卡 |\n\n##### 选型建议\n\n```mermaid\ngraph TD\n    START[\"CNI 选型\"] --> Q1{\"节点跨子网？\"}\n    Q1 -->|\"是\"| Q2{\"需要高性能？\"}\n    Q1 -->|\"否\"| Q3{\"需要 NetworkPolicy？\"}\n    \n    Q2 -->|\"是\"| BGP[\"Calico BGP + IPIP CrossSubnet\"]\n    Q2 -->|\"否\"| OVERLAY[\"Flannel VxLAN / Calico IPIP\"]\n    \n    Q3 -->|\"是\"| Q4{\"需要最高性能？\"}\n    Q3 -->|\"否\"| HOSTGW[\"Flannel Host-GW\"]\n    \n    Q4 -->|\"是\"| CILIUM[\"Cilium eBPF\"]\n    Q4 -->|\"否\"| CALICO[\"Calico BGP\"]\n```\n\n| 场景 | 推荐 CNI |\n|:---|:---|\n| 小型集群、测试环境 | **Flannel Host-GW** |\n| 需要 NetworkPolicy | **Calico** 或 **Cilium** |\n| 跨子网、大规模集群 | **Calico BGP** |\n| 追求极致性能 | **Cilium eBPF Host Routing** |\n| 电信/视频流/高频交易 | **SR-IOV + DPDK** |\n\n---\n\n#### 📝 章节小结\n\n本章系统讲解了 CNI 网络模型：\n\n1. **四大网络类型**：\n   - **Overlay**：封装隧道（VxLAN、IPIP），跨子网通信\n   - **Underlay**：网卡复用（IPVLAN、MACVLAN），同平面通信\n   - **Routing**：路由转发（Host-GW、BGP），Pod IP 暴露\n   - **高性能**：绕过内核（SR-IOV、DPDK、eBPF）\n\n2. **数据包路径**：Pod 发包需经过两次协议栈处理（Pod + 宿主机）\n\n3. **关键技术**：\n   - VxLAN/IPIP 的封装原理\n   - IPVLAN/MACVLAN 的网卡复用\n   - SR-IOV 的网卡直通\n   - Cilium eBPF 的 bpf_redirect 优化\n\n4. **选型关键点**：\n   - 跨子网 → Overlay 或 BGP\n   - 同二层 → Host-GW（最简单高效）\n   - 需要 NetworkPolicy → Calico 或 Cilium\n   - 极致性能 → SR-IOV + DPDK 或 Cilium eBPF\n\n> [!TIP]\n> **学习建议**：\n>\n> 1. 理解\"两次协议栈处理\"是容器网络性能损耗的根源\n> 2. 根据业务场景选择合适的网络模型\n> 3. 关注 eBPF 技术的发展趋势\n> 4. 高性能场景需要了解 SR-IOV、DPDK 的基本原理\n\n---", "subs": ["🎯 学习目标", "5.1 CNI 网络模型概述", "5.2 Pod 数据包转发路径", "5.3 Overlay 叠加网络", "5.4 Underlay 底层网络", "5.5 Routing 路由网络", "5.6 高性能网络", "5.7 CNI 模式对比与选型", "📝 章节小结"]}, {"title": "第6章 CNI 工作原理", "content": "#### 🎯 学习目标\n\n- 理解 CNI 的插件分类：Main、IPAM、Meta\n- 掌握 CNI 的两大核心目录结构\n- 理解 CNI 配置文件的格式与字段含义\n- 掌握 IPAM（IP 地址管理）的工作机制\n- 了解多网卡方案（Multus、Network Attachment Definition）\n\n---\n\n#### 6.1 CNI 概述\n\n##### 背景\n\nCNI（Container Network Interface）是 Kubernetes 网络的标准接口规范。它定义了容器运行时如何调用网络插件来配置 Pod 的网络。\n\n##### 原理\n\n```mermaid\ngraph TD\n    KUBELET[\"kubelet\"] -->|\"创建 Pod\"| CRI[\"容器运行时<br/>containerd/CRI-O\"]\n    CRI -->|\"调用 CNI 插件\"| CNI[\"CNI 插件\"]\n    CNI -->|\"读取配置\"| CONF[\"/etc/cni/net.d/\"]\n    CNI -->|\"执行二进制\"| BIN[\"/opt/cni/bin/\"]\n    CNI -->|\"配置网络\"| POD[\"Pod 网络\"]\n```\n\n**图解说明**：\n\n1. kubelet 调用容器运行时创建 Pod\n2. 容器运行时调用 CNI 插件配置网络\n3. CNI 插件读取 `/etc/cni/net.d/` 下的配置文件\n4. CNI 插件执行 `/opt/cni/bin/` 下的二进制程序\n5. 完成 Pod 网络配置（创建 VETH、分配 IP、配置路由等）\n\n> [!NOTE]\n> **CNI 的本质**：CNI 只是一个**接口规范**，定义了输入输出格式。具体网络实现由各 CNI 插件负责（如 Flannel、Calico、Cilium）。\n\n---\n\n#### 6.2 CNI 插件分类\n\n##### 原理\n\nCNI 插件分为三大类：\n\n```mermaid\ngraph TD\n    CNI[\"CNI 插件分类\"] --> Main[\"Main 插件<br/>负责网络连通性\"]\n    CNI --> IPAM[\"IPAM 插件<br/>负责 IP 地址管理\"]\n    CNI --> Meta[\"Meta 插件<br/>辅助功能\"]\n    \n    Main --> Bridge[\"bridge\"]\n    Main --> VETH[\"veth/ptp\"]\n    Main --> IPVLAN[\"ipvlan\"]\n    Main --> MACVLAN[\"macvlan\"]\n    Main --> SRIOV[\"sriov\"]\n    \n    IPAM --> HostLocal[\"host-local\"]\n    IPAM --> DHCP[\"dhcp\"]\n    IPAM --> Static[\"static\"]\n    IPAM --> Whereabouts[\"whereabouts\"]\n    \n    Meta --> PortMap[\"portmap\"]\n    Meta --> Bandwidth[\"bandwidth\"]\n    Meta --> Tuning[\"tuning\"]\n    Meta --> SBR[\"sbr\"]\n```\n\n**图解说明**：\n\n| 类型 | 职责 | 代表插件 |\n|:---|:---|:---|\n| **Main** | 创建网络接口、配置网络连通性 | bridge、veth、ipvlan、macvlan、sriov |\n| **IPAM** | 分配和回收 IP 地址 | host-local、dhcp、static、whereabouts |\n| **Meta** | 辅助功能（端口映射、带宽限制等） | portmap、bandwidth、tuning、sbr |\n\n##### Main 插件详解\n\n| 插件 | 功能 | 使用场景 |\n|:---|:---|:---|\n| **bridge** | 创建 Linux Bridge，VETH 插入 Bridge | Flannel、默认方案 |\n| **ptp** | 点对点 VETH Pair | Calico |\n| **ipvlan** | IPVLAN 子接口 | 高性能虚拟化环境 |\n| **macvlan** | MACVLAN 子接口 | 裸机高性能 |\n| **sriov** | SR-IOV VF 直通 | 电信/金融高性能 |\n\n##### IPAM 插件详解\n\n| 插件 | 作用域 | 特点 |\n|:---|:---|:---|\n| **host-local** | 单节点 | 最常用，每个节点独立管理 IP 池 |\n| **dhcp** | 跨节点 | 使用 DHCP 服务器分配 IP |\n| **static** | 固定 IP | 手工指定 IP，不自动分配 |\n| **whereabouts** | 集群级 | 跨节点 IP 管理，多网卡常用 |\n\n> [!IMPORTANT]\n> **IPAM 插件的选择**：\n>\n> - 普通场景：**host-local**（Flannel、Calico 默认）\n> - 多网卡场景：**whereabouts**（集群级 IP 管理）\n> - 固定 IP 需求：**static**\n\n---\n\n#### 6.3 CNI 核心目录结构\n\n##### 背景\n\n理解 CNI 的目录结构，是排障和自定义网络配置的基础。\n\n##### 两大核心目录\n\n```mermaid\ngraph LR\n    subgraph CNI[\"CNI 核心目录\"]\n        CONF[\"/etc/cni/net.d/<br/>配置文件目录\"]\n        BIN[\"/opt/cni/bin/<br/>二进制程序目录\"]\n    end\n    \n    CONF -->|\"定义：怎么配置网络\"| DESC[\"网络配置描述\"]\n    BIN -->|\"执行：实际配置网络\"| EXEC[\"网络配置执行\"]\n```\n\n##### `/etc/cni/net.d/` - 配置文件目录\n\n```bash\n# 查看 CNI 配置文件\nls -la /etc/cni/net.d/\n\n# 典型输出\n# 10-flannel.conflist   # Flannel 配置\n# 10-calico.conflist    # Calico 配置\n# 10-cilium.conflist    # Cilium 配置\n```\n\n**配置文件命名规则**：\n\n- 按数字前缀排序，数字小的优先加载\n- `.conf` 格式：单个插件配置\n- `.conflist` 格式：多个插件链式调用\n\n##### `/opt/cni/bin/` - 二进制程序目录\n\n```bash\n# 查看 CNI 二进制程序\nls -la /opt/cni/bin/\n\n# 典型输出\n# bandwidth    # 带宽限制插件\n# bridge       # Linux Bridge 插件\n# dhcp         # DHCP IPAM 插件\n# flannel      # Flannel 专用插件\n# host-local   # host-local IPAM 插件\n# ipvlan       # IPVLAN 插件\n# macvlan      # MACVLAN 插件\n# portmap      # 端口映射插件\n# ptp          # 点对点 VETH 插件\n# sbr          # Source Based Routing 插件\n# sriov        # SR-IOV 插件\n# tuning       # 网卡参数调优插件\n# vlan         # VLAN 插件\n```\n\n**代码说明**：\n\n- 这些二进制文件由 CNI 插件项目提供\n- 容器运行时会调用这些二进制来配置网络\n- 安装不同 CNI 时会添加对应的二进制（如 Calico 的 `calico`、`calico-ipam`）\n\n---\n\n#### 6.4 CNI 配置文件详解\n\n##### 背景\n\nCNI 配置文件定义了网络如何配置。理解配置文件结构，有助于自定义网络和排障。\n\n##### 配置文件示例（Calico）\n\n```json\n{\n  \"name\": \"k8s-pod-network\",\n  \"cniVersion\": \"0.3.1\",\n  \"plugins\": [\n    {\n      \"type\": \"calico\",\n      \"datastore_type\": \"kubernetes\",\n      \"mtu\": 0,\n      \"nodename_file_optional\": false,\n      \"log_level\": \"Info\",\n      \"log_file_path\": \"/var/log/calico/cni/cni.log\",\n      \"ipam\": {\n        \"type\": \"calico-ipam\",\n        \"assign_ipv4\": \"true\",\n        \"assign_ipv6\": \"false\"\n      },\n      \"container_settings\": {\n        \"allow_ip_forwarding\": false\n      },\n      \"policy\": {\n        \"type\": \"k8s\"\n      },\n      \"kubernetes\": {\n        \"k8s_api_root\": \"https://10.96.0.1:443\",\n        \"kubeconfig\": \"/etc/cni/net.d/calico-kubeconfig\"\n      }\n    },\n    {\n      \"type\": \"portmap\",\n      \"snat\": true,\n      \"capabilities\": {\n        \"portMappings\": true\n      }\n    },\n    {\n      \"type\": \"bandwidth\",\n      \"capabilities\": {\n        \"bandwidth\": true\n      }\n    }\n  ]\n}\n```\n\n**配置字段解析**：\n\n| 字段 | 说明 |\n|:---|:---|\n| **name** | 网络名称 |\n| **cniVersion** | CNI 规范版本 |\n| **plugins** | 插件列表（链式调用） |\n| **type** | 插件类型（对应 /opt/cni/bin/ 下的二进制） |\n| **ipam** | IP 地址管理配置 |\n| **datastore_type** | 数据存储类型（kubernetes/etcdv3） |\n| **policy** | NetworkPolicy 实现方式 |\n\n##### 链式调用示意图\n\n```mermaid\ngraph LR\n    Pod[\"Pod 创建\"] --> P1[\"calico 插件<br/>创建 VETH、配置路由\"]\n    P1 --> P2[\"portmap 插件<br/>配置端口映射\"]\n    P2 --> P3[\"bandwidth 插件<br/>配置带宽限制\"]\n    P3 --> Done[\"网络配置完成\"]\n```\n\n**图解说明**：\n\n- CNI 插件按 `plugins` 数组顺序依次执行\n- 每个插件完成特定功能后，传递给下一个插件\n- 类似 Linux 管道的链式处理\n\n---\n\n#### 6.5 IPAM 工作机制\n\n##### 背景\n\nIPAM（IP Address Management）负责 Pod 的 IP 地址分配与回收。不同的 IPAM 插件有不同的管理范围和特点。\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph HostLocal[\"host-local IPAM（节点级）\"]\n        N1[\"节点1<br/>10.244.1.0/24\"]\n        N2[\"节点2<br/>10.244.2.0/24\"]\n        N3[\"节点3<br/>10.244.3.0/24\"]\n    end\n    \n    subgraph Whereabouts[\"whereabouts IPAM（集群级）\"]\n        POOL[\"IP 池<br/>10.244.0.0/16\"]\n        POOL --> PA[\"Pod A: 10.244.1.10\"]\n        POOL --> PB[\"Pod B: 10.244.2.20\"]\n        POOL --> PC[\"Pod C: 10.244.3.30\"]\n    end\n```\n\n**图解说明**：\n\n| IPAM | 管理范围 | IP 池分配 | 适用场景 |\n|:---|:---|:---|:---|\n| **host-local** | 单节点 | 每个节点独立 IP 池 | 默认 CNI（Flannel/Calico） |\n| **whereabouts** | 集群级 | 统一 IP 池，跨节点分配 | 多网卡、需要 IP 跨节点迁移 |\n\n##### host-local 存储位置\n\n```bash\n# host-local 的 IP 分配记录存储位置\nls /var/lib/cni/networks/<network-name>/\n\n# 每个文件名是已分配的 IP 地址\n# 文件内容是 Pod 的 Container ID\n```\n\n##### whereabouts 存储方式\n\n```bash\n# whereabouts 使用 Kubernetes CRD 存储 IP 分配信息\nkubectl get ippools.whereabouts.cni.cncf.io -A\nkubectl get overlappingrangeipreservations.whereabouts.cni.cncf.io -A\n```\n\n---\n\n#### 6.6 多网卡方案（Multus）\n\n##### 背景\n\n在高性能场景中，Pod 可能需要多张网卡：默认网卡用于 Service 通信，额外网卡用于高速数据传输。\n\n##### 原理\n\n```mermaid\ngraph TD\n    subgraph Pod[\"Pod\"]\n        ETH0[\"eth0<br/>默认 CNI 网卡<br/>10.244.1.10\"]\n        NET1[\"net1<br/>MACVLAN 网卡<br/>192.168.1.100\"]\n        ETH0 --> SVC[\"Service 通信\"]\n        NET1 --> DATA[\"高速数据通信\"]\n    end\n    \n    MULTUS[\"Multus CNI<br/>多网卡编排\"] --> ETH0\n    MULTUS --> NET1\n```\n\n**图解说明**：\n\n- **Multus CNI** 是一个 CNI \"元插件\"，可以调用其他 CNI 为 Pod 配置多张网卡\n- **默认网卡（eth0）**：由集群默认 CNI（如 Calico）配置\n- **额外网卡（net1, net2...）**：通过 Network Attachment Definition 配置\n\n##### Network Attachment Definition (NAD)\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: macvlan-net\n  namespace: default\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"type\": \"macvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"bridge\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"192.168.1.0/24\",\n      \"gateway\": \"192.168.1.1\"\n    }\n  }'\n```\n\n**配置说明**：\n\n| 字段 | 说明 |\n|:---|:---|\n| **type** | 网卡类型（macvlan/ipvlan/sriov） |\n| **master** | 父接口（物理网卡） |\n| **mode** | MACVLAN 模式（bridge/vepa/private） |\n| **ipam.type** | IP 管理方式（whereabouts 用于多网卡） |\n| **ipam.range** | IP 地址范围 |\n\n##### Pod 使用多网卡\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: multi-nic-pod\n  annotations:\n    k8s.v1.cni.cncf.io/networks: macvlan-net\nspec:\n  containers:\n  - name: app\n    image: nginx\n```\n\n**代码说明**：\n\n- 通过 `k8s.v1.cni.cncf.io/networks` 注解指定额外网卡\n- 可以指定多个，用逗号分隔：`macvlan-net, sriov-net`\n\n---\n\n#### 6.7 Source Based Routing (SBR)\n\n##### 背景\n\n当 Pod 有多张网卡时，需要确保从某张网卡进来的流量，响应也从同一张网卡出去。这需要基于源地址的路由（SBR）。\n\n##### 原理\n\n```mermaid\ngraph LR\n    subgraph Pod[\"Pod 多网卡\"]\n        ETH0[\"eth0<br/>10.244.1.10\"]\n        NET1[\"net1<br/>192.168.1.100\"]\n    end\n    \n    CLIENT[\"客户端<br/>192.168.1.50\"]\n    \n    CLIENT -->|\"请求到 net1\"| NET1\n    NET1 -->|\"SBR: 响应从 net1 返回\"| CLIENT\n```\n\n**配置示例**：\n\n```bash\n# 添加路由规则：从 192.168.1.0/24 出来的流量，查 table 100\nip rule add from 192.168.1.0/24 table 100\n\n# 在 table 100 中添加默认路由\nip route add default via 192.168.1.1 dev net1 table 100\n```\n\n**要点解读**：\n\n- **基于源地址路由** 优先级高于基于目的地址的路由\n- 多网卡场景必须配置 SBR，否则响应流量可能走错网卡\n- CNI 的 `sbr` 插件可以自动配置\n\n---\n\n#### 6.8 Pod 网络配置流程\n\n##### 完整流程\n\n```mermaid\nsequenceDiagram\n    participant Kubelet as kubelet\n    participant CRI as 容器运行时\n    participant CNI as CNI 插件\n    participant Config as /etc/cni/net.d/\n    participant Bin as /opt/cni/bin/\n\n    Kubelet->>CRI: 创建 Pod\n    CRI->>Config: 读取 CNI 配置文件\n    Config-->>CRI: 返回配置（plugin 列表）\n    CRI->>Bin: 调用 Main 插件（bridge/calico）\n    Bin-->>CRI: 创建 VETH、配置路由\n    CRI->>Bin: 调用 IPAM 插件（host-local）\n    Bin-->>CRI: 分配 IP 地址\n    CRI->>Bin: 调用 Meta 插件（portmap/bandwidth）\n    Bin-->>CRI: 配置端口映射/带宽\n    CRI-->>Kubelet: Pod 网络就绪\n```\n\n**流程说明**：\n\n1. kubelet 调用容器运行时创建 Pod\n2. 容器运行时读取 `/etc/cni/net.d/` 下的配置文件（按名称排序，优先加载）\n3. 按配置文件中的 `plugins` 列表顺序：\n   - 调用 Main 插件：创建网络接口\n   - 调用 IPAM 插件：分配 IP 地址\n   - 调用 Meta 插件：附加功能\n4. 所有插件执行完成，Pod 网络就绪\n\n---\n\n#### 6.9 常见问题与排障\n\n##### 问题1：Pod 网络配置失败\n\n**检查步骤**：\n\n```bash\n# 1. 检查 CNI 配置文件是否存在\nls -la /etc/cni/net.d/\n\n# 2. 检查 CNI 二进制是否存在\nls -la /opt/cni/bin/\n\n# 3. 查看 kubelet 日志\njournalctl -u kubelet | grep -i cni\n\n# 4. 查看容器运行时日志\ncrictl logs <container-id>\n```\n\n##### 问题2：IP 地址分配失败\n\n```bash\n# 检查 host-local IPAM 的 IP 分配记录\nls /var/lib/cni/networks/\n\n# 如果 IP 池耗尽，可以清理无效记录\n# （谨慎操作，仅在确认 IP 未被使用时）\n```\n\n##### 问题3：多网卡 IP 冲突\n\n```bash\n# 检查 whereabouts 的 IP 分配\nkubectl get ippools.whereabouts.cni.cncf.io -A -o wide\n\n# 查看 IP 预留情况\nkubectl get overlappingrangeipreservations -A\n```\n\n---\n\n#### 📝 章节小结\n\n本章深入讲解了 CNI 工作原理：\n\n1. **CNI 插件分类**：\n   - **Main 插件**：创建网络接口（bridge、veth、ipvlan、macvlan、sriov）\n   - **IPAM 插件**：分配 IP 地址（host-local、dhcp、static、whereabouts）\n   - **Meta 插件**：辅助功能（portmap、bandwidth、sbr）\n\n2. **两大核心目录**：\n   - `/etc/cni/net.d/`：配置文件，定义\"怎么配置网络\"\n   - `/opt/cni/bin/`：二进制程序，\"实际执行配置\"\n\n3. **配置文件结构**：链式调用多个插件\n\n4. **IPAM 机制**：\n   - host-local：节点级，每节点独立 IP 池\n   - whereabouts：集群级，跨节点 IP 管理\n\n5. **多网卡方案**：\n   - Multus CNI 编排多网卡\n   - Network Attachment Definition 定义额外网卡\n   - SBR 保证多网卡响应路径正确\n\n> [!TIP]\n> **学习建议**：\n>\n> 1. 在实际集群中查看 `/etc/cni/net.d/` 和 `/opt/cni/bin/` 目录\n> 2. 理解 CNI 配置文件中的 plugins 链式调用\n> 3. 尝试使用 Multus 配置多网卡 Pod\n> 4. 出现网络问题时，首先检查 CNI 配置文件和二进制\n\n> [!IMPORTANT]\n> **CNI 排障核心思路**：\n>\n> 1. 配置文件存在吗？（`/etc/cni/net.d/`）\n> 2. 二进制存在吗？（`/opt/cni/bin/`）\n> 3. 配置文件内容正确吗？（type、ipam 等字段）\n> 4. IP 池是否耗尽？（检查 IPAM 存储）\n\n---", "subs": ["🎯 学习目标", "6.1 CNI 概述", "6.2 CNI 插件分类", "6.3 CNI 核心目录结构", "6.4 CNI 配置文件详解", "6.5 IPAM 工作机制", "6.6 多网卡方案（Multus）", "6.7 Source Based Routing (SBR)", "6.8 Pod 网络配置流程", "6.9 常见问题与排障", "📝 章节小结"]}]}, {"title": "第二部分：Cilium-CNI", "sections": []}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Linux 底层原理学习笔记 · 第五册：进程间通信 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Linux 底层原理学习笔记 · 第五册：进程间通信</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Linux 底层原理学习笔记 · 第五册：进程间通信", "intro": "", "parts": [{"title": "第7章 进程间通信（一）：IPC概述与信号机制", "sections": [{"title": "7.1 进程间通信概述", "content": "> **核心思想**：进程间通信提供4种模式，从简单的管道到复杂的共享内存，以及紧急通知机制——信号。\n\n\n#### 7.1.1 为什么需要IPC\n\n**问题**：进程间相互隔离，如何协作？\n\n**类比**：\n\n- 小项目：单个项目组独立完成\n- 大项目：多个项目组协作\n\n**解决方案**：进程间通信（IPC，Inter-Process Communication）\n\n#### 7.1.2 四种IPC模式\n\n```mermaid\ngraph TD\n    A[进程间通信IPC] --> B[管道模型]\n    A --> C[消息队列模型]\n    A --> D[共享内存+信号量]\n    A --> E[信号模型]\n    \n    B --> B1[类比：瀑布开发]\n    C --> C1[类比：邮件沟通]\n    D --> D1[类比：会议室协作]\n    E --> E1[类比：应急预案]\n    \n    style B fill:#c8e6c9\n    style C fill:#fff9c4\n    style D fill:#ffcdd2\n    style E fill:#e1bee7\n```\n\n---", "subs": ["7.1.1 为什么需要IPC", "7.1.2 四种IPC模式"]}, {"title": "7.2 管道模型（Pipe）", "content": "#### 7.2.1 管道概念\n\n**定义**：单向传输数据的机制\n\n**特点**：\n\n- 一端写入，另一端读出\n- 缓存区\n- 单向通信（双向需要两个管道）\n\n**类比**：瀑布开发模型（上一阶段完成→交给下一阶段）\n\n#### 7.2.2 匿名管道\n\n**示例**：\n\n```bash\nps -ef | grep keyword | awk '{print $2}' | xargs kill -9\n```\n\n**特点**：\n\n- 符号：`|`\n- 自动创建、自动销毁\n- 用户无感知\n\n#### 7.2.3 命名管道（FIFO）\n\n**创建**：\n\n```bash\nmkfifo hello\nls -l\n# prw-r--r-- 1 root root 0 hello\n```\n\n**使用**：\n\n```bash\n# 终端1：写入（会阻塞）\necho \"hello world\" > hello\n\n# 终端2：读取\ncat < hello\n# hello world\n```\n\n**特点**：\n\n- 以文件形式存在\n- 类型标识：`p`（pipe）\n- 写入未读取完毕前，写入端阻塞\n\n#### 7.2.4 管道的局限性\n\n- 效率较低\n- 不适合频繁交换数据\n- 类似瀑布模型，团队无法频繁沟通\n\n---", "subs": ["7.2.1 管道概念", "7.2.2 匿名管道", "7.2.3 命名管道（FIFO）", "7.2.4 管道的局限性"]}, {"title": "7.3 消息队列模型（Message Queue）", "content": "#### 7.3.1 消息队列概念\n\n**类比**：邮件系统\n\n**特点**：\n\n- 分成独立的数据单元（消息体）\n- 固定大小的存储块\n- 字节流不连续\n- 支持频繁通信\n\n#### 7.3.2 消息结构\n\n```c\nstruct msg_buffer {\n    long mtype;       // 消息类型\n    char mtext[1024]; // 消息正文\n};\n```\n\n#### 7.3.3 创建消息队列\n\n```c\n#include <sys/msg.h>\n\nint main() {\n    int messagequeueid;\n    key_t key;\n    \n    // 生成唯一key\n    if ((key = ftok(\"/root/messagequeue/messagequeuekey\", 1024)) < 0) {\n        perror(\"ftok error\");\n        exit(1);\n    }\n    \n    // 创建消息队列\n    if ((messagequeueid = msgget(key, IPC_CREAT|0777)) == -1) {\n        perror(\"msgget error\");\n        exit(1);\n    }\n    \n    printf(\"Message queue id: %d.\\n\", messagequeueid);\n}\n```\n\n**key的作用**：\n\n- 唯一标识消息队列\n- 通过ftok关联文件inode生成\n- 属于System V IPC体系\n\n#### 7.3.4 System V IPC命令\n\n```bash\n# 查看消息队列\nipcs -q\n\n# 创建IPC对象\nipcmk\n\n# 删除IPC对象\nipcrm\n```\n\n#### 7.3.5 发送消息\n\n```c\n// 发送消息\nmsgsnd(messagequeueid, &buffer, len, IPC_NOWAIT);\n```\n\n#### 7.3.6 接收消息\n\n```c\n// 接收消息\nmsgrcv(messagequeueid, &buffer, 1024, type, IPC_NOWAIT);\n```\n\n---", "subs": ["7.3.1 消息队列概念", "7.3.2 消息结构", "7.3.3 创建消息队列", "7.3.4 System V IPC命令", "7.3.5 发送消息", "7.3.6 接收消息"]}, {"title": "7.4 共享内存与信号量", "content": "#### 7.4.1 共享内存概念\n\n**类比**：共享会议室\n\n**问题**：进程间内存隔离\n\n**解决方案**：映射到相同物理内存\n\n```\n进程A虚拟地址空间\n  ├─ 0x1000 → 物理内存0x5000（共享区域）\n  \n进程B虚拟地址空间\n  ├─ 0x2000 → 物理内存0x5000（相同共享区域）\n```\n\n#### 7.4.2 共享内存API\n\n```c\n// 创建共享内存\nint shmget(key_t key, size_t size, int flag);\n\n// 挂载到进程地址空间\nvoid *shmat(int shm_id, const void *addr, int flag);\n\n// 解除绑定\nint shmdt(void *addr);\n\n// 删除共享内存\nint shmctl(int shm_id, int cmd, struct shmid_ds *buf);\n```\n\n**查看**：\n\n```bash\nipcs --shmems\n```\n\n#### 7.4.3 信号量（Semaphore）\n\n**问题**：共享资源的并发访问冲突\n\n**解决方案**：信号量计数器\n\n**操作**：\n\n- **P操作**：申请资源（-N）\n- **V操作**：归还资源（+M）\n\n**原子性**：同一资源不能同时借给两个进程\n\n**示例**（借钱类比）：\n\n```\n初始：信号量 = 100元\nA借80元：P(80) → 信号量 = 20元\nB借50元：P(50) → 阻塞等待\nA还30元：V(30) → 信号量 = 50元\nB借50元：P(50) → 成功，信号量 = 0元\n```\n\n#### 7.4.4 信号量API\n\n```c\n// 创建信号量组\nint semget(key_t key, int num_sems, int sem_flags);\n\n// 初始化信号量\nint semctl(int semid, int semnum, int cmd, union semun args);\n\nunion semun {\n    int val;                    // 资源数量\n    struct semid_ds *buf;\n    unsigned short int *array;\n};\n\n// P/V操作\nint semop(int semid, struct sembuf semoparray[], size_t numops);\n\nstruct sembuf {\n    short sem_num;   // 信号量序号\n    short sem_op;    // <0为P操作，>0为V操作\n    short sem_flg;   // IPC_NOWAIT, SEM_UNDO\n};\n```\n\n---", "subs": ["7.4.1 共享内存概念", "7.4.2 共享内存API", "7.4.3 信号量（Semaphore）", "7.4.4 信号量API"]}, {"title": "7.5 信号机制（Signal）", "content": "#### 7.5.1 信号概述\n\n**类比**：应急预案\n\n**场景**：\n\n- 线上系统故障\n- 7×24小时告警\n- 紧急通知机制\n\n**特点**：\n\n- 用代号（数字）表示事件\n- 无复杂数据结构\n- 异步通知\n\n#### 7.5.2 信号类型\n\n```bash\nkill -l\n# 1) SIGHUP    2) SIGINT    3) SIGQUIT   4) SIGILL\n# 5) SIGTRAP   6) SIGABRT   7) SIGBUS    8) SIGFPE\n# 9) SIGKILL  10) SIGUSR1  11) SIGSEGV  12) SIGUSR2\n# ...\n# 64) SIGRTMAX\n```\n\n**查看详细信息**：\n\n```bash\nman 7 signal\n```\n\n**常见信号**：\n\n| 信号 | 值 | 默认操作 | 说明 |\n|-----|----|---------|----|\n| SIGHUP | 1 | Term | 终端挂起或控制进程死亡 |\n| SIGINT | 2 | Term | Ctrl+C中断 |\n| SIGQUIT | 3 | Core | Ctrl+\\退出 |\n| SIGKILL | 9 | Term | 强制杀死（不可捕获） |\n| SIGSEGV | 11 | Core | 非法内存访问 |\n| SIGPIPE | 13 | Term | 写入无读者的管道 |\n| SIGALRM | 14 | Term | 定时器信号 |\n| SIGTERM | 15 | Term | 终止信号 |\n| SIGCHLD | 17 | Ign | 子进程状态改变 |\n| SIGSTOP | 19 | Stop | 停止进程（不可捕获） |\n\n#### 7.5.3 信号处理方式\n\n1. **执行默认操作**（Term/Core/Ign/Stop）\n2. **捕捉信号**（注册信号处理函数）\n3. **忽略信号**（除了SIGKILL和SIGSTOP）\n\n---", "subs": ["7.5.1 信号概述", "7.5.2 信号类型", "7.5.3 信号处理方式"]}, {"title": "7.6 注册信号处理函数", "content": "#### 7.6.1 signal函数（不推荐）\n\n```c\ntypedef void (*sighandler_t)(int);\nsighandler_t signal(int signum, sighandler_t handler);\n```\n\n**问题**：\n\n- 参数无法细致控制\n- 不同实现行为不同\n- SA_ONESHOT：仅生效一次\n- SA_NOMASK：可被中断\n\n#### 7.6.2 sigaction函数（推荐）\n\n```c\nint sigaction(int signum, const struct sigaction *act,\n              struct sigaction *oldact);\n\nstruct sigaction {\n    __sighandler_t sa_handler;     // 信号处理函数\n    unsigned long sa_flags;         // 标志位\n    __sigrestore_t sa_restorer;    // 恢复函数\n    sigset_t sa_mask;              // 信号屏蔽集\n};\n```\n\n**关键标志位**：\n\n- **SA_RESTART**：系统调用被中断后自动重启\n- **SA_INTERRUPT**：系统调用被中断后返回-EINTR\n- **SA_NOMASK**：信号处理器可被中断\n- **SA_ONESHOT**：仅生效一次\n\n#### 7.6.3 sigaction调用流程\n\n```\nsigaction (glibc)\n  ↓\n__sigaction\n  ↓\n__libc_sigaction\n  ↓\nrt_sigaction (系统调用)\n  ↓\ndo_sigaction\n  ↓\n设置 current->sighand->action[sig-1]\n```\n\n#### 7.6.4 内核实现\n\n```c\nint do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact) {\n    struct task_struct *p = current;\n    struct k_sigaction *k;\n    \n    k = &p->sighand->action[sig-1];\n    \n    spin_lock_irq(&p->sighand->siglock);\n    if (oact)\n        *oact = *k;\n    if (act) {\n        // 清除SIGKILL和SIGSTOP\n        sigdelsetmask(&act->sa.sa_mask,\n                     sigmask(SIGKILL) | sigmask(SIGSTOP));\n        *k = *act;\n    }\n    spin_unlock_irq(&p->sighand->siglock);\n    \n    return 0;\n}\n```\n\n**关键数据结构**：\n\n```\ntask_struct\n  └─ sighand (struct sighand_struct *)\n       └─ action[64] (struct k_sigaction数组)\n            └─ 下标为信号编号\n```\n\n---", "subs": ["7.6.1 signal函数（不推荐）", "7.6.2 sigaction函数（推荐）", "7.6.3 sigaction调用流程", "7.6.4 内核实现"]}, {"title": "7.7 信号的发送", "content": "#### 7.7.1 信号产生的方式\n\n1. **键盘组合键**：\n   - Ctrl+C → SIGINT\n   - Ctrl+Z → SIGTSTP\n\n2. **硬件异常**：\n   - 除以0 → SIGFPE\n   - 非法内存访问 → SIGSEGV\n\n3. **内核发送**：\n   - 写入已关闭管道 → SIGPIPE\n   - 子进程退出 → SIGCHLD\n\n4. **命令/系统调用**：\n   - kill命令\n   - kill/tkill/tgkill系统调用\n\n#### 7.7.2 发送信号的调用链\n\n```\nkill系统调用\n  ↓\nkill_something_info\n  ↓\nkill_pid_info\n  ↓\ngroup_send_sig_info\n  ↓\ndo_send_sig_info\n  ↓\nsend_signal\n  ↓\n__send_signal\n```\n\n#### 7.7.3 __send_signal核心逻辑\n\n```c\nstatic int __send_signal(int sig, struct siginfo *info, struct task_struct *t,\n                        int group, int from_ancestor_ns) {\n    struct sigpending *pending;\n    struct sigqueue *q;\n    \n    // 1. 确定sigpending\n    pending = group ? &t->signal->shared_pending : &t->pending;\n    \n    // 2. 检查是否丢失（<32的信号）\n    if (legacy_queue(pending, sig))\n        goto ret;\n    \n    // 3. 分配sigqueue\n    q = __sigqueue_alloc(sig, t, GFP_ATOMIC, override_rlimit);\n    \n    if (q) {\n        // 4. 加入链表\n        list_add_tail(&q->list, &pending->list);\n        \n        // 5. 设置信号信息\n        q->info.si_signo = sig;\n        q->info.si_code = SI_USER;\n        // ...\n    }\n    \n    // 6. 设置信号集\n    sigaddset(&pending->signal, sig);\n    \n    // 7. 唤醒进程处理信号\n    complete_signal(sig, t, group);\n    \nret:\n    return ret;\n}\n```\n\n#### 7.7.4 sigpending结构\n\n```c\nstruct sigpending {\n    struct list_head list;  // sigqueue链表\n    sigset_t signal;        // 信号集合\n};\n```\n\n**两种表示方式**：\n\n- **sigset_t**：位图，快速判断是否有某信号\n- **list**：sigqueue链表，保存信号详细信息\n\n#### 7.7.5 可靠信号 vs 不可靠信号\n\n**不可靠信号（< 32）**：\n\n- 使用sigset_t标识\n- 重复发送会丢失\n- 信号处理函数未执行时，后续相同信号被忽略\n\n**可靠信号（>= 32，实时信号）**：\n\n- 使用sigqueue链表\n- 不会丢失\n- 每个信号都会被处理\n\n**示例**：\n\n```\n发送100个SIGUSR1（信号10）:\n  - 如果处理不及时，可能只处理1个\n  - 因为sigset_t只记录\"有SIGUSR1\"\n\n发送100个SIGRTMIN（信号34）:\n  - 全部加入链表\n  - 全部会被处理\n```\n\n#### 7.7.6 complete_signal唤醒进程\n\n```c\nstatic void complete_signal(int sig, struct task_struct *p, int group) {\n    struct task_struct *t;\n    \n    // 找一个线程处理信号\n    if (wants_signal(sig, p))\n        t = p;\n    else {\n        t = signal->curr_target;\n        while (!wants_signal(sig, t)) {\n            t = next_thread(t);\n            if (t == signal->curr_target)\n                return;\n        }\n        signal->curr_target = t;\n    }\n    \n    // 唤醒线程\n    signal_wake_up(t, sig == SIGKILL);\n}\n```\n\n**signal_wake_up**：\n\n```c\nvoid signal_wake_up_state(struct task_struct *t, unsigned int state) {\n    // 1. 设置TIF_SIGPENDING标志\n    set_tsk_thread_flag(t, TIF_SIGPENDING);\n    \n    // 2. 唤醒进程\n    if (!wake_up_state(t, state | TASK_INTERRUPTIBLE))\n        kick_process(t);\n}\n```\n\n---", "subs": ["7.7.1 信号产生的方式", "7.7.2 发送信号的调用链", "7.7.3 __send_signal核心逻辑", "7.7.4 sigpending结构", "7.7.5 可靠信号 vs 不可靠信号", "7.7.6 complete_signal唤醒进程"]}, {"title": "7.8 信号的处理", "content": "#### 7.8.1 处理时机\n\n**时机**：从内核态返回用户态时\n\n- 系统调用返回\n- 中断处理返回\n\n**入口**：`exit_to_usermode_loop`\n\n```c\nstatic void exit_to_usermode_loop(struct pt_regs *regs, u32 cached_flags) {\n    while (true) {\n        // 调度\n        if (cached_flags & _TIF_NEED_RESCHED)\n            schedule();\n        \n        // 处理信号\n        if (cached_flags & _TIF_SIGPENDING)\n            do_signal(regs);\n        \n        if (!(cached_flags & EXIT_TO_USERMODE_LOOP_FLAGS))\n            break;\n    }\n}\n```\n\n#### 7.8.2 do_signal函数\n\n```c\nvoid do_signal(struct pt_regs *regs) {\n    struct ksignal ksig;\n    \n    if (get_signal(&ksig)) {\n        // 处理信号\n        handle_signal(&ksig, regs);\n        return;\n    }\n    \n    // 处理系统调用重启\n    if (syscall_get_nr(current, regs) >= 0) {\n        switch (syscall_get_error(current, regs)) {\n        case -ERESTARTNOHAND:\n        case -ERESTARTSYS:\n        case -ERESTARTNOINTR:\n            regs->ax = regs->orig_ax;\n            regs->ip -= 2;\n            break;\n        case -ERESTART_RESTARTBLOCK:\n            regs->ax = get_nr_restart_syscall(regs);\n            regs->ip -= 2;\n            break;\n        }\n    }\n    \n    restore_saved_sigmask();\n}\n```\n\n#### 7.8.3 handle_signal核心流程\n\n**问题**：信号处理函数在用户态，如何调用？\n\n**挑战**：\n\n- 进程在Line A执行系统调用\n- 内核保存Line A到pt_regs\n- 返回用户态应该回到Line A\n- 但要先执行信号处理函数\n\n**解决方案**：修改pt_regs，返回到信号处理函数\n\n```c\nstatic void handle_signal(struct ksignal *ksig, struct pt_regs *regs) {\n    // 1. 处理系统调用重启逻辑\n    if (syscall_get_nr(current, regs) >= 0) {\n        switch (syscall_get_error(current, regs)) {\n        case -ERESTARTSYS:\n            if (!(ksig->ka.sa.sa_flags & SA_RESTART)) {\n                regs->ax = -EINTR;\n                break;\n            }\n        case -ERESTARTNOINTR:\n            regs->ax = regs->orig_ax;\n            regs->ip -= 2;\n            break;\n        }\n    }\n    \n    // 2. 设置信号处理函数栈帧\n    failed = (setup_rt_frame(ksig, regs) < 0);\n    \n    // 3. 屏蔽信号\n    signal_setup_done(failed, ksig, stepping);\n}\n```\n\n#### 7.8.4 setup_rt_frame详解\n\n**作用**：构造用户态栈帧，返回时执行信号处理函数\n\n```c\nstatic int setup_rt_frame(struct ksignal *ksig, struct pt_regs *regs) {\n    struct rt_sigframe __user *frame;\n    \n    // 1. 在用户栈上分配空间\n    frame = get_sigframe(&ksig->ka, regs, sizeof(struct rt_sigframe), &fp);\n    \n    // 2. 保存当前寄存器状态\n    if (copy_siginfo_to_user(&frame->info, &ksig->info))\n        return -EFAULT;\n    \n    // 3. 构造ucontext\n    if (setup_sigcontext(&frame->uc.uc_mcontext, fp, regs, set->sig[0]))\n        return -EFAULT;\n    \n    // 4. 设置恢复函数\n    if (ksig->ka.sa.sa_flags & SA_RESTORER)\n        restorer = ksig->ka.sa.sa_restorer;\n    else\n        restorer = current->mm->context.vdso + selected_vdso32->sym___kernel_rt_sigreturn;\n    \n    // 5. 修改pt_regs：\n    //    - ip指向信号处理函数\n    //    - sp指向构造的栈帧\n    regs->di = ksig->sig;                  // 第1个参数：信号编号\n    regs->ax = 0;\n    regs->si = (unsigned long)&frame->info; // 第2个参数：siginfo\n    regs->dx = (unsigned long)&frame->uc;   // 第3个参数：ucontext\n    regs->ip = (unsigned long)ksig->ka.sa.sa_handler; // 信号处理函数地址\n    regs->sp = (unsigned long)frame;        // 用户栈指针\n    regs->cs = __USER_CS;\n    regs->ss = __USER_DS;\n    \n    return 0;\n}\n```\n\n**用户栈布局**：\n\n```\n用户栈（高地址→低地址）\n  ├─ 原始栈内容\n  ├─ rt_sigframe\n  │   ├─ sig (信号编号)\n  │   ├─ info (siginfo_t)\n  │   ├─ uc (ucontext_t)\n  │   │   ├─ uc_mcontext (保存的寄存器)\n  │   │   └─ ...\n  │   └─ restorer (返回地址)\n  └─ (新的sp指向这里)\n```\n\n#### 7.8.5 信号处理完整流程\n\n```mermaid\ngraph TD\n    A[用户态Line A] -->|系统调用| B[内核态]\n    B -->|保存pt_regs| C[处理系统调用]\n    C -->|信号到来| D[do_send_sig_info]\n    D --> E[设置TIF_SIGPENDING]\n    E --> F[complete_signal唤醒进程]\n    F --> G[exit_to_usermode_loop]\n    G -->|检查TIF_SIGPENDING| H[do_signal]\n    H --> I[handle_signal]\n    I --> J[setup_rt_frame]\n    J -->|修改pt_regs.ip| K[用户态信号处理函数]\n    K -->|执行完毕| L[sys_rt_sigreturn]\n    L -->|恢复pt_regs| M[用户态Line A+1]\n    \n    style E fill:#c8e6c9\n    style J fill:#fff9c4\n    style K fill:#ffcdd2\n```\n\n#### 7.8.6 信号处理函数返回\n\n**问题**：信号处理函数执行完后如何返回？\n\n**解决方案**：`sys_rt_sigreturn`系统调用\n\n```c\nSYSCALL_DEFINE0(rt_sigreturn) {\n    struct pt_regs *regs = current_pt_regs();\n    struct rt_sigframe __user *frame;\n    \n    // 1. 从用户栈获取rt_sigframe\n    frame = (struct rt_sigframe __user *)(regs->sp - sizeof(long));\n    \n    // 2. 恢复信号屏蔽字\n    if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))\n        goto badframe;\n    set_current_blocked(&set);\n    \n    // 3. 恢复寄存器状态\n    if (restore_sigcontext(regs, &frame->uc.uc_mcontext, &ax))\n        goto badframe;\n    \n    // 4. 返回用户态Line A+1继续执行\n    return ax;\n}\n```\n\n---", "subs": ["7.8.1 处理时机", "7.8.2 do_signal函数", "7.8.3 handle_signal核心流程", "7.8.4 setup_rt_frame详解", "7.8.5 信号处理完整流程", "7.8.6 信号处理函数返回"]}, {"title": "7.9 总结", "content": "#### 7.9.1 IPC四种模式对比\n\n| 模式 | 类比 | 特点 | 适用场景 |\n|-----|------|------|---------|\n| 管道 | 瀑布开发 | 单向、简单、效率低 | 命令行管道 |\n| 消息队列 | 邮件 | 双向、频繁、有格式 | 少用（用户级消息队列更好） |\n| 共享内存+信号量 | 会议室 | 高效、复杂、需同步 | C语言开源软件常用 |\n| 信号 | 应急预案 | 异步、紧急、无数据 | 常用、机制复杂 |\n\n#### 7.9.2 信号机制核心流程\n\n**注册阶段**：\n\n```\nsigaction(glibc) → rt_sigaction(syscall) → do_sigaction\n  → 设置 task_struct->sighand->action[sig]\n```\n\n**发送阶段**：\n\n```\nkill → do_send_sig_info → __send_signal\n  → 加入sigpending链表\n  → 设置TIF_SIGPENDING\n  → signal_wake_up唤醒进程\n```\n\n**处理阶段**：\n\n```\nexit_to_usermode_loop → do_signal → handle_signal\n  → setup_rt_frame（修改pt_regs.ip）\n  → 返回用户态执行信号处理函数\n  → sys_rt_sigreturn（恢复pt_regs）\n  → 继续执行原来的代码\n```\n\n#### 7.9.3 重要命令\n\n```bash\n# IPC查看\nipcs -q       # 消息队列\nipcs --shmems # 共享内存\nipcs -s       # 信号量\n\n# IPC删除\nipcrm -q <id>  # 删除消息队列\nipcrm -m <id>  # 删除共享内存\nipcrm -s <id>  # 删除信号量\n\n# 信号\nkill -l        # 列出所有信号\nman 7 signal   # 查看信号手册\nkill -9 <pid>  # 发送SIGKILL\nkill -SIGUSR1 <pid>  # 发送自定义信号\n```\n\n#### 7.9.4 关键数据结构\n\n```\n进程/线程级别：\ntask_struct\n  ├─ signal (struct signal_struct *)\n  │   └─ shared_pending (整个进程共享)\n  ├─ pending (线程独有)\n  └─ sighand (struct sighand_struct *)\n       └─ action[64] (信号处理函数数组)\n\n信号队列：\nstruct sigpending {\n    struct list_head list;  // sigqueue链表（可靠信号）\n    sigset_t signal;        // 信号集（不可靠信号）\n};\n\nstruct sigqueue {\n    struct list_head list;\n    struct siginfo info;\n};\n```\n\n---\n\n**本节完成**：第7章第一部分（IPC概述与信号机制）已讲解完毕。\n\n**内容回顾**：\n\n- ✅ IPC四种模式（管道、消息队列、共享内存、信号）\n- ✅ 管道的两种类型\n- ✅ 消息队列API\n- ✅ 共享内存与信号量概念\n- ✅ 信号机制完整流程（注册、发送、处理）\n\n**下一节预告**：将讲解管道的内核实现。\n\n---", "subs": ["7.9.1 IPC四种模式对比", "7.9.2 信号机制核心流程", "7.9.3 重要命令", "7.9.4 关键数据结构"]}, {"title": "7.10 管道的内核实现", "content": "#### 7.10.1 创建匿名管道\n\n**系统调用**：\n\n```c\nint pipe(int fd[2]);\n```\n\n**返回值**：\n\n- `fd[0]`：读取端\n- `fd[1]`：写入端\n\n**内核实现**：\n\n```c\nSYSCALL_DEFINE1(pipe, int __user *, fildes) {\n    return sys_pipe2(fildes, 0);\n}\n\nSYSCALL_DEFINE2(pipe2, int __user *, fildes, int, flags) {\n    struct file *files[2];\n    int fd[2];\n    int error;\n    \n    // 创建管道文件\n    error = __do_pipe_flags(fd, files, flags);\n    if (!error) {\n        // 复制fd到用户空间\n        if (unlikely(copy_to_user(fildes, fd, sizeof(fd)))) {\n            error = -EFAULT;\n        } else {\n            // 安装文件描述符\n            fd_install(fd[0], files[0]);\n            fd_install(fd[1], files[1]);\n        }\n    }\n    return error;\n}\n```\n\n#### 7.10.2 __do_pipe_flags\n\n```c\nstatic int __do_pipe_flags(int *fd, struct file **files, int flags) {\n    int error;\n    int fdr, fdw;\n    \n    // 1. 创建管道文件\n    error = create_pipe_files(files, flags);\n    \n    // 2. 获取读端fd\n    error = get_unused_fd_flags(flags);\n    fdr = error;\n    \n    // 3. 获取写端fd\n    error = get_unused_fd_flags(flags);\n    fdw = error;\n    \n    fd[0] = fdr;\n    fd[1] = fdw;\n    \n    return 0;\n}\n```\n\n#### 7.10.3 pipefs文件系统\n\n**文件系统定义**：\n\n```c\nstatic struct file_system_type pipefs_type = {\n    .name = \"pipefs\",\n    .mount = pipefs_mount,\n    .kill_sb = kill_anon_super,\n};\n\nstatic int __init init_pipe_fs(void) {\n    int err = register_filesystem(&pipefs_type);\n    if (!err) {\n        pipe_mnt = kern_mount(&pipefs_type);\n    }\n    return err;\n}\n```\n\n**关键点**：\n\n- pipefs是一个特殊的文件系统\n- 仅内核使用，用户不可见\n- 类似bdev文件系统\n\n#### 7.10.4 create_pipe_files\n\n```c\nint create_pipe_files(struct file **res, int flags) {\n    int err;\n    struct inode *inode = get_pipe_inode();\n    struct file *f;\n    struct path path;\n    \n    // 1. 分配dentry\n    path.dentry = d_alloc_pseudo(pipe_mnt->mnt_sb, &empty_name);\n    path.mnt = mntget(pipe_mnt);\n    d_instantiate(path.dentry, inode);\n    \n    // 2. 创建写端文件\n    f = alloc_file(&path, FMODE_WRITE, &pipefifo_fops);\n    f->f_flags = O_WRONLY | (flags & (O_NONBLOCK | O_DIRECT));\n    f->private_data = inode->i_pipe;\n    \n    // 3. 创建读端文件\n    res[0] = alloc_file(&path, FMODE_READ, &pipefifo_fops);\n    path_get(&path);\n    res[0]->private_data = inode->i_pipe;\n    res[0]->f_flags = O_RDONLY | (flags & O_NONBLOCK);\n    \n    res[1] = f;\n    return 0;\n}\n```\n\n**重点**：\n\n- 读端和写端共享同一个inode\n- `private_data`指向`pipe_inode_info`\n- 操作函数都是`pipefifo_fops`\n\n#### 7.10.5 get_pipe_inode\n\n```c\nstatic struct inode * get_pipe_inode(void) {\n    struct inode *inode = new_inode_pseudo(pipe_mnt->mnt_sb);\n    struct pipe_inode_info *pipe;\n    \n    inode->i_ino = get_next_ino();\n    \n    // 分配pipe_inode_info\n    pipe = alloc_pipe_info();\n    \n    inode->i_pipe = pipe;\n    pipe->files = 2;\n    pipe->readers = pipe->writers = 1;\n    inode->i_fop = &pipefifo_fops;\n    \n    inode->i_state = I_DIRTY;\n    inode->i_mode = S_IFIFO | S_IRUSR | S_IWUSR;\n    inode->i_uid = current_fsuid();\n    inode->i_gid = current_fsgid();\n    inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(inode);\n    \n    return inode;\n}\n```\n\n**核心数据结构**：\n\n```c\nstruct pipe_inode_info {\n    struct pipe_buffer *bufs;  // 缓冲区数组\n    unsigned int nrbufs;        // 当前使用的缓冲区数量\n    unsigned int curbuf;        // 当前缓冲区索引\n    unsigned int buffers;       // 缓冲区总数\n    unsigned int readers;       // 读者数量\n    unsigned int writers;       // 写者数量\n    unsigned int files;         // 文件数量\n    unsigned int waiting_writers;\n    unsigned int r_counter;\n    unsigned int w_counter;\n    struct page *tmp_page;\n    struct fasync_struct *fasync_readers;\n    struct fasync_struct *fasync_writers;\n};\n```\n\n**管道本质**：\n\n- 内核中的一串缓存（pipe_buffer数组）\n- 循环队列结构\n\n#### 7.10.6 pipefifo_fops\n\n```c\nconst struct file_operations pipefifo_fops = {\n    .open = fifo_open,\n    .llseek = no_llseek,\n    .read_iter = pipe_read,\n    .write_iter = pipe_write,\n    .poll = pipe_poll,\n    .unlocked_ioctl = pipe_ioctl,\n    .release = pipe_release,\n    .fasync = pipe_fasync,\n};\n```\n\n---", "subs": ["7.10.1 创建匿名管道", "7.10.2 __do_pipe_flags", "7.10.3 pipefs文件系统", "7.10.4 create_pipe_files", "7.10.5 get_pipe_inode", "7.10.6 pipefifo_fops"]}, {"title": "7.11 父子进程间的管道通信", "content": "#### 7.11.1 fork后fd的复制\n\n**关键机制**：\n\n- fork复制父进程的`files_struct`\n- fd数组复制一份\n- 但fd指向的`struct file`是同一个\n\n**结果**：\n\n```\n父进程                    子进程\nfiles_struct             files_struct\n  ├─ fd[0] ───┐           ├─ fd[0] ───┐\n  │           │           │           │\n  └─ fd[1] ───┤           └─ fd[1] ───┤\n              ↓                       ↓\n         struct file[0] (同一个对象，读端)\n         struct file[1] (同一个对象，写端)\n              ↓\n         pipe_inode_info\n              └─ pipe_buffer[]\n```\n\n#### 7.11.2 典型使用方式\n\n```c\n#include <unistd.h>\n#include <stdio.h>\n#include <string.h>\n\nint main() {\n    int fds[2];\n    if (pipe(fds) == -1)\n        perror(\"pipe error\");\n    \n    pid_t pid = fork();\n    if (pid == -1)\n        perror(\"fork error\");\n    \n    if (pid == 0) {\n        // 子进程：关闭读端，保留写端\n        close(fds[0]);\n        char msg[] = \"hello world\";\n        write(fds[1], msg, strlen(msg) + 1);\n        close(fds[1]);\n        exit(0);\n    } else {\n        // 父进程：关闭写端，保留读端\n        close(fds[1]);\n        char msg[128];\n        read(fds[0], msg, 128);\n        close(fds[0]);\n        printf(\"message : %s\\n\", msg);\n        return 0;\n    }\n}\n```\n\n**重要操作**：\n\n- 子进程关闭`fds[0]`（读端）\n- 父进程关闭`fds[1]`（写端）\n- 避免混乱，确保单向通信\n\n---", "subs": ["7.11.1 fork后fd的复制", "7.11.2 典型使用方式"]}, {"title": "7.12 Shell管道的实现（A | B）", "content": "#### 7.12.1 场景说明\n\n命令：`ps -ef | grep systemd`\n\n**问题**：\n\n- A进程（ps）和B进程（grep）都是shell的子进程\n- A和B不是父子关系\n- 如何建立管道？\n\n#### 7.12.2 实现步骤\n\n```\n1. shell创建管道pipe(fds)\n   shell: fds[0](读), fds[1](写)\n\n2. shell fork出子进程A\n   shell: fds[0](读), fds[1](写)\n   A:     fds[0](读), fds[1](写)\n\n3. shell关闭fds[1]，A关闭fds[0]\n   shell: fds[0](读)\n   A:     fds[1](写)\n\n4. shell fork出子进程B\n   shell: fds[0](读)\n   A:     fds[1](写)\n   B:     fds[0](读) (从shell复制)\n\n5. shell关闭fds[0]\n   A:     fds[1](写)\n   B:     fds[0](读)\n```\n\n**结果**：\n\n- A进程写入端\n- B进程读取端\n- 管道建立成功\n\n#### 7.12.3 dup2系统调用\n\n**作用**：将文件描述符复制\n\n```c\nint dup2(int oldfd, int newfd);\n```\n\n**files_struct结构**：\n\n```c\nstruct files_struct {\n    struct file __rcu * fd_array[NR_OPEN_DEFAULT];\n};\n```\n\n**标准文件描述符**：\n\n- `STDIN_FILENO` (0)：标准输入\n- `STDOUT_FILENO` (1)：标准输出\n- `STDERR_FILENO` (2)：错误输出\n\n#### 7.12.4 重定向标准输入输出\n\n**A进程（ps）**：\n\n```c\ndup2(fds[1], STDOUT_FILENO);\n```\n\n- 将标准输出重定向到管道写端\n- 所有写入stdout的数据进入管道\n\n**B进程（grep）**：\n\n```c\ndup2(fds[0], STDIN_FILENO);\n```\n\n- 将标准输入重定向到管道读端\n- 所有从stdin读取的数据来自管道\n\n#### 7.12.5 完整示例\n\n```c\n#include <unistd.h>\n#include <stdio.h>\n\nint main() {\n    int fds[2];\n    if (pipe(fds) == -1)\n        perror(\"pipe error\");\n    \n    pid_t pid = fork();\n    if (pid == -1)\n        perror(\"fork error\");\n    \n    if (pid == 0) {\n        // 子进程A：执行ps -ef\n        dup2(fds[1], STDOUT_FILENO);\n        close(fds[1]);\n        close(fds[0]);\n        execlp(\"ps\", \"ps\", \"-ef\", NULL);\n    } else {\n        // 父进程：创建子进程B\n        pid_t pid2 = fork();\n        if (pid2 == 0) {\n            // 子进程B：执行grep systemd\n            dup2(fds[0], STDIN_FILENO);\n            close(fds[0]);\n            close(fds[1]);\n            execlp(\"grep\", \"grep\", \"systemd\", NULL);\n        } else {\n            // shell关闭管道\n            close(fds[0]);\n            close(fds[1]);\n            wait(NULL);\n            wait(NULL);\n        }\n    }\n    \n    return 0;\n}\n```\n\n---", "subs": ["7.12.1 场景说明", "7.12.2 实现步骤", "7.12.3 dup2系统调用", "7.12.4 重定向标准输入输出", "7.12.5 完整示例"]}, {"title": "7.13 命名管道（FIFO）", "content": "#### 7.13.1 mkfifo函数\n\n```c\nint mkfifo (const char *path, mode_t mode) {\n    dev_t dev = 0;\n    return __xmknod (_MKNOD_VER, path, mode | S_IFIFO, &dev);\n}\n\nint __xmknod (int vers, const char *path, mode_t mode, dev_t *dev) {\n    unsigned long long int k_dev;\n    k_dev = (*dev) & ((1ULL << 32) - 1);\n    \n    return INLINE_SYSCALL (mknodat, 4, AT_FDCWD, path,\n                          mode, (unsigned int) k_dev);\n}\n```\n\n**系统调用**：\n\n```c\nSYSCALL_DEFINE4(mknodat, int, dfd, const char __user *, filename,\n               umode_t, mode, unsigned, dev) {\n    struct dentry *dentry;\n    struct path path;\n    \n    // 创建dentry\n    dentry = user_path_create(dfd, filename, &path, lookup_flags);\n    \n    // 根据类型调用vfs_mknod\n    switch (mode & S_IFMT) {\n    case S_IFIFO:  // 命名管道\n    case S_IFSOCK: // socket\n        error = vfs_mknod(path.dentry->d_inode, dentry, mode, 0);\n        break;\n    case S_IFCHR:  // 字符设备\n    case S_IFBLK:  // 块设备\n        error = vfs_mknod(path.dentry->d_inode, dentry, mode,\n                         new_decode_dev(dev));\n        break;\n    }\n    \n    return error;\n}\n```\n\n#### 7.13.2 vfs_mknod for FIFO\n\n```c\nint vfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode, dev_t dev) {\n    // 调用文件系统的mknod操作\n    error = dir->i_op->mknod(dir, dentry, mode, dev);\n    \n    if (!error)\n        fsnotify_create(dir, dentry);\n    \n    return error;\n}\n```\n\n**创建位置**：\n\n- 在实际文件系统上（如ext4）\n- 不是在pipefs上\n- 持久化存储\n\n#### 7.13.3 匿名管道 vs 命名管道\n\n| 特性 | 匿名管道 | 命名管道 |\n|------|---------|---------|\n| 文件系统 | pipefs（内存） | ext4等（磁盘） |\n| 持久化 | 否 | 是 |\n| 创建方式 | pipe() | mkfifo() |\n| 使用场景 | 父子进程/相关进程 | 无关进程 |\n| 生命周期 | 进程退出销毁 | 手动删除 |\n| 可见性 | 不可见 | /path可见 |\n\n---", "subs": ["7.13.1 mkfifo函数", "7.13.2 vfs_mknod for FIFO", "7.13.3 匿名管道 vs 命名管道"]}, {"title": "7.14 总结", "content": "#### 7.14.1 管道创建流程\n\n```mermaid\ngraph TD\n    A[pipe系统调用] --> B[sys_pipe2]\n    B --> C[__do_pipe_flags]\n    C --> D[create_pipe_files]\n    D --> E[get_pipe_inode]\n    E --> F[new_inode_pseudo<br/>pipefs]\n    E --> G[alloc_pipe_info]\n    D --> H[alloc_file读端]\n    D --> I[alloc_file写端]\n    C --> J[get_unused_fd_flags]\n    C --> K[fd_install]\n    \n    style F fill:#c8e6c9\n    style G fill:#fff9c4\n    style H fill:#ffcdd2\n    style I fill:#ffcdd2\n```\n\n#### 7.14.2 Shell管道流程\n\n```\n┌─────────┐\n│  shell  │ 创建pipe(fds)\n└────┬────┘\n     │ fork\n     ├────────────┐\n     │            │\n┌────▼────┐  ┌───▼────┐\n│ shell   │  │   A    │\n│fds[0]读 │  │fds[1]写│\n│fds[1]写 │  │fds[0]读│\n└────┬────┘  └───┬────┘\n     │           │\n     │关闭fds[1] │关闭fds[0]\n     │           │\n     │ fork      │\n     ├───────┐   │\n     │       │   │\n┌────▼────┐ │   │\n│ shell   │ │   │\n│fds[0]读 │ │   │\n└────┬────┘ │   │\n     │   ┌──▼───▼────┐\n     │   │  B        │\n     │   │fds[0]读   │\n     │   └─────┬─────┘\n     │         │\n     │关闭fds[0]│dup2(fds[1],STDOUT)\n     │         │dup2(fds[0],STDIN)\n     ▼         ▼\n   管道：A写端 → B读端\n```\n\n#### 7.14.3 关键数据结构\n\n```\n进程\n  └─ files_struct\n       └─ fd_array[]\n            ├─ fd[0] → struct file (读端)\n            │            ├─ f_op = pipefifo_fops\n            │            └─ private_data\n            │                    ↓\n            └─ fd[1] → struct file (写端)\n                         ├─ f_op = pipefifo_fops\n                         └─ private_data\n                                  ↓\n                         pipe_inode_info\n                              └─ pipe_buffer[]\n                                   (循环队列缓冲区)\n```\n\n#### 7.14.4 重要命令\n\n```bash\n# 创建命名管道\nmkfifo mypipe\n\n# 写入\necho \"hello\" > mypipe &\n\n# 读取\ncat < mypipe\n\n# 删除\nrm mypipe\n\n# 查看管道状态\nls -l mypipe\n# prw-r--r-- 1 user group 0 mypipe\n```\n\n---\n\n**本节完成**：第7章第一部分全部完成（IPC概述+信号机制+管道实现）。\n\n**内容回顾**：\n\n- ✅ IPC四种模式\n- ✅ 信号机制完整流程\n- ✅ 管道的内核实现\n- ✅ pipefs文件系统\n- ✅ 父子进程通信\n- ✅ Shell管道（A|B）实现\n- ✅ 命名管道\n\n**下一章预告**：将讲解共享内存和IPC的详细实现。\n\n---", "subs": ["7.14.1 管道创建流程", "7.14.2 Shell管道流程", "7.14.3 关键数据结构", "7.14.4 重要命令"]}]}, {"title": "第7章 进程间通信（二）：共享内存与信号量", "sections": [{"title": "7.15 共享内存与信号量配合使用", "content": "> **核心思想**：共享内存提供高效的数据共享，信号量提供同步保护机制。\n\n\n#### 7.15.1 为什么需要配合使用\n\n**问题**：\n\n- 共享内存：高效但不安全\n- 多进程同时读写会冲突\n\n**解决方案**：\n\n- 共享内存：提供数据共享\n- 信号量：提供互斥保护\n\n**类比**：会议室协作\n\n- 共享内存 = 白板\n- 信号量 = 进入会议室的许可\n\n#### 7.15.2 共享数据结构\n\n```c\n#define MAX_NUM 128\n\nstruct shm_data {\n    int data[MAX_NUM];    // 数据数组\n    int datalength;       // 数据个数\n};\n```\n\n**设计原则**：\n\n- 将共享数据封装成struct\n- shmget的size = sizeof(struct)\n- 映射后强制类型转换\n\n---", "subs": ["7.15.1 为什么需要配合使用", "7.15.2 共享数据结构"]}, {"title": "7.16 共享内存API详解", "content": "#### 7.16.1 创建共享内存\n\n```c\nint get_shmid() {\n    int shmid;\n    key_t key;\n    \n    // 生成唯一key\n    if ((key = ftok(\"/root/sharememory/sharememorykey\", 1024)) < 0) {\n        perror(\"ftok error\");\n        return -1;\n    }\n    \n    // 创建共享内存\n    shmid = shmget(key, sizeof(struct shm_data), IPC_CREAT|0777);\n    return shmid;\n}\n```\n\n**参数说明**：\n\n- `key`：唯一标识（ftok生成）\n- `size`：共享内存大小\n- `shmflag`：IPC_CREAT | 权限\n\n#### 7.16.2 映射共享内存\n\n```c\nvoid *shmat(int shm_id, const void *addr, int shmflg);\n```\n\n**使用方式**：\n\n```c\nvoid *shm = shmat(shmid, (void*)0, 0);\nstruct shm_data *shared = (struct shm_data*)shm;\n```\n\n**关键点**：\n\n- `addr=NULL`：内核自动选择地址\n- 返回值：映射后的虚拟地址\n- 强制类型转换为`struct shm_data*`\n\n#### 7.16.3 解除映射\n\n```c\nint shmdt(const void *shmaddr);\n```\n\n---", "subs": ["7.16.1 创建共享内存", "7.16.2 映射共享内存", "7.16.3 解除映射"]}, {"title": "7.17 信号量API详解", "content": "#### 7.17.1 创建信号量集合\n\n```c\nint get_semaphoreid() {\n    int semid;\n    key_t key;\n    \n    // 生成唯一key\n    if ((key = ftok(\"/root/sharememory/semaphorekey\", 1024)) < 0) {\n        perror(\"ftok error\");\n        return -1;\n    }\n    \n    // 创建信号量集合（1个信号量）\n    semid = semget(key, 1, IPC_CREAT|0777);\n    return semid;\n}\n```\n\n**参数说明**：\n\n- `nsems`：信号量个数（这里为1）\n- 用于互斥时通常设置为1\n\n#### 7.17.2 初始化信号量\n\n```c\nunion semun {\n    int val;\n    struct semid_ds *buf;\n    unsigned short int *array;\n};\n\nint semaphore_init(int semid) {\n    union semun argument;\n    unsigned short values[1];\n    values[0] = 1;  // 初始化为1（表示可用）\n    argument.array = values;\n    return semctl(semid, 0, SETALL, argument);\n}\n```\n\n**关键点**：\n\n- 初始化为1表示资源可用\n- `semctl`的SETALL操作\n\n#### 7.17.3 P操作（申请资源）\n\n```c\nint semaphore_p(int semid) {\n    struct sembuf operations[1];\n    operations[0].sem_num = 0;     // 第0个信号量\n    operations[0].sem_op = -1;      // 减1\n    operations[0].sem_flg = SEM_UNDO;\n    return semop(semid, operations, 1);\n}\n```\n\n**语义**：\n\n- 信号量-1\n- 如果已经为0，则阻塞等待\n- SEM_UNDO：进程退出时自动撤销\n\n#### 7.17.4 V操作（释放资源）\n\n```c\nint semaphore_v(int semid) {\n    struct sembuf operations[1];\n    operations[0].sem_num = 0;     // 第0个信号量\n    operations[0].sem_op = 1;       // 加1\n    operations[0].sem_flg = SEM_UNDO;\n    return semop(semid, operations, 1);\n}\n```\n\n**语义**：\n\n- 信号量+1\n- 唤醒等待的进程\n\n---", "subs": ["7.17.1 创建信号量集合", "7.17.2 初始化信号量", "7.17.3 P操作（申请资源）", "7.17.4 V操作（释放资源）"]}, {"title": "7.18 生产者-消费者示例", "content": "#### 7.18.1 生产者代码\n\n```c\n#include \"share.h\"\n\nint main() {\n    void *shm = NULL;\n    struct shm_data *shared = NULL;\n    int shmid = get_shmid();\n    int semid = get_semaphoreid();\n    \n    // 映射共享内存\n    shm = shmat(shmid, (void*)0, 0);\n    shared = (struct shm_data*)shm;\n    memset(shared, 0, sizeof(struct shm_data));\n    \n    // 初始化信号量\n    semaphore_init(semid);\n    \n    while (1) {\n        semaphore_p(semid);  // P操作\n        \n        if (shared->datalength > 0) {\n            // 数据未被消费，释放信号量并等待\n            semaphore_v(semid);\n            sleep(1);\n        } else {\n            // 数据已被消费，生产新数据\n            printf(\"how many integers to calculate : \");\n            scanf(\"%d\", &shared->datalength);\n            \n            if (shared->datalength > MAX_NUM) {\n                perror(\"too many integers.\");\n                shared->datalength = 0;\n                semaphore_v(semid);\n                exit(1);\n            }\n            \n            for (int i = 0; i < shared->datalength; i++) {\n                printf(\"Input the %d integer : \", i);\n                scanf(\"%d\", &shared->data[i]);\n            }\n            \n            semaphore_v(semid);  // V操作\n        }\n    }\n}\n```\n\n#### 7.18.2 消费者代码\n\n```c\n#include \"share.h\"\n\nint main() {\n    void *shm = NULL;\n    struct shm_data *shared = NULL;\n    int shmid = get_shmid();\n    int semid = get_semaphoreid();\n    \n    // 映射共享内存\n    shm = shmat(shmid, (void*)0, 0);\n    shared = (struct shm_data*)shm;\n    \n    while (1) {\n        semaphore_p(semid);  // P操作\n        \n        if (shared->datalength > 0) {\n            // 有数据，进行消费\n            int sum = 0;\n            for (int i = 0; i < shared->datalength - 1; i++) {\n                printf(\"%d+\", shared->data[i]);\n                sum += shared->data[i];\n            }\n            printf(\"%d\", shared->data[shared->datalength - 1]);\n            sum += shared->data[shared->datalength - 1];\n            printf(\"=%d\\n\", sum);\n            \n            // 清空数据\n            memset(shared, 0, sizeof(struct shm_data));\n            semaphore_v(semid);  // V操作\n        } else {\n            // 无数据，等待\n            semaphore_v(semid);\n            printf(\"no tasks, waiting.\\n\");\n            sleep(1);\n        }\n    }\n}\n```\n\n#### 7.18.3 运行示例\n\n```bash\n# 生产者\n$ ./producer\nhow many integers to calculate : 2\nInput the 0 integer : 3\nInput the 1 integer : 4\nhow many integers to calculate : 4\nInput the 0 integer : 3\nInput the 1 integer : 4\nInput the 2 integer : 5\nInput the 3 integer : 6\n\n# 消费者\n$ ./consumer\n3+4=7\n3+4+5+6=18\n```\n\n#### 7.18.4 查看IPC对象\n\n```bash\n# 查看所有IPC对象\n$ ipcs\n\n------ Shared Memory Segments --------\nkey        shmid      owner      perms      bytes      nattch\n0x00016988 32768      root       777        516        0\n\n------ Semaphore Arrays --------\nkey        semid      owner      perms      nsems\n0x00016989 32768      root       777        1\n\n# 删除共享内存\n$ ipcrm -m 32768\n\n# 删除信号量\n$ ipcrm -s 32768\n```\n\n---", "subs": ["7.18.1 生产者代码", "7.18.2 消费者代码", "7.18.3 运行示例", "7.18.4 查看IPC对象"]}, {"title": "7.19 工作流程分析", "content": "#### 7.19.1 执行流程图\n\n```mermaid\ngraph TD\n    A[生产者启动] --> B[创建共享内存]\n    B --> C[创建信号量]\n    C --> D[初始化信号量=1]\n    \n    E[消费者启动] --> F[获取共享内存]\n    F --> G[获取信号量]\n    \n    D --> H{循环}\n    G --> I{循环}\n    \n    H --> J[P操作]\n    J --> K{datalength>0?}\n    K -->|是| L[V操作,sleep]\n    K -->|否| M[输入数据]\n    M --> N[V操作]\n    N --> H\n    L --> H\n    \n    I --> O[P操作]\n    O --> P{datalength>0?}\n    P -->|是| Q[计算求和]\n    Q --> R[清空数据]\n    R --> S[V操作]\n    P -->|否| T[V操作,sleep]\n    S --> I\n    T --> I\n    \n    style J fill:#c8e6c9\n    style O fill:#c8e6c9\n    style N fill:#fff9c4\n    style S fill:#fff9c4\n```\n\n#### 7.19.2 关键步骤\n\n**1. 初始化阶段**：\n\n```\n生产者：\n  shmget → shmat → semget → semctl(init=1)\n\n消费者：\n  shmget → shmat → semget\n```\n\n**2. 生产者处理**：\n\n```\nwhile (1) {\n    P操作 (信号量-1，获得锁)\n    if (有未处理数据) {\n        V操作 (释放锁)\n        等待\n    } else {\n        生产数据\n        V操作 (释放锁)\n    }\n}\n```\n\n**3. 消费者处理**：\n\n```\nwhile (1) {\n    P操作 (信号量-1，获得锁)\n    if (有数据) {\n        消费数据\n        清空数据\n        V操作 (释放锁)\n    } else {\n        V操作 (释放锁)\n        等待\n    }\n}\n```\n\n#### 7.19.3 同步机制\n\n**互斥访问**：\n\n```\n时间线：\nT1: 生产者 P操作成功（信号量1→0）\nT2: 消费者 P操作阻塞（信号量已为0）\nT3: 生产者写入数据\nT4: 生产者 V操作（信号量0→1）\nT5: 消费者 P操作成功（信号量1→0）\nT6: 消费者读取数据\nT7: 消费者 V操作（信号量0→1）\n```\n\n---", "subs": ["7.19.1 执行流程图", "7.19.2 关键步骤", "7.19.3 同步机制"]}, {"title": "7.20 内存映射关系", "content": "#### 7.20.1 虚拟地址空间映射\n\n```\n进程A（生产者）               进程B（消费者）\n虚拟地址空间                 虚拟地址空间\n  ├─ 0x7f1234000000          ├─ 0x7f5678000000\n  │  (shmat返回)             │  (shmat返回)\n  │                          │\n  ↓                          ↓\n共享物理内存页面\n  ├─ struct shm_data\n  │   ├─ data[128]\n  │   └─ datalength\n  └─ (同一块物理内存)\n```\n\n**特点**：\n\n- 不同进程虚拟地址不同\n- 但映射到同一物理内存\n- 直接内存访问，无需拷贝\n\n#### 7.20.2 与管道对比\n\n| 特性 | 管道 | 共享内存 |\n|------|------|---------|\n| 数据传输 | 拷贝（写→内核→读） | 直接访问物理内存 |\n| 效率 | 较低 | 高 |\n| 同步 | 内核自动同步 | 需信号量保护 |\n| 缓冲 | 内核缓冲区 | 用户定义结构 |\n| 使用难度 | 简单 | 复杂 |\n\n---", "subs": ["7.20.1 虚拟地址空间映射", "7.20.2 与管道对比"]}, {"title": "7.21 总结", "content": "#### 7.21.1 共享内存+信号量流程\n\n```mermaid\ngraph LR\n    A[ftok生成key] --> B[shmget创建共享内存]\n    B --> C[shmat映射到进程]\n    \n    D[ftok生成key] --> E[semget创建信号量]\n    E --> F[semctl初始化]\n    \n    C --> G[共享内存读写]\n    F --> H[P/V操作保护]\n    \n    G --> I[shmdt解除映射]\n    \n    style B fill:#c8e6c9\n    style E fill:#fff9c4\n    style G fill:#ffcdd2\n    style H fill:#e1bee7\n```\n\n#### 7.21.2 核心API\n\n```bash\n# 共享内存\nshmget()   # 创建/获取共享内存\nshmat()    # 映射到进程地址空间\nshmdt()    # 解除映射\nshmctl()   # 控制操作\n\n# 信号量\nsemget()   # 创建/获取信号量集合\nsemctl()   # 控制操作（初始化）\nsemop()    # P/V操作\n```\n\n#### 7.21.3 重要命令\n\n```bash\n# 查看IPC对象\nipcs          # 查看所有\nipcs -m       # 查看共享内存\nipcs -s       # 查看信号量\nipcs -q       # 查看消息队列\n\n# 删除IPC对象\nipcrm -m <shmid>   # 删除共享内存\nipcrm -s <semid>   # 删除信号量\nipcrm -q <msqid>   # 删除消息队列\n```\n\n#### 7.21.4 关键点总结\n\n1. **共享内存**：\n   - 最高效的IPC方式\n   - 直接访问物理内存\n   - 需要同步保护\n\n2. **信号量**：\n   - 用于互斥和同步\n   - P操作：-1，可能阻塞\n   - V操作：+1，唤醒等待\n\n3. **配合使用**：\n   - 共享内存提供数据共享\n   - 信号量提供访问控制\n   - 生产者-消费者模型\n\n4. **最佳实践**：\n   - 共享数据封装成struct\n   - 信号量初始化为1（互斥）\n   - 使用SEM_UNDO标志\n   - 及时释放资源\n\n---\n\n**本节完成**：共享内存与信号量的用户级使用。\n\n**内容回顾**：\n\n- ✅ 共享内存API（shmget/shmat/shmdt）\n- ✅ 信号量API（semget/semctl/semop）\n- ✅ P/V操作详解\n- ✅ 生产者-消费者完整示例\n- ✅ 内存映射关系\n- ✅ 与管道对比\n\n**下一节预告**：将讲解共享内存和信号量的内核实现。\n\n---", "subs": ["7.21.1 共享内存+信号量流程", "7.21.2 核心API", "7.21.3 重要命令", "7.21.4 关键点总结"]}]}, {"title": "第7章 进程间通信（三）：共享内存内核实现", "sections": [{"title": "7.22 IPC统一管理机制", "content": "> **核心思想**：IPC统一管理机制，基于shmem文件系统的共享内存实现。\n\n\n#### 7.22.1 ipc_namespace\n\n**统一管理**：信号量、消息队列、共享内存\n\n```c\nstruct ipc_namespace {\n    ......\n    struct ipc_ids ids[3];\n}\n\n#define IPC_SEM_IDS 0\n#define IPC_MSG_IDS 1\n#define IPC_SHM_IDS 2\n\n#define sem_ids(ns) ((ns)->ids[IPC_SEM_IDS])\n#define msg_ids(ns) ((ns)->ids[IPC_MSG_IDS])\n#define shm_ids(ns) ((ns)->ids[IPC_SHM_IDS])\n```\n\n**说明**：\n\n- ids[0]：信号量\n- ids[1]：消息队列\n- ids[2]：共享内存\n\n#### 7.22.2 ipc_ids结构\n\n```c\nstruct ipc_ids {\n    int in_use;                    // 当前使用数量\n    unsigned short seq;            // 序列号\n    struct rw_semaphore rwsem;     // 读写信号量\n    struct idr ipcs_idr;           // 基数树\n    int next_id;                   // 下一个id\n};\n\nstruct idr {\n    struct radix_tree_root idr_rt;  // 基数树根\n    unsigned int idr_next;\n};\n```\n\n**关键点**：\n\n- 基数树：通过id快速查找IPC对象\n- 每种IPC各有一棵基数树\n\n#### 7.22.3 统一抽象：kern_ipc_perm\n\n```c\nstruct sem_array {\n    struct kern_ipc_perm sem_perm;   // 第一个成员\n    time_t sem_ctime;\n    struct list_head pending_alter;\n    int sem_nsems;\n    struct sem sems[];\n};\n\nstruct msg_queue {\n    struct kern_ipc_perm q_perm;     // 第一个成员\n    time_t q_stime;\n    time_t q_rtime;\n    struct list_head q_messages;\n    struct list_head q_receivers;\n    struct list_head q_senders;\n};\n\nstruct shmid_kernel {\n    struct kern_ipc_perm shm_perm;   // 第一个成员\n    struct file *shm_file;\n    unsigned long shm_nattch;\n    unsigned long shm_segsz;\n    time_t shm_atim;\n    time_t shm_dtim;\n    pid_t shm_cprid;\n    pid_t shm_lprid;\n};\n```\n\n**设计精妙**：\n\n- 三个结构的第一个成员都是`kern_ipc_perm`\n- 可以通过`kern_ipc_perm*`强制类型转换\n- 类似C++的面向对象（基类指针）\n\n#### 7.22.4 ipc_obtain_object_idr\n\n```c\nstruct kern_ipc_perm *ipc_obtain_object_idr(struct ipc_ids *ids, int id) {\n    struct kern_ipc_perm *out;\n    int lid = ipcid_to_idx(id);\n    out = idr_find(&ids->ipcs_idr, lid);\n    return out;\n}\n```\n\n**类型转换**：\n\n```c\n// 获取信号量\nstatic inline struct sem_array *sem_obtain_object(struct ipc_namespace *ns, int id) {\n    struct kern_ipc_perm *ipcp = ipc_obtain_object_idr(&sem_ids(ns), id);\n    return container_of(ipcp, struct sem_array, sem_perm);\n}\n\n// 获取消息队列\nstatic inline struct msg_queue *msq_obtain_object(struct ipc_namespace *ns, int id) {\n    struct kern_ipc_perm *ipcp = ipc_obtain_object_idr(&msg_ids(ns), id);\n    return container_of(ipcp, struct msg_queue, q_perm);\n}\n\n// 获取共享内存\nstatic inline struct shmid_kernel *shm_obtain_object(struct ipc_namespace *ns, int id) {\n    struct kern_ipc_perm *ipcp = ipc_obtain_object_idr(&shm_ids(ns), id);\n    return container_of(ipcp, struct shmid_kernel, shm_perm);\n}\n```\n\n---", "subs": ["7.22.1 ipc_namespace", "7.22.2 ipc_ids结构", "7.22.3 统一抽象：kern_ipc_perm", "7.22.4 ipc_obtain_object_idr"]}, {"title": "7.23 共享内存创建（shmget）", "content": "#### 7.23.1 系统调用入口\n\n```c\nSYSCALL_DEFINE3(shmget, key_t, key, size_t, size, int, shmflg) {\n    struct ipc_namespace *ns;\n    static const struct ipc_ops shm_ops = {\n        .getnew = newseg,\n        .associate = shm_security,\n        .more_checks = shm_more_checks,\n    };\n    struct ipc_params shm_params;\n    \n    ns = current->nsproxy->ipc_ns;\n    shm_params.key = key;\n    shm_params.flg = shmflg;\n    shm_params.u.size = size;\n    \n    return ipcget(ns, &shm_ids(ns), &shm_ops, &shm_params);\n}\n```\n\n#### 7.23.2 ipcget通用创建逻辑\n\n```c\nint ipcget(struct ipc_namespace *ns, struct ipc_ids *ids,\n          const struct ipc_ops *ops, struct ipc_params *params) {\n    if (params->key == IPC_PRIVATE)\n        return ipcget_new(ns, ids, ops, params);\n    else\n        return ipcget_public(ns, ids, ops, params);\n}\n\nstatic int ipcget_public(struct ipc_namespace *ns, struct ipc_ids *ids,\n                        const struct ipc_ops *ops, struct ipc_params *params) {\n    struct kern_ipc_perm *ipcp;\n    int flg = params->flg;\n    int err;\n    \n    // 查找key对应的IPC对象\n    ipcp = ipc_findkey(ids, params->key);\n    if (ipcp == NULL) {\n        // 未找到，创建新的\n        if (!(flg & IPC_CREAT))\n            err = -ENOENT;\n        else\n            err = ops->getnew(ns, params);  // 调用newseg\n    } else {\n        // 已存在\n        if (flg & IPC_CREAT && flg & IPC_EXCL)\n            err = -EEXIST;\n        else {\n            err = 0;\n            if (ops->more_checks)\n                err = ops->more_checks(ipcp, params);\n        }\n    }\n    return err;\n}\n```\n\n---", "subs": ["7.23.1 系统调用入口", "7.23.2 ipcget通用创建逻辑"]}, {"title": "7.24 newseg创建共享内存", "content": "#### 7.24.1 newseg函数\n\n```c\nstatic int newseg(struct ipc_namespace *ns, struct ipc_params *params) {\n    key_t key = params->key;\n    int shmflg = params->flg;\n    size_t size = params->u.size;\n    struct shmid_kernel *shp;\n    size_t numpages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;\n    struct file *file;\n    char name[13];\n    \n    // 1. 分配shmid_kernel结构\n    shp = kvmalloc(sizeof(*shp), GFP_KERNEL);\n    \n    // 2. 设置基本属性\n    shp->shm_perm.key = key;\n    shp->shm_perm.mode = (shmflg & S_IRWXUGO);\n    shp->mlock_user = NULL;\n    \n    // 3. 创建shmem文件系统上的文件\n    file = shmem_kernel_file_setup(name, size, acctflag);\n    \n    // 4. 设置shm属性\n    shp->shm_cprid = task_tgid_vnr(current);\n    shp->shm_lprid = 0;\n    shp->shm_atim = shp->shm_dtim = 0;\n    shp->shm_ctim = get_seconds();\n    shp->shm_segsz = size;\n    shp->shm_nattch = 0;\n    shp->shm_file = file;\n    shp->shm_creator = current;\n    \n    // 5. 加入基数树\n    error = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);\n    \n    // 6. 加入当前进程的shm列表\n    list_add(&shp->shm_clist, &current->sysvshm.shm_clist);\n    \n    // 7. 关联文件inode的id\n    file_inode(file)->i_ino = shp->shm_perm.id;\n    \n    ns->shm_tot += numpages;\n    error = shp->shm_perm.id;\n    \n    return error;\n}\n```\n\n---", "subs": ["7.24.1 newseg函数"]}, {"title": "7.25 shmem文件系统", "content": "#### 7.25.1 shmem_init初始化\n\n```c\nint __init shmem_init(void) {\n    int error;\n    \n    // 初始化inode缓存\n    error = shmem_init_inodecache();\n    \n    // 注册shmem文件系统\n    error = register_filesystem(&shmem_fs_type);\n    \n    // 挂载shmem文件系统\n    shm_mnt = kern_mount(&shmem_fs_type);\n    \n    return 0;\n}\n\nstatic struct file_system_type shmem_fs_type = {\n    .owner = THIS_MODULE,\n    .name = \"tmpfs\",\n    .mount = shmem_mount,\n    .kill_sb = kill_litter_super,\n    .fs_flags = FS_USERNS_MOUNT,\n};\n```\n\n**关键点**：\n\n- shmem是内存文件系统（tmpfs）\n- 挂载后得到`shm_mnt`\n- 用于创建共享内存文件\n\n#### 7.25.2 shmem_kernel_file_setup\n\n```c\nstruct file *shmem_kernel_file_setup(const char *name, loff_t size,\n                                    unsigned long flags) {\n    return __shmem_file_setup(name, size, flags, S_PRIVATE);\n}\n\nstatic struct file *__shmem_file_setup(const char *name, loff_t size,\n                                      unsigned long flags, unsigned int i_flags) {\n    struct file *res;\n    struct inode *inode;\n    struct path path;\n    struct super_block *sb;\n    struct qstr this;\n    \n    this.name = name;\n    this.len = strlen(name);\n    this.hash = 0;\n    \n    // 1. 获取shmem的superblock\n    sb = shm_mnt->mnt_sb;\n    \n    // 2. 创建dentry\n    path.mnt = mntget(shm_mnt);\n    path.dentry = d_alloc_pseudo(sb, &this);\n    d_set_d_op(path.dentry, &anon_ops);\n    \n    // 3. 创建inode\n    inode = shmem_get_inode(sb, NULL, S_IFREG | S_IRWXUGO, 0, flags);\n    inode->i_flags |= i_flags;\n    d_instantiate(path.dentry, inode);\n    inode->i_size = size;\n    \n    // 4. 创建file\n    res = alloc_file(&path, FMODE_WRITE | FMODE_READ,\n                    &shmem_file_operations);\n    \n    return res;\n}\n```\n\n#### 7.25.3 shmem_file_operations\n\n```c\nstatic const struct file_operations shmem_file_operations = {\n    .mmap = shmem_mmap,\n    .get_unmapped_area = shmem_get_unmapped_area,\n#ifdef CONFIG_TMPFS\n    .llseek = shmem_file_llseek,\n    .read_iter = shmem_file_read_iter,\n    .write_iter = generic_file_write_iter,\n    .fsync = noop_fsync,\n    .splice_read = generic_file_splice_read,\n    .splice_write = iter_file_splice_write,\n    .fallocate = shmem_fallocate,\n#endif\n};\n```\n\n---", "subs": ["7.25.1 shmem_init初始化", "7.25.2 shmem_kernel_file_setup", "7.25.3 shmem_file_operations"]}, {"title": "7.26 共享内存映射（shmat）", "content": "#### 7.26.1 shmat系统调用\n\n```c\nSYSCALL_DEFINE3(shmat, int, shmid, char __user *, shmaddr, int, shmflg) {\n    unsigned long ret;\n    long err;\n    \n    err = do_shmat(shmid, shmaddr, shmflg, &ret, SHMLBA);\n    force_successful_syscall_return();\n    return (long)ret;\n}\n```\n\n#### 7.26.2 do_shmat核心流程\n\n```c\nlong do_shmat(int shmid, char __user *shmaddr, int shmflg,\n             ulong *raddr, unsigned long shmlba) {\n    struct shmid_kernel *shp;\n    unsigned long addr = (unsigned long)shmaddr;\n    unsigned long size;\n    struct file *file;\n    int err;\n    unsigned long flags = MAP_SHARED;\n    unsigned long prot;\n    struct ipc_namespace *ns;\n    struct shm_file_data *sfd;\n    struct path path;\n    fmode_t f_mode;\n    unsigned long populate = 0;\n    \n    // 1. 设置权限\n    prot = PROT_READ | PROT_WRITE;\n    acc_mode = S_IRUGO | S_IWUGO;\n    f_mode = FMODE_READ | FMODE_WRITE;\n    \n    // 2. 获取shmid_kernel\n    ns = current->nsproxy->ipc_ns;\n    shp = shm_obtain_object_check(ns, shmid);\n    \n    // 3. 获取shmem文件路径\n    path = shp->shm_file->f_path;\n    path_get(&path);\n    shp->shm_nattch++;\n    size = i_size_read(d_inode(path.dentry));\n    \n    // 4. 分配shm_file_data\n    sfd = kzalloc(sizeof(*sfd), GFP_KERNEL);\n    \n    // 5. 创建新的file用于映射\n    file = alloc_file(&path, f_mode,\n                     is_file_hugepages(shp->shm_file) ?\n                     &shm_file_operations_huge :\n                     &shm_file_operations);\n    \n    // 6. 关联file和shm_file_data\n    file->private_data = sfd;\n    file->f_mapping = shp->shm_file->f_mapping;\n    sfd->id = shp->shm_perm.id;\n    sfd->ns = get_ipc_ns(ns);\n    sfd->file = shp->shm_file;\n    sfd->vm_ops = NULL;\n    \n    // 7. 调用do_mmap_pgoff映射\n    addr = do_mmap_pgoff(file, addr, size, prot, flags, 0, &populate, NULL);\n    *raddr = addr;\n    err = 0;\n    \n    return err;\n}\n```\n\n---", "subs": ["7.26.1 shmat系统调用", "7.26.2 do_shmat核心流程"]}, {"title": "7.27 文件与映射关系", "content": "#### 7.27.1 两个file的作用\n\n```\nshmid_kernel\n  └─ shm_file (file1)\n       ├─ f_op = shmem_file_operations\n       └─ 管理shmem文件系统上的文件\n\n进程映射\n  └─ file (file2)\n       ├─ f_op = shm_file_operations\n       ├─ private_data → shm_file_data\n       │    ├─ file → shm_file (file1)\n       │    └─ vm_ops → shmem_vm_ops\n       └─ 专门用于内存映射\n```\n\n**为什么需要两个file**：\n\n- file1：中立的文件管理角色\n- file2：特定进程的映射角色\n\n#### 7.27.2 shm_file_operations\n\n```c\nstatic const struct file_operations shm_file_operations = {\n    .mmap = shm_mmap,\n    .fsync = shm_fsync,\n    .release = shm_release,\n    .get_unmapped_area = shm_get_unmapped_area,\n    .llseek = noop_llseek,\n    .fallocate = shm_fallocate,\n};\n```\n\n---", "subs": ["7.27.1 两个file的作用", "7.27.2 shm_file_operations"]}, {"title": "7.28 shm_mmap映射过程", "content": "#### 7.28.1 shm_mmap\n\n```c\nstatic int shm_mmap(struct file *file, struct vm_area_struct *vma) {\n    struct shm_file_data *sfd = shm_file_data(file);\n    int ret;\n    \n    // 1. 调用底层shmem文件的mmap\n    ret = __shm_open(vma);\n    ret = call_mmap(sfd->file, vma);\n    \n    // 2. 保存shmem的vm_ops\n    sfd->vm_ops = vma->vm_ops;\n    \n    // 3. 替换为shm的vm_ops\n    vma->vm_ops = &shm_vm_ops;\n    \n    return 0;\n}\n```\n\n#### 7.28.2 shmem_mmap\n\n```c\nstatic int shmem_mmap(struct file *file, struct vm_area_struct *vma) {\n    file_accessed(file);\n    vma->vm_ops = &shmem_vm_ops;\n    return 0;\n}\n```\n\n#### 7.28.3 vm_ops关系\n\n```\nvma->vm_ops = shm_vm_ops\n  └─ .fault = shm_fault\n\nshm_file_data->vm_ops = shmem_vm_ops\n  └─ .fault = shmem_fault\n```\n\n---", "subs": ["7.28.1 shm_mmap", "7.28.2 shmem_mmap", "7.28.3 vm_ops关系"]}, {"title": "7.29 缺页异常处理", "content": "#### 7.29.1 shm_vm_ops\n\n```c\nstatic const struct vm_operations_struct shm_vm_ops = {\n    .open = shm_open,      // vm-area打开\n    .close = shm_close,    // vm-area关闭\n    .fault = shm_fault,    // 缺页异常\n};\n```\n\n#### 7.29.2 shm_fault\n\n```c\nstatic int shm_fault(struct vm_fault *vmf) {\n    struct file *file = vmf->vma->vm_file;\n    struct shm_file_data *sfd = shm_file_data(file);\n    \n    // 转发给shmem_fault\n    return sfd->vm_ops->fault(vmf);\n}\n```\n\n#### 7.29.3 shmem_vm_ops\n\n```c\nstatic const struct vm_operations_struct shmem_vm_ops = {\n    .fault = shmem_fault,\n    .map_pages = filemap_map_pages,\n};\n```\n\n#### 7.29.4 shmem_fault分配物理内存\n\n```c\nstatic int shmem_fault(struct vm_fault *vmf) {\n    struct vm_area_struct *vma = vmf->vma;\n    struct inode *inode = file_inode(vma->vm_file);\n    gfp_t gfp = mapping_gfp_mask(inode->i_mapping);\n    \n    // 从page cache或swap获取页，或分配新页\n    error = shmem_getpage_gfp(inode, vmf->pgoff, &vmf->page, sgp,\n                             gfp, vma, vmf, &ret);\n    \n    return error;\n}\n\nstatic int shmem_getpage_gfp(struct inode *inode, pgoff_t index,\n                            struct page **pagep, enum sgp_type sgp, gfp_t gfp,\n                            struct vm_area_struct *vma, struct vm_fault *vmf,\n                            int *fault_type) {\n    ......\n    // 分配新页\n    page = shmem_alloc_and_acct_page(gfp, info, sbinfo, index, false);\n    ......\n}\n```\n\n**关键点**：\n\n- 共享内存创建时只分配inode，不分配物理内存\n- 第一次访问时触发缺页异常\n- shmem_fault调用alloc_page_vma分配物理页\n\n---", "subs": ["7.29.1 shm_vm_ops", "7.29.2 shm_fault", "7.29.3 shmem_vm_ops", "7.29.4 shmem_fault分配物理内存"]}, {"title": "7.30 总结", "content": "#### 7.30.1 共享内存创建流程\n\n```mermaid\ngraph TD\n    A[shmget] --> B[ipcget]\n    B --> C{key==IPC_PRIVATE?}\n    C -->|是| D[ipcget_new]\n    C -->|否| E[ipcget_public]\n    E --> F[ipc_findkey查找]\n    F --> G{找到?}\n    G -->|否| H[newseg创建]\n    G -->|是| I[返回id]\n    \n    H --> J[kvmalloc分配shmid_kernel]\n    J --> K[shmem_kernel_file_setup]\n    K --> L[在shmem创建文件]\n    L --> M[ipc_addid加入基数树]\n    M --> N[返回id]\n    \n    style H fill:#c8e6c9\n    style K fill:#fff9c4\n    style M fill:#ffcdd2\n```\n\n#### 7.30.2 共享内存映射流程\n\n```\nshmat\n  ↓\ndo_shmat\n  ├─ shm_obtain_object_check (从基数树获取shmid_kernel)\n  ├─ kzalloc(shm_file_data)\n  ├─ alloc_file (创建file2用于映射)\n  ├─ file2->private_data = shm_file_data\n  ├─ shm_file_data->file = shm_file (file1)\n  ↓\ndo_mmap_pgoff\n  ↓\nshm_mmap (file2的mmap)\n  ├─ call_mmap(file1) → shmem_mmap\n  │   └─ vma->vm_ops = shmem_vm_ops\n  ├─ sfd->vm_ops = shmem_vm_ops\n  └─ vma->vm_ops = shm_vm_ops\n```\n\n#### 7.30.3 缺页异常流程\n\n```\n访问共享内存地址\n  ↓\ndo_page_fault\n  ↓\nvma->vm_ops->fault (shm_fault)\n  ↓\nsfd->vm_ops->fault (shmem_fault)\n  ↓\nshmem_getpage_gfp\n  ├─ 查找page cache\n  ├─ 查找swap\n  └─ shmem_alloc_and_acct_page\n       ↓\n     alloc_page_vma (分配物理页)\n```\n\n#### 7.30.4 核心数据结构关系\n\n```\nipc_namespace\n  └─ ids[2] (shm_ids)\n       └─ ipcs_idr (基数树)\n            └─ shmid_kernel\n                 ├─ shm_perm (kern_ipc_perm)\n                 ├─ shm_file (file1, shmem文件)\n                 ├─ shm_segsz\n                 └─ shm_nattch\n\n进程A\n  └─ mm_struct\n       └─ vm_area_struct\n            ├─ vm_file (file2)\n            │    ├─ f_op = shm_file_operations\n            │    └─ private_data → shm_file_data\n            │                        ├─ file → shm_file (file1)\n            │                        └─ vm_ops → shmem_vm_ops\n            └─ vm_ops = shm_vm_ops\n\n进程B\n  └─ mm_struct\n       └─ vm_area_struct\n            ├─ vm_file (file3, 另一个映射file)\n            └─ 映射到同一个shmem文件\n```\n\n---\n\n**本节完成**：共享内存的内核实现。\n\n**内容回顾**：\n\n- ✅ IPC统一管理机制（基数树+kern_ipc_perm）\n- ✅ shmget创建流程（newseg）\n- ✅ shmem文件系统（tmpfs）\n- ✅ shmat映射流程（两个file的作用）\n- ✅ 缺页异常处理（shmem_fault）\n\n**下一节预告**：将讲解信号量的内核实现。\n\n---", "subs": ["7.30.1 共享内存创建流程", "7.30.2 共享内存映射流程", "7.30.3 缺页异常流程", "7.30.4 核心数据结构关系"]}]}, {"title": "第7章 进程间通信（四）：信号量内核实现", "sections": [{"title": "7.31 信号量创建（semget）", "content": "> **核心思想**：信号量通过sem_array管理，P/V操作配合等待队列，SEM_UNDO机制保证异常安全。\n\n\n#### 7.31.1 系统调用入口\n\n```c\nSYSCALL_DEFINE3(semget, key_t, key, int, nsems, int, semflg) {\n    struct ipc_namespace *ns;\n    static const struct ipc_ops sem_ops = {\n        .getnew = newary,\n        .associate = sem_security,\n        .more_checks = sem_more_checks,\n    };\n    struct ipc_params sem_params;\n    \n    ns = current->nsproxy->ipc_ns;\n    sem_params.key = key;\n    sem_params.flg = semflg;\n    sem_params.u.nsems = nsems;\n    \n    return ipcget(ns, &sem_ids(ns), &sem_ops, &sem_params);\n}\n```\n\n**说明**：\n\n- 同样使用ipcget统一框架\n- sem_ops.getnew = newary\n\n#### 7.31.2 newary创建信号量数组\n\n```c\nstatic int newary(struct ipc_namespace *ns, struct ipc_params *params) {\n    int retval;\n    struct sem_array *sma;\n    key_t key = params->key;\n    int nsems = params->u.nsems;\n    int semflg = params->flg;\n    int i;\n    \n    // 1. 分配sem_array结构\n    sma = sem_alloc(nsems);\n    \n    // 2. 设置基本属性\n    sma->sem_perm.mode = (semflg & S_IRWXUGO);\n    sma->sem_perm.key = key;\n    sma->sem_perm.security = NULL;\n    \n    // 3. 初始化每个信号量\n    for (i = 0; i < nsems; i++) {\n        INIT_LIST_HEAD(&sma->sems[i].pending_alter);\n        INIT_LIST_HEAD(&sma->sems[i].pending_const);\n        spin_lock_init(&sma->sems[i].lock);\n    }\n    \n    // 4. 初始化信号量数组的等待队列\n    sma->complex_count = 0;\n    sma->use_global_lock = USE_GLOBAL_LOCK_HYSTERESIS;\n    INIT_LIST_HEAD(&sma->pending_alter);\n    INIT_LIST_HEAD(&sma->pending_const);\n    INIT_LIST_HEAD(&sma->list_id);\n    \n    // 5. 设置数量和时间\n    sma->sem_nsems = nsems;\n    sma->sem_ctime = get_seconds();\n    \n    // 6. 加入基数树\n    retval = ipc_addid(&sem_ids(ns), &sma->sem_perm, ns->sc_semmni);\n    \n    ns->used_sems += nsems;\n    \n    return sma->sem_perm.id;\n}\n```\n\n---", "subs": ["7.31.1 系统调用入口", "7.31.2 newary创建信号量数组"]}, {"title": "7.32 核心数据结构", "content": "#### 7.32.1 sem_array\n\n```c\nstruct sem_array {\n    struct kern_ipc_perm sem_perm;      // 第一个成员\n    time_t sem_ctime;                    // 创建时间\n    struct list_head pending_alter;      // 修改操作等待队列\n    struct list_head pending_const;      // 非修改操作等待队列\n    struct list_head list_id;            // undo链表\n    int sem_nsems;                       // 信号量个数\n    int complex_count;                   // 复杂操作计数\n    unsigned int use_global_lock;        // 全局锁标志\n    struct sem sems[];                   // 信号量数组\n};\n```\n\n#### 7.32.2 sem\n\n```c\nstruct sem {\n    int semval;                          // 当前值\n    int sempid;                          // 最后修改的pid\n    spinlock_t lock;                     // 自旋锁\n    struct list_head pending_alter;      // 修改操作等待队列\n    struct list_head pending_const;      // 非修改操作等待队列\n    time_t sem_otime;                    // 最后操作时间\n} ____cacheline_aligned_in_smp;\n```\n\n**关键点**：\n\n- semval：信号量的当前值\n- pending_alter：等待修改该信号量的队列\n- pending_const：等待但不修改的队列\n\n---", "subs": ["7.32.1 sem_array", "7.32.2 sem"]}, {"title": "7.33 信号量初始化（semctl）", "content": "#### 7.33.1 semctl系统调用\n\n```c\nSYSCALL_DEFINE4(semctl, int, semid, int, semnum, int, cmd, unsigned long, arg) {\n    int version;\n    struct ipc_namespace *ns;\n    void __user *p = (void __user *)arg;\n    \n    ns = current->nsproxy->ipc_ns;\n    \n    switch (cmd) {\n    case IPC_INFO:\n    case SEM_INFO:\n    case IPC_STAT:\n    case SEM_STAT:\n        return semctl_nolock(ns, semid, cmd, version, p);\n    case GETALL:\n    case GETVAL:\n    case GETPID:\n    case GETNCNT:\n    case GETZCNT:\n    case SETALL:\n        return semctl_main(ns, semid, semnum, cmd, p);\n    case SETVAL:\n        return semctl_setval(ns, semid, semnum, arg);\n    case IPC_RMID:\n    case IPC_SET:\n        return semctl_down(ns, semid, cmd, version, p);\n    default:\n        return -EINVAL;\n    }\n}\n```\n\n#### 7.33.2 semctl_main（SETALL）\n\n```c\nstatic int semctl_main(struct ipc_namespace *ns, int semid, int semnum,\n                      int cmd, void __user *p) {\n    struct sem_array *sma;\n    struct sem *curr;\n    int err, nsems;\n    ushort fast_sem_io[SEMMSL_FAST];\n    ushort *sem_io = fast_sem_io;\n    DEFINE_WAKE_Q(wake_q);\n    \n    // 1. 获取sem_array\n    sma = sem_obtain_object_check(ns, semid);\n    nsems = sma->sem_nsems;\n    \n    switch (cmd) {\n    case SETALL: {\n        int i;\n        struct sem_undo *un;\n        \n        // 2. 从用户空间拷贝数组\n        if (copy_from_user(sem_io, p, nsems*sizeof(ushort))) {\n            ......\n        }\n        \n        // 3. 设置每个信号量的值\n        for (i = 0; i < nsems; i++) {\n            sma->sems[i].semval = sem_io[i];\n            sma->sems[i].sempid = task_tgid_vnr(current);\n        }\n        \n        sma->sem_ctime = get_seconds();\n        \n        // 4. 唤醒等待队列\n        do_smart_update(sma, NULL, 0, 0, &wake_q);\n        err = 0;\n        goto out_unlock;\n    }\n    }\n    \n    wake_up_q(&wake_q);\n}\n```\n\n#### 7.33.3 semctl_setval（SETVAL）\n\n```c\nstatic int semctl_setval(struct ipc_namespace *ns, int semid, int semnum,\n                        unsigned long arg) {\n    struct sem_undo *un;\n    struct sem_array *sma;\n    struct sem *curr;\n    int err, val;\n    DEFINE_WAKE_Q(wake_q);\n    \n    // 1. 获取sem_array\n    sma = sem_obtain_object_check(ns, semid);\n    \n    // 2. 获取指定的信号量\n    curr = &sma->sems[semnum];\n    \n    // 3. 设置值\n    curr->semval = val;\n    curr->sempid = task_tgid_vnr(current);\n    sma->sem_ctime = get_seconds();\n    \n    // 4. 唤醒等待队列\n    do_smart_update(sma, NULL, 0, 0, &wake_q);\n    \n    wake_up_q(&wake_q);\n    return 0;\n}\n```\n\n---", "subs": ["7.33.1 semctl系统调用", "7.33.2 semctl_main（SETALL）", "7.33.3 semctl_setval（SETVAL）"]}, {"title": "7.34 信号量操作（semop）", "content": "#### 7.34.1 semop/semtimedop\n\n```c\nSYSCALL_DEFINE3(semop, int, semid, struct sembuf __user *, tsops,\n               unsigned, nsops) {\n    return sys_semtimedop(semid, tsops, nsops, NULL);\n}\n\nSYSCALL_DEFINE4(semtimedop, int, semid, struct sembuf __user *, tsops,\n               unsigned, nsops, const struct timespec __user *, timeout) {\n    int error = -EINVAL;\n    struct sem_array *sma;\n    struct sembuf fast_sops[SEMOPM_FAST];\n    struct sembuf *sops = fast_sops, *sop;\n    struct sem_undo *un;\n    bool undos = false, alter = false, dupsop = false;\n    struct sem_queue queue;\n    unsigned long dup = 0, jiffies_left = 0;\n    struct ipc_namespace *ns;\n    \n    ns = current->nsproxy->ipc_ns;\n    \n    // 1. 从用户空间拷贝操作参数\n    if (copy_from_user(sops, tsops, nsops * sizeof(*tsops))) {\n        error = -EFAULT;\n        goto out_free;\n    }\n    \n    // 2. 处理超时参数\n    if (timeout) {\n        struct timespec _timeout;\n        if (copy_from_user(&_timeout, timeout, sizeof(*timeout))) {\n            ......\n        }\n        jiffies_left = timespec_to_jiffies(&_timeout);\n    }\n    \n    // 3. 获取undo结构\n    un = find_alloc_undo(ns, semid);\n    \n    // 4. 获取sem_array\n    sma = sem_obtain_object_check(ns, semid);\n    \n    // 5. 构造sem_queue\n    queue.sops = sops;\n    queue.nsops = nsops;\n    queue.undo = un;\n    queue.pid = task_tgid_vnr(current);\n    queue.alter = alter;\n    queue.dupsop = dupsop;\n    \n    // 6. 尝试原子操作\n    error = perform_atomic_semop(sma, &queue);\n    if (error == 0) {\n        // 成功，唤醒其他等待进程\n        DEFINE_WAKE_Q(wake_q);\n        do_smart_update(sma, sops, nsops, 1, &wake_q);\n        wake_up_q(&wake_q);\n        goto out_free;\n    }\n    \n    // 7. 需要等待，加入等待队列\n    if (nsops == 1) {\n        struct sem *curr;\n        curr = &sma->sems[sops->sem_num];\n        list_add_tail(&queue.list, &curr->pending_alter);\n    } else {\n        list_add_tail(&queue.list, &sma->pending_alter);\n    }\n    \n    // 8. 进入等待循环\n    do {\n        queue.status = -EINTR;\n        queue.sleeper = current;\n        \n        __set_current_state(TASK_INTERRUPTIBLE);\n        \n        if (timeout)\n            jiffies_left = schedule_timeout(jiffies_left);\n        else\n            schedule();\n        \n        // 检查是否超时\n        if (timeout && jiffies_left == 0)\n            error = -EAGAIN;\n    } while (error == -EINTR && !signal_pending(current));\n    \n    ......\n}\n```\n\n---", "subs": ["7.34.1 semop/semtimedop"]}, {"title": "7.35 perform_atomic_semop", "content": "#### 7.35.1 原子操作尝试\n\n```c\nstatic int perform_atomic_semop(struct sem_array *sma, struct sem_queue *q) {\n    int result, sem_op, nsops;\n    struct sembuf *sop;\n    struct sem *curr;\n    struct sembuf *sops;\n    struct sem_undo *un;\n    \n    sops = q->sops;\n    nsops = q->nsops;\n    un = q->undo;\n    \n    // 第一次循环：检查是否可以执行\n    for (sop = sops; sop < sops + nsops; sop++) {\n        curr = &sma->sems[sop->sem_num];\n        sem_op = sop->sem_op;\n        result = curr->semval;\n        \n        result += sem_op;\n        if (result < 0)\n            goto would_block;  // 会阻塞\n        ......\n    }\n    \n    // 第二次循环：执行操作\n    for (sop = sops; sop < sops + nsops; sop++) {\n        curr = &sma->sems[sop->sem_num];\n        sem_op = sop->sem_op;\n        result = curr->semval;\n        \n        if (sop->sem_flg & SEM_UNDO) {\n            int undo = un->semadj[sop->sem_num] - sem_op;\n            un->semadj[sop->sem_num] = undo;\n        }\n        \n        curr->semval += sem_op;\n        curr->sempid = q->pid;\n    }\n    \n    return 0;\n\nwould_block:\n    q->blocking = sop;\n    return sop->sem_flg & IPC_NOWAIT ? -EAGAIN : 1;\n}\n```\n\n**关键点**：\n\n- 两次循环：先检查，再执行\n- result < 0：需要等待\n- 返回0：成功\n- 返回1：需要等待\n- 返回-EAGAIN：不等待直接返回\n\n---", "subs": ["7.35.1 原子操作尝试"]}, {"title": "7.36 等待队列管理", "content": "#### 7.36.1 do_smart_update\n\n```c\n// 唤醒等待队列中的进程\ndo_smart_update(sma, sops, nsops, 1, &wake_q);\nwake_up_q(&wake_q);\n```\n\n#### 7.36.2 update_queue\n\n```c\nstatic int update_queue(struct sem_array *sma, int semnum,\n                       struct wake_q_head *wake_q) {\n    struct sem_queue *q, *tmp;\n    struct list_head *pending_list;\n    int semop_completed = 0;\n    \n    // 确定等待队列\n    if (semnum == -1)\n        pending_list = &sma->pending_alter;\n    else\n        pending_list = &sma->sems[semnum].pending_alter;\n    \nagain:\n    // 遍历等待队列\n    list_for_each_entry_safe(q, tmp, pending_list, list) {\n        int error, restart;\n        \n        // 重新尝试操作\n        error = perform_atomic_semop(sma, q);\n        \n        // 还需要继续等待\n        if (error > 0)\n            continue;\n        \n        // 从队列中移除\n        unlink_queue(sma, q);\n        \n        // 准备唤醒\n        wake_up_sem_queue_prepare(q, error, wake_q);\n        ......\n    }\n    \n    return semop_completed;\n}\n\nstatic inline void wake_up_sem_queue_prepare(struct sem_queue *q, int error,\n                                             struct wake_q_head *wake_q) {\n    wake_q_add(wake_q, q->sleeper);\n}\n```\n\n#### 7.36.3 wake_up_q\n\n```c\nvoid wake_up_q(struct wake_q_head *head) {\n    struct wake_q_node *node = head->first;\n    \n    while (node != WAKE_Q_TAIL) {\n        struct task_struct *task;\n        \n        task = container_of(node, struct task_struct, wake_q);\n        node = node->next;\n        task->wake_q.next = NULL;\n        \n        // 唤醒进程\n        wake_up_process(task);\n        put_task_struct(task);\n    }\n}\n```\n\n---", "subs": ["7.36.1 do_smart_update", "7.36.2 update_queue", "7.36.3 wake_up_q"]}, {"title": "7.37 SEM_UNDO机制", "content": "#### 7.37.1 为什么需要SEM_UNDO\n\n**问题**：\n\n- 信号量是全局资源\n- 进程异常退出可能不归还信号量\n- 其他进程会永久阻塞\n\n**解决方案**：\n\n- SEM_UNDO标志\n- 记录反向操作\n- 进程退出时自动回退\n\n#### 7.37.2 sem_queue\n\n```c\nstruct sem_queue {\n    struct list_head list;               // 队列链表\n    struct task_struct *sleeper;         // 等待的进程\n    struct sem_undo *undo;               // undo结构\n    int pid;                             // 进程id\n    int status;                          // 状态\n    struct sembuf *sops;                 // 操作数组\n    struct sembuf *blocking;             // 阻塞操作\n    int nsops;                           // 操作数量\n    bool alter;                          // 是否修改\n    bool dupsop;                         // 是否重复操作\n};\n```\n\n#### 7.37.3 task_struct中的sysv_sem\n\n```c\nstruct task_struct {\n    ......\n    struct sysv_sem sysvsem;\n    ......\n}\n\nstruct sysv_sem {\n    struct sem_undo_list *undo_list;\n};\n```\n\n#### 7.37.4 sem_undo结构\n\n```c\nstruct sem_undo {\n    struct list_head list_proc;          // 进程的undo链表\n    struct rcu_head rcu;                 // RCU头\n    struct sem_undo_list *ulp;           // 反向指针\n    struct list_head list_id;            // 信号量数组的undo链表\n    int semid;                           // 信号量集合id\n    short *semadj;                       // 调整数组\n};\n\nstruct sem_undo_list {\n    atomic_t refcnt;\n    spinlock_t lock;\n    struct list_head list_proc;\n};\n```\n\n---", "subs": ["7.37.1 为什么需要SEM_UNDO", "7.37.2 sem_queue", "7.37.3 task_struct中的sysv_sem", "7.37.4 sem_undo结构"]}, {"title": "7.38 SEM_UNDO示例", "content": "#### 7.38.1 初始状态\n\n```\nsemaphore1: [3, 3, 3]\nsemaphore2: [4, 4, 4, 4]\n```\n\n#### 7.38.2 操作序列\n\n**操作1**：进程1对semaphore1执行[+1, +2, -3]\n\n```\n信号量值：[4, 5, 0]\nundo结构：[-1, -2, +3]\n```\n\n**操作2**：进程2对semaphore1执行[-3, +2, +1]\n\n```\n信号量值：[1, 7, 1]\nundo结构：[+3, -2, -1]\n```\n\n**操作3**：进程2对semaphore2执行[-3, +1, +4, -1]\n\n```\n信号量值：[1, 5, 8, 3]\nundo结构：[+3, -1, -4, +1]\n```\n\n**操作4**：进程1对semaphore2执行[-1, -4, -5, +2]\n\n```\n信号量值：[0, 1, 3, 5]\nundo结构：[+1, +4, +5, -2]\n```\n\n#### 7.38.3 异常退出恢复\n\n**场景**：进程1异常退出\n\n**恢复操作**：\n\n```\nsemaphore1: [4, 5, 0] + [-1, -2, +3] = [3, 3, 3]\nsemaphore2: [0, 1, 3, 5] + [+1, +4, +5, -2] = [1, 5, 8, 3]\n```\n\n**结果**：\n\n- semaphore1恢复到初始状态\n- semaphore2保留进程2的修改\n- 其他进程不受影响\n\n---", "subs": ["7.38.1 初始状态", "7.38.2 操作序列", "7.38.3 异常退出恢复"]}, {"title": "7.39 总结", "content": "#### 7.39.1 信号量创建流程\n\n```mermaid\ngraph TD\n    A[semget] --> B[ipcget]\n    B --> C{key==IPC_PRIVATE?}\n    C -->|否| D[ipcget_public]\n    D --> E[ipc_findkey]\n    E --> F{找到?}\n    F -->|否| G[newary]\n    F -->|是| H[返回id]\n    \n    G --> I[sem_alloc分配sem_array]\n    I --> J[初始化pending队列]\n    J --> K[ipc_addid加入基数树]\n    K --> L[返回id]\n    \n    style G fill:#c8e6c9\n    style K fill:#ffcdd2\n```\n\n#### 7.39.2 信号量操作流程\n\n```\nsemop系统调用\n  ↓\nsemtimedop\n  ├─ copy_from_user (拷贝sembuf)\n  ├─ find_alloc_undo (获取undo结构)\n  ├─ sem_obtain_object_check (获取sem_array)\n  ├─ 构造sem_queue\n  ↓\nperform_atomic_semop\n  ├─ 第一次循环：检查是否会阻塞\n  ├─ result < 0 → would_block\n  └─ 第二次循环：执行操作\n       ├─ semval += sem_op\n       └─ 记录undo\n  ↓\nif (error == 0) {\n    // 成功\n    do_smart_update\n      └─ update_queue\n           ├─ perform_atomic_semop (重试)\n           └─ wake_up_sem_queue_prepare\n    wake_up_q\n} else {\n    // 需要等待\n    加入pending_alter队列\n    do {\n        __set_current_state(TASK_INTERRUPTIBLE)\n        schedule()\n    } while (未成功 && 未超时 && 未收到信号)\n}\n```\n\n#### 7.39.3 核心数据结构关系\n\n```\nipc_namespace\n  └─ ids[0] (sem_ids)\n       └─ ipcs_idr (基数树)\n            └─ sem_array\n                 ├─ sem_perm (kern_ipc_perm)\n                 ├─ pending_alter (等待队列)\n                 ├─ pending_const (等待队列)\n                 ├─ list_id (undo链表)\n                 └─ sems[]\n                      ├─ semval (信号量值)\n                      ├─ pending_alter\n                      └─ pending_const\n\n进程\n  └─ task_struct\n       └─ sysvsem\n            └─ undo_list\n                 └─ list_proc\n                      └─ sem_undo\n                           ├─ list_proc (进程链表)\n                           ├─ list_id (信号量链表)\n                           ├─ semid\n                           └─ semadj[] (反向操作数组)\n\n等待队列\n  └─ sem_queue\n       ├─ sleeper (task_struct*)\n       ├─ undo (sem_undo*)\n       ├─ sops (sembuf*)\n       ├─ blocking\n       └─ alter\n```\n\n#### 7.39.4 关键流程总结\n\n**1. 创建**：\n\n- semget → newary → sem_alloc → ipc_addid\n\n**2. 初始化**：\n\n- semctl(SETALL) → semctl_main → 设置semval → do_smart_update\n- semctl(SETVAL) → semctl_setval → 设置semval → do_smart_update\n\n**3. P/V操作**：\n\n- semop → perform_atomic_semop\n- 成功：立即返回 + do_smart_update\n- 失败：加入pending_alter + schedule等待\n\n**4. 唤醒**：\n\n- do_smart_update → update_queue → perform_atomic_semop重试 → wake_up_sem_queue_prepare → wake_up_q → wake_up_process\n\n**5. 异常保护**：\n\n- SEM_UNDO标志 → sem_undo结构 → semadj数组\n- 进程退出 → 回退操作 → 信号量恢复\n\n---\n\n**本节完成**：信号量的内核实现。\n\n**内容回顾**：\n\n- ✅ semget创建流程（newary）\n- ✅ semctl初始化（SETALL/SETVAL）\n- ✅ semop P/V操作（perform_atomic_semop）\n- ✅ 等待队列管理（pending_alter）\n- ✅ 唤醒机制（do_smart_update + wake_up_q）\n- ✅ SEM_UNDO机制（异常安全）\n\n**第7章全部完成**！\n\n**章节回顾**：\n\n1. IPC概述与信号机制\n2. 管道的内核实现\n3. 共享内存与信号量使用\n4. 共享内存内核实现\n5. 信号量内核实现\n\n**下一章预告**：网络系统。\n\n---", "subs": ["7.39.1 信号量创建流程", "7.39.2 信号量操作流程", "7.39.3 核心数据结构关系", "7.39.4 关键流程总结"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

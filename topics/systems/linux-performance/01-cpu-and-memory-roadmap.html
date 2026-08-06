@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Linux 性能优化学习笔记 · 第一册：CPU 与内存 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Linux 性能优化学习笔记 · 第一册：CPU 与内存</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Linux 性能优化学习笔记 · 第一册：CPU 与内存", "intro": "", "parts": [{"title": "第 1 章 · CPU 性能分析与优化", "sections": [{"title": "看懂平均负载：判断系统忙不忙的第一指标", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/02-基础篇-到底应该怎么理解平均负载.md -->\n\nCPU 性能排查的第一步，通常不是立刻寻找“最耗 CPU 的进程”，而是先判断系统整体是否繁忙、繁忙趋势是否正在恶化。`uptime` 和 `top` 提供的平均负载，就是完成这一步最直接的指标。\n\n#### 平均负载到底是什么\n\n执行 `uptime`：\n\n```bash\nuptime\n```\n\n典型输出如下：\n\n```text\n02:34:03 up 2 days, 20:14, 1 user, load average: 0.63, 0.83, 0.88\n```\n\n最后三个数字分别代表过去 1 分钟、5 分钟和 15 分钟的平均负载。平均负载不是 CPU 使用率，而是单位时间内系统中处于以下两种状态的平均进程数：\n\n| 进程状态 | `ps` 状态码 | 含义 |\n| --- | --- | --- |\n| 正在运行或等待 CPU | `R` | 进程正在 CPU 上执行，或已进入运行队列等待调度 |\n| 不可中断睡眠 | `D` | 进程通常正在等待磁盘等硬件 I/O，为保证数据一致性暂时不能被中断 |\n\n因此，可以把平均负载理解为系统中的**平均活跃进程数**。它既包含正在使用 CPU 的进程，也包含等待 CPU 和等待不可中断 I/O 的进程。\n\n```mermaid\ngraph TD\n    A[平均负载] --> B[R 状态进程]\n    A --> C[D 状态进程]\n    B --> D[正在使用 CPU]\n    B --> E[等待 CPU 调度]\n    C --> F[等待不可中断 I/O]\n```\n\n#### 为什么必须结合 CPU 数量判断\n\n平均负载是进程数量，必须与逻辑 CPU 数量比较才有意义。查看逻辑 CPU 数量：\n\n```bash\nnproc\n```\n\n也可以使用：\n\n```bash\nlscpu\ngrep -c '^processor' /proc/cpuinfo\n```\n\n假设平均负载为 2：\n\n| 逻辑 CPU 数 | 含义 |\n| ---: | --- |\n| 1 | 平均有一个进程运行，另一个进程等待，系统明显过载 |\n| 2 | 每个 CPU 平均正好运行一个进程，CPU 被充分利用 |\n| 4 | 平均只有一半 CPU 在工作，仍有较多余量 |\n\n可以用归一化负载辅助判断：\n\n```text\n归一化负载 = 1 分钟平均负载 / 逻辑 CPU 数\n```\n\n归一化负载接近 `1`，说明计算资源趋近饱和；持续大于 `1`，说明活跃任务已超过 CPU 的并行处理能力。不过，生产环境不能只依赖固定阈值。更可靠的方法是建立基线，观察负载相对历史水平是否发生显著变化。\n\n#### 用三个时间窗口判断趋势\n\n1 分钟、5 分钟和 15 分钟负载要一起看：\n\n| 负载关系 | 趋势判断 |\n| --- | --- |\n| 三个值接近 | 系统负载相对平稳 |\n| 1 分钟值远大于 15 分钟值 | 负载正在上升，需要继续观察 |\n| 1 分钟值远小于 15 分钟值 | 高负载正在消退 |\n| 三个值都持续高于 CPU 数 | 系统长期过载 |\n\n例如，单 CPU 系统的负载是 `1.73, 0.60, 7.98`：最近一分钟仍然过载，但比过去 15 分钟已经明显下降。\n\n#### 平均负载高不等于 CPU 使用率高\n\n平均负载和 CPU 使用率可能同时升高，也可能完全不同步：\n\n| 场景 | 平均负载 | CPU 使用率 | 关键特征 |\n| --- | --- | --- | --- |\n| CPU 密集型任务 | 高 | 高 | 用户态或系统态 CPU 繁忙 |\n| I/O 密集型任务 | 高 | 不一定高 | `iowait` 或 `D` 状态进程增多 |\n| 大量任务争抢 CPU | 高 | 高 | 运行队列变长，进程 `%wait` 升高 |\n\n所以，看到平均负载升高后，下一步必须判断它来自 CPU、I/O，还是任务调度竞争。\n\n```mermaid\ngraph TD\n    A[平均负载升高] --> B[查看每个 CPU 使用率]\n    A --> C[查看运行队列和阻塞队列]\n    B --> D{CPU 是否繁忙}\n    D -->|用户 CPU 高| E[排查 CPU 密集型进程]\n    D -->|iowait 高| F[排查磁盘 I/O]\n    C --> G{哪类进程增多}\n    G -->|R 增多| H[排查 CPU 竞争]\n    G -->|D 增多| F\n```\n\n常用命令组合：\n\n```bash\n# 观察负载趋势\nwatch -d uptime\n\n# 查看所有 CPU 的使用率\nmpstat -P ALL 1\n\n# 查看运行队列 r 和阻塞队列 b\nvmstat 1\n\n# 查看进程 CPU 使用率和等待 CPU 的时间\npidstat -u 1\n```\n\n排查时不要只看一次快照。至少连续观察数个采样周期，并让不同工具使用相同或接近的采样间隔。\n\n---", "subs": ["平均负载到底是什么", "为什么必须结合 CPU 数量判断", "用三个时间窗口判断趋势", "平均负载高不等于 CPU 使用率高"]}, {"title": "CPU 上下文切换：原理、类型与过高排查", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/03-基础篇-经常说的CPU上下文切换是什么意思上.md; sources/linux-performance/01-CPU性能篇/04-基础篇-经常说的CPU上下文切换是什么意思下.md -->\n\nLinux 可以运行远多于 CPU 数量的任务，是因为调度器在很短的时间内轮流把 CPU 分配给不同任务。每次从一个任务切换到另一个任务，都需要保存旧任务的运行现场并恢复新任务的运行现场，这就是 CPU 上下文切换。\n\n#### CPU 上下文包含什么\n\nCPU 执行任务依赖一组运行状态，核心包括：\n\n- CPU 寄存器；\n- 程序计数器；\n- 内核栈；\n- 进程虚拟内存映射；\n- 线程栈及其他线程私有数据。\n\n上下文切换的基本过程如下：\n\n```mermaid\nsequenceDiagram\n    participant T1 as 任务一\n    participant K as 内核调度器\n    participant T2 as 任务二\n    T1->>K: 触发调度\n    K->>K: 保存任务一上下文\n    K->>K: 选择下一个任务\n    K->>K: 恢复任务二上下文\n    K->>T2: 从原执行位置继续运行\n```\n\n保存和恢复上下文需要 CPU 执行，本身不会产生业务价值。切换过多时，CPU 时间会消耗在寄存器、内核栈、虚拟内存和缓存状态的维护上，真正用于应用计算的时间反而减少。\n\n#### 三类上下文切换\n\n| 类型 | 切换对象 | 主要成本 |\n| --- | --- | --- |\n| 进程上下文切换 | 不同进程 | 寄存器、内核状态、虚拟内存、TLB 和缓存状态 |\n| 线程上下文切换 | 不同线程 | 同进程线程可共享地址空间，通常比跨进程切换轻 |\n| 中断上下文切换 | 当前任务与中断处理程序 | 寄存器、内核栈和中断处理状态 |\n\n系统调用中的用户态与内核态切换，也会保存和恢复 CPU 寄存器，但它始终运行在同一个进程中，不等同于进程上下文切换。\n\n进程上下文切换常由以下事件触发：\n\n- 当前任务时间片耗尽；\n- 任务主动睡眠；\n- 任务等待 I/O、内存等资源；\n- 更高优先级任务抢占 CPU；\n- 当前任务退出；\n- 硬件中断触发；\n- 多个任务在运行队列中竞争 CPU。\n\n#### 先看系统级切换\n\n`vmstat` 可以同时观察上下文切换、系统中断、运行队列和不可中断进程：\n\n```bash\nvmstat 1\n```\n\n重点字段：\n\n| 字段 | 含义 | 异常方向 |\n| --- | --- | --- |\n| `r` | 正在运行和等待 CPU 的任务数 | 持续大于逻辑 CPU 数，说明 CPU 竞争激烈 |\n| `b` | 不可中断睡眠任务数 | 持续升高，通常需要排查 I/O |\n| `in` | 每秒中断次数 | 突增时检查具体中断来源 |\n| `cs` | 每秒上下文切换次数 | 相对基线数量级增长时需要分析 |\n| `us` | 用户态 CPU 使用率 | 高时排查应用计算 |\n| `sy` | 内核态 CPU 使用率 | 高时排查系统调用、调度和内核活动 |\n\n上下文切换没有适用于所有机器的绝对阈值。课程案例给出的经验是：稳定在数百至一万次每秒可能仍属正常，而超过一万或出现数量级增长时，应结合机器规格和历史基线继续分析。\n\n#### 再看进程和线程级切换\n\n查看进程上下文切换：\n\n```bash\npidstat -w 1\n```\n\n重点区分两类指标：\n\n| 指标 | 类型 | 常见原因 |\n| --- | --- | --- |\n| `cswch/s` | 自愿上下文切换 | 任务主动等待 I/O、锁、内存或其他资源 |\n| `nvcswch/s` | 非自愿上下文切换 | 时间片耗尽、任务过多、CPU 竞争或高优先级任务抢占 |\n\nLinux 调度的基本单位是线程。进程级数据解释不了系统级 `cs` 时，要继续查看线程：\n\n```bash\npidstat -wt 1\n```\n\n如果主线程切换次数不高，但大量工作线程的 `nvcswch/s` 很高，说明问题可能来自线程数量过多或工作线程争抢 CPU。\n\n#### 中断次数也要交叉验证\n\n上下文切换升高经常伴随中断升高。查看硬中断分布：\n\n```bash\nwatch -d cat /proc/interrupts\n```\n\n如果 `RES`，即重调度中断增长很快，通常说明多核系统正在频繁唤醒其他 CPU 重新调度任务，这与运行队列过长、线程竞争激烈的判断相互印证。\n\n```mermaid\ngraph TD\n    A[cs 数量级升高] --> B[查看 r 和 sy]\n    B --> C{r 是否超过 CPU 数}\n    C -->|是| D[CPU 竞争和频繁调度]\n    C -->|否| E[检查资源等待和中断]\n    D --> F[pidstat -w 1]\n    F --> G{进程数据能否解释}\n    G -->|不能| H[pidstat -wt 1]\n    H --> I[定位高切换线程]\n    E --> J[查看 interrupts]\n    J --> K[定位具体中断类型]\n```\n\n诊断结论要落到“哪种切换、哪个任务、什么原因”：\n\n- 自愿切换高：沿 I/O、锁、内存等资源等待方向排查；\n- 非自愿切换高：沿 CPU 竞争、线程数、时间片和优先级方向排查；\n- 中断高：从 `/proc/interrupts` 定位硬件或重调度中断；\n- 系统态 CPU 同时很高：警惕大量调度工作本身已经成为瓶颈。\n\n---", "subs": ["CPU 上下文包含什么", "三类上下文切换", "先看系统级切换", "再看进程和线程级切换", "中断次数也要交叉验证"]}, {"title": "定位把 CPU 跑满的应用进程", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/05-基础篇-某个应用的CPU使用率居然达到100%，我该怎么办.md; sources/linux-performance/01-CPU性能篇/14-答疑二-如何用perf工具分析Java程序.md -->\n\nCPU 使用率表示一段采样时间内，CPU 非空闲时间占总时间的比例。排查 CPU 跑满问题时，既要识别“CPU 时间花在哪一类活动上”，也要定位“具体哪个进程、线程和函数消耗了这些时间”。\n\n#### 读懂 CPU 使用率分类\n\nLinux 的 CPU 时间来自 `/proc/stat`。性能工具通过两次采样的差值，计算采样间隔内的使用率，而不是直接使用开机以来的累计值。\n\n```text\nCPU 使用率 = 1 - 空闲时间增量 / 总 CPU 时间增量\n```\n\n常见 CPU 使用率字段：\n\n| 字段 | 含义 | 高值时的优先排查方向 |\n| --- | --- | --- |\n| `us` | 普通优先级用户态 CPU 时间 | 应用代码、计算热点 |\n| `ni` | 低优先级用户态 CPU 时间 | 调整过 nice 值的应用 |\n| `sy` | 内核态 CPU 时间 | 系统调用、调度、内核线程 |\n| `id` | 空闲时间 | 越低说明 CPU 越繁忙 |\n| `wa` | 等待 I/O 的时间 | 磁盘或其他 I/O |\n| `hi` | 硬中断 CPU 时间 | 硬件中断 |\n| `si` | 软中断 CPU 时间 | 网络收发、定时器、调度等 |\n| `st` | 虚拟机被宿主机抢占的时间 | 宿主机资源争用 |\n| `guest` | 运行客户虚拟机的时间 | 虚拟化工作负载 |\n\n注意不同工具的统计窗口：\n\n- `top` 默认按较短时间间隔动态刷新；\n- `pidstat` 按指定间隔输出；\n- `ps` 的 CPU 使用率更接近进程生命周期内的平均值。\n\n对比工具数据时，应尽量统一采样时间和观察窗口。\n\n#### 从系统到进程\n\n先用 `top` 判断 CPU 时间主要消耗在哪一类活动：\n\n```bash\ntop\n```\n\n进入 `top` 后按 `1`，切换到每个逻辑 CPU 的视图。多核机器上，“某进程 100%”通常表示它占满一个逻辑 CPU，并不代表整台机器所有 CPU 都已耗尽。\n\n再用 `pidstat` 查看进程的用户态、内核态和等待 CPU 时间：\n\n```bash\npidstat -u 1\n```\n\n需要观察线程时：\n\n```bash\npidstat -t -u 1\ntop -H -p <PID>\n```\n\n如果多个进程或线程的 `%CPU` 之和能解释系统整体的 `us` 或 `sy`，说明已经完成“系统指标到责任进程”的关联。\n\n#### 用 perf 定位热点函数\n\n找到高 CPU 进程后，不要在线上排查初期直接使用会暂停进程的 GDB。`perf` 基于性能事件采样，对运行中程序的干扰通常更小，更适合先定位热点函数和调用链。\n\n实时查看系统热点：\n\n```bash\nperf top\n```\n\n只分析指定进程，并采集调用关系：\n\n```bash\nperf top -g -p <PID>\n```\n\n保存一段时间的数据，再离线查看：\n\n```bash\nperf record -g -p <PID> -- sleep 30\nperf report\n```\n\n`perf top` 或 `perf report` 中的重要字段：\n\n| 字段 | 含义 |\n| --- | --- |\n| `Overhead` 或 `Children` | 该符号及其调用路径占采样事件的比例 |\n| `Self` | 符号自身占用的采样比例 |\n| `Shared Object` | 函数所在的程序、动态库或内核 |\n| `Symbol` | 函数或指令符号 |\n\n样本数过少时，百分比不具有代表性。应让采样覆盖稳定复现问题的一段时间。\n\n#### 先判断 perf 报告是否可信\n\n`perf` 能生成报告，不代表报告一定包含可解释的调用栈。分析前先检查以下四个条件：\n\n| 检查项 | 异常表现 | 处理方向 |\n| --- | --- | --- |\n| 采样窗口 | 样本很少，热点每次变化很大 | 延长采样并覆盖故障窗口 |\n| 符号解析 | 只有十六进制地址或 `[unknown]` | 补齐二进制、动态库和调试符号 |\n| 调用栈展开 | 只能看到叶子函数，父调用缺失 | 调整 call graph 模式或构建选项 |\n| 目标范围 | 报告被 `swapper` 或其他进程占满 | 限定 PID、线程、CPU 或 cgroup |\n\n记录时同时显示采样数量，避免只看百分比：\n\n```bash\nperf report --show-nr-samples\n```\n\n只看目标进程：\n\n```bash\nperf report --pid <PID>\n```\n\n只看目标命令：\n\n```bash\nperf report --comms <COMMAND>\n```\n\n如果目标函数占比很低，调用栈可能被展示阈值隐藏。课程案例中，应用占比约为 `0.34%`，低于当时 `perf report` 调用图的默认阈值，因此界面只展开了占比更高的 `swapper`。可以显式降低阈值：\n\n```bash\nperf report -g graph,0.1\n```\n\n阈值越低，报告越完整，但调用树也会更大。正确做法是先过滤到目标进程或动态库，再逐步降低阈值，而不是在全系统报告中展开所有分支。\n\n`swapper` 代表 CPU 空闲任务。系统级采样主要由 `swapper` 构成，通常说明：\n\n- 采样时故障没有发生；\n- 工作负载已经结束；\n- 目标进程大部分时间阻塞而非消耗 CPU；\n- 采样范围过大，目标进程占比被稀释；\n- 选择了不适合当前问题的事件。\n\n若业务慢但 CPU 大量空闲，应转向 off-CPU、I/O、锁、调度延迟和依赖服务，而不是继续把 idle 路径当作 CPU 热点。\n\n#### 符号为何变成十六进制地址\n\n`perf` 根据指令地址查找对应的 ELF、动态库、内核符号和调试信息。以下情况会造成符号缺失：\n\n- 可执行文件或动态库被 `strip` 删除符号；\n- 运行时二进制已经升级或删除，与采样时版本不同；\n- `perf.data` 被复制到另一台机器，但没有同步二进制；\n- 容器文件系统中的库在宿主机同路径不存在；\n- 内核符号受权限限制；\n- JIT 代码运行时生成，没有静态 ELF 符号；\n- 调用栈依赖帧指针，但编译器省略了帧指针。\n\n先保留构建产物和 Build ID：\n\n```bash\nperf buildid-list -i perf.data\n```\n\n对于自己维护的 C、C++ 或 Rust 程序，生产发布可以将调试信息拆分保存，而不是彻底丢弃：\n\n```text\n生产二进制：保留 Build ID，可按需去除大部分调试段\n符号服务器：按 Build ID 保存未裁剪二进制和调试文件\n性能数据：保存 perf.data、内核版本和容器镜像摘要\n```\n\n需要源码行号时，还必须提供 DWARF 调试信息：\n\n```bash\nperf report --stdio --sort comm,dso,symbol,srcline\n```\n\n若 `srcline` 为空，不代表函数没有执行，只说明无法把地址映射到源码行。\n\n#### 调用栈展开模式\n\n调用栈缺失还可能是展开方式不匹配。常见模式包括：\n\n| 模式 | 特点 | 适用条件 |\n| --- | --- | --- |\n| Frame Pointer | 开销较低 | 程序和库保留帧指针 |\n| DWARF | 能处理省略帧指针的程序 | 二进制包含展开信息，采样开销较高 |\n| LBR | 使用硬件分支记录 | 受 CPU 型号和调用深度限制 |\n\n使用 DWARF 采集：\n\n```bash\nperf record --call-graph dwarf -p <PID> -- sleep 30\n```\n\n使用帧指针模式：\n\n```bash\nperf record --call-graph fp -p <PID> -- sleep 30\n```\n\n若使用帧指针模式，应用和关键动态库应采用等价于 `-fno-omit-frame-pointer` 的构建选项。DWARF 调用栈会增加数据量和采样成本，应先在压测环境评估。\n\n#### 容器中的 perf 符号解析\n\n宿主机能够采样容器进程，但容器内的动态库通常不在宿主机相同路径。常见现象是内核符号正常，用户态函数全部显示为地址。\n\n先获取容器主进程在宿主机中的 PID：\n\n```bash\nPID=$(docker inspect --format '{{.State.Pid}}' <CONTAINER>)\n```\n\n采集目标进程：\n\n```bash\nperf record -g -p \"$PID\" -- sleep 30\n```\n\n分析时指定容器根文件系统：\n\n```bash\nperf report --symfs \"/proc/$PID/root\"\n```\n\n如果容器已退出，`/proc/<PID>/root` 会消失。可选做法是：\n\n1. 保留发生问题时的镜像摘要。\n2. 从相同镜像创建只读容器。\n3. 将其 rootfs 挂载到稳定目录。\n4. 使用 `perf report --symfs <ROOTFS>` 解析。\n\n另一种方式是在宿主机采集 `perf.data`，再把数据和匹配版本的工具放进同镜像环境分析。无论采用哪种方法，内核仍属于宿主机，`perf` 与宿主机内核能力和权限必须匹配。\n\n容器内直接运行 `perf` 往往需要额外 capabilities、较低的 `perf_event_paranoid` 限制或特权权限。不要为了排障长期给业务容器开放高权限；优先由宿主机或专用诊断容器执行短时采样。\n\n#### Java 程序为何更特殊\n\nJava 热点代码由 JIT 在运行时生成。普通 `perf` 可以采到 JVM、GC、JIT 编译线程和内核路径，但若没有 JIT 符号映射，Java 方法可能显示为未知地址。\n\n传统方法是让 JVM 或辅助工具生成：\n\n```text\n/tmp/perf-<PID>.map\n```\n\n并在需要时保留帧指针：\n\n```bash\n-XX:+PreserveFramePointer\n```\n\n这种方法适合把 Java、native 和 kernel 帧放到同一张 perf 火焰图中，但要确认 JDK、发行版和容器对符号文件目录的处理。\n\n现代 Java 排障通常优先使用 async-profiler。它可采集 Java、native、内核、GC 和 JIT 编译线程，并支持 CPU、分配、锁竞争和多类性能事件：\n\n```bash\nasprof -d 30 -f cpu-flamegraph.html <PID>\n```\n\n采集分配热点：\n\n```bash\nasprof -e alloc -d 30 -f alloc.html <PID>\n```\n\n采集锁竞争：\n\n```bash\nasprof -e lock -d 30 -f lock.html <PID>\n```\n\n若需要低频、长时间的生产记录，可使用 JDK Flight Recorder。先查询目标 JVM 支持的参数：\n\n```bash\njcmd <PID> help JFR.start\n```\n\n启动一段有时限的记录：\n\n```bash\njcmd <PID> JFR.start \\\n  name=cpu-investigation \\\n  settings=profile \\\n  duration=60s \\\n  filename=/tmp/cpu-investigation.jfr\n```\n\n工具选择可以按目标区分：\n\n| 目标 | 首选 |\n| --- | --- |\n| 系统与所有进程的 CPU 归因 | `perf` |\n| Java 方法、native 与内核混合火焰图 | async-profiler |\n| 长时间 JVM 事件、GC、线程和锁分析 | JFR |\n| 某个时刻线程状态 | `jstack` 或 `jcmd Thread.print` |\n\n`jstack` 是线程快照，不等于 CPU 采样。一次快照中的 RUNNABLE 线程未必是长期热点，应与线程 CPU、持续采样或多次快照交叉验证。\n\n```mermaid\ngraph TD\n    A[系统 CPU 使用率高] --> B[top 查看 CPU 类型]\n    B --> C[pidstat 定位进程]\n    C --> D[定位线程]\n    D --> E[perf 采样调用链]\n    E --> F[识别热点函数]\n    F --> G[检查代码和配置]\n    G --> H[修复后复测]\n```\n\n#### 案例闭环：PHP 计算热点\n\n课程案例中，Web 服务吞吐量很低，`top` 显示两个 CPU 的 `us` 接近 100%，多个 `php-fpm` 进程合计占满 CPU。`perf top -g -p <PID>` 最终把热点定位到 `sqrt` 调用。\n\n源码中存在一段遗留测试循环：\n\n```php\n<?php\n$x = 0.0001;\n\nfor ($i = 0; $i <= 1000000; $i++) {\n    $x += sqrt($x);\n}\n\necho \"It works!\";\n```\n\n删除无意义的循环后，相同压测条件下，案例吞吐量从每秒约 11 个请求提升到 2200 多个请求。这个案例说明：\n\n1. 系统指标只能告诉你“CPU 忙”。\n2. 进程指标告诉你“谁在忙”。\n3. 调用链采样才能告诉你“忙在哪个函数”。\n4. 优化必须回到相同压测条件复测，不能以代码改完作为结束。\n\n---", "subs": ["读懂 CPU 使用率分类", "从系统到进程", "用 perf 定位热点函数", "先判断 perf 报告是否可信", "符号为何变成十六进制地址", "调用栈展开模式", "容器中的 perf 符号解析", "Java 程序为何更特殊", "案例闭环：PHP 计算热点"]}, {"title": "CPU 使用率高却找不到进程的排查", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/06-案例篇-系统的CPU使用率很高，但为啥却找不到高CPU的应用.md -->\n\n有时 `top` 显示系统 CPU 使用率很高，但进程列表中没有任何一个进程持续占用大量 CPU。此时不应先怀疑统计工具，而应考虑快照型工具是否漏掉了生命周期很短的任务。\n\n#### 为什么会出现系统与进程数据不一致\n\n最常见的原因有两类：\n\n- 应用频繁执行生命周期很短的外部命令，进程在两次刷新之间已经退出；\n- 应用不断崩溃并被守护程序拉起，启动和初始化阶段消耗了大量 CPU。\n\n`top`、`ps` 和普通 `pidstat` 更擅长观察持续存在的进程。短时进程不断创建和退出时，系统累计 CPU 时间会升高，但任何一次进程快照都可能只看到它们短暂的残影。\n\n可疑特征包括：\n\n- 系统 `us` 或 `sy` 很高，但进程 `%CPU` 之和明显对不上；\n- `top` 的 `running` 任务数较多；\n- 偶尔看到处于 `R` 状态的可疑进程；\n- 同名进程的 PID 持续变化；\n- 某个请求、定时任务或脚本触发后问题明显。\n\n#### 先跟踪父子关系\n\n如果能捕捉到可疑进程，用 `pstree` 查找它的父进程：\n\n```bash\npstree -aps <PID>\n```\n\n也可以按名称查找：\n\n```bash\npstree -ap | grep '<COMMAND>'\n```\n\n父进程往往比短时子进程稳定。找到父进程后，就可以检查它为何反复调用外部命令。\n\n#### 用事件记录替代进程快照\n\n`perf record` 可以累计一段时间内的 CPU 事件，即使短时进程已经退出，其采样仍会保留在报告中：\n\n```bash\nperf record -g -a -- sleep 15\nperf report\n```\n\n更直接的工具是 `execsnoop`。它通过内核追踪记录 `exec` 行为，可以看到短时进程的 PID、父 PID、命令和返回结果：\n\n```bash\nexecsnoop\n```\n\n不同系统中的 `execsnoop` 可能来自 BCC、bpfcc-tools 或其他 eBPF 工具包，命令参数会有差异，使用前应查看本机帮助信息。\n\n```mermaid\ngraph TD\n    A[系统 CPU 高] --> B[进程 CPU 之和对不上]\n    B --> C[观察 R 状态和 PID 变化]\n    C --> D{是否疑似短时进程}\n    D -->|是| E[execsnoop 记录 exec]\n    D -->|不确定| F[perf record 全系统采样]\n    E --> G[找到父 PID 和命令行]\n    F --> G\n    G --> H[pstree 关联父进程]\n    H --> I[检查应用调用逻辑]\n```\n\n#### 案例闭环：请求触发短时 stress\n\n课程案例中，系统 `us` 高达约 80%，`sy` 约 15%，但常驻进程的 CPU 使用率都很低。重新观察后发现，`stress` 进程偶尔处于 `R` 状态，而且 PID 一直变化。\n\n`pstree` 显示调用链类似：\n\n```text\nphp-fpm -> sh -> stress\n```\n\n应用代码对每个请求都执行一次外部命令：\n\n```php\n<?php\n$result = exec(\n    \"/usr/local/bin/stress -t 1 -d 1 2>&1\",\n    $output,\n    $status\n);\n```\n\n命令又因为权限错误快速失败、退出并被下一次请求重新创建。普通进程快照很难稳定捕捉到它，但 `perf` 的累计报告显示 `stress` 占据了大部分 CPU 时钟事件，`execsnoop` 也能持续记录大量 `stress` 启动。\n\n处理这类问题时，应先回答四个问题：\n\n1. 哪个短时命令在频繁执行？\n2. 它由哪个父进程触发？\n3. 它为什么执行或失败后重试？\n4. 这段调用能否删除、降频、异步化或改为进程内实现？\n\n---", "subs": ["为什么会出现系统与进程数据不一致", "先跟踪父子关系", "用事件记录替代进程快照", "案例闭环：请求触发短时 stress"]}, {"title": "处理大量不可中断进程与僵尸进程", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/07-案例篇-系统中出现大量不可中断进程和僵尸进程怎么办上.md; sources/linux-performance/01-CPU性能篇/08-案例篇-系统中出现大量不可中断进程和僵尸进程怎么办下.md -->\n\n`top` 和 `ps` 中的进程状态，是连接平均负载、CPU 使用率、I/O 等待和应用行为的重要线索。尤其是 `D` 状态和 `Z` 状态持续增多时，通常已经不只是 CPU 问题，还涉及 I/O 或进程管理缺陷。\n\n#### 常见进程状态\n\n| 状态 | 名称 | 含义 |\n| --- | --- | --- |\n| `R` | Running 或 Runnable | 正在运行或等待 CPU |\n| `S` | Interruptible Sleep | 等待事件，可被信号唤醒 |\n| `D` | Uninterruptible Sleep | 通常等待硬件 I/O，暂时不可中断 |\n| `Z` | Zombie | 子进程已退出，父进程尚未回收退出状态 |\n| `T` 或 `t` | Stopped 或 Traced | 被暂停或正在被调试器跟踪 |\n| `I` | Idle | 空闲内核线程，不会像 `D` 状态那样抬高负载 |\n| `X` | Dead | 已消亡，通常不会在普通进程列表中看到 |\n\n短时间出现 `D` 状态并不一定异常。真正需要警惕的是：\n\n- `D` 状态进程持续不恢复或数量持续增加；\n- `iowait` 同时升高；\n- 平均负载被大量 `D` 状态进程抬高；\n- 业务延迟与磁盘或设备请求同步恶化。\n\n#### 排查不可中断进程\n\n先用 `top`、`vmstat` 或 `dstat` 判断 `D` 状态是否与 I/O 变化相关：\n\n```bash\ntop\nvmstat 1\ndstat -tcdnmgy 1\n```\n\n再用 `pidstat` 查看进程 I/O：\n\n```bash\npidstat -d 1\npidstat -d -p <PID> 1\n```\n\n常用字段：\n\n| 字段 | 含义 |\n| --- | --- |\n| `kB_rd/s` | 每秒读取的数据量 |\n| `kB_wr/s` | 每秒写入的数据量 |\n| `kB_ccwr/s` | 被任务取消的写入量 |\n| `iodelay` | 块 I/O 延迟的累计时钟周期 |\n\n如果目标进程持续存在，可以跟踪系统调用：\n\n```bash\nstrace -f -tt -T -p <PID>\n```\n\n但短时进程可能在附加前已经退出，或者变成无法继续跟踪的僵尸进程。这时应改用累计采样：\n\n```bash\nperf record -g -a -- sleep 15\nperf report\n```\n\n课程案例通过调用链中的 `sys_read`、`new_sync_read` 和块设备直接 I/O 路径，最终发现应用使用 `O_DIRECT` 绕过页缓存读取磁盘，造成明显的 `iowait`。删除不必要的 `O_DIRECT` 后，`iowait` 从很高的水平下降到接近零。\n\n> `iowait` 高不等于磁盘一定达到硬件极限。它表示采样期间 CPU 空闲且至少有任务在等待 I/O。仍需结合吞吐量、延迟、队列和设备利用率判断真正的 I/O 瓶颈。\n\n#### 僵尸进程为什么出现\n\n子进程退出后，内核会保留少量退出信息，等待父进程调用 `wait()` 或 `waitpid()` 回收。父进程没有及时回收时，子进程就处于 `Z` 状态。\n\n僵尸进程不再执行代码，通常也不消耗 CPU 和大量内存，但会占用 PID 和进程表项。持续累积可能最终阻止系统创建新进程。\n\n```mermaid\nstateDiagram-v2\n    [*] --> Running\n    Running --> Exited: 子进程退出\n    Exited --> Zombie: 父进程未回收\n    Zombie --> Reaped: wait 或 waitpid\n    Reaped --> [*]\n```\n\n查找僵尸进程及其父进程：\n\n```bash\nps -eo pid,ppid,stat,comm,wchan:32 | awk '$3 ~ /^Z/'\npstree -aps <ZOMBIE_PID>\n```\n\n修复重点在父进程，而不是对子进程执行 `kill -9`。僵尸进程已经退出，没有可供信号终止的运行实体。应检查父进程是否：\n\n- 调用了 `wait()` 或 `waitpid()`；\n- 正确处理了 `SIGCHLD`；\n- 存在永远走不到回收逻辑的循环；\n- 在异常路径中遗漏了子进程清理；\n- 创建子进程的速度超过回收速度。\n\n课程案例中的父进程虽然写了 `wait()`，但它被放在无限循环之后，实际上永远无法执行。把回收逻辑移动到可达路径后，僵尸进程不再累积。\n\n```c\nfor (;;) {\n    pid_t pid = fork();\n\n    if (pid == 0) {\n        run_child_work();\n        _exit(0);\n    }\n\n    if (pid > 0) {\n        waitpid(pid, NULL, 0);\n    }\n}\n```\n\n完整排查路径：\n\n```mermaid\ngraph TD\n    A[负载升高] --> B[查看 R D Z 状态]\n    B --> C{D 状态是否增多}\n    C -->|是| D[关联 iowait 和磁盘活动]\n    D --> E[pidstat 定位 I/O 进程]\n    E --> F{进程是否仍存在}\n    F -->|是| G[strace 查看系统调用]\n    F -->|否| H[perf 累计采样]\n    B --> I{Z 状态是否增多}\n    I -->|是| J[pstree 找父进程]\n    J --> K[检查 wait 和 SIGCHLD]\n```\n\n---", "subs": ["常见进程状态", "排查不可中断进程", "僵尸进程为什么出现"]}, {"title": "理解软中断：网络与 I/O 背后的 CPU 消耗", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/09-基础篇-怎么理解Linux软中断.md -->\n\n中断让 CPU 不必持续轮询硬件状态。设备有事件时主动通知 CPU，CPU 暂停当前任务并执行中断处理程序，从而提高系统并发处理能力。\n\n问题在于，中断处理会打断正常进程。如果处理程序执行时间过长，其他中断和任务会被延迟。Linux 因此把中断处理拆成上半部和下半部。\n\n#### 上半部与下半部\n\n| 阶段 | 常用名称 | 主要职责 | 特点 |\n| --- | --- | --- | --- |\n| 上半部 | 硬中断 | 快速响应硬件、读取必要状态、确认中断 | 优先级高，要求尽快完成 |\n| 下半部 | 软中断 | 延迟处理剩余工作 | 可稍后执行，避免长时间阻塞硬中断 |\n\n以网卡收包为例：\n\n```mermaid\nsequenceDiagram\n    participant NIC as 网卡\n    participant IRQ as 硬中断\n    participant SIRQ as 软中断\n    participant Stack as 网络协议栈\n    participant App as 应用\n    NIC->>IRQ: 数据包到达\n    IRQ->>IRQ: 确认硬件状态\n    IRQ->>SIRQ: 调度 NET_RX\n    SIRQ->>Stack: 解析和处理数据包\n    Stack->>App: 数据进入套接字\n```\n\n软中断不只处理硬件中断的下半部，还包括定时器、调度、RCU 等内核事件。常见类型包括：\n\n- `HI`：高优先级 tasklet；\n- `TIMER`：定时器；\n- `NET_TX`：网络发送；\n- `NET_RX`：网络接收；\n- `BLOCK`：块设备；\n- `IRQ_POLL`：中断轮询；\n- `TASKLET`：普通 tasklet；\n- `SCHED`：调度；\n- `HRTIMER`：高精度定时器；\n- `RCU`：RCU 回调。\n\n#### 查看软中断\n\n查看各 CPU 从启动以来的累计软中断次数：\n\n```bash\ncat /proc/softirqs\n```\n\n累计值本身意义有限，排障时更重要的是变化速率：\n\n```bash\nwatch -d -n 1 cat /proc/softirqs\n```\n\n观察时关注两点：\n\n1. 哪种软中断增长最快；\n2. 同类软中断在不同 CPU 上是否严重不均衡。\n\n每个 CPU 通常都有对应的 `ksoftirqd/<CPU>` 内核线程。查看这些线程：\n\n```bash\nps -eLo pid,tid,psr,pcpu,stat,comm | grep ksoftirqd\n```\n\n进程名位于方括号中的任务通常是内核线程。`ksoftirqd` CPU 使用率升高，说明该 CPU 上积压了较多软中断工作，但仍需通过 `/proc/softirqs` 确认具体类型。\n\n#### 软中断为什么会拖慢业务\n\n软中断与应用进程共享 CPU。软中断频率过高时可能出现：\n\n- 应用可获得的 CPU 时间减少；\n- 网络收发延迟升高；\n- 数据包积压或丢弃；\n- 调度响应变慢；\n- 某些 CPU 被中断集中打满，而其他 CPU 仍较空闲。\n\n所以，系统整体 CPU 使用率不高，也不能排除软中断瓶颈。单核的 `si` 比例、`ksoftirqd` 活动和每秒中断增长率，可能比全机平均 CPU 使用率更有解释力。\n\n---", "subs": ["上半部与下半部", "查看软中断", "软中断为什么会拖慢业务"]}, {"title": "软中断导致 CPU 升高的定位", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/10-案例篇-系统的软中断CPU使用率升高，我该怎么办.md -->\n\n软中断排查的关键不是停在“`si` 高”，而是继续回答三个问题：\n\n1. 哪一种软中断增长最快？\n2. 它对应的系统活动是什么？\n3. 这些活动由什么流量、设备或工作负载触发？\n\n#### 第一步：确认 CPU 时间花在软中断\n\n```bash\ntop\nmpstat -P ALL 1\n```\n\n关注每个 CPU 的 `%soft` 或 `si`。全机平均值可能掩盖单个 CPU 的热点，所以必须查看逐 CPU 数据。\n\n#### 第二步：定位软中断类型\n\n```bash\nwatch -d -n 1 cat /proc/softirqs\n```\n\n如果 `NET_RX` 增长最快，说明主要压力来自网络接收；如果 `NET_TX` 增长快，则继续检查网络发送；如果 `SCHED` 或 `TIMER` 异常，则应沿调度和定时任务方向分析。\n\n#### 第三步：分析网络 PPS 与 BPS\n\n网络软中断高时，先看包速率和字节速率：\n\n```bash\nsar -n DEV 1\n```\n\n关键字段：\n\n| 字段 | 含义 |\n| --- | --- |\n| `rxpck/s` | 每秒接收包数，即接收 PPS |\n| `txpck/s` | 每秒发送包数，即发送 PPS |\n| `rxkB/s` | 每秒接收千字节数 |\n| `txkB/s` | 每秒发送千字节数 |\n\n平均包大小可粗略估算为：\n\n```text\n平均接收包大小 = rxkB/s * 1024 / rxpck/s\n```\n\n高 PPS、低 BPS 通常意味着大量小包。小包即使吞吐量不高，也会频繁触发协议栈处理和软中断，消耗大量 CPU。\n\n#### 第四步：抓包确认协议和来源\n\n```bash\ntcpdump -i eth0 -nn -c 200 'tcp port 80'\n```\n\n课程案例中，`NET_RX` 快速增长，网卡接收 PPS 很高但 BPS 很低，平均包长只有约 54 字节。抓包发现大量仅设置 `SYN` 标志的 TCP 包，最终确认是 SYN Flood。\n\n```mermaid\ngraph TD\n    A[si 或 soft 升高] --> B[查看 softirqs 增长率]\n    B --> C{增长最快的类型}\n    C -->|NET_RX| D[sar 查看接收 PPS 和 BPS]\n    C -->|NET_TX| E[sar 查看发送 PPS 和 BPS]\n    C -->|其他类型| F[沿对应内核活动排查]\n    D --> G{是否高 PPS 低 BPS}\n    G -->|是| H[tcpdump 分析小包]\n    G -->|否| I[检查大流量和协议栈处理]\n    H --> J[确认协议 标志 来源和目的]\n```\n\n#### 处置不能只停留在服务器进程\n\n网络攻击或异常流量已经到达服务器时，应用优化往往不是第一选择。课程案例最直接的止损方式是在交换机、硬件防火墙或上游网络设备封禁来源，使异常包不再进入服务器。\n\n实际环境还应根据问题类型考虑：\n\n- 上游清洗或限速；\n- 防火墙规则；\n- SYN cookies 和连接队列参数；\n- 网卡多队列与 RSS；\n- IRQ 亲和性和 `irqbalance`；\n- 应用监听和连接处理能力；\n- 内核网络参数；\n- 对异常来源进行持续监控。\n\n这些措施必须在明确流量类型、业务基线和风险后实施，不能看到 `NET_RX` 高就盲目修改内核参数。\n\n---", "subs": ["第一步：确认 CPU 时间花在软中断", "第二步：定位软中断类型", "第三步：分析网络 PPS 与 BPS", "第四步：抓包确认协议和来源", "处置不能只停留在服务器进程"]}, {"title": "CPU 性能问题的快速定位流程", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/11-套路篇-如何迅速分析出系统CPU的瓶颈在哪里.md; sources/linux-performance/01-CPU性能篇/13-答疑一-无法模拟出RES中断的问题，怎么办.md -->\n\nCPU 指标很多，但它们不是互相孤立的。高效排查的核心，是先用覆盖面广的工具缩小范围，再沿异常指标选择专项工具，而不是把所有命令无差别运行一遍。\n\n#### CPU 核心指标\n\n| 指标 | 说明 | 常见异常方向 |\n| --- | --- | --- |\n| 平均负载 | `R` 和 `D` 状态的平均活跃任务数 | CPU 竞争或 I/O 等待 |\n| 用户 CPU | 用户态代码消耗 | 应用热点 |\n| 系统 CPU | 内核态代码消耗 | 系统调用、调度、内核线程 |\n| `iowait` | CPU 空闲且存在 I/O 等待 | 存储 I/O |\n| 软中断 | 内核软中断处理 | 网络、定时器、调度 |\n| 硬中断 | 硬件中断处理 | 网卡、磁盘或其他设备 |\n| 自愿上下文切换 | 任务主动等待资源 | I/O、锁、内存 |\n| 非自愿上下文切换 | 任务被强制换出 | CPU 竞争、线程过多 |\n| CPU 缓存命中率 | 热点数据能否从缓存获取 | 数据布局、跨核调度、NUMA |\n\n#### 三个入口工具\n\n优先运行 `top`、`vmstat` 和 `pidstat`：\n\n```bash\ntop\nvmstat 1\npidstat -u -w 1\n```\n\n它们分别回答：\n\n| 工具 | 主要回答的问题 |\n| --- | --- |\n| `top` | 整体负载如何，CPU 时间花在哪，哪些进程和状态可疑 |\n| `vmstat` | 运行队列、阻塞队列、上下文切换和中断是否异常 |\n| `pidstat` | 哪个进程消耗用户态或内核态 CPU，谁在等待 CPU，谁频繁切换 |\n\n#### 实验结果不符合预期时怎么处理\n\n性能实验不是固定剧本。同一条命令在不同内核、工具版本、虚拟化平台和硬件上，可能产生完全不同的指标。遇到“没有复现课程现象”时，不要先怀疑命令没执行，而应按以下顺序核对：\n\n```mermaid\ngraph TD\n    A[实验结果不符合预期] --> B[确认工具版本和参数]\n    B --> C[确认 CPU 内存 磁盘规格]\n    C --> D[确认负载是否真正到达目标资源]\n    D --> E[检查容器和虚拟化限制]\n    E --> F[读取日志和退出状态]\n    F --> G[根据实际指标重新解释]\n```\n\n#### stress 无法制造 iowait\n\n旧版课程使用 `stress -i` 调用 `sync` 制造 I/O 压力，但这个实验并不稳定。`sync` 只有在系统存在足够脏页时才会产生明显写入；若页缓存中几乎没有待写数据，命令会频繁进入内核，却不会形成足够设备 I/O。\n\n这种场景常表现为：\n\n- 平均负载有所升高；\n- `sy` 明显升高；\n- `wa` 仍接近零；\n- 磁盘吞吐和队列并不高。\n\n这不是 `iowait` 指标错误，而是实验主要制造了系统调用开销。\n\n可使用 `stress-ng` 同时产生同步调用和临时文件 I/O：\n\n```bash\nstress-ng --io 1 --hdd 1 --timeout 60s --metrics-brief\n```\n\n运行时必须同步观察设备：\n\n```bash\nmpstat -P ALL 1\niostat -xz 1\npidstat -d 1\n```\n\n只有看到设备吞吐、队列或延迟升高，才能证明压力真正到达存储设备。高性能 NVMe 可能轻松吸收低强度负载，需要逐步增加并发和数据量；机械盘则可能很快饱和，不能直接照搬高强度参数。\n\n测试前确认目标设备和数据路径：\n\n```bash\nfindmnt -T /path/to/test-file\nlsblk -o NAME,TYPE,SIZE,FSTYPE,MOUNTPOINTS\n```\n\n容器内的文件可能落在 OverlayFS、宿主机卷或网络存储，观察错误设备会得出“没有 I/O”的假结论。\n\n#### 单核系统为何看不到 RES\n\n`RES` 通常表示重调度处理器间中断。它用于通知其他 CPU 重新调度任务，因此只有一个逻辑 CPU 时，没有其他 CPU 需要被唤醒，`RES` 不增长是合理现象。\n\n即使单核机器看不到 `RES`，线程过多仍会造成：\n\n- 运行队列增长；\n- 非自愿上下文切换增长；\n- 每个线程等待 CPU 的时间增加；\n- 缓存和调度开销上升；\n- 吞吐不再随线程数增长。\n\n验证 CPU 竞争：\n\n```bash\nvmstat 1\npidstat -u -w -t 1\n```\n\n关键证据是 `r`、`cswch/s`、`nvcswch/s` 和进程 `%wait`，不是必须看到某一种中断。\n\n#### pidstat 的 wait 不等于 top 的 wa\n\n这两个字段名称相似，但统计对象不同：\n\n| 指标 | 统计对象 | 含义 |\n| --- | --- | --- |\n| `pidstat %wait` | 进程或线程 | 可运行但等待获得 CPU 的时间比例 |\n| `top wa` | CPU | CPU 空闲且系统存在未完成 I/O 的时间比例 |\n\n进程 `%wait` 高通常意味着 CPU 竞争或配额节流；CPU `wa` 高通常引导到存储 I/O。一个线程等待磁盘时处于睡眠状态，并不会直接把同一数值显示成该线程的 `%wait`。\n\n容器 CPU 配额不足也会造成进程 `%wait` 高。此时宿主机可能仍有空闲 CPU，应同时检查：\n\n```bash\ncat /sys/fs/cgroup/<CGROUP>/cpu.stat\ncat /sys/fs/cgroup/<CGROUP>/cpu.max\n```\n\n#### vmstat 第一行为什么不同\n\n执行：\n\n```bash\nvmstat 5\n```\n\n默认情况下，第一行的 CPU、上下文切换和中断等速率，通常是系统启动以来的平均值；后续行才是每个五秒采样窗口的平均值。进程数和内存等部分字段则是当前快照。\n\n因此：\n\n- 不要拿第一行与第二行直接判断突发变化；\n- 自动采集时可丢弃第一行；\n- 明确使用采样间隔和次数；\n- 不同版本行为以本机 `man vmstat` 为准。\n\n例如采集五次一秒窗口：\n\n```bash\nvmstat 1 6\n```\n\n分析时通常使用后五行。工具输出不符合直觉时，先查版本和手册：\n\n```bash\nvmstat --version\nman vmstat\n```\n\n#### 工具缺少字段不等于指标不存在\n\n课程答疑中，旧版 `pidstat` 没有 `%wait` 列。生产环境经常因为发行版较旧、最小化镜像或权限限制，无法使用最新工具。处理原则是：\n\n1. 先确认工具版本和字段定义。\n2. 查找指标在 `/proc`、`/sys` 或 cgroup 中的原始来源。\n3. 使用另一种工具交叉验证。\n4. 不要把“工具没有显示”解释成“系统没有这个现象”。\n\n```bash\npidstat -V\nuname -r\ncat /proc/stat\ncat /proc/loadavg\ncat /proc/interrupts\n```\n\n同名字段在不同工具中也可能含义不同。引用指标时应同时记录工具、版本、参数和采样窗口。\n\n#### 按异常指标选择下一步\n\n| 起始现象 | 下一步工具 | 目标 |\n| --- | --- | --- |\n| `us` 高 | `pidstat -u`、`perf` | 找到应用和热点函数 |\n| `sy` 高 | `pidstat`、`strace`、`perf` | 分析系统调用、调度或内核热点 |\n| 负载高且 `r` 高 | `pidstat`、`top -H` | 找出争抢 CPU 的进程和线程 |\n| 负载高且 `b` 高 | `dstat`、`iostat`、`pidstat -d` | 定位 I/O 等待 |\n| `cs` 高 | `pidstat -w`、`pidstat -wt` | 区分自愿与非自愿切换 |\n| `si` 高 | `/proc/softirqs`、`sar -n DEV`、`tcpdump` | 定位软中断类型和网络流量 |\n| `in` 高 | `/proc/interrupts` | 定位具体硬中断 |\n| 系统 CPU 高但无高 CPU 进程 | `execsnoop`、`perf record -a` | 捕捉短时进程 |\n\n#### 一套可执行的快速流程\n\n```mermaid\ngraph TD\n    A[业务变慢或告警] --> B[top 获取全局画像]\n    B --> C[vmstat 核对队列 切换 中断]\n    C --> D[pidstat 关联责任进程]\n    D --> E{主要异常}\n    E -->|用户 CPU| F[perf 定位热点函数]\n    E -->|系统 CPU| G[strace 或 perf 分析内核路径]\n    E -->|iowait| H[dstat iostat pidstat 分析 I/O]\n    E -->|软中断| I[softirqs sar tcpdump]\n    E -->|上下文切换| J[pidstat -wt 分析线程]\n    E -->|进程数据缺失| K[execsnoop 捕捉短时进程]\n    F --> L[形成根因假设]\n    G --> L\n    H --> L\n    I --> L\n    J --> L\n    K --> L\n    L --> M[用第二类证据交叉验证]\n    M --> N[实施最小修复并复测]\n```\n\n#### 生产排障记录模板\n\n每次排障至少记录以下内容：\n\n```text\n时间范围：\n受影响业务：\n主机和 CPU 规格：\n业务症状：\n平均负载 1m 5m 15m：\nus sy wa hi si st：\nr b cs in：\n高 CPU 进程或线程：\n关键调用链或系统调用：\n异常中断或网络流量：\n根因假设：\n交叉验证证据：\n修复动作：\n修复前后业务指标：\n修复前后系统指标：\n```\n\n记录完整证据链，才能区分“相关现象”和“真正根因”，也便于后续复盘和建立监控阈值。\n\n---", "subs": ["CPU 核心指标", "三个入口工具", "实验结果不符合预期时怎么处理", "stress 无法制造 iowait", "单核系统为何看不到 RES", "pidstat 的 wait 不等于 top 的 wa", "vmstat 第一行为什么不同", "工具缺少字段不等于指标不存在", "按异常指标选择下一步", "一套可执行的快速流程", "生产排障记录模板"]}, {"title": "CPU 性能优化的常用手段", "content": "<!-- src: sources/linux-performance/01-CPU性能篇/12-套路篇-CPU性能优化的几个思路.md -->\n\n性能优化不是看到 CPU 高就立即改参数。正确顺序是先量化目标、定位主瓶颈、选择成本可控的方案，再用相同条件验证效果。\n\n#### 优化前先回答三个问题\n\n1. 用什么指标证明优化有效？\n2. 多个问题同时存在时，先解决哪个？\n3. 多个方案都能改善性能时，哪一个综合成本最低？\n\n性能评估至少包含应用和系统两个维度：\n\n| 维度 | 可选指标 |\n| --- | --- |\n| 应用 | 吞吐量、请求延迟、错误率、任务完成时间 |\n| 系统 | CPU 使用率、运行队列、上下文切换、缓存命中率 |\n\n评估流程：\n\n```mermaid\ngraph TD\n    A[确定量化指标] --> B[记录优化前基线]\n    B --> C[实施单一可控变更]\n    C --> D[相同条件重新压测]\n    D --> E[比较应用指标]\n    D --> F[比较系统指标]\n    E --> G{是否达到目标}\n    F --> G\n    G -->|是| H[保留变更并持续监控]\n    G -->|否| I[回退或继续分析]\n```\n\n压测客户端与目标服务应尽量分离，避免压测工具抢占目标服务器资源。优化前后还必须保持机器规格、数据集、并发参数和外部依赖一致。\n\n#### 应用层优化\n\n| 方法 | 适用方向 | 注意事项 |\n| --- | --- | --- |\n| 删除无效工作 | 无意义循环、重复计算、调试代码 | 优先级最高，风险通常最低 |\n| 编译器优化 | 本地编译型程序 | 评估 `-O2` 等选项对调试和行为的影响 |\n| 算法优化 | 计算复杂度过高 | 优先优化热点路径，不要只看理论复杂度 |\n| 异步处理 | 大量资源等待或轮询 | 关注队列堆积、超时和失败重试 |\n| 多线程代替多进程 | 跨进程切换成本高 | 同步、锁竞争和线程数可能成为新瓶颈 |\n| 缓存 | 重复访问或重复计算 | 处理一致性、失效和容量问题 |\n| 批处理 | 高频小任务 | 会增加单批延迟，需要平衡吞吐与时延 |\n| 减少锁竞争 | 多线程热点临界区 | 避免把锁拆得过细导致复杂度失控 |\n\n应用优化首先关注热点路径。没有采样证据时，不要把时间花在极少执行的代码上。\n\n#### 系统层优化\n\n| 方法 | 作用 | 风险或前提 |\n| --- | --- | --- |\n| CPU 亲和性 | 减少跨 CPU 调度，提高缓存局部性 | 绑定不当会造成单核热点 |\n| CPU 独占 | 为关键任务保留 CPU | 降低系统可共享的计算资源 |\n| 调整 nice | 改变普通进程调度优先级 | 不能突破 CPU 总容量 |\n| cgroups CPU 限制 | 防止单个服务耗尽 CPU | 限制过低会抬高业务延迟 |\n| NUMA 优化 | 尽量访问本地内存 | 需要理解 CPU 和内存节点拓扑 |\n| 中断负载均衡 | 分散硬中断和软中断压力 | 需结合网卡队列和应用绑核设计 |\n| 减少线程数量 | 降低调度和切换开销 | 不能牺牲必要并发能力 |\n| 升级 CPU 或扩容 | 增加总计算能力 | 应先确认瓶颈确实是 CPU 容量 |\n\n常见命令示例：\n\n```bash\n# 查看进程允许使用的 CPU\ntaskset -cp <PID>\n\n# 将进程绑定到 CPU 0 和 CPU 1\ntaskset -cp 0,1 <PID>\n\n# 调低进程优先级\nrenice 10 -p <PID>\n\n# 查看 NUMA 拓扑\nnumactl --hardware\n\n# 查看中断亲和性\ncat /proc/irq/<IRQ>/smp_affinity_list\n```\n\n不要孤立使用这些命令。比如绑核能提高缓存局部性，但也可能把应用线程、网络中断和内核线程挤到同一个 CPU 上，制造更严重的热点。\n\n#### 如何选择优化顺序\n\n当多个问题同时存在时：\n\n1. 优先处理已经达到硬瓶颈的系统资源。\n2. 优先处理对业务指标影响最大的问题。\n3. 排除有因果关系的次生现象，避免重复优化。\n4. 优先选择改动小、收益明确、容易回退的方案。\n5. 每次尽量只改变一个主要变量，便于判断因果。\n\n例如，系统态 CPU 和上下文切换同时升高时，大量线程竞争可能是根因，而系统态 CPU 高只是频繁调度的结果。此时应优先控制线程数量和调度竞争，而不是单独追求降低 `sy`。\n\n#### 避免过早优化\n\n优化会增加代码、配置和运维复杂度，还可能把瓶颈转移到内存、I/O 或网络。满足当前业务目标后，应停止无收益的极限调优，把剩余风险纳入监控。\n\nCPU 优化的最终标准不是“CPU 使用率越低越好”，而是：\n\n- 业务吞吐量和延迟达到目标；\n- CPU 资源使用可解释且有合理余量；\n- 没有把瓶颈转移成更严重的问题；\n- 方案可维护、可观测、可回退。", "subs": ["优化前先回答三个问题", "应用层优化", "系统层优化", "如何选择优化顺序", "避免过早优化"]}]}, {"title": "第 2 章 · 内存性能分析与优化", "sections": [{"title": "Linux 内存管理机制速览", "content": "<!-- src: sources/linux-performance/02-内存性能篇/15-基础篇-Linux内存是怎么工作的.md; sources/linux-performance/02-内存性能篇/22-答疑三-文件系统与磁盘的区别是什么.md -->\n\nLinux 进程看到的不是物理内存，而是内核为它提供的独立虚拟地址空间。理解虚拟地址、页表、缺页异常、内存分配和回收之间的关系，是解释内存占用、Swap、OOM 和缓存行为的基础。\n\n#### 虚拟内存如何映射到物理内存\n\n每个进程都有独立且连续的虚拟地址空间。用户态只能访问用户空间，进入内核态后才能访问内核空间。不同进程的用户空间相互隔离，而内核空间最终关联到相同的内核物理内存。\n\n```mermaid\ngraph TD\n    A[进程虚拟地址] --> B[MMU]\n    B --> C[TLB 查询]\n    C -->|命中| D[物理地址]\n    C -->|未命中| E[查询页表]\n    E -->|已有映射| D\n    E -->|没有映射| F[触发缺页异常]\n    F --> G[内核分配或加载内存页]\n    G --> H[更新页表]\n    H --> D\n```\n\nLinux 通常以页为最小映射单位，常见页大小为 4 KiB。页表记录虚拟页到物理页的映射，TLB 则缓存近期使用的页表项，减少地址转换开销。\n\n频繁跨进程调度可能降低 TLB 和 CPU 缓存的局部性。大量内存访问型应用还可能使用 HugePage，常见大小为 2 MiB 或 1 GiB，以减少页表项数量和 TLB 压力。\n\n查看页大小和大页配置：\n\n```bash\ngetconf PAGE_SIZE\ngrep -E 'HugePages|Hugepagesize|AnonHugePages' /proc/meminfo\n```\n\n#### 进程虚拟地址空间\n\n用户空间通常包含：\n\n| 内存区域 | 典型内容 | 管理特点 |\n| --- | --- | --- |\n| 只读段 | 程序代码、常量 | 由程序映像确定 |\n| 数据段 | 全局变量、静态变量 | 生命周期通常与进程一致 |\n| 堆 | `malloc` 等动态分配 | 向高地址增长，由应用管理 |\n| 文件映射段 | 动态库、共享内存、`mmap` 文件 | 由映射关系管理 |\n| 栈 | 局部变量、调用帧 | 由线程和系统自动管理 |\n\n查看进程内存映射：\n\n```bash\npmap -x <PID>\ncat /proc/<PID>/maps\ncat /proc/<PID>/smaps\n```\n\n`maps` 适合看地址范围和映射对象，`smaps` 还提供 RSS、PSS、匿名页、共享页和 Swap 等详细数据。\n\n#### 分配内存不等于立即占用物理内存\n\n用户态程序调用 `malloc()` 后，分配器可能通过 `brk()` 扩展堆，或通过 `mmap()` 创建匿名映射。申请成功通常只代表获得虚拟地址空间，物理页往往在首次读写时通过缺页异常按需分配。\n\n```mermaid\nsequenceDiagram\n    participant App as 应用\n    participant Lib as 内存分配器\n    participant Kernel as 内核\n    App->>Lib: malloc 申请内存\n    Lib->>Kernel: brk 或 mmap\n    Kernel-->>App: 返回虚拟地址\n    App->>App: 首次访问地址\n    App->>Kernel: 缺页异常\n    Kernel->>Kernel: 分配物理页并更新页表\n    Kernel-->>App: 恢复执行\n```\n\n常见实现中，小块分配倾向复用堆中的内存，大块分配倾向使用 `mmap()`。具体阈值由内存分配器和运行环境决定，不能把固定的 128 KiB 当作所有系统的硬规则。\n\n用户空间分配器负责小对象复用；内核则通过伙伴系统管理页，通过 Slab 或 SLUB 管理内核小对象。频繁分配和释放会产生缺页、锁竞争、碎片和元数据管理开销，因此高频路径常使用对象池或内存池。\n\n#### 主缺页与次缺页\n\n缺页异常不一定意味着磁盘 I/O。根据完成映射是否需要外部 I/O，可分为：\n\n| 类型 | 英文 | 常见场景 | 主要成本 |\n| --- | --- | --- | --- |\n| 次缺页 | Minor Fault | 首次分配匿名页、写时复制、页已在缓存 | 页表和内存管理 |\n| 主缺页 | Major Fault | 文件页不在缓存、换入 Swap 页 | 存储 I/O 和调度等待 |\n\n进程首次写入 `malloc()` 返回的匿名地址，通常会产生次缺页。读取一个尚未进入页缓存的大文件，或访问已换出的匿名页，可能产生主缺页。\n\n查看进程缺页速率：\n\n```bash\npidstat -r -p <PID> 1\n```\n\n其中 `minflt/s` 和 `majflt/s` 分别表示次缺页和主缺页速率。还可以采集程序执行期间的总量：\n\n```bash\nperf stat -e page-faults,minor-faults,major-faults -- <COMMAND>\n```\n\n判断时注意：\n\n- 次缺页很多不一定有问题，进程启动和大块匿名内存首次触碰都会产生；\n- 主缺页会引入 I/O，但偶发主缺页也可能是正常按需加载；\n- 主缺页与业务尾延迟同时上升，才值得继续检查文件访问和 Swap；\n- 使用 HugePage、预热或内存池前，应先证明页表、TLB 或缺页确实是瓶颈。\n\n#### Active 与 Inactive LRU\n\nLinux 会根据页面访问情况维护活跃和非活跃集合，并区分匿名页与文件页：\n\n```bash\ngrep -E '^(Active|Inactive|Unevictable)' /proc/meminfo\n```\n\n典型字段包括：\n\n```text\nActive(anon)\nInactive(anon)\nActive(file)\nInactive(file)\nUnevictable\n```\n\n可以把回收过程理解为：\n\n```mermaid\ngraph LR\n    A[新页或再次访问] --> B[活跃集合]\n    B --> C[老化扫描]\n    C --> D[非活跃集合]\n    D -->|再次访问| B\n    D -->|干净文件页| E[直接回收]\n    D -->|脏文件页| F[写回后回收]\n    D -->|匿名页| G[换出或保留]\n```\n\n现代内核的具体回收实现会随版本演进，但运维判断仍应区分：\n\n- 文件页可以在需要时从文件重新读取，干净页回收成本较低；\n- 脏文件页必须先写回；\n- 匿名页没有文件作为后备，通常需要 Swap 才能释放物理页；\n- `Unevictable` 包含被锁定等不可回收页面；\n- 回收扫描本身也消耗 CPU，直接回收还会阻塞申请内存的线程。\n\n观察扫描、回收和换页增量：\n\n```bash\ngrep -E 'pgscan|pgsteal|pgactivate|pgdeactivate|pswpin|pswpout' /proc/vmstat\n```\n\n`pgscan` 增长而 `pgsteal` 很少，说明扫描效率较低；业务线程直接回收时间增加时，即使还没有 OOM，也可能出现明显尾延迟。\n\n#### 内存紧张时发生什么\n\n当可用内存不足时，Linux 可能：\n\n1. 回收可丢弃的文件页缓存；\n2. 把脏页写回存储后再回收；\n3. 把不活跃匿名页换出到 Swap；\n4. 触发内存压缩或直接回收；\n5. 无法满足分配时触发 OOM，选择进程终止。\n\n```mermaid\ngraph TD\n    A[可用内存下降] --> B[回收文件页]\n    B --> C[写回脏页]\n    C --> D{是否仍不足}\n    D -->|否| E[继续分配]\n    D -->|是| F{是否启用 Swap}\n    F -->|是| G[换出匿名页]\n    F -->|否| H[直接回收和压缩]\n    G --> I{是否满足分配}\n    H --> I\n    I -->|否| J[触发 OOM]\n    I -->|是| E\n```\n\nOOM 选择不应仅按进程 RSS 简单理解。查看相关值：\n\n```bash\ncat /proc/<PID>/oom_score\ncat /proc/<PID>/oom_score_adj\n```\n\n现代系统通常通过 `oom_score_adj` 调整倾向，范围为 `-1000` 到 `1000`。`-1000` 可使进程尽量避免被 OOM 选择，但滥用会让系统失去可终止对象，因此只应保护真正关键的少量进程。\n\n#### 虚拟内存承诺与 overcommit\n\n虚拟地址申请成功，不代表系统已经为最坏情况保留了同等物理内存。Linux 使用 overcommit 策略决定是否接受新的虚拟内存承诺：\n\n```bash\nsysctl vm.overcommit_memory\nsysctl vm.overcommit_ratio\ngrep -E 'CommitLimit|Committed_AS' /proc/meminfo\n```\n\n常见模式：\n\n| `vm.overcommit_memory` | 含义 |\n| --- | --- |\n| `0` | 使用内核启发式策略判断 |\n| `1` | 倾向允许分配，实际使用时再承担风险 |\n| `2` | 按 commit limit 执行更严格的承诺检查 |\n\n`Committed_AS` 是系统已经承诺的虚拟内存估算，`CommitLimit` 是严格模式下的承诺上限。二者不是当前 RSS，也不能直接替代 `available`。\n\n```text\n严格 overcommit 检查失败：\n  内存申请可能直接返回失败\n\n进程被 OOM 杀死：\n  申请曾经成功\n  页面实际触碰后物理内存和回收能力不足\n```\n\n因此，“OOM 按虚拟内存触发”是不准确的简化。OOM 的直接背景是某次内存分配在允许的回收、压缩和换页之后仍无法满足；虚拟内存承诺策略会影响分配是否提前失败，但不是唯一条件。\n\n#### 区分全局 OOM 与 cgroup OOM\n\n全局 OOM 表示主机级内存分配失败，通常能在内核日志中看到完整的内存状态和被终止进程：\n\n```bash\njournalctl -k | grep -i -E 'out of memory|oom-killer|killed process'\n```\n\ncgroup OOM 则可能发生在主机仍有大量可用内存时，因为容器或服务已经达到自身限制。cgroup v2 可检查：\n\n```bash\ncat /sys/fs/cgroup/<CGROUP>/memory.current\ncat /sys/fs/cgroup/<CGROUP>/memory.high\ncat /sys/fs/cgroup/<CGROUP>/memory.max\ncat /sys/fs/cgroup/<CGROUP>/memory.events\n```\n\n`memory.events` 中常见计数：\n\n- `high`：超过软限制并受到回收或节流；\n- `max`：分配触及硬上限；\n- `oom`：该 cgroup 进入 OOM 状态；\n- `oom_kill`：有任务被 OOM killer 终止。\n\n排查容器 OOM 时，必须同时保留容器状态、cgroup 限制与事件、进程工作集、内核日志和故障前峰值历史。\n\n#### 读懂系统和进程内存指标\n\n系统整体：\n\n```bash\nfree -h\n```\n\n| 指标 | 含义 |\n| --- | --- |\n| `total` | 物理内存总量 |\n| `used` | 按工具口径计算的已用内存 |\n| `free` | 完全未使用的内存 |\n| `shared` | 主要包括 tmpfs 等共享内存 |\n| `buff/cache` | Buffer、页缓存和可回收 Slab 等 |\n| `available` | 在不发生明显交换的情况下可供新应用使用的估算值 |\n\n判断内存余量时，`available` 通常比 `free` 更重要。Linux 会主动用空闲内存做缓存，`free` 很低并不自动表示内存不足。\n\n进程维度：\n\n| 指标 | 含义 | 注意事项 |\n| --- | --- | --- |\n| `VIRT` 或 `VSZ` | 虚拟地址空间总量 | 包含未实际占用物理页的映射 |\n| `RES` 或 `RSS` | 常驻物理内存 | 共享页会在多个进程中重复出现 |\n| `SHR` | 可共享映射的近似值 | 不能简单相加计算系统总占用 |\n| `PSS` | 按共享比例分摊后的物理内存 | 统计多进程总占用更合理 |\n| `USS` | 进程独占的物理内存 | 进程退出后可直接释放的部分 |\n\n对于单个进程，可优先使用汇总接口：\n\n```bash\ncat /proc/<PID>/smaps_rollup\n```\n\n统计一组工作进程的总物理占用时，直接累加 RSS 会重复计算共享库和共享内存；累加 PSS 更接近这组进程按比例分摊后的总成本。PSS 仍是采样时刻的统计值，容量规划要使用业务峰值和历史分位数，而不是只测空闲启动状态。\n\n```bash\nps -eo pid,ppid,comm,vsz,rss,%mem --sort=-rss | head\ntop\n```\n\n---", "subs": ["虚拟内存如何映射到物理内存", "进程虚拟地址空间", "分配内存不等于立即占用物理内存", "主缺页与次缺页", "Active 与 Inactive LRU", "内存紧张时发生什么", "虚拟内存承诺与 overcommit", "区分全局 OOM 与 cgroup OOM", "读懂系统和进程内存指标"]}, {"title": "区分 Buffer 与 Cache：内存都去哪了", "content": "<!-- src: sources/linux-performance/02-内存性能篇/16-基础篇-怎么理解内存中的Buffer和Cache.md -->\n\n`free` 中的 `buff/cache` 不是“被浪费的内存”，而是 Linux 为减少慢速存储访问而主动使用的内存。理解 Buffer、页缓存和 Slab，能避免看到缓存增长就错误地清缓存或扩容。\n\n#### 指标从哪里来\n\n```bash\ngrep -E '^(Buffers|Cached|SReclaimable|SUnreclaim|Dirty|Writeback):' /proc/meminfo\n```\n\n主要指标：\n\n| 指标 | 含义 |\n| --- | --- |\n| `Buffers` | 原始块设备元数据或块 I/O 相关缓冲 |\n| `Cached` | 文件页缓存，不含 SwapCached |\n| `SReclaimable` | 内存紧张时可回收的 Slab |\n| `SUnreclaim` | 不能直接回收的 Slab |\n| `Dirty` | 已修改但尚未写回存储的页 |\n| `Writeback` | 正在写回存储的页 |\n\n不同内核和工具版本对 `buff/cache` 的组合口径可能不同，应以本机 `man free` 和 `/proc/meminfo` 为准。\n\n#### Buffer 与 Cache 的实用区别\n\n课程实验可归纳为：\n\n| 操作对象 | 读操作主要增长 | 写操作主要增长 |\n| --- | --- | --- |\n| 文件系统中的普通文件 | 页缓存 Cache | 页缓存和脏页 Cache |\n| 原始块设备 | Buffer 或块层相关缓存 | Buffer 或块层相关缓存 |\n\n因此，更实用的理解是：\n\n- Cache 主要服务文件数据；\n- Buffer 主要服务原始块设备和块层；\n- 两者都可能参与读写，不能简化成“Buffer 只写、Cache 只读”。\n\n普通文件写入时，应用通常先把数据写入页缓存，页面被标记为脏页，再由内核异步写回磁盘。这样能合并小写请求并让应用更快返回，但也意味着“`write()` 返回”不等于“数据已经持久化”。\n\n```mermaid\nsequenceDiagram\n    participant App as 应用\n    participant Cache as 页缓存\n    participant Kernel as 内核写回\n    participant Disk as 磁盘\n    App->>Cache: write 写入缓存\n    Cache-->>App: 提前返回\n    Kernel->>Cache: 扫描脏页\n    Kernel->>Disk: 合并并写回\n    Disk-->>Kernel: 持久化完成\n```\n\n需要明确持久化边界时，应根据应用语义使用 `fsync()`、`fdatasync()` 或数据库自身的日志机制，而不是假设操作系统会立即落盘。\n\n#### 动态观察缓存和 I/O\n\n```bash\nvmstat 1\n```\n\n重点字段：\n\n| 字段 | 含义 |\n| --- | --- |\n| `buff` | Buffer 用量 |\n| `cache` | 页缓存等用量 |\n| `bi` | 从块设备读入 |\n| `bo` | 写入块设备 |\n| `wa` | I/O 等待 |\n\n还可以使用：\n\n```bash\nwatch -n 1 \"grep -E '^(MemAvailable|Buffers|Cached|Dirty|Writeback):' /proc/meminfo\"\n```\n\n排查缓存增长时，要同时看：\n\n- `available` 是否持续下降；\n- 缓存是否可回收；\n- `Dirty` 和 `Writeback` 是否堆积；\n- 磁盘吞吐、延迟和队列是否恶化；\n- 增长是否与特定任务或文件访问同步。\n\n#### 不要在生产环境随意 drop_caches\n\n课程实验使用：\n\n```bash\nsync\necho 3 > /proc/sys/vm/drop_caches\n```\n\n这是为了构造冷缓存环境，不是常规优化手段。清缓存会让后续访问重新落到存储，可能造成延迟尖峰和 I/O 风暴。生产环境只有在明确实验目的、评估影响并获得变更许可后才应使用。\n\n---", "subs": ["指标从哪里来", "Buffer 与 Cache 的实用区别", "动态观察缓存和 I/O", "不要在生产环境随意 drop_caches"]}, {"title": "用好系统缓存提升程序效率", "content": "<!-- src: sources/linux-performance/02-内存性能篇/17-案例篇-如何利用系统缓存优化程序的运行效率.md -->\n\n缓存是否有效，不能只看 Cache 占用大小。更关键的指标是缓存命中率，以及命中数据量是否与应用实际 I/O 规模一致。\n\n#### 缓存命中率\n\n```text\n缓存命中率 = 缓存命中请求数 / 总请求数\n```\n\n命中率高通常意味着更少的磁盘访问，但仍需结合每次请求的数据大小、业务延迟和磁盘指标判断。大量微小请求的高命中率，未必能解释应用声称的大吞吐量。\n\n课程使用 BCC 工具：\n\n```bash\ncachestat 1\ncachetop\n```\n\n| 工具 | 用途 |\n| --- | --- |\n| `cachestat` | 查看系统级缓存命中、未命中和脏页趋势 |\n| `cachetop` | 按进程查看缓存命中情况 |\n\nBCC 工具的安装路径和命令名称因发行版而异，可能位于 `/usr/share/bcc/tools`，也可能带 `-bpfcc` 后缀。\n\n查看指定文件有多少页在内存中，可使用 `pcstat` 或同类基于 `mincore` 的工具：\n\n```bash\npcstat /path/to/file\n```\n\n#### 冷缓存与热缓存是不同测试\n\n同一个文件第一次读取时需要访问磁盘，第二次读取可能全部命中页缓存。课程案例中，同一 512 MiB 文件：\n\n- 冷缓存读取约为磁盘速度；\n- 热缓存读取达到内存拷贝级速度；\n- 第二次结果不能代表底层磁盘性能。\n\n因此，性能测试前要先明确目标：\n\n| 测试目标 | 缓存处理 |\n| --- | --- |\n| 用户真实体验 | 保留与生产一致的缓存状态 |\n| 文件系统热读能力 | 预热缓存后测试 |\n| 存储设备能力 | 使用直接 I/O 或超出内存的数据集 |\n| 首次访问延迟 | 构造可控冷缓存环境 |\n\n不要把热缓存的 `dd` 结果写成磁盘吞吐量。更适合存储基准的工具通常是 `fio`，并应明确 `direct`、队列深度、块大小、读写模式和工作集大小。\n\n#### 判断应用是否绕过缓存\n\n如果应用声称读取 32 MiB/s，但 `cachetop` 只观察到少量缓存页命中，可能存在直接 I/O。\n\n```bash\nstrace -f -e trace=open,openat,read,pread64 -p <PID>\n```\n\n看到类似以下标志时，说明应用使用直接 I/O：\n\n```text\nopenat(..., O_RDONLY|O_DIRECT) = 4\n```\n\n直接 I/O 绕过页缓存，适合数据库等自行管理缓存和 I/O 调度的应用，但普通顺序读场景可能因此失去系统缓存带来的性能收益。\n\n```mermaid\ngraph TD\n    A[文件读取慢] --> B[观察缓存命中率]\n    B --> C{命中数据量是否匹配}\n    C -->|匹配且命中低| D[工作集未预热或过大]\n    C -->|不匹配| E[检查是否直接 I/O]\n    E --> F[strace 查看 O_DIRECT]\n    F --> G{应用是否自行管理缓存}\n    G -->|否| H[评估改为缓存 I/O]\n    G -->|是| I[继续分析应用缓存和存储]\n```\n\n课程案例移除不必要的 `O_DIRECT` 后，读取 32 MiB 数据的耗时从约 0.9 秒降到约 0.03 秒。这里的结论不是“直接 I/O 一定差”，而是 I/O 模式必须与应用的缓存策略一致。\n\n#### 应用层缓存仍然必要\n\n操作系统页缓存的内容和生命周期由内核管理。需要精确控制热点数据、过期时间和跨主机共享时，还需要：\n\n- 进程内缓存；\n- 对象池；\n- Redis 等外部缓存；\n- 数据库 Buffer Pool；\n- CDN 或反向代理缓存。\n\n任何缓存都应监控命中率、容量、淘汰、穿透、失效延迟和数据一致性，不能只关注“是否用了缓存”。\n\n---", "subs": ["缓存命中率", "冷缓存与热缓存是不同测试", "判断应用是否绕过缓存", "应用层缓存仍然必要"]}, {"title": "内存泄漏的定位与处理", "content": "<!-- src: sources/linux-performance/02-内存性能篇/18-案例篇-内存泄漏了，我该如何定位和处理.md -->\n\n内存泄漏是程序失去对已分配内存的有效引用，却没有将其归还分配器或内核。泄漏会逐步挤压可用内存，触发缓存回收、Swap、分配延迟甚至 OOM。\n\n#### 先区分增长与泄漏\n\n进程 RSS 增长不一定是泄漏，也可能是：\n\n- 工作集正常扩大；\n- 页缓存增长；\n- 内存分配器保留空闲 Arena；\n- 线程栈或连接数量增长；\n- 内存映射文件增多；\n- 应用主动缓存；\n- 队列积压。\n\n泄漏的典型特征是：业务负载稳定时，进程内存仍长期单向增长，且已完成请求对应的内存不能被复用或释放。\n\n#### 从系统趋势定位责任进程\n\n```bash\nvmstat 3\npidstat -r 1\nps -eo pid,comm,rss,vsz,%mem --sort=-rss | head\n```\n\n如果 `free` 持续下降而 `buff/cache` 基本稳定，说明增长更可能来自进程匿名内存。找到目标进程后：\n\n```bash\npmap -x <PID>\ncat /proc/<PID>/status\ncat /proc/<PID>/smaps_rollup\n```\n\n重点观察：\n\n- `RssAnon`：匿名常驻内存；\n- `RssFile`：文件映射常驻内存；\n- `RssShmem`：共享内存；\n- `VmSwap`：换出的虚拟内存；\n- `Private_Dirty`：进程私有脏页。\n\n#### 用分配调用栈确认泄漏\n\n课程使用 BCC `memleak` 跟踪未释放分配：\n\n```bash\nmemleak -p <PID>\n```\n\n其他常见工具：\n\n```bash\nvalgrind --leak-check=full --show-leak-kinds=all ./app\n```\n\n生产环境更适合低开销采样、应用运行时 Profiling 或在预发布环境使用 Valgrind。工具能否解析符号取决于：\n\n- 二进制是否保留符号；\n- 调试信息是否可用；\n- 容器内路径在宿主机是否可访问；\n- 编译优化是否内联了关键函数；\n- 调用栈展开信息是否完整。\n\n容器场景中，宿主机追踪工具可能找不到容器内的二进制路径。需要在宿主机提供相同路径的二进制和符号，或进入目标命名空间运行工具。\n\n```mermaid\ngraph TD\n    A[可用内存持续下降] --> B[确认缓存是否稳定]\n    B --> C[pidstat 和 ps 找增长进程]\n    C --> D[smaps 区分匿名页和文件页]\n    D --> E{是否疑似匿名内存泄漏}\n    E -->|是| F[memleak 或运行时 Profiler]\n    F --> G[获取未释放分配调用栈]\n    G --> H[检查成功和异常路径的释放]\n    H --> I[修复后长时间复测]\n```\n\n#### 修复必须覆盖所有所有权路径\n\n课程案例中，函数通过 `calloc()` 返回内存，调用方使用后没有 `free()`。实际项目还应检查：\n\n- 正常返回路径；\n- 错误返回路径；\n- 超时与取消路径；\n- 多线程之间的所有权转移；\n- 第三方库要求调用的释放函数；\n- 容器、集合和回调中隐式持有的引用。\n\nC 语言中可采用单一清理出口：\n\n```c\nint handle_request(void) {\n    char *buffer = NULL;\n    int rc = -1;\n\n    buffer = malloc(4096);\n    if (buffer == NULL) {\n        goto out;\n    }\n\n    if (do_work(buffer) != 0) {\n        goto out;\n    }\n\n    rc = 0;\n\nout:\n    free(buffer);\n    return rc;\n}\n```\n\n修复验证不能只看程序“不崩溃”。应在稳定负载下持续观察 RSS、匿名内存和未释放调用栈，确认内存曲线进入稳定区间。\n\n---", "subs": ["先区分增长与泄漏", "从系统趋势定位责任进程", "用分配调用栈确认泄漏", "修复必须覆盖所有所有权路径"]}, {"title": "Swap 频繁使用的成因与排查", "content": "<!-- src: sources/linux-performance/02-内存性能篇/19-案例篇-为什么系统的Swap变高了上.md; sources/linux-performance/02-内存性能篇/20-案例篇-为什么系统的Swap变高了下.md -->\n\nSwap 把不活跃匿名页写入磁盘，释放物理内存；进程再次访问时，再把页面从磁盘换回。它可以缓解内存不足，却会把内存访问变成慢得多的存储 I/O。\n\n#### 文件页和匿名页的回收方式\n\n| 页面类型 | 内容 | 内存紧张时的处理 |\n| --- | --- | --- |\n| 干净文件页 | 文件读取缓存 | 可直接丢弃，需要时从文件重读 |\n| 脏文件页 | 尚未落盘的文件修改 | 先写回磁盘，再回收 |\n| 匿名页 | 堆、栈等无文件后备的数据 | 需要 Swap 才能换出 |\n\n```mermaid\ngraph TD\n    A[内存回收] --> B[文件页]\n    A --> C[匿名页]\n    B --> D{是否脏页}\n    D -->|否| E[直接丢弃]\n    D -->|是| F[写回后回收]\n    C --> G{是否启用 Swap}\n    G -->|是| H[换出到磁盘]\n    G -->|否| I[不能通过交换回收]\n```\n\n#### 内存水位与回收\n\n内核按内存 Zone 维护 `min`、`low`、`high` 水位。可用页跌破 `low` 时，后台回收线程会工作，目标是把空闲页恢复到 `high` 附近；分配路径无法等待时还可能触发直接回收。\n\n```bash\ncat /proc/zoneinfo\nsysctl vm.min_free_kbytes\n```\n\n`vm.min_free_kbytes` 影响系统保留的最低空闲内存，设置不当可能导致浪费或分配失败，不应作为普通调优旋钮随意修改。\n\nNUMA 系统还要逐节点观察：\n\n```bash\nnumactl --hardware\nnumastat\ncat /proc/sys/vm/zone_reclaim_mode\n```\n\n全机 `available` 充足，不代表每个 NUMA Node 都充足。本地节点压力、内存绑定或回收策略可能导致远端访问、局部回收甚至 Swap。\n\n#### 正确理解 swappiness\n\n```bash\nsysctl vm.swappiness\n```\n\n`swappiness` 表示回收匿名页相对于文件页的倾向，不是“内存使用到多少百分比开始 Swap”。值越高通常越积极考虑匿名页回收，值越低通常越偏向回收文件页。\n\n即使设置为 0，也不能把它理解为绝对禁止 Swap。要完全禁止，需要关闭 Swap，但这会改变系统在突发内存压力下的失败模式，可能更早触发 OOM。\n\n#### Swap 排查步骤\n\n先确认空间和实时换页：\n\n```bash\nfree -h\nswapon --show\nvmstat 1\nsar -r -S -W 1\n```\n\n重点区分：\n\n- Swap 已使用但 `si`、`so` 为 0：可能只是历史换出页面仍未被访问；\n- `si` 持续升高：进程正在访问被换出的页，通常直接影响延迟；\n- `so` 持续升高：系统仍在换出匿名页，内存压力尚未解除；\n- `si`、`so` 同时活跃：可能发生严重的交换抖动。\n\n查看回收和缺页：\n\n```bash\ngrep -E 'pgscan|pgsteal|pswpin|pswpout|pgmajfault' /proc/vmstat\n```\n\n定位使用 Swap 的进程：\n\n```bash\nfor status in /proc/[0-9]*/status; do\n    awk '\n        /^Name:/   { name=$2 }\n        /^Pid:/    { pid=$2 }\n        /^VmSwap:/ { swap=$2 }\n        END {\n            if (swap > 0) {\n                printf \"%10d kB  pid=%-8s %s\\n\", swap, pid, name\n            }\n        }\n    ' \"$status\"\ndone | sort -nr | head\n```\n\n进一步查看目标进程：\n\n```bash\ngrep -E '^(Name|VmRSS|VmSwap|RssAnon|RssFile):' /proc/<PID>/status\ncat /proc/<PID>/smaps_rollup\n```\n\n课程案例中，大量块设备读取不断扩大 Buffer，空闲页跌破水位后，系统循环回收文件页和匿名页，导致 Swap 增长。这个案例说明：即使大部分内存看起来是可回收缓存，内核仍可能按回收策略换出一部分匿名页。\n\n#### 降低 Swap 风险\n\n常见方法：\n\n- 修复泄漏、无界缓存和队列积压；\n- 为工作集提供足够物理内存；\n- 对延迟敏感系统评估关闭 Swap；\n- 必须使用 Swap 时，基于压测调整 `swappiness`；\n- 使用 cgroups 限制异常进程；\n- 对少量关键内存使用 `mlock()` 或 `mlockall()`，并评估锁页上限；\n- 监控 `si`、`so`、主缺页、回收和业务延迟，而不只监控 Swap 已用空间。\n\n关闭和重新开启 Swap 会把页面读回内存，内存余量不足时可能触发 OOM，不能把 `swapoff -a && swapon -a` 当作无风险清理操作。\n\n---", "subs": ["文件页和匿名页的回收方式", "内存水位与回收", "正确理解 swappiness", "Swap 排查步骤", "降低 Swap 风险"]}, {"title": "内存性能问题的快速定位流程", "content": "<!-- src: sources/linux-performance/02-内存性能篇/21-套路篇-如何快准狠找到系统内存的问题.md -->\n\n内存排障应先区分“正常利用内存”和“真正的内存压力”，再判断问题来自进程匿名内存、文件缓存、Slab、缺页还是 Swap。\n\n#### 核心指标与工具\n\n| 指标 | 首选工具 |\n| --- | --- |\n| 总量、可用内存、缓存、Swap | `free`、`/proc/meminfo` |\n| 动态内存、换入换出 | `vmstat`、`sar` |\n| 进程 RSS、VSZ、缺页 | `top`、`ps`、`pidstat -r` |\n| 进程地址空间、PSS、匿名页 | `pmap`、`smaps`、`smaps_rollup` |\n| 页缓存命中 | `cachestat`、`cachetop` |\n| 指定文件缓存 | `pcstat` |\n| Slab | `slabtop`、`/proc/slabinfo` |\n| 内存泄漏 | `memleak`、Valgrind、运行时 Profiler |\n| Swap 进程 | `/proc/<PID>/status` |\n| 内存水位与碎片 | `/proc/zoneinfo`、`/proc/buddyinfo` |\n\n#### 三层排查法\n\n第一层，确认系统整体：\n\n```bash\nfree -h\ntop\n```\n\n优先看 `available`、Swap、业务是否已出现 OOM 或延迟，而不是只看 `free`。\n\n第二层，观察趋势：\n\n```bash\nvmstat 1\nsar -r -S -W 1\npidstat -r 1\n```\n\n确认内存是否持续增长、缓存是否增长、是否发生换入换出、哪个进程的 RSS 或缺页在变化。\n\n第三层，专项定位：\n\n```mermaid\ngraph TD\n    A[内存告警或业务变慢] --> B[free 查看 available 和 Swap]\n    B --> C[vmstat 和 sar 查看趋势]\n    C --> D{主要现象}\n    D -->|进程 RSS 增长| E[pidstat pmap smaps]\n    D -->|缓存增长| F[cachetop slabtop pcstat]\n    D -->|Swap 活跃| G[zoneinfo vmstat 进程 VmSwap]\n    D -->|主缺页高| H[检查工作集和存储]\n    E --> I{是否泄漏}\n    I -->|是| J[memleak 或 Profiler]\n    I -->|否| K[检查业务缓存和队列]\n```\n\n#### 常见现象的判断\n\n| 现象 | 优先判断 |\n| --- | --- |\n| `free` 很低但 `available` 较高 | 大量可回收缓存，通常不代表压力 |\n| `available` 持续下降 | 进程匿名内存、不可回收 Slab或工作集增长 |\n| RSS 持续增长 | 泄漏、缓存、队列或分配器保留 |\n| Cache 很大且命中率高 | 可能是有效缓存 |\n| Cache 很大但磁盘仍繁忙 | 工作集过大、访问模式随机或直接 I/O |\n| `SUnreclaim` 持续增长 | 内核对象泄漏或内核资源积压 |\n| 主缺页和 `si` 高 | Swap 换入导致慢访问 |\n| Swap 已用但无 `si`、`so` | 不一定正在造成性能问题 |\n| OOM 日志出现 | 物理内存和回收路径已无法满足分配 |\n\n查看 OOM 记录：\n\n```bash\njournalctl -k | grep -i -E 'out of memory|oom-killer|killed process'\n```\n\n#### 内存优化原则\n\n1. 修复泄漏和无界增长。\n2. 把真正的热点工作集留在内存中。\n3. 减少高频动态分配，使用对象池、内存池或批量分配。\n4. 根据场景使用页缓存、应用缓存或数据库缓存。\n5. 通过 cgroups 设置边界，避免单服务拖垮主机。\n6. 评估大页、NUMA 绑定和内存局部性。\n7. 对延迟敏感应用减少主缺页和活跃交换。\n8. 调整 OOM 保护时保留系统自救空间。\n\n内存优化的目标不是让占用率最低，而是让工作集稳定、访问延迟可控、回收和交换可接受，并且在异常增长时有明确的隔离与失败边界。", "subs": ["核心指标与工具", "三层排查法", "常见现象的判断", "内存优化原则"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kafka 深度学习笔记 · 第一册：基础、部署与客户端 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kafka 深度学习笔记 · 第一册：基础、部署与客户端</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kafka 深度学习笔记 · 第一册：基础、部署与客户端", "intro": "> **适用对象**：运维工程师 / SRE / 后端开发人员  \n> **学习目标**：系统性掌握 Kafka 核心概念、集群部署、客户端开发、内核原理、运维管理和流处理应用\n\n---", "parts": [{"title": "第一章 Kafka 入门基础", "sections": [{"title": "1.1 消息引擎系统概述", "content": "本章将从消息引擎的基本概念出发，介绍 Kafka 的核心术语、定位与演进历程，帮助读者建立对 Kafka 的整体认知，并指导如何选择合适的 Kafka 版本。\n\n---\n\n\n#### 📌 背景\n\n在分布式系统中，不同服务之间需要进行数据交换和通信。传统的同步调用方式存在诸多问题：\n\n- **系统耦合度高**：服务之间直接调用，一个服务的变更可能影响多个下游服务\n- **流量冲击问题**：上游系统的突发流量可能直接压垮下游系统\n- **容错能力弱**：任一环节故障可能导致整个链路不可用\n\n消息引擎系统（Messaging System）应运而生，它在系统之间引入了一个中间层，实现了生产者和消费者的解耦。\n\n#### 📐 原理\n\n##### 1.1.1 消息引擎的定义\n\n根据维基百科的定义：\n\n> **消息引擎系统是一组规范，企业利用这组规范在不同系统之间传递语义准确的消息，实现松耦合的异步式数据传递。**\n\n通俗来说：**系统 A 发送消息给消息引擎系统，系统 B 从消息引擎系统中读取 A 发送的消息。**\n\n##### 1.1.2 两种消息传输模型\n\n```mermaid\ngraph LR\n    subgraph \"点对点模型 P2P\"\n        PA[生产者A] --> Q[消息队列]\n        Q --> CA[消费者A]\n    end\n```\n\n```mermaid\ngraph LR\n    subgraph \"发布订阅模型 Pub/Sub\"\n        PB1[发布者1] --> T[主题 Topic]\n        PB2[发布者2] --> T\n        T --> SB1[订阅者1]\n        T --> SB2[订阅者2]\n        T --> SB3[订阅者3]\n    end\n```\n\n| 模型 | 特点 | 典型场景 |\n|:---:|:---|:---|\n| **点对点模型** | 一条消息只能被一个消费者消费 | 电话客服系统：一个客户呼入只能被一位客服处理 |\n| **发布/订阅模型** | 一条消息可以被多个订阅者同时接收 | 报纸订阅：一份报纸可以被多人阅读 |\n\n> **💡 关键点**：Kafka 同时支持这两种消息模型，通过消费者组（Consumer Group）机制实现。\n\n##### 1.1.3 消息格式设计\n\n消息引擎的核心要解决两个问题：\n\n1. **消息格式**：如何设计消息使其能准确表达业务语义\n2. **传输协议**：如何将消息可靠地传输出去\n\n**常见的消息格式方案：**\n\n| 方案 | 特点 |\n|:---|:---|\n| CSV/XML/JSON | 通用性强，但性能开销较大 |\n| Protocol Buffer (Google) | 二进制格式，高效紧凑 |\n| Thrift (Facebook) | 跨语言序列化框架 |\n| **Kafka 方案** | **纯二进制字节序列**，结构化但需转换 |\n\n#### 🔧 实现\n\n##### 1.1.4 削峰填谷机制\n\n**这是消息引擎最核心的价值所在。**\n\n```mermaid\ngraph TD\n    subgraph \"无消息引擎\"\n        O1[订单服务<br/>TPS: 10000] -->|直接调用| S1[支付服务<br/>TPS: 1000]\n        S1 -->|压力过大| X1[系统崩溃!]\n    end\n```\n\n```mermaid\ngraph TD\n    subgraph \"引入Kafka后\"\n        O2[订单服务<br/>TPS: 10000] -->|写入消息| K[Kafka 集群]\n        K -->|按需消费| S2[支付服务<br/>TPS: 1000]\n        K -->|消息缓存| S2\n    end\n```\n\n**实际业务案例（以极客时间购课流程为例）：**\n\n1. 用户点击订阅按钮，触发订单生成\n2. 订单系统将订单消息写入 Kafka\n3. 下游服务（支付、用户验证、课程查询）各自从 Kafka 消费消息\n4. 秒杀场景下，Kafka 可缓存瞬时流量，保护下游服务\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **削峰填谷** | 缓冲上下游瞬时突发流量，避免系统雪崩 |\n| **异步解耦** | 生产者和消费者互不依赖，独立扩展 |\n| **消息持久化** | 消息保存在磁盘，支持重复消费 |\n| **JMS 规范** | Kafka 并未完全遵循 JMS 规范，而是另辟蹊径 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "1.2 Kafka 核心术语详解", "content": "#### 📌 背景\n\n要深入学习 Kafka，首先必须掌握其核心术语。这些术语构成了 Kafka 的概念体系，理解它们是后续学习的基础。\n\n#### 📐 原理\n\n##### 1.2.1 Kafka 消息架构三层结构\n\nKafka 的消息组织采用\"主题-分区-消息\"的三层结构：\n\n```mermaid\ngraph TD\n    subgraph \"Kafka 消息架构\"\n        T[主题 Topic] --> P0[分区0 Partition-0]\n        T --> P1[分区1 Partition-1]\n        T --> P2[分区2 Partition-2]\n        \n        P0 --> M01[消息0]\n        P0 --> M02[消息1]\n        P0 --> M03[消息2]\n        \n        P1 --> M11[消息0]\n        P1 --> M12[消息1]\n        \n        P2 --> M21[消息0]\n        P2 --> M22[消息1]\n        P2 --> M23[消息2]\n        P2 --> M24[消息3]\n    end\n```\n\n| 层级 | 概念 | 说明 |\n|:---:|:---|:---|\n| **第一层** | 主题（Topic） | 逻辑容器，按业务区分，每个主题可配置 M 个分区 |\n| **第二层** | 分区（Partition） | 有序消息序列，每个分区配置 N 个副本，只有 Leader 对外提供服务 |\n| **第三层** | 消息（Record） | 分区内的每条消息都有唯一的位移（Offset），从 0 开始递增 |\n\n##### 1.2.2 Broker 与集群架构\n\n```mermaid\ngraph TB\n    subgraph \"Kafka 集群\"\n        B1[Broker 1]\n        B2[Broker 2]\n        B3[Broker 3]\n    end\n    \n    P[Producer<br/>生产者] -->|发送消息| B1\n    P -->|发送消息| B2\n    \n    B1 -->|消费消息| C[Consumer<br/>消费者]\n    B2 -->|消费消息| C\n    B3 -->|消费消息| C\n    \n    ZK[ZooKeeper<br/>协调服务] -.->|元数据管理| B1\n    ZK -.->|元数据管理| B2\n    ZK -.->|元数据管理| B3\n```\n\n**核心组件说明：**\n\n| 组件 | 英文名 | 作用 |\n|:---|:---|:---|\n| **Broker** | 服务器节点 | 接收和处理客户端请求，持久化消息数据 |\n| **Producer** | 生产者 | 向主题发布消息的客户端应用程序 |\n| **Consumer** | 消费者 | 从主题订阅消息的客户端应用程序 |\n| **ZooKeeper** | 协调服务 | 保存集群元数据信息（Broker 列表、Topic 配置等） |\n\n##### 1.2.3 副本机制：Leader 与 Follower\n\n```mermaid\ngraph LR\n    subgraph \"分区副本机制\"\n        L[Leader 副本<br/>对外提供服务] \n        F1[Follower 副本1<br/>被动同步]\n        F2[Follower 副本2<br/>被动同步]\n        \n        P[Producer] -->|写入| L\n        C[Consumer] -->|读取| L\n        L -->|复制| F1\n        L -->|复制| F2\n    end\n```\n\n**副本机制要点：**\n\n| 项目 | Leader 副本 | Follower 副本 |\n|:---|:---|:---|\n| **对外服务** | ✅ 处理所有读写请求 | ❌ 不对外提供服务 |\n| **数据写入** | 接收生产者消息 | 从 Leader 拉取消息同步 |\n| **故障切换** | 宕机时触发新选举 | 可被选为新 Leader |\n\n> **⚠️ 注意**：与 MySQL 不同，Kafka 的 Follower 副本不能处理读请求。这样设计是为了保证 **Read-your-writes** 和 **单调读** 语义。\n\n##### 1.2.4 消费者组与重平衡\n\n```mermaid\ngraph TB\n    subgraph \"主题 Topic-A\"\n        P0[分区0]\n        P1[分区1]\n        P2[分区2]\n        P3[分区3]\n    end\n    \n    subgraph \"消费者组 Consumer Group\"\n        C1[消费者实例1]\n        C2[消费者实例2]\n    end\n    \n    P0 --> C1\n    P1 --> C1\n    P2 --> C2\n    P3 --> C2\n```\n\n**消费者组核心概念：**\n\n| 概念 | 说明 |\n|:---|:---|\n| **消费者组** | 多个消费者实例组成的一个组，共同消费一组主题 |\n| **分区分配** | 每个分区只能被组内一个消费者实例消费 |\n| **重平衡 (Rebalance)** | 消费者加入或退出时，自动重新分配分区 |\n\n> **💡 双刃剑**：重平衡既是 Kafka 实现高可用的重要手段，也是很多消费者问题的根源（会在后续章节详细讨论）。\n\n##### 1.2.5 两种位移概念\n\nKafka 中有两个容易混淆的\"位移\"概念：\n\n| 位移类型 | 英文 | 含义 | 特点 |\n|:---|:---|:---|:---|\n| **分区位移** | Offset | 消息在分区内的位置 | 固定不变，从 0 开始递增 |\n| **消费者位移** | Consumer Offset | 消费者当前消费到的位置 | 随消费进度变化 |\n\n```mermaid\ngraph LR\n    subgraph \"分区消息序列\"\n        M0[\"消息0<br/>offset=0\"]\n        M1[\"消息1<br/>offset=1\"]\n        M2[\"消息2<br/>offset=2\"]\n        M3[\"消息3<br/>offset=3\"]\n        M4[\"消息4<br/>offset=4\"]\n        M5[\"消息5<br/>offset=5\"]\n    end\n    \n    M0 --> M1 --> M2 --> M3 --> M4 --> M5\n    \n    CP[\"Consumer 位移=3<br/>(下一条待消费)\"] -.-> M3\n```\n\n#### 🔧 实现\n\n##### 1.2.6 消息日志存储机制\n\nKafka 使用**追加写入（Append-only）**的消息日志来保存数据：\n\n```mermaid\ngraph LR\n    subgraph \"日志存储结构\"\n        LS1[日志段1<br/>已封存] --> LS2[日志段2<br/>已封存] --> LS3[日志段3<br/>当前活跃]\n    end\n    \n    NM[新消息] -->|追加写入| LS3\n    \n    BG[后台任务] -->|定期清理| LS1\n```\n\n**存储机制要点：**\n\n| 特性 | 说明 |\n|:---|:---|\n| **顺序写入** | 避免随机 I/O，实现高吞吐量 |\n| **日志段切分** | 写满后自动切分新段，老段封存 |\n| **定期删除** | 后台任务清理过期日志段，回收磁盘空间 |\n\n#### ⚠️ 关键点\n\n**Kafka 核心术语速查表：**\n\n| 术语 | 英文 | 一句话解释 |\n|:---|:---|:---|\n| 消息 | Record | Kafka 处理的主要对象 |\n| 主题 | Topic | 承载消息的逻辑容器，用于区分业务 |\n| 分区 | Partition | 有序不变的消息序列，主题的物理存储单元 |\n| 消息位移 | Offset | 分区内每条消息的位置，单调递增且不变 |\n| 副本 | Replica | 同一消息的多份拷贝，分 Leader 和 Follower |\n| 生产者 | Producer | 发布消息的应用程序 |\n| 消费者 | Consumer | 订阅消息的应用程序 |\n| 消费者位移 | Consumer Offset | 消费者消费进度的标记 |\n| 消费者组 | Consumer Group | 多消费者实例组成的组，共同消费分区 |\n| 重平衡 | Rebalance | 消费者组内重新分配分区的过程 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "1.3 Kafka 的定位与演进", "content": "#### 📌 背景\n\nApache Kafka 诞生于 LinkedIn，最初是为了解决数据实时处理方面的需求。LinkedIn 早期面临的主要问题包括：\n\n1. **数据正确性不足**：采用轮询方式收集数据，间隔时间难以确定\n2. **系统高度定制化**：各业务系统需要对接数据收集模块，维护成本高\n3. **现有方案不理想**：ActiveMQ 无法满足性能需求\n\n#### 📐 原理\n\n##### 1.3.1 Kafka 的双重身份\n\n> **Apache Kafka 是消息引擎系统，也是分布式流处理平台。**\n\n这是理解 Kafka 定位的核心观点。\n\n```mermaid\ntimeline\n    title Kafka 演进历程\n    2011 : LinkedIn 开源 Kafka\n         : 定位为消息引擎\n    2012 : 成为 Apache 顶级项目\n    2016 : 0.10.0.0 版本\n         : 引入 Kafka Streams\n         : 升级为流处理平台\n    2017 : 0.11.0.0 版本\n         : 支持精确一次语义\n    2018 : Kafka 2.0 发布\n         : Streams 组件成熟\n```\n\n##### 1.3.2 流处理平台的优势\n\nKafka 作为流处理平台相比其他框架（Spark Streaming、Flink）的独特优势：\n\n**优势一：端到端的精确一次处理语义（Exactly-Once Semantics, EOS）**\n\n```mermaid\ngraph LR\n    subgraph \"外部框架 + Kafka\"\n        K1[Kafka] -->|读取| F[Flink/Spark]\n        F -->|写入| K2[Kafka]\n        F -.->|\"框架内EOS<br/>但无法控制Kafka\"| F\n    end\n```\n\n```mermaid\ngraph LR\n    subgraph \"Kafka Streams\"\n        KS1[Kafka] -->|读取| KS[Kafka Streams]\n        KS -->|写入| KS2[Kafka]\n        KS -.->|\"端到端EOS<br/>全程可控\"| KS\n    end\n```\n\n> 由于所有数据流转和计算都在 Kafka 内部完成，Kafka 可以实现真正的端到端精确一次处理语义。\n\n**优势二：轻量级客户端库定位**\n\n| 特性 | Kafka Streams | Flink/Spark |\n|:---|:---|:---|\n| **定位** | Java 客户端库 | 完整功能平台 |\n| **部署方式** | 普通 Java 应用 | 需要集群调度器 |\n| **资源管理** | 自行管理 | 框架提供 |\n| **适用场景** | 中小规模流处理 | 大规模数据处理 |\n\n#### 🔧 实现\n\n##### 1.3.3 Kafka 生态圈\n\n```mermaid\ngraph TB\n    subgraph \"Kafka 生态系统\"\n        KC[Kafka Connect<br/>数据集成]\n        KS[Kafka Streams<br/>流处理]\n        KB[Kafka Broker<br/>消息存储]\n    end\n    \n    subgraph \"数据源\"\n        MySQL[(MySQL)]\n        ES[(Elasticsearch)]\n        HDFS[(HDFS)]\n    end\n    \n    subgraph \"数据目标\"\n        DW[(Data Warehouse)]\n        BI[BI 系统]\n    end\n    \n    MySQL -->|Source Connector| KC\n    ES -->|Source Connector| KC\n    HDFS -->|Source Connector| KC\n    \n    KC --> KB\n    KB --> KS\n    KS --> KB\n    \n    KC -->|Sink Connector| DW\n    KC -->|Sink Connector| BI\n```\n\n**核心组件：**\n\n| 组件 | 功能 | 说明 |\n|:---|:---|:---|\n| **Kafka Broker** | 消息存储与传输 | 核心功能，提供高吞吐、持久化 |\n| **Kafka Connect** | 数据集成 | 通过 Connector 连接外部系统 |\n| **Kafka Streams** | 流处理 | 客户端库，用于构建实时应用 |\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **双重定位** | 既是消息引擎，也是流处理平台 |\n| **EOS 优势** | 可实现端到端精确一次语义，其他框架难以做到 |\n| **轻量级设计** | 作为客户端库而非完整平台，适合中小规模场景 |\n| **生态完善** | Kafka Connect + Kafka Streams 形成完整数据处理生态 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "1.4 Kafka 发行版选择指南", "content": "#### 📌 背景\n\n市面上存在多个 Kafka \"发行版\"，类似于 Linux 有 CentOS、Ubuntu 等不同发行版。选择合适的发行版对于生产环境至关重要。\n\n#### 📐 原理\n\n##### 1.4.1 三大主流 Kafka 发行版\n\n```mermaid\ngraph TB\n    subgraph \"Kafka 发行版生态\"\n        AK[Apache Kafka<br/>社区版]\n        CK[Confluent Kafka<br/>企业版]\n        CDH[CDH/HDP Kafka<br/>大数据平台版]\n    end\n    \n    AK -->|基础| CK\n    AK -->|基础| CDH\n```\n\n#### 🔧 实现\n\n##### 1.4.2 各发行版详细对比\n\n**Apache Kafka（社区版）**\n\n| 项目 | 说明 |\n|:---|:---|\n| **优势** | 迭代速度最快，社区响应度高，把控度高 |\n| **劣势** | 仅提供基础组件，缺少监控工具和高级 Connector |\n| **适用场景** | 需要高度定制化，有自研能力的团队 |\n\n**Confluent Kafka**\n\n| 项目 | 说明 |\n|:---|:---|\n| **创始团队** | Kafka 三位创始人（包括饶军）创办的公司 |\n| **免费版特性** | Schema Registry、REST Proxy、更多 Connector |\n| **企业版特性** | 跨数据中心备份、集群监控 |\n| **劣势** | 国内资料较少，普及率低 |\n| **适用场景** | 需要高级特性，有一定预算的企业 |\n\n**CDH/HDP Kafka**\n\n| 项目 | 说明 |\n|:---|:---|\n| **提供方** | Cloudera (CDH) 和 Hortonworks (HDP)，现已合并 |\n| **优势** | 开箱即用，统一管理界面，与大数据组件无缝集成 |\n| **劣势** | 版本滞后，把控度低，与社区版有延迟 |\n| **适用场景** | 需要快速搭建多框架数据平台的企业 |\n\n##### 1.4.3 发行版选型决策树\n\n```mermaid\ngraph TD\n    A[开始选择 Kafka 发行版] --> B{是否需要快速搭建<br/>多框架数据平台?}\n    B -->|是| C[CDH/HDP Kafka]\n    B -->|否| D{是否需要高级特性<br/>如跨DC备份、监控?}\n    D -->|是| E{是否有预算?}\n    E -->|是| F[Confluent Kafka 企业版]\n    E -->|否| G[Confluent Kafka 免费版]\n    D -->|否| H{是否有自研能力?}\n    H -->|是| I[Apache Kafka]\n    H -->|否| G\n```\n\n#### ⚠️ 关键点\n\n| 发行版 | 一句话总结 |\n|:---|:---|\n| **Apache Kafka** | 最正宗，迭代快，适合有自研能力的团队 |\n| **Confluent Kafka** | 高级特性丰富，原班人马打造，但国内资料少 |\n| **CDH/HDP Kafka** | 开箱即用，适合多框架场景，但版本滞后 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "1.5 Kafka 版本演进与选型", "content": "#### 📌 背景\n\nKafka 版本选择直接关系到能否使用特定功能特性。了解各版本差异是技术选型和架构评估的重要依据。\n\n#### 📐 原理\n\n##### 1.5.1 版本号命名规则\n\n**Kafka 版本号示例解析：**\n\n```\nkafka_2.11-2.1.1\n  │     │ │ │\n  │     │ │ └─ Patch 号（修订版本）\n  │     │ └─── Minor Version（小版本）\n  │     └───── Major Version（大版本）\n  └─────────── Scala 编译器版本（非 Kafka 版本！）\n```\n\n> **⚠️ 常见误区**：`2.11` 是 Scala 版本，真正的 Kafka 版本是 `2.1.1`\n\n##### 1.5.2 版本演进历程\n\n```mermaid\ntimeline\n    title Kafka 版本演进\n    0.7 : 最早开源版本\n        : 仅有基础消息队列功能\n        : 无副本机制\n    0.8 : 引入副本机制\n        : 成为完备的分布式系统\n        : 老版本客户端 API\n    0.8.2 : 引入新版本 Producer API\n    0.9 : 安全认证/权限功能\n        : Java 重写 Consumer API\n        : 引入 Kafka Connect\n    0.10 : 引入 Kafka Streams\n        : 升级为流处理平台\n    0.10.2.2 : Consumer API 稳定\n    0.11 : 幂等性 Producer\n        : 事务 API\n        : 消息格式 V2\n    1.0/2.0 : Kafka Streams 完善\n        : 消息引擎功能成熟\n```\n\n#### 🔧 实现\n\n##### 1.5.3 各版本特性详解\n\n| 版本 | 重要特性 | 建议 |\n|:---|:---|:---|\n| **0.7** | 最古老版本，无副本机制 | ❌ 完全不推荐使用 |\n| **0.8** | 引入副本机制，老版本客户端 | 若必须使用，至少升级到 0.8.2.2 |\n| **0.9** | 安全认证，新 Producer 稳定 | 不要使用新版 Consumer API (Bug 多) |\n| **0.10** | Kafka Streams 引入 | 建议至少升级到 0.10.2.2 |\n| **0.11** | 幂等 Producer，事务，消息格式 V2 | 目前最主流版本之一，推荐 0.11.0.3 |\n| **1.0/2.0** | Streams 完善 | 消息引擎场景推荐，Streams 场景建议 2.0+ |\n\n##### 1.5.4 版本选择决策指南\n\n```mermaid\ngraph TD\n    A[开始选择 Kafka 版本] --> B{主要使用场景?}\n    B -->|消息引擎| C{是否需要事务/幂等?}\n    C -->|是| D[0.11.0.3 或更高]\n    C -->|否| E[0.10.2.2 或更高]\n    B -->|流处理 Kafka Streams| F[2.0.0 或更高]\n    \n    D --> G{是否追求最新特性?}\n    E --> G\n    F --> G\n    G -->|是| H[使用最新稳定版]\n    G -->|否| I[使用选定版本]\n    \n    I --> J[确保客户端与服务端版本一致]\n    H --> J\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **版本号解读** | `kafka_2.11-2.1.1` 中 `2.11` 是 Scala 版本，`2.1.1` 才是 Kafka 版本 |\n| **避免过老版本** | 0.7/0.8 版本问题多，不建议生产使用 |\n| **0.11 是里程碑** | 引入幂等和事务，消息格式 V2，功能完备 |\n| **版本一致性** | 服务端和客户端版本保持一致，否则损失性能优化 |\n| **不做小白鼠** | 不要急于使用最新版本，等待社区验证 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "📝 第一章小结", "content": "本章从消息引擎的基本概念出发，系统介绍了 Kafka 的核心知识体系：\n\n```mermaid\nmindmap\n  root((Kafka 入门基础))\n    消息引擎概述\n      削峰填谷\n      异步解耦\n      两种消息模型\n    核心术语\n      主题-分区-消息\n      副本机制\n      消费者组\n      位移概念\n    定位与演进\n      消息引擎\n      流处理平台\n      生态圈\n    发行版选择\n      Apache Kafka\n      Confluent Kafka\n      CDH/HDP Kafka\n    版本选型\n      版本号规则\n      特性演进\n      选型建议\n```\n\n**核心收获：**\n\n1. 理解 Kafka 作为消息引擎的核心价值：**削峰填谷、异步解耦**\n2. 掌握 Kafka 的核心术语：**主题、分区、副本、消费者组、位移**\n3. 明确 Kafka 的双重定位：**消息引擎 + 流处理平台**\n4. 学会根据场景选择合适的 **发行版** 和 **版本**\n\n---\n\n> 📖 **下一章预告**：第三章将介绍 Kafka 生产者客户端详解，包括分区机制、压缩算法、无消息丢失配置等核心知识。\n\n---", "subs": []}]}, {"title": "第二章 集群部署与核心参数配置", "sections": [{"title": "2.1 线上集群部署方案", "content": "本章是 Kafka 运维的核心章节，将从操作系统选择、磁盘规划、网络带宽等基础设施层面出发，详细介绍 Kafka 集群的部署方案和核心参数配置，帮助运维工程师搭建高性能、高可用的 Kafka 集群。\n\n---\n\n\n#### 📌 背景\n\n生产环境中部署 Kafka 集群需要综合考虑多种因素。与开发测试环境不同，线上环境需要仔细评估操作系统、磁盘类型、存储容量和网络带宽等关键指标，这些决策直接影响 Kafka 集群的性能、稳定性和成本。\n\n虽然 Kafka 是 JVM 系应用，理论上可以跨平台运行，但不同操作系统和硬件配置对 Kafka 的影响差异巨大。因此，在部署前进行全面的规划至关重要。\n\n#### 📐 原理\n\n##### 2.1.1 操作系统选择：为什么推荐 Linux\n\nKafka 在不同操作系统上的表现差异主要体现在以下三个方面：\n\n```mermaid\ngraph TB\n    subgraph \"操作系统选择考量因素\"\n        IO[I/O 模型]\n        NET[网络传输效率]\n        SUP[社区支持度]\n    end\n    \n    IO --> L1[Linux: epoll 高效]\n    IO --> W1[Windows: select 低效]\n    \n    NET --> L2[Linux: 零拷贝支持]\n    NET --> W2[Windows: Java 8u60 才支持]\n    \n    SUP --> L3[Linux: 全力支持]\n    SUP --> W3[Windows: Bug 不保证修复]\n```\n\n**因素一：I/O 模型差异**\n\n| I/O 模型 | 说明 | 效率 |\n|:---|:---|:---:|\n| 阻塞式 I/O | 线程阻塞等待 I/O 完成 | ⭐ |\n| 非阻塞式 I/O | 轮询检查 I/O 状态 | ⭐⭐ |\n| I/O 多路复用 (select) | 同时监控多个文件描述符 | ⭐⭐⭐ |\n| I/O 多路复用 (epoll) | Linux 特有，事件驱动 | ⭐⭐⭐⭐ |\n| 异步 I/O (IOCP) | Windows 特有 | ⭐⭐⭐⭐ |\n\nKafka 客户端底层使用 Java 的 Selector：\n\n- **Linux 平台**：基于 `epoll` 实现，事件驱动，高效\n- **Windows 平台**：基于 `select` 实现，轮询方式，效率较低\n\n**因素二：零拷贝（Zero Copy）技术**\n\n```mermaid\ngraph LR\n    subgraph \"传统数据传输\"\n        D1[磁盘] -->|1.读取| K1[内核缓冲区]\n        K1 -->|2.拷贝| U1[用户缓冲区]\n        U1 -->|3.拷贝| K2[Socket缓冲区]\n        K2 -->|4.发送| N1[网络]\n    end\n```\n\n```mermaid\ngraph LR\n    subgraph \"零拷贝传输\"\n        D2[磁盘] -->|1.读取| K3[内核缓冲区]\n        K3 -->|2.直接发送| N2[网络]\n    end\n```\n\n零拷贝技术避免了昂贵的内核态与用户态之间的数据拷贝，实现了磁盘到网络的快速数据传输。Linux 原生支持零拷贝，而 Windows 需要 Java 8 Update 60 以上版本才能使用。\n\n**因素三：社区支持度**\n\nLinux 平台是 Kafka 社区的首要支持对象。在 Windows 平台上发现的 Bug，社区通常不会投入资源修复，而是建议用户升级或迁移到 Linux 平台。\n\n#### 🔧 实现\n\n##### 2.1.2 磁盘规划\n\n**机械硬盘 vs SSD**\n\n| 对比项 | 机械硬盘 (HDD) | 固态硬盘 (SSD) |\n|:---|:---|:---|\n| **成本** | 低 | 高 |\n| **容量** | 大 | 相对较小 |\n| **随机读写** | 慢 | 快 |\n| **顺序读写** | 较快 | 快 |\n| **可靠性** | 易损坏 | 更可靠 |\n\n**💡 建议：使用普通机械硬盘即可。**\n\n原因分析：\n\n- Kafka 主要使用**顺序读写**操作，规避了机械硬盘随机读写慢的劣势\n- 机械硬盘物美价廉，性价比更高\n- 可靠性问题由 Kafka 的副本机制在软件层面解决\n\n**是否需要 RAID？**\n\n```mermaid\ngraph TD\n    A[磁盘方案选择] --> B{是否追求性价比?}\n    B -->|是| C[普通磁盘组 + Kafka 副本机制]\n    B -->|否| D[RAID 阵列]\n    \n    C --> E[Kafka 1.1+ 支持<br/>Failover 故障转移]\n    D --> F[硬件级冗余<br/>负载均衡]\n```\n\nRAID 的两大优势：\n\n1. 提供冗余的磁盘存储空间\n2. 提供负载均衡\n\n但是 Kafka 在软件层面已经提供了这些能力：\n\n- **副本机制**：实现数据冗余\n- **分区机制**：实现负载均衡\n- **Kafka 1.1+**：支持磁盘故障转移（Failover），坏掉的磁盘数据自动转移到其他正常磁盘\n\n**💡 建议：追求性价比的公司可以不搭建 RAID，使用普通磁盘组成存储空间即可。**\n\n##### 2.1.3 磁盘容量计算\n\n**计算公式：**\n\n```\n总容量 = 每天消息量 × 消息大小 × 副本数 × 保留天数 × (1 + 索引开销) ÷ 压缩比\n```\n\n**实际案例计算：**\n\n| 参数 | 数值 |\n|:---|:---|\n| 每天消息量 | 1 亿条 |\n| 平均消息大小 | 1 KB |\n| 副本数 | 2 |\n| 保留时间 | 14 天 |\n| 索引等额外开销 | 10% |\n| 压缩比 | 0.75 |\n\n计算过程：\n\n```\n每天数据量 = 1亿 × 1KB × 2 = 200 GB\n含索引开销 = 200 GB × 1.1 = 220 GB\n两周总量 = 220 GB × 14 = 3.08 TB\n压缩后容量 = 3.08 TB × 0.75 ≈ 2.25 TB\n```\n\n**磁盘容量规划要素：**\n\n| 要素 | 说明 |\n|:---|:---|\n| 新增消息数 | 每天产生的消息条数 |\n| 消息留存时间 | log.retention.hours 配置 |\n| 平均消息大小 | 根据业务评估 |\n| 副本数 | replication.factor 配置 |\n| 是否启用压缩 | compression.type 配置 |\n\n##### 2.1.4 网络带宽规划\n\n带宽资源是 Kafka 最容易成为瓶颈的资源之一，据统计，带宽不足导致的性能问题占比超过 60%。\n\n**服务器数量计算方法：**\n\n```mermaid\ngraph TD\n    A[业务需求: 1小时处理1TB数据] --> B[换算: 每秒处理 2336 Mb]\n    B --> C[单机可用带宽: 1Gbps × 70% = 700 Mbps]\n    C --> D[保守预留: 700 Mbps ÷ 3 ≈ 240 Mbps]\n    D --> E[所需服务器: 2336 ÷ 240 ≈ 10 台]\n    E --> F[考虑副本: 10 × 3 = 30 台]\n```\n\n**带宽规划关键参数：**\n\n| 参数 | 说明 | 建议值 |\n|:---|:---|:---|\n| 网络带宽利用率 | 超过此值可能丢包 | 70% |\n| 预留带宽比例 | 避免常规性打满 | 使用 1/3 |\n| 副本因子 | 需要乘以此倍数 | 通常为 3 |\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **操作系统** | 强烈推荐 Linux，Windows 仅适合测试环境 |\n| **磁盘类型** | 机械硬盘即可满足需求，性价比最优 |\n| **RAID** | 非必需，Kafka 软件层面已提供冗余和故障转移 |\n| **容量规划** | 综合考虑消息量、副本数、留存时间、压缩比 |\n| **带宽规划** | 最容易成为瓶颈，需预留足够余量 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "2.2 Broker 端核心参数配置", "content": "#### 📌 背景\n\nKafka Broker 提供了近 200 个配置参数，但绝大部分可以使用默认值。本节重点介绍那些**必须修改默认值**的关键参数，这些参数直接影响 Kafka 集群的正确性、性能和稳定性。\n\n这里介绍的参数也称为**静态参数（Static Configs）**，需要在 `server.properties` 配置文件中设置，修改后必须重启 Broker 才能生效。\n\n#### 📐 原理\n\nBroker 端参数按功能可分为以下几类：\n\n```mermaid\ngraph TB\n    subgraph \"Broker 核心参数分类\"\n        ST[存储配置]\n        ZK[ZooKeeper 连接]\n        LI[监听器配置]\n        TP[Topic 管理]\n        RT[数据留存]\n    end\n    \n    ST --> ST1[log.dirs]\n    ZK --> ZK1[zookeeper.connect]\n    LI --> LI1[listeners]\n    LI --> LI2[advertised.listeners]\n    TP --> TP1[auto.create.topics.enable]\n    TP --> TP2[unclean.leader.election.enable]\n    TP --> TP3[auto.leader.rebalance.enable]\n    RT --> RT1[\"log.retention.{hours|minutes|ms}\"]\n    RT --> RT2[log.retention.bytes]\n    RT --> RT3[message.max.bytes]\n```\n\n#### 🔧 实现\n\n##### 2.2.1 存储配置：log.dirs\n\n| 参数 | 说明 |\n|:---|:---|\n| `log.dirs` | 指定 Broker 使用的多个文件目录路径（CSV 格式） |\n| `log.dir` | 单个路径，不推荐使用 |\n\n**配置示例：**\n\n```properties\nlog.dirs=/home/kafka1,/home/kafka2,/home/kafka3\n```\n\n**配置多路径的好处：**\n\n```mermaid\ngraph TB\n    subgraph \"多磁盘配置优势\"\n        A[配置多个 log.dirs] --> B[提升读写性能]\n        A --> C[故障转移能力]\n        \n        B --> B1[多磁盘并行读写<br/>提高吞吐量]\n        C --> C1[Kafka 1.1+<br/>坏盘自动迁移数据]\n    end\n```\n\n- **提升读写性能**：多块物理磁盘同时读写数据，吞吐量更高\n- **故障转移（Failover）**：Kafka 1.1+ 版本，坏盘上的数据自动转移到其他正常磁盘，Broker 继续工作\n\n> **💡 最佳实践**：只需设置 `log.dirs`，配置多个路径并挂载到不同物理磁盘。\n\n##### 2.2.2 ZooKeeper 连接配置\n\n| 参数 | 说明 |\n|:---|:---|\n| `zookeeper.connect` | ZooKeeper 集群地址，CSV 格式 |\n\n**基本配置：**\n\n```properties\nzookeeper.connect=zk1:2181,zk2:2181,zk3:2181\n```\n\n**多 Kafka 集群共享 ZooKeeper（使用 chroot）：**\n\n```mermaid\ngraph TB\n    subgraph \"ZooKeeper 集群\"\n        ZK[zk1:2181, zk2:2181, zk3:2181]\n    end\n    \n    subgraph \"Kafka 集群1\"\n        K1[kafka1]\n    end\n    \n    subgraph \"Kafka 集群2\"\n        K2[kafka2]\n    end\n    \n    K1 -->|\"/kafka1\"| ZK\n    K2 -->|\"/kafka2\"| ZK\n```\n\n```properties\n# Kafka 集群1\nzookeeper.connect=zk1:2181,zk2:2181,zk3:2181/kafka1\n\n# Kafka 集群2\nzookeeper.connect=zk1:2181,zk2:2181,zk3:2181/kafka2\n```\n\n> **⚠️ 注意**：chroot 只需写一次，加在最后。错误写法：`zk1:2181/kafka1,zk2:2181/kafka1`\n\n##### 2.2.3 监听器配置\n\n| 参数 | 说明 |\n|:---|:---|\n| `listeners` | Broker 监听的地址和端口 |\n| `advertised.listeners` | 对外发布的地址（用于客户端连接） |\n| `host.name/port` | ❌ 已过期，不要使用 |\n\n**监听器格式：**\n\n```\n<协议名称>://<主机名>:<端口号>\n```\n\n**配置示例：**\n\n```properties\nlisteners=PLAINTEXT://hostname:9092,SSL://hostname:9093\nadvertised.listeners=PLAINTEXT://public-hostname:9092\n```\n\n**内置协议类型：**\n\n| 协议 | 说明 |\n|:---|:---|\n| PLAINTEXT | 明文传输，无加密 |\n| SSL | SSL/TLS 加密传输 |\n| SASL_PLAINTEXT | SASL 认证 + 明文传输 |\n| SASL_SSL | SASL 认证 + SSL 加密 |\n\n**自定义协议：**\n\n```properties\nlisteners=CONTROLLER://localhost:9092\nlistener.security.protocol.map=CONTROLLER:PLAINTEXT\n```\n\n> **💡 最佳实践**：全部使用主机名而非 IP 地址。Broker 源码中使用主机名，混用 IP 可能导致连接问题。\n\n##### 2.2.4 Topic 管理参数\n\n**auto.create.topics.enable**\n\n| 值 | 行为 |\n|:---|:---|\n| true（默认） | Producer 向不存在的 Topic 发送消息时自动创建 |\n| false | 禁止自动创建，需手动创建 Topic |\n\n> **💡 建议：设置为 false**。避免因拼写错误创建大量垃圾 Topic（如把 test 写成 tst）。\n\n**unclean.leader.election.enable**\n\n这是一个关于**数据一致性 vs 可用性**权衡的参数：\n\n```mermaid\ngraph TD\n    A[Leader 副本挂掉] --> B{ISR 中是否有副本?}\n    B -->|有| C[从 ISR 中选举新 Leader]\n    B -->|无| D{unclean.leader.election.enable}\n    D -->|false| E[分区不可用<br/>保证数据一致性]\n    D -->|true| F[从落后副本选举<br/>可能丢失数据]\n```\n\n| 值 | 行为 | 后果 |\n|:---|:---|:---|\n| false | 只从 ISR 中选举 Leader | 可能导致分区不可用 |\n| true | 允许从落后副本选举 | 可能丢失数据 |\n\n> **💡 强烈建议：设置为 false**。宁可分区暂时不可用，也不要丢失数据。\n\n**auto.leader.rebalance.enable**\n\n| 值 | 行为 |\n|:---|:---|\n| true（默认） | 定期重新选举 Leader，即使当前 Leader 正常 |\n| false | 不自动换 Leader |\n\n> **💡 建议：设置为 false**。换 Leader 代价很高（所有客户端需要切换），且没有性能收益。\n\n##### 2.2.5 数据留存参数\n\n**log.retention.{hours|minutes|ms}**\n\n控制消息数据保存时长，三个参数优先级：`ms` > `minutes` > `hours`\n\n```properties\n# 保存 7 天（默认值）\nlog.retention.hours=168\n\n# 保存 3 天\nlog.retention.hours=72\n```\n\n**log.retention.bytes**\n\n控制 Broker 为消息保存的总磁盘容量：\n\n| 值 | 说明 |\n|:---|:---|\n| -1（默认） | 无限制，直到磁盘用尽 |\n| 具体数值 | 限制该 Broker 上的消息总量 |\n\n适用场景：云上多租户 Kafka 集群，限制每个租户的磁盘使用量。\n\n**message.max.bytes**\n\n控制 Broker 能接收的最大消息大小：\n\n| 默认值 | 说明 |\n|:---|:---|\n| 1000012（约 1MB） | 对于很多场景太小 |\n\n> **💡 建议：设置一个较大的值**。生产环境中超过 1MB 的消息很常见，建议设置为 10MB 或更大。\n\n#### ⚠️ 关键点\n\n**Broker 端核心参数速查表：**\n\n| 参数 | 建议值 | 说明 |\n|:---|:---|:---|\n| `log.dirs` | 多路径 CSV | 配置多块磁盘，提升性能和容错 |\n| `zookeeper.connect` | 带 chroot | 支持多集群共享 ZK |\n| `listeners` | 使用主机名 | 不要使用 IP 地址 |\n| `auto.create.topics.enable` | **false** | 禁止自动创建 Topic |\n| `unclean.leader.election.enable` | **false** | 禁止从落后副本选举 |\n| `auto.leader.rebalance.enable` | **false** | 禁止自动换 Leader |\n| `log.retention.hours` | 按需设置 | 消息保留时间 |\n| `message.max.bytes` | 10485760+ | 调大最大消息限制 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "2.3 Topic 级别参数配置", "content": "#### 📌 背景\n\n除了全局的 Broker 参数，Kafka 还支持 Topic 级别的参数配置。Topic 级别参数会**覆盖**全局 Broker 参数，允许不同的 Topic 根据业务需要设置不同的配置。\n\n例如，交易数据需要保存 6 个月，而日志数据只需保存 7 天。这种场景下，使用 Topic 级别参数就非常合适。\n\n#### 📐 原理\n\n```mermaid\ngraph TB\n    subgraph \"参数优先级\"\n        TP[Topic 级别参数] -->|覆盖| BP[Broker 全局参数]\n    end\n    \n    subgraph \"应用场景\"\n        T1[交易主题<br/>retention.ms=半年]\n        T2[日志主题<br/>retention.ms=7天]\n        T3[大消息主题<br/>max.message.bytes=5MB]\n    end\n```\n\n#### 🔧 实现\n\n##### 2.3.1 核心 Topic 级别参数\n\n**retention.ms**\n\n规定 Topic 消息的保存时长，覆盖 Broker 的 `log.retention.hours`。\n\n```bash\n# 创建 Topic 时设置：保存 180 天\nbin/kafka-topics.sh --bootstrap-server localhost:9092 \\\n    --create --topic transaction \\\n    --partitions 3 --replication-factor 2 \\\n    --config retention.ms=15552000000\n```\n\n**retention.bytes**\n\n规定 Topic 预留的磁盘空间大小，适用于多租户场景。\n\n**max.message.bytes**\n\n限定 Topic 能接收的最大消息大小。\n\n```bash\n# 修改已存在的 Topic 参数：最大消息 10MB\nbin/kafka-configs.sh --zookeeper localhost:2181 \\\n    --entity-type topics --entity-name transaction \\\n    --alter --add-config max.message.bytes=10485760\n```\n\n##### 2.3.2 参数设置方法\n\n**方法一：创建 Topic 时设置**\n\n```bash\nbin/kafka-topics.sh --bootstrap-server localhost:9092 \\\n    --create --topic my_topic \\\n    --partitions 1 --replication-factor 1 \\\n    --config retention.ms=15552000000 \\\n    --config max.message.bytes=5242880\n```\n\n**方法二：修改已有 Topic**\n\n```bash\nbin/kafka-configs.sh --zookeeper localhost:2181 \\\n    --entity-type topics --entity-name my_topic \\\n    --alter --add-config max.message.bytes=10485760\n```\n\n> **💡 建议**：统一使用 `kafka-configs` 脚本修改 Topic 参数。\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **覆盖机制** | Topic 参数优先级高于 Broker 全局参数 |\n| **使用场景** | 不同业务的 Topic 需要不同的留存时间或消息大小限制 |\n| **推荐工具** | 使用 `kafka-configs.sh` 统一管理 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "2.4 JVM 参数配置", "content": "#### 📌 背景\n\nKafka 服务器端代码由 Scala 编写，最终编译为 JVM 字节码运行。JVM 参数设置直接影响 Kafka Broker 的性能和稳定性，特别是堆内存大小和垃圾回收器的选择。\n\n#### 📐 原理\n\n```mermaid\ngraph TB\n    subgraph \"JVM 参数影响\"\n        HEAP[堆大小<br/>KAFKA_HEAP_OPTS]\n        GC[垃圾回收器<br/>KAFKA_JVM_PERFORMANCE_OPTS]\n    end\n    \n    HEAP --> H1[过小: OOM, 频繁 GC]\n    HEAP --> H2[过大: GC 停顿时间长]\n    \n    GC --> G1[Java 7: CMS 或 Parallel]\n    GC --> G2[Java 8+: G1 推荐]\n```\n\n#### 🔧 实现\n\n##### 2.4.1 Java 版本选择\n\n| Java 版本 | 建议 |\n|:---|:---|\n| Java 6 | ❌ 太老，完全不推荐 |\n| Java 7 | ❌ Kafka 2.0 已不支持 |\n| Java 8+ | ✅ 推荐使用 |\n\n##### 2.4.2 堆大小配置\n\n**建议值：6GB**\n\n这是业界公认的合理值。原因：\n\n- 默认 1GB 太小，Broker 与客户端交互时会创建大量 ByteBuffer\n- 过大的堆会导致 GC 停顿时间过长\n\n```bash\nexport KAFKA_HEAP_OPTS=\"--Xms6g --Xmx6g\"\n```\n\n##### 2.4.3 GC 策略选择\n\n| Java 版本 | CPU 资源 | 推荐 GC |\n|:---|:---|:---|\n| Java 7 | 充足 | CMS (`-XX:+UseCurrentMarkSweepGC`) |\n| Java 7 | 有限 | Parallel (`-XX:+UseParallelGC`) |\n| Java 8+ | 任意 | **G1** (`-XX:+UseG1GC`) ✅ |\n\nG1 的优势：\n\n- 更少的 Full GC\n- 更少的调优参数\n- 开箱即用，表现优于 CMS\n\n##### 2.4.4 完整 JVM 参数配置\n\n```bash\n# 设置堆大小\nexport KAFKA_HEAP_OPTS=\"--Xms6g --Xmx6g\"\n\n# 设置 GC 参数（Java 8+ 推荐）\nexport KAFKA_JVM_PERFORMANCE_OPTS=\"-server -XX:+UseG1GC \\\n    -XX:MaxGCPauseMillis=20 \\\n    -XX:InitiatingHeapOccupancyPercent=35 \\\n    -XX:+ExplicitGCInvokesConcurrent \\\n    -Djava.awt.headless=true\"\n\n# 启动 Kafka\nbin/kafka-server-start.sh config/server.properties\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **Java 版本** | 至少使用 Java 8 |\n| **堆大小** | 推荐 6GB，通过 `KAFKA_HEAP_OPTS` 设置 |\n| **GC 策略** | Java 8+ 使用 G1，通过 `KAFKA_JVM_PERFORMANCE_OPTS` 设置 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "2.5 操作系统参数优化", "content": "#### 📌 背景\n\n操作系统级别的参数优化是 Kafka 性能调优的重要组成部分。虽然 Kafka 对操作系统的要求不算苛刻，但正确配置以下参数可以显著提升性能和稳定性。\n\n#### 📐 原理\n\n```mermaid\ngraph TB\n    subgraph \"操作系统关键参数\"\n        FD[文件描述符限制<br/>ulimit -n]\n        FS[文件系统类型]\n        SW[Swap 配置]\n        FL[Flush 落盘时间]\n    end\n```\n\n#### 🔧 实现\n\n##### 2.5.1 文件描述符限制\n\n```bash\n# 查看当前限制\nulimit -n\n\n# 设置为较大值（推荐）\nulimit -n 1000000\n```\n\n**说明：**\n\n- 文件描述符是廉价资源，设置大一点没有负面影响\n- 设置太小会导致 \"Too many open files\" 错误\n- 这个参数\"不重要\"（设置简单），但\"没有它很重要\"（不设会出问题）\n\n##### 2.5.2 文件系统类型\n\n| 文件系统 | 性能 | 建议 |\n|:---|:---|:---|\n| ext3 | 一般 | ❌ 不推荐 |\n| ext4 | 较好 | ⭕ 可用 |\n| **XFS** | **最佳** | ✅ **推荐** |\n| ZFS | 据报告更强 | 可尝试 |\n\n根据官方测试报告，XFS 的性能明显优于 ext4。\n\n##### 2.5.3 Swap 配置\n\n| swappiness 值 | 行为 | 建议 |\n|:---|:---|:---|\n| 0 | 完全禁用 swap | ❌ 危险，可能触发 OOM Killer |\n| 1 | 几乎不使用 swap | ✅ **推荐** |\n| 60（默认） | 积极使用 swap | 不推荐 |\n\n```bash\n# 查看当前值\ncat /proc/sys/vm/swappiness\n\n# 设置为 1（临时）\nsysctl vm.swappiness=1\n\n# 永久设置（编辑 /etc/sysctl.conf）\nvm.swappiness=1\n```\n\n**为什么不设置为 0？**\n\n设置为 0 时，当物理内存耗尽，操作系统会触发 OOM Killer，随机 kill 进程，没有任何预警。设置为 1 时，开始使用 swap 时会观察到 Broker 性能下降，给管理员留出诊断和处理的时间。\n\n##### 2.5.4 Flush 落盘时间\n\nKafka 写入消息时，数据先写入操作系统的 Page Cache，然后由操作系统异步刷盘。\n\n```mermaid\ngraph LR\n    P[Producer] -->|写入| B[Broker]\n    B -->|写入| PC[Page Cache]\n    PC -->|定期 Flush| D[磁盘]\n```\n\n| 默认值 | 说明 |\n|:---|:---|\n| 5 秒 | 可能过于频繁 |\n\n**优化建议：**\n\n- 适当增加提交间隔，降低磁盘写入频率\n- 虽然可能丢失 Page Cache 中的数据（机器宕机时），但 Kafka 的副本机制提供了数据冗余\n- 可以用稍微放宽的落盘时间换取更好的性能\n\n#### ⚠️ 关键点\n\n**操作系统参数速查表：**\n\n| 参数 | 建议值 | 说明 |\n|:---|:---|:---|\n| 文件描述符 (`ulimit -n`) | 1000000 | 设置足够大，避免 \"Too many open files\" |\n| 文件系统 | XFS | 性能最佳 |\n| swappiness | **1** | 接近 0 但不为 0，保留预警能力 |\n| Flush 间隔 | 可适当增大 | Kafka 副本机制已提供数据保护 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "📝 第二章小结", "content": "本章从基础设施层面详细介绍了 Kafka 集群的部署方案和核心参数配置：\n\n```mermaid\nmindmap\n  root((集群部署与配置))\n    部署方案\n      操作系统选择\n      磁盘规划\n      容量计算\n      带宽规划\n    Broker 参数\n      存储配置\n      ZooKeeper 连接\n      监听器配置\n      Topic 管理\n      数据留存\n    Topic 参数\n      retention.ms\n      max.message.bytes\n      设置方法\n    JVM 参数\n      堆大小 6GB\n      G1 垃圾回收器\n    操作系统参数\n      文件描述符\n      XFS 文件系统\n      Swap 配置\n```\n\n**核心收获：**\n\n1. **操作系统**：Linux 是最佳选择，因为 I/O 模型、零拷贝和社区支持度\n2. **磁盘规划**：机械硬盘 + 多路径 + Kafka 副本机制 = 高性价比方案\n3. **容量和带宽**：使用公式计算，预留足够余量\n4. **Broker 参数**：重点关注 `log.dirs`、`auto.create.topics.enable`、`unclean.leader.election.enable`\n5. **JVM**：6GB 堆 + G1 GC 是推荐配置\n6. **操作系统**：ulimit 调大、使用 XFS、swappiness=1\n\n---\n\n> 📖 **下一章预告**：第四章将介绍 Kafka 消费者客户端详解，包括消费者组机制、位移提交、重平衡等核心知识。\n\n---", "subs": []}]}, {"title": "第三章 生产者客户端详解", "sections": [{"title": "3.1 消息分区机制原理", "content": "本章深入剖析 Kafka 生产者客户端的核心机制，包括消息分区策略、压缩算法、无消息丢失配置、高级拦截器功能、TCP 连接管理，以及幂等性和事务生产者等高级特性。\n\n---\n\n\n#### 📌 背景\n\nKafka 的消息组织方式是三层结构：**主题 → 分区 → 消息**。主题下的每条消息只会保存在某一个分区中，而不会在多个分区中被保存多份。分区机制是 Kafka 实现高吞吐量和水平扩展的核心设计。\n\n作为生产者，在发送消息时需要决定：这条消息应该发送到哪个分区？这就是分区策略需要解决的问题。\n\n#### 📐 原理\n\n##### 3.1.1 分区的作用\n\n```mermaid\ngraph TB\n    subgraph \"分区的两大作用\"\n        LB[负载均衡]\n        SC[高可扩展性]\n    end\n    \n    LB --> LB1[不同分区位于不同Broker]\n    LB --> LB2[消息均匀分布到多节点]\n    \n    SC --> SC1[通过增加分区数扩容]\n    SC --> SC2[突破单机磁盘/带宽限制]\n```\n\n##### 3.1.2 分区策略详解\n\nKafka 提供了多种分区策略，Producer 可以根据业务需求选择合适的策略：\n\n```mermaid\ngraph TD\n    A[收到消息] --> B{消息是否指定分区?}\n    B -->|是| C[直接发送到指定分区]\n    B -->|否| D{消息是否有Key?}\n    D -->|否| E[轮询策略<br/>Round-Robin]\n    D -->|是| F[按Key哈希<br/>相同Key到同一分区]\n```\n\n**策略一：轮询策略（Round-Robin）**\n\n```mermaid\ngraph LR\n    subgraph \"Producer 发送消息\"\n        M1[消息1] --> P0[分区0]\n        M2[消息2] --> P1[分区1]\n        M3[消息3] --> P2[分区2]\n        M4[消息4] --> P0\n        M5[消息5] --> P1\n    end\n```\n\n| 特点 | 说明 |\n|:---|:---|\n| **工作方式** | 消息依次发送到各个分区，循环往复 |\n| **适用场景** | 消息无顺序要求，追求最大吞吐量 |\n| **默认行为** | 当消息没有 Key 时的默认策略 |\n| **优点** | 负载最均匀，吞吐量最大 |\n\n**策略二：按消息键保序策略（Key-Ordering）**\n\n```mermaid\ngraph LR\n    subgraph \"按Key分区\"\n        K1[\"Key=user_001\"] -->|hash| P0[分区0]\n        K2[\"Key=user_002\"] -->|hash| P1[分区1]\n        K3[\"Key=user_001\"] -->|hash| P0\n        K4[\"Key=user_003\"] -->|hash| P2[分区2]\n        K5[\"Key=user_001\"] -->|hash| P0\n    end\n```\n\n| 特点 | 说明 |\n|:---|:---|\n| **工作方式** | 对 Key 进行哈希运算，相同 Key 固定到同一分区 |\n| **适用场景** | 需要保证同一业务对象的消息顺序 |\n| **典型案例** | 用户 ID 作为 Key，保证同一用户消息有序 |\n| **注意事项** | 分区数变更后，哈希结果会改变 |\n\n**策略三：随机策略（Random）**\n\n| 特点 | 说明 |\n|:---|:---|\n| **工作方式** | 随机选择一个分区发送 |\n| **使用频率** | 较少使用，老版本 Kafka 的默认策略 |\n| **与轮询对比** | 负载均匀性略差于轮询 |\n\n#### 🔧 实现\n\n##### 3.1.3 自定义分区器实现\n\n当内置策略不满足需求时，可以实现自定义分区器：\n\n```java\npublic class MyPartitioner implements Partitioner {\n    \n    @Override\n    public int partition(String topic, Object key, byte[] keyBytes, \n                        Object value, byte[] valueBytes, Cluster cluster) {\n        // 自定义分区逻辑\n        List<PartitionInfo> partitions = cluster.partitionsForTopic(topic);\n        int numPartitions = partitions.size();\n        \n        // 示例：根据业务规则选择分区\n        if (key != null && key.toString().startsWith(\"VIP_\")) {\n            return 0; // VIP消息固定发到分区0\n        }\n        return Math.abs(key.hashCode()) % numPartitions;\n    }\n    \n    @Override\n    public void close() {}\n    \n    @Override\n    public void configure(Map<String, ?> configs) {}\n}\n```\n\n**配置自定义分区器：**\n\n```java\nprops.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, \n          \"com.example.MyPartitioner\");\n```\n\n##### 3.1.4 实战案例：消息顺序性保证\n\n**场景**：业务需要保证同一订单的所有消息严格有序。\n\n**解决方案**：\n\n```mermaid\ngraph TD\n    A[订单消息] --> B[提取订单ID作为Key]\n    B --> C[同一订单ID]\n    C --> D[固定到同一分区]\n    D --> E[分区内消息有序]\n    E --> F[消费时保证顺序]\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **轮询策略** | 负载最均匀，无 Key 时的默认策略 |\n| **Key 策略** | 相同 Key 保证顺序，但可能导致数据倾斜 |\n| **自定义分区** | 实现 Partitioner 接口，灵活控制分区逻辑 |\n| **分区数变更** | 会影响 Key 哈希结果，需谨慎操作 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "3.2 压缩算法面面观", "content": "#### 📌 背景\n\n消息压缩是 Kafka 优化网络带宽和存储空间的重要手段。在带宽资源紧张或消息体积较大的场景下，启用压缩可以显著提升吞吐量。\n\nKafka 的消息层次分为两层：**消息集合（Message Set）** 和 **消息（Message）**。一个消息集合包含若干条日志项，而日志项才是真正封装消息的地方。Kafka 通常不会直接操作单条消息，而是以消息集合为单位进行操作，这也是压缩的基本单位。\n\n#### 📐 原理\n\n##### 3.2.1 消息格式版本\n\n| 版本 | 引入时间 | 特点 |\n|:---|:---|:---|\n| V1 | Kafka 0.11 之前 | 每条消息需单独保存 CRC 值 |\n| V2 | Kafka 0.11+ | 消息集合级别 CRC，更紧凑高效 |\n\n> **💡 重要**：V2 版本将 CRC 校验移到消息集合层面，避免了因 Broker 端时间戳更新导致的 CRC 重新计算，显著降低 CPU 开销。\n\n##### 3.2.2 压缩发生的位置\n\n```mermaid\ngraph LR\n    subgraph \"压缩流程\"\n        P[Producer] -->|压缩| B[Broker]\n        B -->|保持原样| D[磁盘]\n        D -->|保持压缩| C[Consumer]\n        C -->|解压| APP[应用程序]\n    end\n```\n\n**压缩发生时机：**\n\n| 场景 | 行为 |\n|:---|:---|\n| **Producer 端** | 消息发送前压缩（推荐） |\n| **Broker 端** | 通常透传，两种情况例外 |\n\n**Broker 端解压再压缩的情况：**\n\n```mermaid\ngraph TD\n    A[消息到达Broker] --> B{是否需要处理?}\n    B -->|情况1| C[Broker与Producer压缩算法不同]\n    B -->|情况2| D[消息格式转换]\n    C --> E[解压后重新压缩]\n    D --> E\n    E --> F[增加CPU开销]\n```\n\n> **⚠️ 警告**：避免在 Broker 端配置与 Producer 不同的压缩算法，否则会导致额外的压缩/解压开销。\n\n##### 3.2.3 压缩算法对比\n\n| 算法 | 压缩比 | 压缩速度 | 解压速度 | CPU 开销 | 建议场景 |\n|:---|:---:|:---:|:---:|:---:|:---|\n| **GZIP** | 最高 | 慢 | 中等 | 高 | 带宽紧张，CPU 富余 |\n| **Snappy** | 中等 | 快 | 快 | 低 | 通用场景 |\n| **LZ4** | 中等 | 最快 | 最快 | 最低 | 追求性能 |\n| **Zstandard** | 高 | 较快 | 较快 | 中等 | Kafka 2.1+ 推荐 |\n\n```mermaid\ngraph LR\n    subgraph \"压缩算法选择\"\n        direction TB\n        Q1{带宽是否紧张?}\n        Q1 -->|是| A1[选择高压缩比: GZIP/Zstd]\n        Q1 -->|否| Q2{CPU是否紧张?}\n        Q2 -->|是| A2[选择低CPU: LZ4]\n        Q2 -->|否| A3[选择均衡: Snappy/Zstd]\n    end\n```\n\n#### 🔧 实现\n\n##### 3.2.4 压缩配置\n\n**Producer 端配置：**\n\n```java\nprops.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, \"lz4\");\n```\n\n**Broker 端配置：**\n\n```properties\n# 默认使用producer指定的压缩算法\ncompression.type=producer\n```\n\n> **💡 最佳实践**：Broker 端保持 `compression.type=producer`，让 Producer 控制压缩策略。\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **压缩位置** | 尽量在 Producer 端压缩，避免 Broker 重复压缩 |\n| **算法选择** | 带宽紧张选 GZIP/Zstd，CPU 紧张选 LZ4 |\n| **版本建议** | Kafka 2.1+ 推荐使用 Zstandard |\n| **避免转换** | Producer 和 Broker 统一压缩算法 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "3.3 无消息丢失配置", "content": "#### 📌 背景\n\n消息丢失是消息系统最严重的问题之一。在 Kafka 中，\"消息丢失\"和\"消息持久化\"需要明确定义：\n\n> **Kafka 只对\"已提交\"的消息做持久化保证。**\n\n**\"已提交\"的定义**：当 Kafka 的若干个 Broker 成功接收到一条消息并写入日志文件后，它们会告诉 Producer 这条消息已成功提交。\n\n#### 📐 原理\n\n##### 3.3.1 消息丢失场景分析\n\n```mermaid\ngraph TB\n    subgraph \"消息丢失场景\"\n        P[Producer端丢失]\n        C[Consumer端丢失]\n    end\n    \n    P --> P1[\"Fire and Forget<br/>不处理发送结果\"]\n    P --> P2[\"网络抖动<br/>未收到ACK重试不足\"]\n    \n    C --> C1[\"先提交位移再处理<br/>处理失败导致丢失\"]\n    C --> C2[\"自动提交开启<br/>消费失败位移已提交\"]\n```\n\n##### 3.3.2 Producer 端丢失场景\n\n**场景一：Fire and Forget 模式**\n\n```java\n// ❌ 错误示例：不关心发送结果\nproducer.send(record);\n\n// ✅ 正确示例：使用回调处理结果\nproducer.send(record, (metadata, exception) -> {\n    if (exception != null) {\n        // 处理发送失败\n        log.error(\"发送失败\", exception);\n        // 可选：重试或告警\n    }\n});\n```\n\n**场景二：网络瞬时抖动**\n\n消息成功提交到 Broker，但 ACK 返回时网络出现问题，Producer 无法确认是否成功，可能触发重试。\n\n##### 3.3.3 Consumer 端丢失场景\n\n```mermaid\nsequenceDiagram\n    participant K as Kafka\n    participant C as Consumer\n    participant P as 业务处理\n    \n    Note over C: 错误做法\n    C->>K: 拉取消息\n    K-->>C: 返回消息\n    C->>K: 提交位移\n    C->>P: 处理消息\n    P-->>C: 处理失败!!\n    Note over C: 消息丢失!位移已提交\n```\n\n```mermaid\nsequenceDiagram\n    participant K as Kafka\n    participant C as Consumer\n    participant P as 业务处理\n    \n    Note over C: 正确做法\n    C->>K: 拉取消息\n    K-->>C: 返回消息\n    C->>P: 处理消息\n    P-->>C: 处理成功\n    C->>K: 提交位移\n    Note over C: 确保消息已处理\n```\n\n#### 🔧 实现\n\n##### 3.3.4 无消息丢失最佳配置清单\n\n**Producer 端配置：**\n\n| 配置项 | 建议值 | 说明 |\n|:---|:---|:---|\n| `acks` | **all** | 等待所有 ISR 副本确认 |\n| `retries` | **较大值 (如 3)** | 自动重试次数 |\n| `retry.backoff.ms` | 100+ | 重试间隔 |\n| 回调函数 | **必须设置** | 处理发送结果 |\n\n**Broker 端配置：**\n\n| 配置项 | 建议值 | 说明 |\n|:---|:---|:---|\n| `unclean.leader.election.enable` | **false** | 禁止落后副本成为 Leader |\n| `replication.factor` | **≥ 3** | 副本数至少 3 个 |\n| `min.insync.replicas` | **> 1** | 最少同步副本数 |\n\n**Consumer 端配置：**\n\n| 配置项 | 建议值 | 说明 |\n|:---|:---|:---|\n| `enable.auto.commit` | **false** | 禁用自动提交 |\n| 手动提交 | **处理完成后** | 确保先处理再提交 |\n\n##### 3.3.5 完整配置示例\n\n```java\n// Producer 配置\nprops.put(ProducerConfig.ACKS_CONFIG, \"all\");\nprops.put(ProducerConfig.RETRIES_CONFIG, 3);\nprops.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);\n\n// 使用回调确保消息发送成功\nproducer.send(record, (metadata, exception) -> {\n    if (exception != null) {\n        // 记录失败，必要时重试\n        handleFailure(record, exception);\n    }\n});\n\n// Consumer 配置\nprops.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);\n\n// 手动提交：先处理，后提交\nwhile (true) {\n    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));\n    for (ConsumerRecord<String, String> record : records) {\n        process(record);  // 先处理\n    }\n    consumer.commitSync();  // 后提交\n}\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **acks=all** | Producer 必须配置，确保消息写入所有 ISR 副本 |\n| **replication.factor ≥ 3** | 保证足够的副本冗余 |\n| **min.insync.replicas > 1** | 配合 acks=all 使用 |\n| **禁用自动提交** | Consumer 端手动控制提交时机 |\n| **回调处理** | Producer 必须设置回调处理发送结果 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "3.4 客户端拦截器", "content": "#### 📌 背景\n\n拦截器是一种允许在主业务逻辑前后插入自定义处理逻辑的机制。Kafka 从 0.10.0.0 版本引入拦截器功能，支持在消息发送前后和消费前后植入拦截逻辑。\n\n虽然拦截器在实际生产中使用较少，但在以下场景中非常有用：\n\n- 端到端延时监控\n- 消息审计\n- 客户端监控指标采集\n\n#### 📐 原理\n\n##### 3.4.1 拦截器工作原理\n\n```mermaid\ngraph LR\n    subgraph \"Producer 拦截器\"\n        P1[业务代码] --> I1[拦截器1<br/>onSend]\n        I1 --> I2[拦截器2<br/>onSend]\n        I2 --> K[Kafka Broker]\n        K --> I3[拦截器<br/>onAcknowledgement]\n        I3 --> CB[回调Callback]\n    end\n```\n\n```mermaid\ngraph LR\n    subgraph \"Consumer 拦截器\"\n        K2[Kafka] --> I4[拦截器<br/>onConsume]\n        I4 --> APP[业务处理]\n        APP --> I5[拦截器<br/>onCommit]\n        I5 --> K2\n    end\n```\n\n##### 3.4.2 拦截器核心方法\n\n**Producer 拦截器接口：**\n\n| 方法 | 调用时机 | 用途 |\n|:---|:---|:---|\n| `onSend()` | 消息发送前 | 修改消息、添加时间戳等 |\n| `onAcknowledgement()` | 发送完成后 | 记录发送结果（成功/失败） |\n\n**Consumer 拦截器接口：**\n\n| 方法 | 调用时机 | 用途 |\n|:---|:---|:---|\n| `onConsume()` | 消息返回给业务前 | 消息预处理、过滤等 |\n| `onCommit()` | 位移提交后 | 记账、日志记录等 |\n\n#### 🔧 实现\n\n##### 3.4.3 端到端延时监控实战\n\n**Producer 拦截器：**\n\n```java\npublic class LatencyProducerInterceptor \n    implements ProducerInterceptor<String, String> {\n    \n    private Jedis jedis;\n    \n    @Override\n    public ProducerRecord<String, String> onSend(\n            ProducerRecord<String, String> record) {\n        jedis.incr(\"totalSentMessage\");\n        return record;\n    }\n    \n    @Override\n    public void onAcknowledgement(RecordMetadata metadata, \n                                   Exception exception) {\n        // 可记录发送成功/失败\n    }\n}\n```\n\n**Consumer 拦截器：**\n\n```java\npublic class LatencyConsumerInterceptor \n    implements ConsumerInterceptor<String, String> {\n    \n    private Jedis jedis;\n    \n    @Override\n    public ConsumerRecords<String, String> onConsume(\n            ConsumerRecords<String, String> records) {\n        long latency = 0L;\n        for (ConsumerRecord<String, String> record : records) {\n            latency += System.currentTimeMillis() - record.timestamp();\n        }\n        jedis.incrBy(\"totalLatency\", latency);\n        \n        // 计算平均延时\n        long total = Long.parseLong(jedis.get(\"totalLatency\"));\n        long count = Long.parseLong(jedis.get(\"totalSentMessage\"));\n        jedis.set(\"avgLatency\", String.valueOf(total / count));\n        \n        return records;\n    }\n}\n```\n\n**配置拦截器：**\n\n```java\nList<String> interceptors = new ArrayList<>();\ninterceptors.add(\"com.example.LatencyProducerInterceptor\");\nprops.put(ProducerConfig.INTERCEPTOR_CLASSES_CONFIG, interceptors);\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **支持链式调用** | 多个拦截器按添加顺序依次执行 |\n| **注意线程安全** | onSend 和 onAcknowledgement 不在同一线程 |\n| **避免重逻辑** | onAcknowledgement 在主路径，别放太重的逻辑 |\n| **典型场景** | 端到端监控、消息审计、指标采集 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "3.5 Java 生产者 TCP 连接管理", "content": "#### 📌 背景\n\nKafka 的所有通信都基于 TCP 协议，而不是 HTTP。采用 TCP 的主要原因：\n\n- 支持多路复用请求（Multiplexing）\n- 可同时轮询多个连接\n- HTTP 库在很多语言中过于简陋\n\n了解 Producer 如何管理 TCP 连接，有助于排查连接问题和优化网络资源使用。\n\n#### 📐 原理\n\n##### 3.5.1 TCP 连接创建时机\n\n```mermaid\ngraph TD\n    A[TCP 连接创建时机] --> B[创建 KafkaProducer 实例时]\n    A --> C[更新元数据后]\n    A --> D[发送消息时]\n    \n    B --> B1[Sender线程启动]\n    B1 --> B2[连接bootstrap.servers<br/>所有Broker]\n    \n    C --> C1[发现新Broker]\n    C1 --> C2[创建新连接]\n    \n    D --> D1[目标Broker无连接]\n    D1 --> D2[按需创建]\n```\n\n**创建 KafkaProducer 时：**\n\n```java\n// 此时已创建TCP连接！\nProducer<String, String> producer = new KafkaProducer<>(props);\n```\n\n当创建 KafkaProducer 实例时，会启动一个后台 Sender 线程，该线程会立即尝试连接 `bootstrap.servers` 中配置的所有 Broker。\n\n> **💡 建议**：`bootstrap.servers` 只需配置 3~4 台 Broker，Producer 连接任一台后即可获取完整集群信息。\n\n##### 3.5.2 元数据更新场景\n\n| 场景 | 触发条件 |\n|:---|:---|\n| **主题不存在** | 发送到不存在的 Topic，触发 METADATA 请求 |\n| **定期更新** | `metadata.max.age.ms` 默认 5 分钟刷新一次 |\n\n##### 3.5.3 TCP 连接关闭时机\n\n**主动关闭：**\n\n```java\nproducer.close(); // 用户主动关闭\n```\n\n**自动关闭：**\n\n| 参数 | 默认值 | 行为 |\n|:---|:---|:---|\n| `connections.max.idle.ms` | 9 分钟 | 空闲超过此时间自动关闭 |\n| 设置为 -1 | - | 禁用自动关闭，成为永久长连接 |\n\n> **⚠️ 注意**：自动关闭是在 Broker 端执行的，属于被动关闭（Passive Close），可能产生大量 CLOSE_WAIT 连接。\n\n#### 🔧 实现\n\n##### 3.5.4 连接管理最佳实践\n\n```mermaid\ngraph TD\n    A[TCP 连接管理建议] --> B[bootstrap.servers<br/>配置3-4台即可]\n    A --> C[注意connections.max.idle.ms]\n    A --> D[监控CLOSE_WAIT连接]\n    \n    B --> B1[避免创建不必要的连接]\n    C --> C1[根据实际情况调整]\n    D --> D1[被动关闭的副作用]\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **创建时机** | KafkaProducer 实例创建时即建立 TCP 连接 |\n| **bootstrap.servers** | 配置 3~4 台即可，无需全部 Broker |\n| **自动关闭** | 默认 9 分钟空闲关闭，由 Broker 端执行 |\n| **CLOSE_WAIT** | 被动关闭可能导致大量 CLOSE_WAIT，需监控 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "3.6 幂等生产者与事务生产者", "content": "#### 📌 背景\n\n消息交付语义是消息系统的核心保障。Kafka 提供三种交付语义：\n\n| 语义 | 含义 | 实现方式 |\n|:---|:---|:---|\n| **At Most Once** | 最多一次，可能丢失 | 禁用重试 |\n| **At Least Once** | 至少一次，可能重复 | 默认行为 |\n| **Exactly Once** | 精确一次，不丢不重 | 幂等/事务 |\n\nKafka 0.11 版本引入了**幂等性 Producer** 和**事务型 Producer**，用于实现精确一次语义。\n\n#### 📐 原理\n\n##### 3.6.1 幂等性 Producer 原理\n\n```mermaid\ngraph LR\n    subgraph \"幂等性Producer\"\n        P[Producer] -->|\"消息+PID+SeqNum\"| B[Broker]\n        B -->|检查SeqNum| D{是否重复?}\n        D -->|是| E[丢弃消息]\n        D -->|否| F[写入日志]\n    end\n```\n\n**实现机制：**\n\n- 每个 Producer 实例分配唯一的 **PID (Producer ID)**\n- 每条消息携带 **Sequence Number**\n- Broker 根据 PID + SeqNum 判断是否重复\n\n**幂等性的作用范围：**\n\n| 维度 | 保证范围 |\n|:---|:---|\n| 分区维度 | ✅ 单分区幂等 |\n| 会话维度 | ✅ 单会话幂等 |\n| 跨分区 | ❌ 不保证 |\n| 跨会话 | ❌ 重启后失效 |\n\n##### 3.6.2 事务型 Producer 原理\n\n```mermaid\ngraph TD\n    A[事务型Producer] --> B[initTransactions]\n    B --> C[beginTransaction]\n    C --> D[send record1]\n    D --> E[send record2]\n    E --> F{是否成功?}\n    F -->|是| G[commitTransaction]\n    F -->|否| H[abortTransaction]\n```\n\n**事务的作用范围：**\n\n| 维度 | 保证范围 |\n|:---|:---|\n| 分区维度 | ✅ 多分区原子性写入 |\n| 会话维度 | ✅ 跨会话保证 |\n\n#### 🔧 实现\n\n##### 3.6.3 幂等性 Producer 配置\n\n```java\n// 只需设置一个参数\nprops.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);\n```\n\n##### 3.6.4 事务型 Producer 配置\n\n```java\n// 1. 开启幂等性\nprops.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);\n\n// 2. 设置事务ID\nprops.put(ProducerConfig.TRANSACTIONAL_ID_CONFIG, \"my-transactional-id\");\n\n// 3. 使用事务API\nproducer.initTransactions();\ntry {\n    producer.beginTransaction();\n    producer.send(new ProducerRecord<>(\"topic1\", \"key\", \"value1\"));\n    producer.send(new ProducerRecord<>(\"topic2\", \"key\", \"value2\"));\n    producer.commitTransaction();\n} catch (KafkaException e) {\n    producer.abortTransaction();\n}\n```\n\n##### 3.6.5 Consumer 端配置\n\n```java\n// 只读取已提交的事务消息\nprops.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, \"read_committed\");\n```\n\n| 隔离级别 | 行为 |\n|:---|:---|\n| `read_uncommitted` | 默认值，读取所有消息 |\n| `read_committed` | 只读取已提交事务的消息 |\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **幂等配置简单** | 只需 `enable.idempotence=true` |\n| **幂等范围有限** | 仅单分区、单会话有效 |\n| **事务功能强大** | 支持跨分区、跨会话的精确一次 |\n| **事务有性能开销** | 切勿无脑启用，需评估业务需求 |\n| **Consumer 配合** | 需设置 `isolation.level=read_committed` |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "📝 第三章小结", "content": "本章深入剖析了 Kafka 生产者客户端的核心机制：\n\n```mermaid\nmindmap\n  root((生产者客户端详解))\n    分区机制\n      轮询策略\n      Key哈希策略\n      自定义分区器\n    压缩算法\n      GZIP/Snappy/LZ4/Zstd\n      压缩位置选择\n      算法对比选型\n    无消息丢失\n      Producer配置\n      Broker配置\n      Consumer配置\n    拦截器\n      Producer拦截器\n      Consumer拦截器\n      端到端监控\n    TCP连接管理\n      创建时机\n      关闭时机\n      连接优化\n    幂等与事务\n      幂等Producer\n      事务Producer\n      精确一次语义\n```\n\n**核心收获：**\n\n1. **分区策略**：轮询保证均匀，Key 哈希保证顺序\n2. **压缩选择**：带宽紧张用 GZIP/Zstd，CPU 紧张用 LZ4\n3. **无消息丢失**：acks=all + replication.factor≥3 + 禁用自动提交\n4. **拦截器**：端到端监控和消息审计的利器\n5. **TCP 管理**：bootstrap.servers 配置 3~4 台，注意空闲连接关闭\n6. **精确一次**：幂等解决单分区重复，事务解决多分区原子性\n\n---\n\n> 📖 **下一章预告**：第五章将介绍 Kafka 内核原理，包括副本机制、请求处理、控制器等核心知识。\n\n---", "subs": []}]}, {"title": "第四章 消费者客户端详解", "sections": [{"title": "4.1 消费者组机制", "content": "本章深入剖析 Kafka 消费者客户端的核心机制，包括消费者组设计、位移主题、重平衡机制、位移提交策略、异常处理、多线程消费方案、TCP 连接管理以及消费进度监控等关键知识。\n\n---\n\n\n#### 📌 背景\n\nConsumer Group（消费者组）是 Kafka 最具亮点的设计之一。它提供了一种可扩展且具有容错性的消费者机制，既解决了传统消息队列的所有消费者\"抢\"消息的问题，又避免了发布/订阅模式每个订阅者必须订阅所有分区的伸缩性问题。\n\n通过 Consumer Group，Kafka 用一种机制同时实现了两种消息模型：\n\n- **消息队列模型**：所有实例属于同一 Group\n- **发布/订阅模型**：所有实例分别属于不同 Group\n\n#### 📐 原理\n\n##### 4.1.1 消费者组核心特性\n\n```mermaid\ngraph TB\n    subgraph \"Consumer Group 三大特性\"\n        F1[可扩展性]\n        F2[容错性]\n        F3[位移管理]\n    end\n    \n    F1 --> F1D[多个Consumer实例共同消费]\n    F2 --> F2D[实例故障自动重分配]\n    F3 --> F3D[记录消费进度]\n```\n\n| 特性 | 说明 |\n|:---|:---|\n| **Group ID** | 唯一标识一个消费者组的字符串 |\n| **Consumer 实例** | 可以是进程或线程 |\n| **分区分配** | 一个分区只能被组内一个实例消费 |\n\n##### 4.1.2 Consumer 数量与分区数的关系\n\n```mermaid\ngraph LR\n    subgraph \"消费者数量建议\"\n        P[3个分区的Topic] --> C1[Consumer 1]\n        P --> C2[Consumer 2]\n        P --> C3[Consumer 3]\n        P -.-> C4[Consumer 4<br/>空闲!]\n    end\n```\n\n| Consumer 数量 | 效果 |\n|:---|:---|\n| **< 分区数** | 每个 Consumer 消费多个分区 |\n| **= 分区数** | 最理想，一对一消费 |\n| **> 分区数** | 多余的 Consumer 空闲浪费资源 |\n\n> **💡 建议**：Consumer 实例数量应等于订阅主题的分区总数，以实现最大伸缩性。\n\n##### 4.1.3 位移管理的演进\n\n```mermaid\ngraph LR\n    subgraph \"位移存储演进\"\n        OLD[老版本] -->|位移存储| ZK[ZooKeeper]\n        NEW[新版本] -->|位移存储| KT[__consumer_offsets<br/>内部主题]\n    end\n```\n\n| 版本 | 位移存储 | 问题/优势 |\n|:---|:---|:---|\n| 老版本 Consumer | ZooKeeper | ZK 不适合高频写操作 |\n| 新版本 Consumer | Kafka 内部主题 | 高吞吐、高持久性 |\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **统一模型** | 消费者组同时实现队列模型和发布/订阅模型 |\n| **实例数量** | 建议等于分区总数，多余实例无效 |\n| **位移存储** | 新版本存储在 `__consumer_offsets` 主题中 |\n\n---", "subs": ["📌 背景", "📐 原理", "⚠️ 关键点"]}, {"title": "4.2 位移主题详解", "content": "#### 📌 背景\n\n`__consumer_offsets` 是 Kafka 的内部主题，用于保存消费者的位移信息。从 0.8.2.x 版本开始，Kafka 社区就开始重新设计位移管理方式，将位移作为普通消息保存在这个专用主题中。\n\n这个设计的核心思想是：既然 Kafka 天然支持高持久性和高吞吐量，那么需要这两个特性的子服务就不必依赖外部系统，用 Kafka 自己实现即可。\n\n#### 📐 原理\n\n##### 4.2.1 位移主题消息格式\n\n```mermaid\ngraph TB\n    subgraph \"位移主题消息格式\"\n        MSG[消息]\n        KEY[Key]\n        VAL[Value]\n        \n        MSG --> KEY\n        MSG --> VAL\n        \n        KEY --> K1[Group ID]\n        KEY --> K2[Topic]\n        KEY --> K3[Partition]\n        \n        VAL --> V1[位移值]\n        VAL --> V2[时间戳]\n        VAL --> V3[元数据]\n    end\n```\n\n**位移主题的三种消息格式：**\n\n| 格式类型 | 用途 | 消息体特点 |\n|:---|:---|:---|\n| **位移消息** | 保存位移数据 | 包含位移值及元数据 |\n| **Group 信息** | 注册消费者组 | 保存 Group 元信息 |\n| **Tombstone** | 删除过期数据 | 消息体为 null（墓碑消息） |\n\n##### 4.2.2 位移主题的创建与配置\n\n| 参数 | 默认值 | 说明 |\n|:---|:---|:---|\n| `offsets.topic.num.partitions` | 50 | 位移主题分区数 |\n| `offsets.topic.replication.factor` | 3 | 位移主题副本数 |\n\n**创建时机**：当 Kafka 集群中第一个 Consumer 程序启动时，系统自动创建位移主题。\n\n> **💡 建议**：让 Kafka 自动创建位移主题，避免手动创建可能遇到的兼容性问题。\n\n##### 4.2.3 位移主题的消息清理\n\n```mermaid\ngraph LR\n    subgraph \"Compaction 清理过程\"\n        M1[\"位移=100<br/>时间=T1\"] --> M2[\"位移=150<br/>时间=T2\"]\n        M2 --> M3[\"位移=200<br/>时间=T3\"]\n        M3 --> COMPACT[Compaction]\n        COMPACT --> R[\"只保留<br/>位移=200\"]\n    end\n```\n\n**清理策略**：Kafka 使用 **Log Compaction** 策略删除过期消息，只保留每个 Key 最新的一条消息。\n\n**关键组件**：**Log Cleaner** 后台线程负责执行 Compaction 操作。\n\n> **⚠️ 注意**：如果位移主题无限膨胀占用过多磁盘空间，请检查 Log Cleaner 线程是否正常运行。\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **位移主题本质** | 普通 Kafka 主题，但消息格式由 Kafka 定义 |\n| **自动创建** | 首个 Consumer 启动时自动创建 |\n| **消息清理** | Log Compaction 策略，只保留最新位移 |\n| **不要手动写** | 禁止使用 Producer 直接写入此主题 |\n\n---", "subs": ["📌 背景", "📐 原理", "⚠️ 关键点"]}, {"title": "4.3 消费者组重平衡", "content": "#### 📌 背景\n\nRebalance（重平衡）是一种协议，规定 Consumer Group 下所有 Consumer 如何达成一致来分配订阅主题的每个分区。虽然 Rebalance 是必要的机制，但它有明显的弊端，被形容为\"臭名昭著\"。\n\n#### 📐 原理\n\n##### 4.3.1 Coordinator 协调者\n\n**Coordinator**（协调者）是 Broker 端的组件，负责：\n\n- Consumer Group 的成员管理\n- 位移提交管理\n- 执行 Rebalance\n\n**定位 Coordinator 的算法：**\n\n```mermaid\ngraph TD\n    A[计算 Group ID 的 hashCode] --> B[对位移主题分区数取模]\n    B --> C[找到对应分区的 Leader 副本]\n    C --> D[该 Broker 即为 Coordinator]\n```\n\n```\npartitionId = Math.abs(groupId.hashCode() % offsetsTopicPartitionCount)\n```\n\n##### 4.3.2 Rebalance 触发条件\n\n```mermaid\ngraph TB\n    subgraph \"Rebalance 触发条件\"\n        T1[组成员数量变化]\n        T2[订阅主题数变化]\n        T3[订阅主题分区数变化]\n    end\n    \n    T1 --> T1D[新实例加入/离开/崩溃]\n    T2 --> T2D[正则订阅时新主题创建]\n    T3 --> T3D[分区扩容]\n```\n\n##### 4.3.3 Rebalance 的弊端\n\n| 弊端 | 说明 |\n|:---|:---|\n| **影响 TPS** | Rebalance 期间所有 Consumer 停止消费 |\n| **速度慢** | 大 Group 甚至需要几个小时 |\n| **效率低** | 全部重新分配，不考虑局部性 |\n\n> **💡 优化提示**：0.11.0.0 版本引入了 **StickyAssignor**（粘性分配器），尽量保留之前的分配方案。\n\n#### 🔧 实现\n\n##### 4.3.4 避免不必要的 Rebalance\n\n**两类非必要 Rebalance：**\n\n**类型一：心跳超时导致被踢出**\n\n```mermaid\ngraph TD\n    A[Consumer] -->|定期发送| B[心跳请求]\n    B -->|超过session.timeout.ms| C[被判定为死亡]\n    C --> D[触发Rebalance]\n```\n\n**推荐配置：**\n\n| 参数 | 建议值 | 说明 |\n|:---|:---|:---|\n| `session.timeout.ms` | **6s** | Consumer 存活判断时间 |\n| `heartbeat.interval.ms` | **2s** | 心跳发送间隔 |\n| 规则 | session ≥ 3 × heartbeat | 保证至少发送 3 轮心跳 |\n\n**类型二：消费时间过长导致超时**\n\n| 参数 | 说明 |\n|:---|:---|\n| `max.poll.interval.ms` | 两次 poll 的最大时间间隔，默认 5 分钟 |\n\n**解决方案**：根据下游处理时间，适当调大 `max.poll.interval.ms` 值。\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **Coordinator** | 负责 Rebalance 执行的 Broker 组件 |\n| **避免频繁 Rebalance** | 合理设置心跳和消费超时参数 |\n| **检查 GC** | 频繁 Full GC 也会导致 Rebalance |\n| **粘性分配** | 使用 StickyAssignor 减少分配变动 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "4.4 位移提交详解", "content": "#### 📌 背景\n\nConsumer 的位移记录的是**下一条待消费消息的位移**，而非最新已消费消息的位移。位移提交是 Kafka 提供的语义保障工具，直接影响消息消费的可靠性。\n\n> **⚠️ 重要**：如果提交的位移值不正确，可能导致消息丢失或重复消费。\n\n#### 📐 原理\n\n##### 4.4.1 位移提交方式分类\n\n```mermaid\ngraph TB\n    subgraph \"位移提交分类\"\n        方式[提交方式]\n        方式 --> 自动[自动提交]\n        方式 --> 手动[手动提交]\n        \n        手动 --> 同步[同步提交<br/>commitSync]\n        手动 --> 异步[异步提交<br/>commitAsync]\n    end\n```\n\n##### 4.4.2 自动提交 vs 手动提交\n\n| 方式 | 优点 | 缺点 |\n|:---|:---|:---|\n| **自动提交** | 简单省心 | 可能重复消费，无法精细控制 |\n| **手动提交** | 灵活可控 | 代码复杂 |\n\n**自动提交的问题：**\n\n```mermaid\nsequenceDiagram\n    participant P as Producer\n    participant C as Consumer\n    \n    Note over C: 位移自动提交\n    C->>C: 消费消息\n    C->>C: 3秒后发生Rebalance\n    Note over C: 之前3秒的消息需重新消费\n```\n\n##### 4.4.3 同步提交 vs 异步提交\n\n| 方式 | 特点 | 适用场景 |\n|:---|:---|:---|\n| **commitSync()** | 阻塞式，自动重试 | 需要可靠提交 |\n| **commitAsync()** | 非阻塞，不重试 | 追求高 TPS |\n\n#### 🔧 实现\n\n##### 4.4.4 推荐实现模式\n\n**最佳实践：组合使用同步和异步提交**\n\n```java\ntry {\n    while (true) {\n        ConsumerRecords<String, String> records = \n            consumer.poll(Duration.ofSeconds(1));\n        process(records);\n        consumer.commitAsync(); // 常规使用异步，不阻塞\n    }\n} catch (Exception e) {\n    handle(e);\n} finally {\n    try {\n        consumer.commitSync(); // 关闭前使用同步，确保成功\n    } finally {\n        consumer.close();\n    }\n}\n```\n\n##### 4.4.5 细粒度位移提交\n\n```java\n// 每处理100条消息提交一次位移\nMap<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();\nint count = 0;\n\nwhile (true) {\n    ConsumerRecords<String, String> records = \n        consumer.poll(Duration.ofSeconds(1));\n    for (ConsumerRecord<String, String> record : records) {\n        process(record);\n        offsets.put(\n            new TopicPartition(record.topic(), record.partition()),\n            new OffsetAndMetadata(record.offset() + 1) // 下一条位移\n        );\n        if (count % 100 == 0) {\n            consumer.commitAsync(offsets, null);\n        }\n        count++;\n    }\n}\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **位移含义** | 下一条待消费消息的位移 |\n| **推荐方式** | 手动提交，组合使用同步+异步 |\n| **细粒度提交** | 使用 `commitSync(Map)` 实现批量提交 |\n| **防止重复** | 禁用自动提交，控制提交时机 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "4.5 CommitFailedException 异常处理", "content": "#### 📌 背景\n\n`CommitFailedException` 是 Consumer 提交位移时遇到的不可恢复的严重异常。这是 Kafka 源码中注释最详细的异常类，说明它确实让很多开发者困惑。\n\n#### 📐 原理\n\n##### 4.5.1 异常发生的原因\n\n**核心原因**：消息处理时间超过了 `max.poll.interval.ms` 参数值，导致 Consumer 被踢出 Group，提交位移时分区已分配给其他实例。\n\n```mermaid\nsequenceDiagram\n    participant C as Consumer\n    participant CO as Coordinator\n    \n    C->>CO: poll()\n    Note over C: 处理消息耗时过长\n    Note over C: 超过max.poll.interval.ms\n    CO->>CO: 判定Consumer已死\n    CO->>CO: 触发Rebalance\n    C->>CO: commitSync()\n    CO-->>C: CommitFailedException!\n```\n\n##### 4.5.2 两种典型场景\n\n**场景一：消息处理超时（常见）**\n\n| 解决方案 | 说明 |\n|:---|:---|\n| 缩短单条消息处理时间 | 优化下游逻辑 |\n| 增加 `max.poll.interval.ms` | 给更多处理时间 |\n| 减少 `max.poll.records` | 每批消息数量减少 |\n| 多线程消费 | 并行处理提升速度 |\n\n**场景二：Group ID 冲突（罕见）**\n\n当独立消费者（Standalone Consumer）和消费者组使用了相同的 `group.id` 时，也会触发此异常。\n\n#### 🔧 实现\n\n**计算合理的 max.poll.interval.ms 值：**\n\n```\n合理值 = 单条消息处理时间 × max.poll.records × 安全系数\n\n示例：2秒/条 × 500条 × 1.2 = 1200秒\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **根本原因** | 消息处理超时导致被踢出 Group |\n| **首选方案** | 优化消费逻辑，缩短处理时间 |\n| **参数调整** | 调大 max.poll.interval.ms 或调小 max.poll.records |\n| **隐藏场景** | 检查是否有 Group ID 冲突 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "4.6 多线程消费方案", "content": "#### 📌 背景\n\nKafka Java Consumer 采用**单线程设计**（从 0.10.1.0 开始是用户主线程 + 心跳线程的双线程设计）。这种设计简化了实现，但在多核服务器上可能无法充分利用资源。因此，需要设计合理的多线程消费方案。\n\n> **⚠️ 注意**：KafkaConsumer 类**不是线程安全的**，不能在多个线程中共享同一实例。\n\n#### 📐 原理\n\n##### 4.6.1 两种多线程方案\n\n**方案一：每个线程一个 KafkaConsumer 实例**\n\n```mermaid\ngraph TB\n    subgraph \"方案1: 多Consumer实例\"\n        T1[线程1] --> C1[Consumer1]\n        T2[线程2] --> C2[Consumer2]\n        T3[线程3] --> C3[Consumer3]\n        \n        C1 --> P1[分区1,2]\n        C2 --> P2[分区3,4]\n        C3 --> P3[分区5,6]\n    end\n```\n\n**方案二：单 Consumer + 多 Worker 线程池**\n\n```mermaid\ngraph TB\n    subgraph \"方案2: 消费与处理分离\"\n        T[主线程] --> C[Consumer]\n        C --> MQ[消息队列]\n        MQ --> W1[Worker1]\n        MQ --> W2[Worker2]\n        MQ --> W3[Worker3]\n    end\n```\n\n##### 4.6.2 方案对比\n\n| 维度 | 方案一 | 方案二 |\n|:---|:---|:---|\n| **实现难度** | 简单 | 复杂 |\n| **线程安全** | 简单（无共享） | 需要处理 |\n| **消息顺序** | 保证分区内有序 | 无法保证 |\n| **资源占用** | 高（多个 Consumer） | 低 |\n| **扩展性** | 受限于分区数 | 灵活 |\n| **位移提交** | 简单 | 复杂 |\n\n#### 🔧 实现\n\n##### 4.6.3 方案一代码示例\n\n```java\npublic class KafkaConsumerRunner implements Runnable {\n    private final AtomicBoolean closed = new AtomicBoolean(false);\n    private final KafkaConsumer consumer;\n\n    public void run() {\n        try {\n            consumer.subscribe(Arrays.asList(\"topic\"));\n            while (!closed.get()) {\n                ConsumerRecords records = \n                    consumer.poll(Duration.ofMillis(10000));\n                // 处理消息\n            }\n        } catch (WakeupException e) {\n            if (!closed.get()) throw e;\n        } finally {\n            consumer.close();\n        }\n    }\n\n    public void shutdown() {\n        closed.set(true);\n        consumer.wakeup(); // 唯一可跨线程调用的方法\n    }\n}\n```\n\n##### 4.6.4 方案二代码示例\n\n```java\nprivate final KafkaConsumer<String, String> consumer;\nprivate ExecutorService executors;\n\nexecutors = new ThreadPoolExecutor(\n    workerNum, workerNum, 0L, TimeUnit.MILLISECONDS,\n    new ArrayBlockingQueue<>(1000), \n    new ThreadPoolExecutor.CallerRunsPolicy());\n\nwhile (true) {\n    ConsumerRecords<String, String> records = \n        consumer.poll(Duration.ofSeconds(1));\n    for (final ConsumerRecord record : records) {\n        executors.submit(new Worker(record));\n    }\n}\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **线程安全** | KafkaConsumer 不是线程安全的 |\n| **唯一例外** | wakeup() 方法可跨线程调用 |\n| **方案选择** | 需要保序用方案一，追求灵活用方案二 |\n| **位移提交** | 方案二的位移提交更复杂 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "4.7 Java 消费者 TCP 连接管理", "content": "#### 📌 背景\n\n与 Producer 不同，Consumer 在构造 KafkaConsumer 实例时**不会创建任何 TCP 连接**。所有连接都是在调用 `poll()` 方法时创建的。这种设计避免了构造函数中启动线程的问题（this 指针逃逸）。\n\n#### 📐 原理\n\n##### 4.7.1 TCP 连接创建时机\n\n```mermaid\ngraph TD\n    A[调用 poll 方法] --> B[发起 FindCoordinator 请求]\n    B --> C[创建第一个连接<br/>找负载最小的Broker]\n    C --> D[收到 Coordinator 位置]\n    D --> E[创建第二个连接<br/>连接 Coordinator]\n    E --> F[获取分区分配]\n    F --> G[创建第三类连接<br/>连接各分区Leader]\n```\n\n##### 4.7.2 三类 TCP 连接\n\n| 类型 | 用途 | 节点 ID 特征 |\n|:---|:---|:---|\n| **第一类** | 获取元数据和发送 FindCoordinator | -1（临时） |\n| **第二类** | 连接协调者，执行组管理 | Integer.MAX_VALUE - 真实ID |\n| **第三类** | 实际消费数据 | 真实 Broker ID |\n\n> **💡 说明**：第一类连接在第三类连接创建后会被废弃，最终只保留第二类和第三类连接。\n\n##### 4.7.3 TCP 连接关闭时机\n\n| 方式 | 说明 |\n|:---|:---|\n| **主动关闭** | 调用 `consumer.close()` 或 Kill 进程 |\n| **自动关闭** | 空闲超过 `connection.max.idle.ms`（默认 9 分钟） |\n\n> **⚠️ 注意**：如果使用循环调用 poll()，连接会保持\"长连接\"状态，不会被自动关闭。\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **创建时机** | 在 poll() 方法中创建，非构造函数 |\n| **三类连接** | 元数据、协调者、数据消费 |\n| **连接复用** | 第一类连接会被废弃，元数据请求使用第三类连接 |\n| **长连接** | 循环 poll 会保持连接存活 |\n\n---", "subs": ["📌 背景", "📐 原理", "⚠️ 关键点"]}, {"title": "4.8 消费进度监控", "content": "#### 📌 背景\n\n**Consumer Lag（消费滞后）** 是消费者最重要的监控指标，表示消费者落后于生产者的程度。Lag 值过大可能导致消息从磁盘读取（而非页缓存），进一步拉大差距，形成马太效应。\n\n> **💡 定义**：Lag = 分区最新消息位移 - 消费者当前位移\n\n#### 📐 原理\n\n##### 4.8.1 三种监控方法\n\n```mermaid\ngraph TB\n    subgraph \"Lag 监控方法\"\n        M1[kafka-consumer-groups<br/>命令行工具]\n        M2[Java Consumer API<br/>编程方式]\n        M3[JMX 监控指标<br/>集成监控框架]\n    end\n```\n\n##### 4.8.2 Lag 与 Lead 指标\n\n```mermaid\ngraph LR\n    subgraph \"消息位移示意\"\n        FIRST[第一条消息<br/>位移=0] --- CURRENT[当前消费位移<br/>位移=80]\n        CURRENT --- LATEST[最新消息<br/>位移=100]\n        \n        CURRENT -.->|Lead=80| FIRST\n        CURRENT -.->|Lag=20| LATEST\n    end\n```\n\n| 指标 | 含义 | 作用 |\n|:---|:---|:---|\n| **Lag** | 落后于生产者的消息数 | 衡量消费速度 |\n| **Lead** | 领先于最早消息的消息数 | 预警消息即将过期 |\n\n> **⚠️ 重要**：Lead 接近 0 时必须立即处理，否则消息可能被删除导致丢失！\n\n#### 🔧 实现\n\n##### 4.8.3 命令行方式\n\n```bash\nbin/kafka-consumer-groups.sh \\\n    --bootstrap-server localhost:9092 \\\n    --describe \\\n    --group <group-name>\n```\n\n输出字段：\n\n| 字段 | 说明 |\n|:---|:---|\n| LOG-END-OFFSET | 分区最新消息位移 |\n| CURRENT-OFFSET | 消费者当前位移 |\n| LAG | 两者差值 |\n\n##### 4.8.4 Java API 方式\n\n```java\npublic static Map<TopicPartition, Long> lagOf(\n        String groupID, String bootstrapServers) {\n    // 获取消费者组当前位移\n    Map<TopicPartition, OffsetAndMetadata> consumedOffsets = \n        client.listConsumerGroupOffsets(groupID)\n              .partitionsToOffsetAndMetadata().get();\n    \n    // 获取分区最新位移\n    Map<TopicPartition, Long> endOffsets = \n        consumer.endOffsets(consumedOffsets.keySet());\n    \n    // 计算 Lag\n    return endOffsets.entrySet().stream()\n        .collect(Collectors.toMap(\n            e -> e.getKey(),\n            e -> e.getValue() - consumedOffsets.get(e.getKey()).offset()\n        ));\n}\n```\n\n##### 4.8.5 JMX 监控指标\n\n| JMX 指标 | 说明 |\n|:---|:---|\n| `records-lag-max` | 测量周期内最大 Lag |\n| `records-lead-min` | 测量周期内最小 Lead |\n| `records-lag-avg` | 平均 Lag（分区级别） |\n| `records-lead-avg` | 平均 Lead（分区级别） |\n\n**JMX 名称**：\n\n```\nkafka.consumer:type=consumer-fetch-manager-metrics,\n               client-id=\"{client-id}\"\n```\n\n#### ⚠️ 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| **最重要指标** | Lag 是消费者最关键的监控指标 |\n| **监控 Lead** | Lead 过小预示消息可能被删除 |\n| **推荐方式** | 生产环境优先使用 JMX 集成监控框架 |\n| **命令行备选** | kafka-consumer-groups.sh 用于快速排查 |\n\n---", "subs": ["📌 背景", "📐 原理", "🔧 实现", "⚠️ 关键点"]}, {"title": "📝 第四章小结", "content": "本章深入剖析了 Kafka 消费者客户端的核心机制：\n\n```mermaid\nmindmap\n  root((消费者客户端详解))\n    消费者组\n      Group ID\n      分区分配\n      位移管理\n    位移主题\n      __consumer_offsets\n      消息格式\n      Log Compaction\n    重平衡\n      Coordinator\n      触发条件\n      避免策略\n    位移提交\n      自动提交\n      手动提交\n      细粒度提交\n    异常处理\n      CommitFailedException\n      超时处理\n      参数调优\n    多线程消费\n      多Consumer方案\n      Worker线程池方案\n      方案选型\n    TCP连接\n      创建时机\n      三类连接\n      连接管理\n    消费监控\n      Lag指标\n      Lead指标\n      监控方法\n```\n\n**核心收获：**\n\n1. **消费者组**：统一实现队列和发布/订阅两种模型\n2. **位移主题**：`__consumer_offsets` 存储消费进度，使用 Log Compaction 清理\n3. **避免 Rebalance**：合理设置心跳和消费超时参数\n4. **位移提交**：推荐手动提交，组合使用同步+异步\n5. **多线程消费**：保序用多 Consumer 方案，灵活用线程池方案\n6. **监控 Lag**：同时关注 Lag 和 Lead，优先使用 JMX 集成监控\n\n---\n\n> 📖 **下一章预告**：第六章将介绍 Kafka 运维管理，包括主题管理、动态配置、位移重设等核心知识。\n\n---", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

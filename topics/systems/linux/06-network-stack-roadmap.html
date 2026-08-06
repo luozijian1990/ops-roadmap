@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Linux 底层原理学习笔记 · 第六册：网络协议栈 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Linux 底层原理学习笔记 · 第六册：网络协议栈</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Linux 底层原理学习笔记 · 第六册：网络协议栈", "intro": "", "parts": [{"title": "第8章 网络系统（一）：Socket通信基础", "sections": [{"title": "8.1 网络协议分层", "content": "> **核心思想**：网络分层架构，Socket作为用户态和内核态的桥梁，TCP通过数据结构维护连接状态。\n\n\n#### 8.1.1 为什么要分层？\n\n**问题**：\n\n- 网络环境过于复杂\n- 不是集中控制的体系\n- 全球亿级服务器和设备各有各的体系\n\n**解决方案**：\n\n- 切分成多个层次和组合\n- 通过同一套网络协议栈满足不同需求\n\n#### 8.1.2 OSI七层与TCP/IP四层模型\n\n```\nOSI七层模型          TCP/IP模型         协议示例\n┌─────────────┐\n│  应用层      │ ─┐\n├─────────────┤  │\n│  表示层      │  ├─→  应用层        HTTP/FTP/DNS\n├─────────────┤  │\n│  会话层      │ ─┘\n├─────────────┤\n│  传输层      │ ───→  传输层        TCP/UDP\n├─────────────┤\n│  网络层      │ ───→  网络层        IP/ICMP/ARP\n├─────────────┤\n│  数据链路层  │ ─┐\n├─────────────┤  ├─→  链路层        Ethernet/WiFi\n│  物理层      │ ─┘\n└─────────────┘\n```\n\n**重点关注链路**：`TCP/UDP → IPv4 → ARP`\n\n#### 8.1.3 IP层（网络层）\n\n**IP地址格式**：`192.168.1.100/24`\n\n- 前24位：网络号\n- 后8位：主机号\n- 作用：全局定位，类似邮寄地址\n\n**路由转发**：\n\n- 网络包通过多个网络、多个路由器转发\n- 从源IP到目标IP\n- IP地址始终不变\n\n#### 8.1.4 MAC层（数据链路层）\n\n**MAC地址**：\n\n- 每个网卡的硬件地址\n- 无全局定位功能，仅本地网络有效\n- 通过ARP协议从IP获取MAC（广播\"吼\"）\n\n**特点**：\n\n- 同一网络内通信简单\n- 每经过一个路由器，MAC地址就要更换\n- IP地址不变，MAC地址变化\n\n#### 8.1.5 传输层（TCP/UDP）\n\n**TCP特点**：\n\n- 面向连接（数据结构维护状态）\n- 可靠传输（重传、排序、去重）\n- 面向字节流\n- 流量控制和拥塞控制\n\n**UDP特点**：\n\n- 无连接\n- 不可靠\n- 面向数据报\n- 简单快速\n\n**关键理解**：\n\n- TCP的\"连接\"不是物理连接\n- 而是两端数据结构状态的协同\n- 功夫在两端，不在通路\n\n#### 8.1.6 应用层与Socket\n\n**Socket定位**：\n\n- 不属于任何一层\n- 属于操作系统概念，非协议分层概念\n- 是用户态和内核态的接口\n\n**分工**：\n\n- 二到四层：内核处理\n- 七层（应用层）：用户态处理\n- Socket：跨内核态和用户态的系统调用\n\n---", "subs": ["8.1.1 为什么要分层？", "8.1.2 OSI七层与TCP/IP四层模型", "8.1.3 IP层（网络层）", "8.1.4 MAC层（数据链路层）", "8.1.5 传输层（TCP/UDP）", "8.1.6 应用层与Socket"]}, {"title": "8.2 数据包封装与转发", "content": "#### 8.2.1 发送端层层封装\n\n```\n应用层：HTTP请求\n  ↓\nSocket接口\n  ↓ [内核]\n传输层：+ TCP头（源端口/目标端口/序列号等）\n  ↓\n网络层：+ IP头（源IP/目标IP）\n  ↓\n链路层：+ MAC头（源MAC/目标MAC）\n  ↓\n物理层：网卡发送\n```\n\n#### 8.2.2 中间设备转发\n\n**交换机（二层设备）**：\n\n- 只处理MAC层\n- 拆MAC头，查找目标MAC对应的网口\n- 从对应网口转发\n\n**路由器（三层设备）**：\n\n- 处理到IP层\n- 拆MAC头和IP头\n- 查路由表，决定下一跳\n- 更换MAC头（源MAC变为自己的MAC，目标MAC变为下一跳MAC）\n- IP地址不变\n\n#### 8.2.3 接收端层层解封装\n\n```\n物理层：网卡接收\n  ↓\n链路层：检查MAC地址，匹配则拆MAC头\n  ↓\n网络层：检查IP地址，匹配则拆IP头\n  ↓\n传输层：检查序列号，缓存数据，等待应用读取\n  ↓\nSocket接口\n  ↓ [用户态]\n应用层：HTTP解析\n```\n\n---", "subs": ["8.2.1 发送端层层封装", "8.2.2 中间设备转发", "8.2.3 接收端层层解封装"]}, {"title": "8.3 Socket系统调用", "content": "#### 8.3.1 socket() - 创建套接字\n\n```c\nint socket(int domain, int type, int protocol);\n```\n\n**参数**：\n\n- `domain`：地址族（AF_INET=IPv4, AF_INET6=IPv6）\n- `type`：套接字类型\n  - SOCK_STREAM：TCP\n  - SOCK_DGRAM：UDP\n  - SOCK_RAW：原始IP包\n- `protocol`：协议（IPPROTO_TCP、IPPROTO_UDP）\n\n**返回**：文件描述符\n\n#### 8.3.2 TCP服务端流程\n\n```mermaid\ngraph TD\n    A[socket] --> B[bind绑定端口]\n    B --> C[listen监听]\n    C --> D[accept等待连接]\n    D --> E{有连接?}\n    E -->|否| D\n    E -->|是| F[返回新socket]\n    F --> G[read/write数据]\n    G --> H[close]\n```\n\n**bind**：\n\n```c\nint bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);\n\nstruct sockaddr_in {\n    sa_family_t sin_family;  // AF_INET\n    __be16 sin_port;         // 端口号（大端）\n    struct in_addr sin_addr; // IP地址\n};\n```\n\n**listen**：\n\n```c\nint listen(int sockfd, int backlog);\n```\n\n- 进入LISTEN状态\n- 等待客户端连接\n\n**accept**：\n\n```c\nint accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);\n```\n\n- 从连接队列取出一个已完成连接\n- 返回新的socket用于数据传输\n- 监听socket和已连接socket是两个不同的socket\n\n#### 8.3.3 TCP客户端流程\n\n```mermaid\ngraph TD\n    A[socket] --> B[connect连接服务端]\n    B --> C{三次握手}\n    C --> D[read/write数据]\n    D --> E[close]\n```\n\n**connect**：\n\n```c\nint connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);\n```\n\n- 内核自动分配临时端口\n- 发起三次握手\n\n#### 8.3.4 UDP编程\n\n**特点**：\n\n- 无连接，不需要listen和connect\n- 每次通信都需要传入IP和端口\n\n**API**：\n\n```c\nssize_t sendto(int sockfd, const void *buf, size_t len, int flags,\n               const struct sockaddr *dest_addr, socklen_t addrlen);\n               \nssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,\n                 struct sockaddr *src_addr, socklen_t *addrlen);\n```\n\n#### 8.3.5 大小端转换\n\n**概念**：\n\n- 大端（Big Endian）：最低位在第一个位置\n- 小端（Little Endian）：最低位在最后一个位置\n- 网络字节序：大端\n- x86机器：小端\n\n---", "subs": ["8.3.1 socket() - 创建套接字", "8.3.2 TCP服务端流程", "8.3.3 TCP客户端流程", "8.3.4 UDP编程", "8.3.5 大小端转换"]}, {"title": "8.4 Socket内核数据结构", "content": "#### 8.4.1 三级参数与三级结构\n\n```\nsocket(family, type, protocol)\n   ↓\nnet_families[family] → net_proto_family\n   ↓\ninetsw[type] → inet_protosw链表\n   ↓\nfind protocol → inet_protosw\n   ↓\n两层操作：\n  - 第一层：inet_stream_ops（面向用户）\n  - 第二层：tcp_prot（面向内核协议栈）\n```\n\n#### 8.4.2 核心数据结构关系\n\n```c\n// 地址族数组\nstruct net_proto_family __rcu *net_families[NPROTO];\n\n// IP地址族\nstatic const struct net_proto_family inet_family_ops = {\n    .family = PF_INET,\n    .create = inet_create,  // socket系统调用会调用\n};\n\n// 类型数组（每个type一个链表）\nstatic struct list_head inetsw[SOCK_MAX];\n\n// 协议结构\nstatic struct inet_protosw inetsw_array[] = {\n    {\n        .type = SOCK_STREAM,\n        .protocol = IPPROTO_TCP,\n        .prot = &tcp_prot,        // 第二层操作\n        .ops = &inet_stream_ops,  // 第一层操作\n    },\n    {\n        .type = SOCK_DGRAM,\n        .protocol = IPPROTO_UDP,\n        .prot = &udp_prot,\n        .ops = &inet_dgram_ops,\n    },\n    ...\n};\n```\n\n#### 8.4.3 socket与sock的区别\n\n```\nstruct socket（用户层）\n  ├─ ops = inet_stream_ops\n  ├─ file（关联文件系统）\n  └─ sk ───→ struct sock（内核层）\n              ├─ sk_prot = tcp_prot\n              ├─ sk_protocol = IPPROTO_TCP\n              └─ (扩展) struct inet_sock\n```\n\n**分工**：\n\n- `socket`：对上给用户提供接口，关联文件系统\n- `sock`：对下对接内核网络协议栈\n\n#### 8.4.4 两层操作函数\n\n**第一层（inet_stream_ops）**：\n\n```c\nconst struct proto_ops inet_stream_ops = {\n    .bind = inet_bind,\n    .listen = inet_listen,\n    .accept = inet_accept,\n    .connect = inet_stream_connect,\n    .sendmsg = inet_sendmsg,\n    .recvmsg = inet_recvmsg,\n};\n```\n\n**第二层（tcp_prot）**：\n\n```c\nstruct proto tcp_prot = {\n    .name = \"TCP\",\n    .close = tcp_close,\n    .connect = tcp_v4_connect,\n    .accept = inet_csk_accept,\n    .init = tcp_v4_init_sock,\n    .sendmsg = tcp_sendmsg,\n    .recvmsg = tcp_recvmsg,\n    .hash = inet_hash,\n    .get_port = inet_csk_get_port,\n};\n```\n\n---", "subs": ["8.4.1 三级参数与三级结构", "8.4.2 核心数据结构关系", "8.4.3 socket与sock的区别", "8.4.4 两层操作函数"]}, {"title": "8.5 系统调用内核实现", "content": "#### 8.5.1 socket创建流程\n\n```\nSYSCALL_DEFINE3(socket, ...)\n  ↓\nsock_create\n  ↓\n__sock_create\n  ├─ sock_alloc()  // 分配struct socket\n  ├─ net_families[family]->create  // 调用inet_create\n  └─ sock_map_fd()  // 关联文件描述符\n\ninet_create\n  ├─ 查找inetsw[type]链表，匹配protocol\n  ├─ sock->ops = answer->ops  // inet_stream_ops\n  ├─ sk_alloc()  // 分配struct sock\n  ├─ sk->sk_prot = answer->prot  // tcp_prot\n  └─ sock_init_data(sock, sk)  // 关联socket和sock\n```\n\n#### 8.5.2 bind绑定流程\n\n```\nSYSCALL_DEFINE3(bind, ...)\n  ↓\nsockfd_lookup_light  // 根据fd找到socket\n  ↓\nsock->ops->bind  // inet_bind\n  ↓\nsk->sk_prot->get_port  // inet_csk_get_port\n  ↓\n绑定端口到inet_hashinfo的bhash哈希表\n```\n\n#### 8.5.3 listen监听流程\n\n```\nSYSCALL_DEFINE2(listen, ...)\n  ↓\nsock->ops->listen  // inet_listen\n  ↓\ninet_csk_listen_start\n  ├─ sk->sk_state = TCP_LISTEN\n  ├─ sk->sk_prot->get_port  // inet_csk_get_port\n  └─ reqsk_queue_alloc  // 分配连接请求队列\n```\n\n**连接队列**：\n\n- `syn_queue`：半连接队列（收到SYN）\n- `accept_queue`：全连接队列（完成三次握手）\n\n#### 8.5.4 accept接受连接\n\n```\nSYSCALL_DEFINE3(accept, ...)\n  ↓\nsock->ops->accept  // inet_accept\n  ↓\nsk->sk_prot->accept  // inet_csk_accept\n  ↓\n从accept_queue取出已完成连接的sock\n  ↓\n创建新的socket结构\n  ↓\n返回新的文件描述符\n```\n\n#### 8.5.5 connect连接流程\n\n```\nSYSCALL_DEFINE3(connect, ...)\n  ↓\nsock->ops->connect  // inet_stream_connect\n  ↓\nsk->sk_prot->connect  // tcp_v4_connect\n  ├─ 选择源IP和源端口\n  ├─ 查找路由\n  ├─ 创建sk_buff\n  └─ tcp_connect  // 发送SYN\n       └─ tcp_transmit_skb\n```\n\n---", "subs": ["8.5.1 socket创建流程", "8.5.2 bind绑定流程", "8.5.3 listen监听流程", "8.5.4 accept接受连接", "8.5.5 connect连接流程"]}, {"title": "8.6 TCP三次握手", "content": "#### 8.6.1 状态转换图\n\n```mermaid\ngraph LR\n    A[CLOSED] -->|socket| B[CLOSED]\n    B -->|listen| C[LISTEN服务端]\n    B -->|connect发SYN| D[SYN_SENT客户端]\n    C -->|收SYN发SYN-ACK| E[SYN_RECV]\n    D -->|收SYN-ACK发ACK| F[ESTABLISHED客户端]\n    E -->|收ACK| G[ESTABLISHED服务端]\n```\n\n#### 8.6.2 详细流程\n\n**第一次握手（客户端 → 服务端）**：\n\n```\n客户端：\n  connect()\n    ↓\n  tcp_v4_connect\n    ↓\n  tcp_connect\n    ↓\n  tcp_transmit_skb(SYN)\n    ↓\n  状态：SYN_SENT\n\n服务端：\n  收到SYN包\n    ↓\n  tcp_v4_rcv\n    ↓\n  tcp_v4_do_rcv\n    ↓\n  tcp_rcv_state_process（LISTEN状态）\n    ↓\n  tcp_v4_conn_request\n    ├─ 创建request_sock\n    ├─ 加入syn_queue\n    └─ 发送SYN-ACK\n  状态：SYN_RECV\n```\n\n**第二次握手（服务端 → 客户端）**：\n\n```\n客户端：\n  收到SYN-ACK\n    ↓\n  tcp_rcv_state_process（SYN_SENT状态）\n    ↓\n  tcp_rcv_synsent_state_process\n    ├─ 检查ACK\n    ├─ 发送ACK\n    └─ 状态：ESTABLISHED\n```\n\n**第三次握手（客户端 → 服务端）**：\n\n```\n服务端：\n  收到ACK\n    ↓\n  tcp_v4_rcv\n    ↓\n  tcp_check_req\n    ├─ 从syn_queue移除request_sock\n    ├─ 创建完整的sock\n    ├─ 加入accept_queue\n    └─ 状态：ESTABLISHED\n    \n  用户调用accept()时\n    ↓\n  从accept_queue取出sock\n    ↓\n  返回新的socket给应用层\n```\n\n#### 8.6.3 关键数据结构\n\n**连接请求（半连接）**：\n\n```c\nstruct request_sock {\n    struct sock *sk;\n    // 客户端信息\n};\n```\n\n**连接队列**：\n\n```c\nstruct inet_connection_sock {\n    struct request_sock_queue icsk_accept_queue;\n};\n\nstruct request_sock_queue {\n    struct request_sock *rskq_accept_head;  // 全连接队列\n    struct request_sock *rskq_accept_tail;\n    struct listen_sock *listen_opt;         // syn_queue\n};\n```\n\n---", "subs": ["8.6.1 状态转换图", "8.6.2 详细流程", "8.6.3 关键数据结构"]}, {"title": "8.7 总结", "content": "#### 8.7.1 Socket系统调用流程\n\n**TCP服务端**：\n\n1. socket() → 创建socket，得到fd\n2. bind() → 绑定IP和端口\n3. listen() → 进入LISTEN状态，分配连接队列\n4. accept() → 从全连接队列取连接，返回新socket\n5. read()/write() → 数据传输\n6. close() → 关闭连接\n\n**TCP客户端**：\n\n1. socket() → 创建socket\n2. connect() → 发起三次握手\n3. read()/write() → 数据传输\n4. close() → 关闭连接\n\n#### 8.7.2 内核数据结构层次\n\n```\n三级参数：\n  family (AF_INET) → net_proto_family\n    ↓\n  type (SOCK_STREAM) → inet_protosw链表\n    ↓\n  protocol (IPPROTO_TCP) → 特定协议\n\n两层操作：\n  第一层：inet_stream_ops（用户接口层）\n  第二层：tcp_prot（协议栈层）\n  \n两个结构：\n  socket（面向用户）\n  sock（面向内核）\n```\n\n#### 8.7.3 核心理解\n\n1. **TCP连接的本质**：两端数据结构状态的协同，不是物理连接\n2. **两个socket**：监听socket（listen）vs 已连接socket（accept返回）\n3. **两个队列**：syn_queue（半连接）vs accept_queue（全连接）\n4. **三次握手在内核完成**：应用层调用accept时，连接已建立\n5. **Socket是桥梁**：连接用户态应用和内核态协议栈\n\n---\n\n**本节完成**：网络基础与Socket通信。\n\n**内容回顾**：\n\n- ✅ 网络协议分层（重点TCP/IP模型）\n- ✅ 数据包封装与转发流程\n- ✅ Socket API使用（TCP/UDP）\n- ✅ Socket内核数据结构（三级参数，两层操作）\n- ✅ 系统调用内核实现（socket/bind/listen/accept/connect）\n- ✅ TCP三次握手状态转换\n\n**下一节预告**：发送网络包的详细流程。\n\n---", "subs": ["8.7.1 Socket系统调用流程", "8.7.2 内核数据结构层次", "8.7.3 核心理解"]}]}, {"title": "第8章 网络系统（二）：发送网络包", "sections": [{"title": "8.8 发送网络包完整流程", "content": "> **核心思想**：数据从用户态write调用，经过VFS→Socket→TCP→IP→MAC层层封装，最终通过网卡发送。\n\n\n#### 网络协议栈双向数据流架构图\n\n```mermaid\ngraph TB\n    subgraph 用户空间[\"👤 用户空间\"]\n        APP_SEND[应用程序 write]  \n        APP_RECV[应用程序 read]\n    end\n    \n    subgraph Socket层[\"🔌 Socket层\"]\n        direction LR\n        SEND_SOCK[sock_sendmsg] \n        RECV_SOCK[sock_recvmsg]\n    end\n    \n    subgraph 传输层[\"📦 传输层 TCP/UDP\"]\n        direction LR  \n        TCP_SEND[tcp_sendmsg<br/>拥塞控制/滑动窗口]\n        TCP_RECV[tcp_recvmsg<br/>按序交付/乱序缓存]\n    end\n    \n    subgraph IP层[\"🌐 IP层\"]\n        direction LR\n        IP_SEND[ip_queue_xmit<br/>路由查找/分片]\n        IP_RECV[ip_rcv<br/>重组/本地交付]\n    end\n    \n    subgraph MAC层[\"🔗 MAC层/邻居子系统\"]\n        direction LR\n        ARP_SEND[ip_finish_output2<br/>ARP解析]\n        ARP_RECV[netif_receive_skb<br/>协议分发]\n    end\n    \n    subgraph 设备队列[\"⚙️ 设备队列层\"]\n        direction LR\n        TX_QUEUE[dev_queue_xmit<br/>发送队列/Qdisc]\n        RX_POLL[napi_poll<br/>轮询接收]\n    end\n    \n    subgraph 驱动层[\"🎛️ 网卡驱动\"]\n        direction LR\n        DRV_TX[ndo_start_xmit<br/>DMA发送]\n        DRV_RX[ixgb_clean_rx_irq<br/>中断接收]\n    end\n    \n    subgraph 硬件[\"📡 网卡硬件 NIC\"]\n        NIC[网卡<br/>DMA引擎]\n    end\n    \n    subgraph 中断机制[\"⚡ 中断与软中断\"]\n        direction TB\n        HW_IRQ[硬件中断<br/>ixgb_intr]\n        NAPI[NAPI轮询<br/>减少中断]\n        SOFTIRQ[软中断<br/>NET_RX_SOFTIRQ]\n    end\n    \n    subgraph 数据结构[\"📊 核心数据结构\"]\n        direction TB\n        SK_BUFF[sk_buff<br/>网络包]\n        SOCK_STRUCT[struct sock<br/>socket状态]\n        QUEUES[三个队列<br/>backlog/prequeue/receive]\n    end\n    \n    %% 发送路径（绿色）\n    APP_SEND ==>|系统调用| SEND_SOCK\n    SEND_SOCK ==>|inet_sendmsg| TCP_SEND\n    TCP_SEND ==>|封装TCP头| IP_SEND\n    IP_SEND ==>|封装IP头| ARP_SEND\n    ARP_SEND ==>|查找MAC| TX_QUEUE\n    TX_QUEUE ==>|Qdisc调度| DRV_TX\n    DRV_TX ==>|DMA| NIC\n    \n    %% 接收路径（蓝色）\n    NIC -.->|DMA| DRV_RX\n    DRV_RX -.->|触发| HW_IRQ\n    HW_IRQ -.->|调度| NAPI\n    NAPI -.->|触发| SOFTIRQ\n    SOFTIRQ -.->|轮询| RX_POLL  \n    RX_POLL -.->|分发| ARP_RECV\n    ARP_RECV -.->|剥离MAC头| IP_RECV\n    IP_RECV -.->|剥离IP头| TCP_RECV\n    TCP_RECV -.->|存入队列| RECV_SOCK\n    RECV_SOCK -.->|拷贝| APP_RECV\n    \n    %% 数据结构关联\n    TCP_SEND -.操作.-> SK_BUFF\n    TCP_RECV -.操作.-> SK_BUFF\n    SEND_SOCK -.操作.-> SOCK_STRUCT\n    RECV_SOCK -.操作.-> SOCK_STRUCT\n    TCP_RECV -.管理.-> QUEUES\n    \n    %% 样式  \n    linkStyle 0,1,2,3,4,5,6 stroke:#4caf50,stroke-width:3px\n    linkStyle 7,8,9,10,11,12,13,14,15,16 stroke:#2196f3,stroke-width:3px,stroke-dasharray: 5 5\n    \n    style TCP_SEND fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px\n    style TCP_RECV fill:#bbdefb,stroke:#1565c0,stroke-width:2px\n    style SK_BUFF fill:#fff9c4,stroke:#f57f17,stroke-width:2px\n    style NAPI fill:#ffccbc,stroke:#d84315,stroke-width:2px\n    style NIC fill:#e0e0e0,stroke:#424242,stroke-width:3px\n```\n\n**协议栈架构要点**：\n\n1. **发送路径**（绿色实线）：\n   - 用户空间 → Socket → TCP → IP → MAC → 网卡驱动 → 硬件\n   - 数据层层封装：添加TCP头 → IP头 → MAC头\n   - sk_buff的data指针不断前移\n\n2. **接收路径**（蓝色虚线）：\n   - 硬件 → 中断 → NAPI轮询 → 软中断 → MAC → IP → TCP → Socket → 用户空间\n   - 数据层层解封装：剥离MAC头 → IP头 → TCP头\n   - sk_buff的data指针不断后移\n\n3. **NAPI机制**（关键优化）：\n   - 第一个包：硬件中断\n   - 后续包：轮询poll（避免中断风暴）\n   - 批量处理提高效率\n\n4. **核心数据结构**：\n   - `sk_buff`：网络包的统一表示（从驱动到应用层）\n   - `struct sock`：socket状态（连接、窗口、队列）\n   - 三个队列：backlog、prequeue、sk_receive_queue\n\n5. **关键Netfilter hook点**：\n   - 发送：LOCAL_OUT、POSTROUTING\n   - 接收：PREROUTING、LOCAL_IN\n\n#### 8.8.1 整体调用链\n\n```\n用户态：write()\n  ↓\nVFS层：sock_write_iter()\n  ↓\nSocket层：sock_sendmsg() → inet_sendmsg()\n  ↓\nTCP层：tcp_sendmsg() → tcp_write_xmit() → tcp_transmit_skb()\n  ↓\nIP层：ip_queue_xmit() → ip_local_out() → ip_output()\n  ↓\nMAC层：ip_finish_output2() → neigh_output() → dev_queue_xmit()\n  ↓\n网卡驱动：hard_start_xmit()\n```\n\n---", "subs": ["网络协议栈双向数据流架构图", "8.8.1 整体调用链"]}, {"title": "8.9 VFS层与Socket层", "content": "#### 8.9.1 write系统调用\n\n```c\nwrite(sockfd, buf, len)\n  ↓\nsocket_file_ops.write_iter = sock_write_iter\n  ↓\nsock_write_iter\n  ├─ file->private_data → struct socket\n  └─ sock_sendmsg(socket, msghdr)\n```\n\n**关键数据结构**：\n\n```c\nstatic const struct file_operations socket_file_ops = {\n    .read_iter = sock_read_iter,\n    .write_iter = sock_write_iter,\n    .poll = sock_poll,\n    .mmap = sock_mmap,\n    .release = sock_close,\n};\n```\n\n#### 8.9.2 Socket层转发\n\n```c\nsock_sendmsg\n  ↓\nsock_sendmsg_nosec\n  ↓\nsocket->ops->sendmsg  // inet_sendmsg\n  ↓\nsk->sk_prot->sendmsg  // tcp_sendmsg\n```\n\n---", "subs": ["8.9.1 write系统调用", "8.9.2 Socket层转发"]}, {"title": "8.10 TCP层：tcp_sendmsg", "content": "#### 8.10.1 核心任务\n\n1. **拷贝用户数据到sk_buff**\n2. **发送sk_buff**\n\n#### 8.10.2 sk_buff数据结构\n\n```c\nstruct sk_buff {\n    struct sk_buff *next;       // 链表指针\n    struct sk_buff *prev;\n    \n    // 各层头部位置\n    __u16 transport_header;     // TCP头\n    __u16 network_header;       // IP头\n    __u16 mac_header;           // MAC头\n    \n    // 数据区域指针\n    unsigned char *head;        // 内存块起始\n    unsigned char *data;        // 当前数据起始（可变）\n    sk_buff_data_t tail;        // 数据结尾\n    sk_buff_data_t end;         // 内存块结尾\n    \n    unsigned int truesize;      // 总大小\n};\n```\n\n**sk_buff设计思想**：\n\n- `head`：分配的内存块起始\n- `data`：可变指针，发送时减小（添加头部），接收时增大（剥离头部）\n- `tail`：数据结尾\n- `end`：内存块结尾\n\n```\n接收时（剥离头部）：data往后移\n┌────────────────────────────────────┐\n│  MAC头  │  IP头  │  TCP头  │  数据  │\n└────────────────────────────────────┘\n head    data→      →      →tail   end\n\n发送时（添加头部）：data往前移\n┌────────────────────────────────────┐\n│        │         │        │  数据   │\n└────────────────────────────────────┘\n head   ←data    tail            end\n        添加TCP头 添加IP头 添加MAC头\n```\n\n#### 8.10.3 MSS与MTU\n\n**MTU（Maximum Transmission Unit）**：\n\n- 二层（数据链路层）定义\n- 以太网MTU = 1500字节\n- 完整帧 = 6(目标MAC) + 6(源MAC) + 2(类型) + 1500(数据) + 4(CRC) = 1518字节\n\n**MSS（Maximum Segment Size）**：\n\n- TCP层定义\n- MSS = MTU - IP头(20字节) - TCP头(20字节) = 1460字节\n- 单个TCP段的最大数据量\n\n#### 8.10.4 拷贝数据循环\n\n```c\nwhile (msg_data_left(msg)) {\n    // 1. 从TCP写队列取最后一个sk_buff\n    skb = tcp_write_queue_tail(sk);\n    \n    // 2. 计算MSS\n    mss_now = tcp_send_mss(sk, &size_goal, flags);\n    max = size_goal;\n    copy = max - skb->len;  // 剩余空间\n    \n    // 3. 如果空间不足，分配新sk_buff\n    if (copy <= 0 || !tcp_skb_can_collapse_to(skb)) {\n        skb = sk_stream_alloc_skb(sk, ...);\n        skb_entail(sk, skb);  // 加入队列尾部\n    }\n    \n    // 4. 拷贝数据\n    if (skb_availroom(skb) > 0) {\n        // 拷贝到连续内存区域\n        skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);\n    } else {\n        // 拷贝到分散聚合页面（Scatter/Gather）\n        skb_copy_to_page_nocache(sk, &msg->msg_iter, skb, ...);\n    }\n    \n    // 5. 更新序列号\n    tp->write_seq += copy;\n    TCP_SKB_CB(skb)->end_seq += copy;\n    \n    copied += copy;\n}\n```\n\n**分散聚合（Scatter/Gather）I/O**：\n\n- 减少内存拷贝\n- 数据可以分散在不连续页面\n- 网卡支持时直接在设备层聚合\n\n---", "subs": ["8.10.1 核心任务", "8.10.2 sk_buff数据结构", "8.10.3 MSS与MTU", "8.10.4 拷贝数据循环"]}, {"title": "8.11 TCP发送：tcp_write_xmit", "content": "#### 8.11.1 发送队列循环\n\n```c\nwhile ((skb = tcp_send_head(sk))) {\n    // 1. TSO（TCP Segmentation Offload）\n    tso_segs = tcp_init_tso_segs(skb, mss_now);\n    \n    // 2. 拥塞窗口检查\n    cwnd_quota = tcp_cwnd_test(tp, skb);\n    \n    // 3. 接收窗口检查\n    if (!tcp_snd_wnd_test(tp, skb, mss_now)) {\n        is_rwnd_limited = true;\n        break;\n    }\n    \n    // 4. 分片检查\n    if (skb->len > limit && \n        tso_fragment(sk, skb, limit, mss_now, gfp))\n        break;\n    \n    // 5. 发送sk_buff\n    tcp_transmit_skb(sk, skb, 1, gfp);\n    \n    // 6. 更新发送状态\n    tcp_event_new_data_sent(sk, skb);\n}\n```\n\n#### 8.11.2 TSO（TCP Segmentation Offload）\n\n**概念**：\n\n- 将大数据包的分段工作延迟到网卡硬件\n- 降低CPU负载\n- 需要网卡支持\n\n**实现**：\n\n```c\n// 计算需要分成几段\nsegments = DIV_ROUND_UP(skb->len, mss_now);\n\n// 大部分情况下不在这里分片，等到网卡\nif (tso_segs > 1) {\n    // 计算分片点\n    max_len = mss_now * max_seg\n\ns;\n    // 判断是否需要现在分片\n    if (skb->len > limit)\n        tso_fragment(sk, skb, limit, mss_now, gfp);\n}\n```\n\n#### 8.11.3 拥塞控制（Congestion Control）\n\n**拥塞窗口（cwnd）**：\n\n- 控制发送速率，防止网络拥塞\n- 动态调整大小\n\n**拥塞控制算法**：\n\n```mermaid\ngraph TD\n    A[慢启动 cwnd=1MSS] -->|指数增长| B{达到ssthresh?}\n    B -->|是| C[拥塞避免 线性增长]\n    B -->|否| A\n    C --> D{发生丢包?}\n    D -->|是 快速恢复| E[cwnd减半]\n    D -->|是 超时重传| F[cwnd=1MSS]\n    E --> C\n    F --> A\n```\n\n**状态转换**：\n\n1. **慢启动（Slow Start）**：\n   - 初始cwnd = 1 MSS\n   - 每收到一个ACK，cwnd翻倍\n   - 指数增长\n\n2. **拥塞避免（Congestion Avoidance）**：\n   - 达到ssthresh（慢启动阈值）\n   - 每个RTT，cwnd += 1\n   - 线性增长\n\n3. **快速恢复（Fast Recovery）**：\n   - 检测到丢包（3个重复ACK）\n   - cwnd = cwnd / 2\n   - ssthresh = cwnd\n\n4. **超时重传**：\n   - 超时检测到丢包\n   - cwnd = 1 MSS\n   - 重新慢启动\n\n#### 8.11.4 滑动窗口（Sliding Window）\n\n**接收窗口（rwnd）**：\n\n- 接收方告诉发送方的接收能力\n- 防止接收方缓存溢出\n\n**发送方缓存（4个部分）**：\n\n```\n┌─────────────┬──────────────┬──────────────┬──────────────┐\n│ 1.已发送     │ 2.已发送     │ 3.未发送     │ 4.未发送     │\n│   已确认     │   未确认     │   可发送     │   不可发送   │\n└─────────────┴──────────────┴──────────────┴──────────────┘\n                ←─ 滑动窗口 rwnd ─→\n```\n\n1. **已发送已确认**：可以回收\n2. **已发送未确认**：等待ACK，不能删除（可能重传）\n3. **未发送可发送**：在窗口内，可以立即发送\n4. **未发送不可发送**：超出接收方能力\n\n**接收方缓存（3个部分）**：\n\n```\n┌─────────────┬──────────────┬──────────────┐\n│ 1.已接收     │ 2.未接收     │ 3.未接收     │\n│   已确认     │   可接收     │   不可接收   │\n└─────────────┴──────────────┴──────────────┘\n               ←─ AdvertisedWindow ─→\n```\n\n**发送控制**：\n\n```c\n// 检查是否在滑动窗口范围内\nif (!tcp_snd_wnd_test(tp, skb, mss_now)) {\n    is_rwnd_limited = true;\n    break;  // 超出窗口，停止发送\n}\n\n// 计算窗口大小\nwindow = tcp_wnd_end(tp) - TCP_SKB_CB(skb)->seq;\n\n// 可能需要分片以适应窗口\nif (max_len > window)\n    tso_fragment(...);\n```\n\n---", "subs": ["8.11.1 发送队列循环", "8.11.2 TSO（TCP Segmentation Offload）", "8.11.3 拥塞控制（Congestion Control）", "8.11.4 滑动窗口（Sliding Window）"]}, {"title": "8.12 TCP传输：tcp_transmit_skb", "content": "#### 8.12.1 填充TCP头\n\n```c\n// 1. 为TCP头预留空间\nskb_push(skb, tcp_header_size);\n\n// 2. 获取TCP头部\nth = (struct tcphdr *)skb->data;\n\n// 3. 填充TCP头\nth->source = inet->inet_sport;        // 源端口\nth->dest = inet->inet_dport;          // 目标端口\nth->seq = htonl(tcb->seq);            // 序列号\nth->ack_seq = htonl(tp->rcv_nxt);     // 确认序列号\nth->window = htons(tp->rcv_wnd);      // 窗口大小\nth->check = 0;                        // 校验和（稍后计算）\nth->urg_ptr = 0;                      // 紧急指针\n\n// 4. 设置标志位\n*(((__be16 *)th) + 6) = htons(((tcp_header_size >> 2) << 12) |\n                               tcb->tcp_flags);\n\n// 5. 填充选项\ntcp_options_write((__be32 *)(th + 1), tp, &opts);\n```\n\n**TCP头格式**：\n\n```\n 0                   1                   2                   3\n 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|          Source Port          |       Destination Port        |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|                        Sequence Number                        |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|                    Acknowledgment Number                      |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|  Data |       |C|E|U|A|P|R|S|F|                               |\n| Offset| Rsrvd |W|C|R|C|S|S|Y|I|            Window             |\n|       |       |R|E|G|K|H|T|N|N|                               |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|           Checksum            |         Urgent Pointer        |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|                    Options                    |    Padding    |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n```\n\n#### 8.12.2 调用IP层\n\n```c\n// 调用IP层发送\nerr = icsk->icsk_af_ops->queue_xmit(sk, skb, &inet->cork.fl);\n\n// icsk_af_ops = ipv4_specific\nconst struct inet_connection_sock_af_ops ipv4_specific = {\n    .queue_xmit = ip_queue_xmit,\n    .send_check = tcp_v4_send_check,\n    ...\n};\n```\n\n---", "subs": ["8.12.1 填充TCP头", "8.12.2 调用IP层"]}, {"title": "8.13 IP层：ip_queue_xmit", "content": "#### 8.13.1 三大任务\n\n1. **选择路由**：确定从哪个网卡发出\n2. **填充IP头**：添加IP层信息\n3. **发送IP包**：调用`ip_local_out`\n\n#### 8.13.2 路由查找\n\n```c\n// 1. 查找路由\nrt = ip_route_output_ports(net, fl4, sk,\n                           daddr, saddr,\n                           dport, sport, protocol, ...);\n\n// 调用链：\nip_route_output_ports\n  → ip_route_output_flow\n    → __ip_route_output_key\n      → ip_route_output_key_hash\n        → ip_route_output_key_hash_rcu\n```\n\n**路由表查找**：\n\n```c\n// 1. 查找FIB（Forwarding Information Base）\nfib_lookup(net, fl4, res, 0);\n\n// 2. 在主路由表中查找\ntb = fib_get_table(net, RT_TABLE_MAIN);\nfib_table_lookup(tb, flp, res, flags);\n```\n\n**Trie树结构**：\n\n- 路由表使用Trie树（前缀树）存储\n- 支持最长前缀匹配\n- 快速查找路由\n\n```\n示例路由表：\ndefault via 192.168.1.1 dev eth0\n192.168.1.0/24 dev eth0 src 192.168.1.100\n192.168.2.0/24 dev eth1 src 192.168.2.1\n```\n\n**创建路由表项**：\n\n```c\n// 分配rtable结构\nrth = rt_dst_alloc(dev, flags, type, ...);\n\n// 设置输出函数\nrt->dst.output = ip_output;\n```\n\n#### 8.13.3 填充IP头\n\n```c\n// 1. 为IP头预留空间\nskb_push(skb, sizeof(struct iphdr) + inet_opt_len);\nskb_reset_network_header(skb);\n\n// 2. 获取IP头\niph = ip_hdr(skb);\n\n// 3. 填充IP头\n*((__be16 *)iph) = htons((4 << 12) | (5 << 8) | tos);  // 版本+头长+TOS\niph->frag_off = htons(IP_DF);              // 禁止分片\niph->ttl = ip_select_ttl(inet, &rt->dst); // TTL\niph->protocol = sk->sk_protocol;           // 上层协议(TCP)\nip_copy_addrs(iph, fl4);                   // 源IP和目标IP\n\n// 4. 填充选项\nif (inet_opt && inet_opt->opt.optlen) {\n    ip_options_build(skb, &inet_opt->opt, inet->inet_daddr, rt, 0);\n}\n\n// 5. 选择IP标识\nip_select_ident_segs(net, skb, sk, skb_shinfo(skb)->gso_segs ?: 1);\n```\n\n**IP头格式**：\n\n```\n 0                   1                   2                   3\n 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|Version|  IHL  |Type of Service|          Total Length         |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|         Identification        |Flags|      Fragment Offset    |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|  Time to Live |    Protocol   |         Header Checksum       |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|                       Source Address                          |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|                    Destination Address                        |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n|                    Options                    |    Padding    |\n+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+\n```\n\n**关键字段**：\n\n- **TOS**：服务类型\n- **frag_off**：分片偏移（IP_DF表示禁止分片）\n- **TTL**：生存时间，每经过路由器减1\n- **Protocol**：上层协议（6=TCP, 17=UDP）\n\n#### 8.13.4 Netfilter与iptables\n\n```c\n// 1. ip_local_out调用__ip_local_out\nip_local_out(net, sk, skb)\n  → __ip_local_out(net, sk, skb)\n    → nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT, ...)\n\n// 2. ip_output也有hook点\nip_output(net, sk, skb)\n  → NF_HOOK(NFPROTO_IPV4, NF_INET_POST_ROUTING, ...)\n```\n\n**iptables表和链**：\n\n**filter表**（过滤）：\n\n- INPUT链：目标是本机的包\n- FORWARD链：路过本机的包\n- OUTPUT链：本机产生的包\n\n**nat表**（地址转换）：\n\n- PREROUTING链：到达时改变目标地址（DNAT）\n- OUTPUT链：改变本地产生包的目标地址\n- POSTROUTING链：离开时改变源地址（SNAT）\n\n**发送时经过的hook点**：\n\n1. NF_INET_LOCAL_OUT（OUTPUT链）\n2. NF_INET_POST_ROUTING（POSTROUTING链）\n\n#### 8.13.5 IP层输出\n\n```c\n// dst_output调用rtable的output\ndst_output(net, sk, skb)\n  → skb_dst(skb)->output(net, sk, skb)\n    → ip_output(net, sk, skb)  // rt->dst.output指向ip_output\n      → NF_HOOK(..., ip_finish_output)\n```\n\n---", "subs": ["8.13.1 三大任务", "8.13.2 路由查找", "8.13.3 填充IP头", "8.13.4 Netfilter与iptables", "8.13.5 IP层输出"]}, {"title": "8.14 MAC层：邻居子系统与ARP", "content": "#### 8.14.1 ip_finish_output2\n\n```c\n// 1. 获取下一跳IP\nnexthop = rt_nexthop(rt, ip_hdr(skb)->daddr);\n\n// 2. 查找邻居结构（MAC地址）\nneigh = __ipv4_neigh_lookup_noref(dev, nexthop);\nif (!neigh)\n    neigh = __neigh_create(&arp_tbl, &nexthop, dev, false);\n\n// 3. 发送\nres = neigh_output(neigh, skb);\n```\n\n#### 8.14.2 ARP表结构\n\n```c\nstruct neigh_table arp_tbl = {\n    .family = AF_INET,\n    .key_len = 4,           // IP地址长度\n    .protocol = cpu_to_be16(ETH_P_IP),\n    .hash = arp_hash,\n    .key_eq = arp_key_eq,\n    .constructor = arp_constructor,\n    .id = \"arp_cache\",\n    .gc_interval = 30 * HZ,\n    .gc_thresh1 = 128,\n    .gc_thresh2 = 512,\n    .gc_thresh3 = 1024,\n};\n```\n\n#### 8.14.3 邻居结构创建\n\n```c\n// 1. 分配neighbour结构\nn = neigh_alloc(tbl, dev);\n\n// 2. 初始化\nskb_queue_head_init(&n->arp_queue);  // ARP请求队列\nn->output = neigh_blackhole;         // 默认输出函数\nsetup_timer(&n->timer, neigh_timer_handler, ...);  // 定时器\n\n// 3. 设置操作函数\nn->ops = &arp_hh_ops;\nn->output = n->ops->output;  // neigh_resolve_output\n\n// 4. 加入哈希表\nhash_val = tbl->hash(pkey, dev, nht->hash_rnd);\nrcu_assign_pointer(nht->hash_buckets[hash_val], n);\n```\n\n**邻居状态（NUD State）**：\n\n- `NUD_NONE`：初始状态\n- `NUD_INCOMPLETE`：正在解析（发送ARP请求）\n- `NUD_REACHABLE`：可达（有MAC地址）\n- `NUD_STALE`：过期\n- `NUD_DELAY`：延迟探测\n\n#### 8.14.4 ARP解析流程\n\n```c\nneigh_resolve_output(neigh, skb)\n  ↓\nneigh_event_send(neigh, skb)\n  ↓\n__neigh_event_send(neigh, skb)\n  ├─ 如果状态为NUD_INCOMPLETE\n  │   ├─ 设置定时器\n  │   ├─ 将skb加入arp_queue\n  │   └─ 立即发送ARP请求\n  └─ 如果状态为NUD_STALE\n      └─ 设置为NUD_DELAY，稍后探测\n```\n\n**ARP请求发送**：\n\n```c\n// 定时器触发\nneigh_timer_handler\n  ↓\nneigh_probe(neigh)\n  ↓\nneigh->ops->solicit  // arp_solicit\n  ↓\narp_send(ARPOP_REQUEST, ETH_P_ARP,\n         target, dev, saddr,\n         dst_hw, src_hw, NULL);\n```\n\n**ARP回复处理**：\n\n- 收到ARP回复后更新邻居表\n- 状态变为NUD_REACHABLE\n- 调用`dev_queue_xmit`发送队列中的包\n\n#### 8.14.5 发送到网卡\n\n```c\nneigh_resolve_output\n  → dev_queue_xmit(skb)\n```\n\n---", "subs": ["8.14.1 ip_finish_output2", "8.14.2 ARP表结构", "8.14.3 邻居结构创建", "8.14.4 ARP解析流程", "8.14.5 发送到网卡"]}, {"title": "8.15 网卡驱动层", "content": "#### 8.15.1 dev_queue_xmit\n\n```c\ndev_queue_xmit(skb)\n  ↓\n__dev_queue_xmit(skb, NULL)\n  ├─ 选择发送队列（多队列网卡）\n  ├─ 流量控制（qdisc）\n  └─ dev_hard_start_xmit\n       ↓\n     xmit_one\n       ↓\n     netdev_start_xmit\n       ↓\n     dev->netdev_ops->ndo_start_xmit  // 网卡驱动函数\n```\n\n#### 8.15.2 Qdisc（流量控制）\n\n**队列规则（Queueing Discipline）**：\n\n- `pfifo_fast`：默认队列（3个band）\n- `tbf`：令牌桶（Token Bucket Filter）\n- `htb`：层次令牌桶（Hierarchical Token Bucket）\n- `sfq`：随机公平队列（Stochastic Fair Queuing）\n\n**作用**：\n\n- 流量整形（Traffic Shaping）\n- 优先级控制\n- 带宽限制\n\n#### 8.15.3 网卡驱动发送\n\n```c\n// 网卡驱动的发送函数（以e1000为例）\nstatic netdev_tx_t e1000_xmit_frame(struct sk_buff *skb,\n                                    struct net_device *netdev)\n{\n    // 1. 获取DMA映射\n    dma_addr = dma_map_single(dev, skb->data, skb->len, DMA_TO_DEVICE);\n    \n    // 2. 填充发送描述符\n    tx_desc->buffer_addr = cpu_to_le64(dma_addr);\n    tx_desc->lower.data = ...;\n    \n    // 3. 更新发送队列尾指针\n    writel(tx_ring->next_to_use, hw->hw_addr + tx_ring->tdt);\n    \n    // 4. 网卡硬件开始DMA传输\n    return NETDEV_TX_OK;\n}\n```\n\n**DMA传输**：\n\n- 网卡直接从内存读取数据\n- 不经过CPU\n- 高效传输\n\n---", "subs": ["8.15.1 dev_queue_xmit", "8.15.2 Qdisc（流量控制）", "8.15.3 网卡驱动发送"]}, {"title": "8.16 完整流程总结", "content": "#### 8.16.1 层次划分\n\n```mermaid\ngraph TD\n    A[用户态 write] --> B[VFS层 sock_write_iter]\n    B --> C[Socket层 inet_sendmsg]\n    C --> D[TCP层 tcp_sendmsg]\n    D --> E[TCP发送 tcp_write_xmit]\n    E --> F[TCP传输 tcp_transmit_skb]\n    F --> G[IP层 ip_queue_xmit]\n    G --> H[IP输出 ip_finish_output2]\n    H --> I[MAC层 neigh_output]\n    I --> J[网卡队列 dev_queue_xmit]\n    J --> K[网卡驱动 ndo_start_xmit]\n```\n\n#### 8.16.2 关键数据结构\n\n```\nstruct file (VFS)\n  ↓\nstruct socket (Socket层)\n  ├─ ops = inet_stream_ops\n  └─ sk → struct sock (Sock层)\n           ├─ sk_prot = tcp_prot\n           └─ sk_write_queue (发送队列)\n                ↓\n            struct sk_buff (网络包)\n              ├─ transport_header → TCP头\n              ├─ network_header → IP头\n              ├─ mac_header → MAC头\n              └─ data → 数据\n```\n\n#### 8.16.3 核心机制\n\n1. **sk_buff管理**：\n   - 链表组织\n   - 头部指针动态调整\n   - 分散聚合支持\n\n2. **TCP拥塞控制**：\n   - 慢启动 → 拥塞避免\n   - 快速恢复 / 超时重传\n   - 动态调整cwnd\n\n3. **滑动窗口**：\n   - 发送方4部分缓存\n   - 接收方3部分缓存\n   - 流量控制\n\n4. **路由选择**：\n   - FIB查找\n   - Trie树最长匹配\n   - 确定出口网卡\n\n5. **邻居子系统**：\n   - ARP表维护\n   - MAC地址解析\n   - 状态机管理\n\n6. **Netfilter**：\n   - iptables规则\n   - filter表和nat表\n   - hook点拦截\n\n7. **网卡发送**：\n   - Qdisc流量控制\n   - DMA传输\n   - 硬件卸载（TSO/GSO）\n\n#### 8.16.4 核心理解\n\n1. **sk_buff是核心**：所有层次都操作sk_buff\n2. **层层封装**：data指针不断前移，添加各层头部\n3. **拥塞控制**：TCP通过cwnd控制发送速率\n4. **滑动窗口**：接收方通过rwnd控制发送方\n5. **路由决定出口**：IP层查找路由表\n6. **ARP解析MAC**：同一局域网通过MAC通信\n7. **Netfilter可干预**：iptables在关键点拦截\n8. **硬件卸载优化**：TSO、GSO减轻CPU负担\n\n---\n\n**本节完成**：发送网络包。\n\n**内容回顾**：\n\n- ✅ VFS层到Socket层转发\n- ✅ TCP层数据拷贝与sk_buff管理\n- ✅ TCP拥塞控制与滑动窗口\n- ✅ TCP头填充与传输\n- ✅ IP层路由选择与IP头填充\n- ✅ Netfilter与iptables\n- ✅ MAC层邻居子系统与ARP\n- ✅ 网卡驱动与DMA传输\n\n**下一节预告**：接收网络包的详细流程。\n\n---", "subs": ["8.16.1 层次划分", "8.16.2 关键数据结构", "8.16.3 核心机制", "8.16.4 核心理解"]}]}, {"title": "第8章 网络系统（三）：接收网络包", "sections": [{"title": "8.17 接收网络包完整流程", "content": "> **核心思想**：网络包从网卡到达，经过硬件中断→软中断→IP层→TCP层→Socket层，最终被用户进程read读取。\n\n\n#### 8.17.1 整体调用链（反向）\n\n```\n硬件：网卡接收 → DMA传输\n  ↓\n硬件中断：ixgb_intr() → __napi_schedule()\n  ↓\n软中断：NET_RX_SOFTIRQ → net_rx_action() → napi_poll()\n  ↓\n网卡驱动：ixgb_clean_rx_irq() → netif_receive_skb()\n  ↓\n协议层分发：__netif_receive_skb() → ip_rcv()\n  ↓\nIP层：ip_rcv_finish() → ip_local_deliver()\n  ↓\nTCP层：tcp_v4_rcv() → tcp_v4_do_rcv()\n  ↓\n数据队列：tcp_data_queue() → sk_receive_queue\n  ↓\nSocket层：sock_recvmsg() → inet_recvmsg() → tcp_recvmsg()\n  ↓\n用户态：read()\n```\n\n---", "subs": ["8.17.1 整体调用链（反向）"]}, {"title": "8.18 硬件中断与NAPI", "content": "#### 8.18.1 问题：中断风暴\n\n**传统中断模式的问题**：\n\n- 网络包到达频繁\n- 每个包都触发中断\n- CPU频繁被打断，效率低下\n\n**解决方案：NAPI（New API）**：\n\n- 第一个包：触发硬件中断\n- 后续包：主动轮询（poll）\n- 批量处理，减少中断次数\n\n#### 8.18.2 网卡驱动初始化\n\n```c\n// 注册网卡驱动\nstatic int __init ixgb_init_module(void)\n{\n    return pci_register_driver(&ixgb_driver);\n}\n\n// probe函数\nstatic int ixgb_probe(struct pci_dev *pdev, ...)\n{\n    // 1. 分配net_device\n    netdev = alloc_etherdev(sizeof(struct ixgb_adapter));\n    \n    // 2. 注册NAPI poll函数\n    netif_napi_add(netdev, &adapter->napi, ixgb_clean, 64);\n    \n    // 3. 设置网卡操作函数\n    netdev->netdev_ops = &ixgb_netdev_ops;\n    \n    return 0;\n}\n```\n\n**关键结构**：\n\n- `net_device`：网络设备结构\n- `napi_struct`：NAPI结构，包含poll函数\n- `ixgb_clean`：轮询函数，处理接收到的包\n\n#### 8.18.3 网卡激活与中断注册\n\n```c\n// 网卡up时注册中断\nint ixgb_up(struct ixgb_adapter *adapter)\n{\n    // 注册硬件中断处理函数\n    err = request_irq(adapter->pdev->irq, ixgb_intr, \n                      irq_flags, netdev->name, netdev);\n    return 0;\n}\n```\n\n#### 8.18.4 硬件中断处理\n\n```c\n// 硬件中断处理函数\nstatic irqreturn_t ixgb_intr(int irq, void *data)\n{\n    struct net_device *netdev = data;\n    struct ixgb_adapter *adapter = netdev_priv(netdev);\n    \n    // 如果可以调度NAPI\n    if (napi_schedule_prep(&adapter->napi)) {\n        // 1. 关闭网卡中断（避免中断风暴）\n        IXGB_WRITE_REG(&adapter->hw, IMC, ~0);\n        \n        // 2. 调度NAPI（触发软中断）\n        __napi_schedule(&adapter->napi);\n    }\n    \n    return IRQ_HANDLED;\n}\n```\n\n**关键步骤**：\n\n1. 关闭网卡中断（暂时）\n2. 调度NAPI（触发软中断）\n3. 后续通过轮询处理包，不再触发中断\n\n---", "subs": ["8.18.1 问题：中断风暴", "8.18.2 网卡驱动初始化", "8.18.3 网卡激活与中断注册", "8.18.4 硬件中断处理"]}, {"title": "8.19 软中断处理", "content": "#### 8.19.1 __napi_schedule\n\n```c\nvoid __napi_schedule(struct napi_struct *n)\n{\n    unsigned long flags;\n    \n    local_irq_save(flags);\n    \n    // 将napi_struct加入softnet_data的poll_list\n    ____napi_schedule(this_cpu_ptr(&softnet_data), n);\n    \n    local_irq_restore(flags);\n}\n\nstatic inline void ____napi_schedule(struct softnet_data *sd,\n                                      struct napi_struct *napi)\n{\n    // 加入poll_list\n    list_add_tail(&napi->poll_list, &sd->poll_list);\n    \n    // 触发软中断NET_RX_SOFTIRQ\n    __raise_softirq_irqoff(NET_RX_SOFTIRQ);\n}\n```\n\n**softnet_data结构**：\n\n```c\nstruct softnet_data {\n    struct list_head poll_list;      // 接收：待轮询设备列表\n    struct Qdisc *output_queue;       // 发送：发送队列\n    struct Qdisc **output_queue_tailp;\n    ...\n};\n```\n\n#### 8.19.2 软中断处理函数\n\n```c\nstatic __latent_entropy void net_rx_action(struct softirq_action *h)\n{\n    struct softnet_data *sd = this_cpu_ptr(&softnet_data);\n    LIST_HEAD(list);\n    \n    // 从poll_list取出设备列表\n    list_splice_init(&sd->poll_list, &list);\n    \n    // 循环处理每个设备\n    for (;;) {\n        struct napi_struct *n;\n        \n        n = list_first_entry(&list, struct napi_struct, poll_list);\n        \n        // 调用设备的poll函数（ixgb_clean）\n        budget -= napi_poll(n, &repoll);\n        \n        if (budget <= 0)\n            break;\n    }\n}\n```\n\n---", "subs": ["8.19.1 __napi_schedule", "8.19.2 软中断处理函数"]}, {"title": "8.20 网卡驱动接收", "content": "#### 8.20.1 ixgb_clean_rx_irq\n\n```c\nstatic bool ixgb_clean_rx_irq(struct ixgb_adapter *adapter,\n                               int *work_done, int work_to_do)\n{\n    struct ixgb_desc_ring *rx_ring = &adapter->rx_ring;\n    struct net_device *netdev = adapter->netdev;\n    struct ixgb_rx_desc *rx_desc, *next_rxd;\n    struct ixgb_buffer *buffer_info, *next_buffer;\n    struct sk_buff *skb;\n    unsigned int i;\n    \n    i = rx_ring->next_to_clean;\n    rx_desc = IXGB_RX_DESC(*rx_ring, i);\n    buffer_info = &rx_ring->buffer_info[i];\n    \n    // 循环处理接收描述符\n    while (rx_desc->status & IXGB_RX_DESC_STATUS_DD) {\n        // 1. 获取sk_buff\n        skb = buffer_info->skb;\n        buffer_info->skb = NULL;\n        \n        // 2. 设置协议类型\n        skb->protocol = eth_type_trans(skb, netdev);\n        \n        // 3. 设置校验和\n        if (adapter->rx_csum && ...){\n            skb->ip_summed = CHECKSUM_UNNECESSARY;\n        }\n        \n        // 4. 传递给上层协议栈\n        netif_receive_skb(skb);\n        \n        //5. 移动到下一个描述符\n        rx_desc = IXGB_RX_DESC(*rx_ring, i);\n        buffer_info = &rx_ring->buffer_info[i];\n    }\n    \n    return cleaned;\n}\n```\n\n**接收描述符环**：\n\n```\n┌─────────┬─────────┬─────────┬─────────┬─────────┐\n│ Desc 0  │ Desc 1  │ Desc 2  │ ...     │ Desc N  │\n└─────────┴─────────┴─────────┴─────────┴─────────┘\n     ↓         ↓         ↓\n  sk_buff   sk_buff   sk_buff\n  \n  next_to_clean → 指向下一个待清理的描述符\n```\n\n#### 8.20.2 netif_receive_skb\n\n```c\nint netif_receive_skb(struct sk_buff *skb)\n{\n    return netif_receive_skb_internal(skb);\n}\n\nstatic int netif_receive_skb_internal(struct sk_buff *skb)\n{\n    // 预处理：时间戳、vlan等\n    net_timestamp_check(netdev_tstamp_prequeue, skb);\n    \n    // 分发到协议层\n    return __netif_receive_skb(skb);\n}\n```\n\n---", "subs": ["8.20.1 ixgb_clean_rx_irq", "8.20.2 netif_receive_skb"]}, {"title": "8.21 协议层分发", "content": "#### 8.21.1 __netif_receive_skb\n\n```c\nstatic int __netif_receive_skb(struct sk_buff *skb)\n{\n    int ret;\n    \n    // 根据协议类型分发\n    ret = __netif_receive_skb_core(skb, false);\n    \n    return ret;\n}\n\nstatic int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)\n{\n    struct packet_type *ptype, *pt_prev;\n    \n    // 获取协议类型（ETH_P_IP、ETH_P_ARP等）\n    type = skb->protocol;\n    \n    // 查找协议处理函数\n    list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type) & PTYPE_HASH_MASK],\n                            list) {\n        if (ptype->type == type) {\n            // 调用协议处理函数（ip_rcv）\n            ret = deliver_skb(skb, pt_prev, orig_dev);\n        }\n    }\n    \n    return ret;\n}\n```\n\n**协议注册**：\n\n```c\nstatic struct packet_type ip_packet_type __read_mostly = {\n    .type = cpu_to_be16(ETH_P_IP),\n    .func = ip_rcv,  // IP层接收函数\n};\n```\n\n---", "subs": ["8.21.1 __netif_receive_skb"]}, {"title": "8.22 IP层接收", "content": "#### 8.22.1 ip_rcv\n\n```c\nint ip_rcv(struct sk_buff *skb, struct net_device *dev,\n           struct packet_type *pt, struct net_device *orig_dev)\n{\n    const struct iphdr *iph;\n    struct net *net;\n    \n    net = dev_net(dev);\n    \n    // 1. 检查IP头长度\n    if (!pskb_may_pull(skb, sizeof(struct iphdr)))\n        goto inhdr_error;\n    \n    iph = ip_hdr(skb);\n    \n    // 2. 检查IP版本和头长度\n    if (iph->ihl < 5 || iph->version != 4)\n        goto inhdr_error;\n    \n    // 3. 检查IP包长度\n    if (skb->len < ntohs(iph->tot_len))\n        goto inhdr_error;\n    \n    // 4. 检查IP校验和\n    if (ip_fast_csum((u8 *)iph, iph->ihl))\n        goto csum_error;\n    \n    // 5. 进入Netfilter  hook点（PREROUTING）\n    return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,\n                   net, NULL, skb, dev, NULL,\n                   ip_rcv_finish);\n    \ninhdr_error:\n    IP_INC_STATS(net, IPSTATS_MIB_INHDRERRORS);\n    goto drop;\n    \ncsum_error:\n    IP_INC_STATS(net, IPSTATS_MIB_CSUMERRORS);\n    \ndrop:\n    kfree_skb(skb);\n    return NET_RX_DROP;\n}\n```\n\n#### 8.22.2 ip_rcv_finish与路由\n\n```c\nstatic int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)\n{\n    const struct iphdr *iph = ip_hdr(skb);\n    struct rtable *rt;\n    \n    // 1. 查找路由（判断是本地还是转发）\n    if (!skb_valid_dst(skb)) {\n        int err = ip_route_input_noref(skb, iph->daddr, iph->saddr,\n                                        iph->tos, skb->dev);\n        if (err)\n            goto drop;\n    }\n    \n    // 2. 调用目标处理函数\n    return dst_input(skb);\n}\n\nstatic inline int dst_input(struct sk_buff *skb)\n{\n    // 如果是本地：ip_local_deliver\n    // 如果是转发：ip_forward\n    return skb_dst(skb)->input(skb);\n}\n```\n\n#### 8.22.3 ip_local_deliver\n\n```c\nint ip_local_deliver(struct sk_buff *skb)\n{\n    struct net *net = dev_net(skb->dev);\n    \n    // 1. IP分片重组\n    if (ip_is_fragment(ip_hdr(skb))) {\n        if (ip_defrag(net, skb, IP_DEFRAG_LOCAL_DELIVER))\n            return 0;\n    }\n    \n    // 2. Netfilter hook点（LOCAL_IN）\n    return NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_IN,\n                   net, NULL, skb, skb->dev, NULL,\n                   ip_local_deliver_finish);\n}\n```\n\n#### 8.22.4 ip_local_deliver_finish\n\n```c\nstatic int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_buff *skb)\n{\n    const struct iphdr *iph = ip_hdr(skb);\n    int protocol = iph->protocol;\n    const struct net_protocol *ipprot;\n    \n    // 根据协议号查找处理函数\n    ipprot = rcu_dereference(inet_protos[protocol]);\n    if (ipprot) {\n        // 调用传输层处理函数（tcp_v4_rcv、udp_rcv等）\n        ret = ipprot->handler(skb);\n    }\n    \n    return ret;\n}\n```\n\n**协议注册**：\n\n```c\nstatic const struct net_protocol tcp_protocol = {\n    .handler = tcp_v4_rcv,  // TCP接收函数\n    .err_handler = tcp_v4_err,\n    .no_policy = 1,\n    .netns_ok = 1,\n    .icmp_strict_tag_validation = 1,\n};\n```\n\n---", "subs": ["8.22.1 ip_rcv", "8.22.2 ip_rcv_finish与路由", "8.22.3 ip_local_deliver", "8.22.4 ip_local_deliver_finish"]}, {"title": "8.23 TCP层接收", "content": "#### 8.23.1 tcp_v4_rcv\n\n```c\nint tcp_v4_rcv(struct sk_buff *skb)\n{\n    struct net *net = dev_net(skb->dev);\n    const struct iphdr *iph;\n    const struct tcphdr *th;\n    struct sock *sk;\n    int ret;\n    \n    // 1. 获取TCP头\n    th = (const struct tcphdr *)skb->data;\n    iph = ip_hdr(skb);\n    \n    // 2. 提取TCP信息到skb控制块\n    TCP_SKB_CB(skb)->seq = ntohl(th->seq);\n    TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq + th->syn + th->fin + skb->len;\n    TCP_SKB_CB(skb)->ack_seq = ntohl(th->ack_seq);\n    TCP_SKB_CB(skb)->tcp_flags = tcp_flag_byte(th);\n    \n    // 3. 查找对应的socket\n    sk = __inet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th),\n                           th->source, th->dest, ...);\n    \n    // 4. 根据状态处理\n    if (sk->sk_state == TCP_TIME_WAIT)\n        goto do_time_wait;\n    \n    if (sk->sk_state == TCP_NEW_SYN_RECV) {\n        ...\n    }\n    \n    // 5. 检查socket是否被用户进程占用\n    if (!sock_owned_by_user(sk)) {\n        // 用户没有占用，直接处理\n        if (!tcp_prequeue(sk, skb))\n            ret = tcp_v4_do_rcv(sk, skb);\n    } else if (tcp_add_backlog(sk, skb)) {\n        // 用户正在占用，加入backlog队列\n        goto discard_and_relse;\n    }\n    \n    return ret;\n}\n```\n\n#### 8.23.2 三个队列\n\n**1. backlog队列**：\n\n- 用户进程正在读取socket\n- 软中断不能直接处理\n- 暂存到backlog，由用户进程稍后处理\n\n**2. prequeue队列**：\n\n- 用户进程等待读取\n- 根据`sysctl_tcp_low_latency`决定\n  - =0：放入prequeue（低延迟）\n  - =1：直接处理\n\n**3. sk_receive_queue队列**：\n\n- 最终数据队列\n- 用户read时从这里读取\n\n```mermaid\ngraph TD\n    A[tcp_v4_rcv] --> B{sock_owned_by_user?}\n    B -->|否| C{tcp_prequeue}\n    B -->|是| D[tcp_add_backlog]\n    C -->|low_latency=0| E[放入prequeue]\n    C -->|low_latency=1| F[tcp_v4_do_rcv]\n    D --> G[backlog队列]\n    F --> H[tcp_data_queue]\n    H --> I[sk_receive_queue]\n```\n\n#### 8.23.3 tcp_v4_do_rcv\n\n```c\nint tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)\n{\n    struct sock *rsk;\n    \n    // 1. 如果是ESTABLISHED状态（快速路径）\n    if (sk->sk_state == TCP_ESTABLISHED) {\n        struct dst_entry *dst = sk->sk_rx_dst;\n        \n        tcp_rcv_established(sk, skb, tcp_hdr(skb), skb->len);\n        return 0;\n    }\n    \n    // 2. 其他状态（慢速路径）\n    if (tcp_rcv_state_process(sk, skb)) {\n        ...\n    }\n    \n    return 0;\n}\n```\n\n#### 8.23.4 tcp_rcv_established\n\n```c\nvoid tcp_rcv_established(struct sock *sk, struct sk_buff *skb,\n                         const struct tcphdr *th, unsigned int len)\n{\n    struct tcp_sock *tp = tcp_sk(sk);\n    \n    // 快速路径：数据按序到达\n    if (len <= tp->ucopy.len && !TCP_SKB_CB(skb)->tcp_flags) {\n        // ...\n    }\n    \n    // 慢速路径\n    if (len < (th->doff << 2) || tcp_checksum_complete(skb))\n        goto csum_error;\n    \n    // 处理数据\n    tcp_data_queue(sk, skb);\n    \n    // 发送ACK\n    tcp_ack(sk, skb, FLAG_DATA_ACKED);\n    \n    return;\n}\n```\n\n#### 8.23.5 tcp_data_queue\n\n```c\nstatic void tcp_data_queue(struct sock *sk, struct sk_buff *skb)\n{\n    struct tcp_sock *tp = tcp_sk(skb);\n    bool fragstolen = false;\n    \n    // 情况1：按序到达（seq == rcv_nxt）\n    if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt) {\n        // 如果用户正在等待读取\n        if (tp->ucopy.task == current &&\n            sock_owned_by_user(sk) &&\n            !tp->urg_data) {\n            int chunk = min_t(unsigned int, skb->len, tp->ucopy.len);\n            \n            // 直接拷贝给用户\n            if (!skb_copy_datagram_msg(skb, 0, tp->ucopy.msg, chunk)) {\n                tp->ucopy.len -= chunk;\n                tp->copied_seq += chunk;\n               eaten = (chunk == skb->len);\n            }\n        }\n        \n        // 如果没有直接拷贝或拷贝失败，加入队列\n        if (eaten <= 0) {\n            eaten = tcp_queue_rcv(sk, skb, 0, &fragstolen);\n        }\n        \n        // 更新rcv_nxt\n        tcp_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);\n        \n        // 检查乱序队列\n        if (!RB_EMPTY_ROOT(&tp->out_of_order_queue)) {\n            tcp_ofo_queue(sk);\n        }\n        \n        return;\n    }\n    \n    // 情况2：重传包（seq < rcv_nxt）\n    if (!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt)) {\n        // 发送DSACK\n        tcp_dsack_set(sk, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);\n        tcp_enter_quickack_mode(sk);\n        goto drop;\n    }\n    \n    // 情况3：数据包超出窗口\n    if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt + tcp_receive_window(tp)))\n        goto out_of_window;\n    \n    // 情况4：乱序包\n    tcp_data_queue_ofo(sk, skb);\n}\n```\n\n**乱序队列out_of_order_queue**：\n\n- 使用红黑树管理\n- seq小于rcv_nxt的直接丢弃\n- seq大于rcv_nxt的放入乱序队列\n- 当按序包到达后，检查乱序队列能否合并\n\n**示例**：\n\n```\n发送：5 6 7 8 9\n到达：7 8 5 6 9\n\nrcv_nxt=5时：\n  7,8到达 → out_of_order_queue\n  \nrcv_nxt=5时：\n  5到达 → sk_receive_queue，rcv_nxt=6\n  检查乱序队列 → 6不在\n  \nrcv_nxt=6时：\n  6到达 → sk_receive_queue，rcv_nxt=7\n  检查乱序队列 → 7,8可以移入 → rcv_nxt=9\n  \nrcv_nxt=9时：\n  9到达 → sk_receive_queue，rcv_nxt=10\n```\n\n---", "subs": ["8.23.1 tcp_v4_rcv", "8.23.2 三个队列", "8.23.3 tcp_v4_do_rcv", "8.23.4 tcp_rcv_established", "8.23.5 tcp_data_queue"]}, {"title": "8.24 Socket层接收", "content": "#### 8.24.1 read系统调用\n\n```c\nread(sockfd, buf, len)\n  ↓\nsys_read\n  ↓\nvfs_read\n  ↓\n__vfs_read\n  ↓\nfile->f_op->read_iter  // sock_read_iter\n  ↓\nsock_recvmsg\n```\n\n#### 8.24.2 sock_recvmsg\n\n```c\nint sock_recvmsg(struct socket *sock, struct msghdr *msg, int flags)\n{\n    int err = security_socket_recvmsg(sock, msg, msg_data_len(msg), flags);\n    \n    return err ?: sock_recvmsg_nosec(sock, msg, flags);\n}\n\nstatic inline int sock_recvmsg_nosec(struct socket *sock, struct msghdr *msg,\n                                      int flags)\n{\n    // 调用socket的recvmsg（inet_recvmsg）\n    return sock->ops->recvmsg(sock, msg, msg_data_len(msg), flags);\n}\n```\n\n#### 8.24.3 inet_recvmsg\n\n```c\nint inet_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,\n                 int flags)\n{\n    struct sock *sk = sock->sk;\n    \n    // 调用tcp_recvmsg\n    return sk->sk_prot->recvmsg(sk, msg, size, flags & MSG_DONTWAIT,\n                                 flags & ~MSG_DONTWAIT, &addr_len);\n}\n```\n\n#### 8.24.4 tcp_recvmsg\n\n```c\nint tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,\n                int flags, int *addr_len)\n{\n    struct tcp_sock *tp = tcp_sk(sk);\n    int copied = 0;\n    long timeo;\n    \n    timeo = sock_rcvtimeo(sk, nonblock);\n    \n    do {\n        struct sk_buff *skb;\n        u32 offset;\n        \n        // 1. 从sk_receive_queue获取数据\n        skb_queue_walk(&sk->sk_receive_queue, skb) {\n            offset = tp->copied_seq - TCP_SKB_CB(skb)->seq;\n            \n            // 拷贝数据到用户空间\n            used = skb->len - offset;\n            if (len < used)\n                used = len;\n            \n            if (!(flags & MSG_TRUNC)) {\n                err = skb_copy_datagram_msg(skb, offset, msg, used);\n                if (err) {\n                    if (!copied)\n                        copied = -EFAULT;\n                    break;\n                }\n            }\n            \n            copied += used;\n            len -= used;\n            \n            tcp_rcv_space_adjust(sk);\n            \n            if (tp->urg_data && after(tp->copied_seq, tp->urg_seq)) {\n                tp->urg_data = 0;\n                tcp_fast_path_check(sk);\n            }\n            \n            if (used + offset < skb->len)\n                continue;\n            \n            if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)\n                goto found_fin_ok;\n                \n            sk_eat_skb(sk, skb);\n            if (!desc.count)\n                break;\n        }\n        \n        // 2. 处理backlog队列\n        if (!skb_queue_empty(&sk->sk_backlog.head)) {\n            release_sock(sk);\n            lock_sock(sk);\n            // backlog会被处理并移入sk_receive_queue\n        }\n        \n        // 3. 如果没有数据，等待\n        if (!copied) {\n            if (sk->sk_err || sk->sk_state == TCP_CLOSE ||\n                (sk->sk_shutdown & RCV_SHUTDOWN) ||\n                !timeo || signal_pending(current))\n                break;\n        } else {\n            if (sk->sk_err || sk->sk_state == TCP_CLOSE ||\n                (sk->sk_shutdown & RCV_SHUTDOWN))\n                break;\n                \n            if (!timeo)\n                break;\n        }\n        \n        // 等待数据到达\n        sk_wait_data(sk, &timeo, NULL);\n        \n    } while (len > 0);\n    \n    return copied;\n}\n```\n\n**关键步骤**：\n\n1. 从`sk_receive_queue`读取数据\n2. 拷贝到用户空间缓冲区\n3. 更新`copied_seq`\n4. 如果没有数据，阻塞等待（或非阻塞返回）\n\n---", "subs": ["8.24.1 read系统调用", "8.24.2 sock_recvmsg", "8.24.3 inet_recvmsg", "8.24.4 tcp_recvmsg"]}, {"title": "8.25 完整流程总结", "content": "#### 8.25.1 层次划分\n\n```mermaid\ngraph TD\n    A[硬件DMA] --> B[硬件中断 ixgb_intr]\n    B --> C[软中断 NET_RX_SOFTIRQ]\n    C --> D[网卡驱动 ixgb_clean_rx_irq]\n    D --> E[协议分发 netif_receive_skb]\n    E --> F[IP层 ip_rcv]\n    F --> G[IP路由 ip_local_deliver]\n    G --> H[TCP层 tcp_v4_rcv]\n    H --> I[TCP状态处理 tcp_v4_do_rcv]\n    I --> J[数据队列 tcp_data_queue]\n    J --> K[Socket读取 tcp_recvmsg]\n    K --> L[用户态 read]\n```\n\n#### 8.25.2 关键数据结构关系\n\n```\n网卡接收描述符环\n  ↓ DMA\nsk_buff (网络包)\n  ↓\nsoftnet_data (CPU私有)\n  ├─ poll_list (待轮询设备)\n  └─ (发送时：output_queue)\n  ↓\n协议层分发\n  ↓\nstruct sock\n  ├─ sk_backlog (用户占用时暂存)\n  ├─ prequeue (低延迟选项)\n  ├─ sk_receive_queue (最终数据队列)\n  └─ out_of_order_queue (乱序队列，红黑树)\n  ↓\n用户进程缓冲区\n```\n\n#### 8.25.3 核心机制\n\n1. **NAPI机制**：\n   - 第一个包：硬件中断\n   - 后续包：主动轮询\n   - 批量处理，减少中断\n\n2. **软中断处理**：\n   - NET_RX_SOFTIRQ\n   - net_rx_action循环poll_list\n   - 调用设备poll函数\n\n3. **三个队列协作**：\n   - backlog：用户占用时暂存\n   - prequeue：低延迟暂存\n   - sk_receive_queue：最终读取\n\n4. **乱序处理**：\n   - 红黑树管理out_of_order_queue\n   - 按序到达时检查合并\n   - 保证数据顺序\n\n5. **Netfilter hook**：\n   - PREROUTING：ip_rcv后\n   - LOCAL_IN：ip_local_deliver后\n   - 可拦截/修改包\n\n6. **零拷贝优化**：\n   - 用户等待时直接拷贝\n   - 避免多次在队列中倒腾\n   - skb_copy_datagram_msg\n\n#### 8.25.4 发送vs接收对比\n\n| 方面 | 发送 | 接收 |\n|------|------|------|\n| 起点 | 用户态write() | 网卡硬件 |\n| 第一层 | VFS层 | 硬件中断 |\n| 中断 | 发送完成中断 | 接收硬件中断+软中断 |\n| sk_buff data指针 | 前移（添加头） | 后移（剥离头） |\n| 拥塞控制 | cwnd/rwnd控制发送| 接收窗口通告 |\n| 队列 | output_queue | poll_list + 三个接收队列 |\n| 路由 | 查找出口 | 判断本地/转发 |\n| ARP | 查找下一跳MAC | 不需要 |\n| Netfilter | OUTPUT/POSTROUTING | PREROUTING/LOCAL_IN |\n| 终点 | 网卡DMA发送 | 用户态read() |\n\n#### 8.25.5 核心理解\n\n1. **NAPI是关键**：硬件中断+软中断轮询，平衡性能和延迟\n2. **三个队列**：根据用户进程状态和配置，权衡性能和延迟\n3. **按序交付**：TCP保证顺序，乱序队列暂存，按序合并\n4. **零拷贝**：用户等待时直接拷贝，减少队列倒腾\n5. **sk_buff剥离头**：data指针后移，层层剥离协议头\n6. **软中断快速处理**：尽快离开软中断，避免阻塞其他CPU\n7. **用户进程参与**：read时可能触发backlog/prequeue处理\n8. **协议栈分层**：每层只处理自己的头部，清晰解耦\n\n---\n\n**本节完成**：接收网络包。\n\n**内容回顾**：\n\n- ✅ 硬件中断与NAPI机制\n- ✅ 软中断处理（NET_RX_SOFTIRQ）\n- ✅ 网卡驱动接收（ixgb_clean_rx_irq）\n- ✅ 协议层分发（netif_receive_skb）\n- ✅ IP层接收与路由判断\n- ✅ Netfilter hook点（PREROUTING/LOCAL_IN）\n- ✅ TCP层三个队列（backlog/prequeue/sk_receive_queue）\n- ✅ 乱序队列处理（out_of_order_queue）\n- ✅ Socket层read系统调用\n- ✅ 发送vs接收完整对比\n\n**第8章网络系统完结！**🎉\n\n---\n\n**下一节预告\n\n🔜 敬请期待...\n\n---\n\n**文档版本**: v1.0  \n**适用内核版本**: Linux 4.x/5.x  \n**最后更新**: 2025年11月26日", "subs": ["8.25.1 层次划分", "8.25.2 关键数据结构关系", "8.25.3 核心机制", "8.25.4 发送vs接收对比", "8.25.5 核心理解"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Nginx 学习笔记 · 第二册：HTTP 模块 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nginx 学习笔记 · 第二册：HTTP 模块</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Nginx 学习笔记 · 第二册：HTTP 模块", "intro": "", "parts": [{"title": "第三部分：详解HTTP模块", "sections": [{"title": "3.1 HTTP模块概述", "content": "HTTP模块是Nginx最核心的功能模块,负责处理HTTP请求的各个阶段。本部分将以**请求处理流程**为主线,按照Nginx定义的**11个阶段**依次讲解各个HTTP模块的使用方法。\n\n**学习重点:**\n\n- HTTP配置指令的合并规则\n- 11个请求处理阶段及模块执行顺序\n- HTTP过滤模块的调用流程\n- Nginx变量的运行原理和使用方法", "subs": ["HTTP配置指令的合并规则", "11个请求处理阶段及模块执行顺序", "HTTP过滤模块的调用流程", "Nginx变量的运行原理和使用方法"]}, {"title": "3.2 HTTP配置指令的合并规则", "content": "#### 3.2.1 配置块的嵌套结构\n\nNginx配置文件中,HTTP相关配置按照层级嵌套:\n\n```\nmain (全局配置)\n└── http\n    ├── upstream (上游服务器组)\n    ├── map (变量映射)\n    ├── geo (地理位置)\n    ├── split_clients (AB测试)\n    └── server (虚拟主机)\n        └── location (URL匹配)\n            └── if (条件判断)\n```\n\n#### 3.2.2 指令的Context(上下文)\n\n每个指令都有其允许出现的context,例如:\n\n```nginx\n# log_format 只能出现在 http 块中\nhttp {\n    log_format main '$remote_addr - $remote_user [$time_local]';\n  \n    # access_log 可以出现在多个context中\n    access_log /var/log/nginx/access.log main;  # http\n  \n    server {\n        access_log /var/log/nginx/server.log;   # server\n  \n        location / {\n            access_log /var/log/nginx/location.log;  # location\n        }\n    }\n}\n```\n\n#### 3.2.3 指令分类\n\n**1. 值指令(可合并)**\n\n存储配置值的指令,子配置块可以继承父配置块的值:\n\n- `root` - 指定根目录\n- `gzip` - 开启压缩\n- `access_log` - 访问日志\n\n**合并规则:**\n\n- 子配置不存在时,直接使用父配置的值\n- 子配置存在时,覆盖父配置的值\n\n```nginx\nserver {\n    root /usr/share/nginx/html;  # 父配置\n    access_log /var/log/nginx/access.log;\n  \n    location /test {\n        # 没有定义root,继承父配置\n        # root仍然是 /usr/share/nginx/html\n    }\n  \n    location /api {\n        root /data/api;  # 覆盖父配置\n        # root变为 /data/api\n    }\n}\n```\n\n**2. 动作类指令(不可合并)**\n\n指定行为的指令,在特定阶段执行特定动作:\n\n- `return` - 返回响应\n- `rewrite` - 重写URL\n- `proxy_pass` - 反向代理\n\n**生效阶段:**\n\n- `server_rewrite` 阶段\n- `rewrite` 阶段\n- `content` 阶段\n\n```nginx\nlocation /test {\n    return 200 \"OK\";  # 动作类指令,不会合并\n    # 后续指令不会执行\n}\n```\n\n#### 3.2.4 通过源码判断合并规则\n\n查看模块的 `ngx_http_module_t` 结构体中的 `merge_loc_conf` 或 `merge_srv_conf` 方法:\n\n```c\n// 示例:referer模块的合并方法\nstatic char *\nngx_http_referer_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)\n{\n    ngx_http_referer_conf_t *prev = parent;  // 父配置\n    ngx_http_referer_conf_t *conf = child;   // 子配置\n  \n    // 如果子配置未设置,使用父配置\n    if (conf->keys == NULL) {\n        conf->keys = prev->keys;\n    }\n  \n    return NGX_CONF_OK;\n}\n```\n\n**判断要点:**\n\n1. 指令在哪个块下生效(server/location)\n2. 指令允许出现在哪些context中\n3. 是否定义了 `merge_srv_conf` 或 `merge_loc_conf` 方法\n4. 合并方法中的具体逻辑", "subs": ["3.2.1 配置块的嵌套结构", "3.2.2 指令的Context(上下文)", "3.2.3 指令分类", "3.2.4 通过源码判断合并规则"]}, {"title": "3.3 Listen指令详解", "content": "#### 3.3.1 基本语法\n\n`listen` 指令用于监听端口,建立TCP连接:\n\n```nginx\n# 语法格式\nlisten address[:port];\nlisten port;\nlisten unix:path;\n\n# 示例\nlisten 80;                          # 监听所有IP的80端口\nlisten 192.168.1.100:8080;         # 监听特定IP和端口\nlisten [::]:80;                     # 监听IPv6\nlisten unix:/var/run/nginx.sock;   # Unix Socket(本地通信)\n```\n\n#### 3.3.2 常用参数\n\n```nginx\nlisten 80 default_server;  # 默认server\nlisten 443 ssl;            # SSL/TLS\nlisten 80 reuseport;       # SO_REUSEPORT(多进程监听)\n```\n\n**注意事项:**\n\n- 只指定端口时,默认监听所有IP地址\n- `default_server` 用于指定默认虚拟主机\n- Unix Socket适用于本地进程通信,性能更高\n\n#### 3.3.4 配置示例: listen.conf\n\n**用途:** 演示listen指令的bind参数使用,控制监听地址的绑定行为\n\n**完整配置:**\n\n```nginx\n# 第一个server块: 监听所有IP地址的7000端口,使用bind参数\nserver {\n    server_name access.taohui.tech;\n  \n    # listen指令语法: listen address:port [bind];\n    # *:7000 表示监听所有IP地址(0.0.0.0)的7000端口\n    # bind参数: 强制绑定到指定的地址和端口组合\n    #   - 使用bind时,会为每个address:port创建独立的socket\n    #   - 不使用bind时,可能会复用已有的socket(如果地址相同)\n    listen *:7000 bind;\n  \n    # 返回固定响应,用于测试\n    return 200 '7000\\n';\n}\n\n# 第二个server块: 仅监听localhost的7000端口\nserver {\n    server_name access.taohui.tech;\n  \n    # localhost:7000 表示只监听本地回环地址(127.0.0.1)的7000端口\n    # 这个配置不会响应来自外部网络的请求\n    # 适用场景: 仅允许本机进程访问的服务\n    listen localhost:7000;\n  \n    # 返回不同的响应,用于区分两个server块\n    return 200 'localhost:7000\\n';\n}\n```\n\n**关键配置项解释:**\n\n- `listen *:7000 bind` - 监听所有IP地址的7000端口,并强制绑定\n\n  - `*` 或 `0.0.0.0` 表示监听所有可用的IPv4地址\n  - `bind` 参数确保为这个配置创建独立的socket\n  - 适用于需要明确区分不同监听地址的场景\n- `listen localhost:7000` - 仅监听本地回环地址\n\n  - `localhost` 会被解析为 `127.0.0.1`\n  - 只接受来自本机的连接请求\n  - 外部网络无法访问此端口\n\n**使用场景:**\n\n1. **多IP服务器**: 服务器有多个IP地址,需要在不同IP上提供不同服务\n2. **安全隔离**: 某些服务只允许本地访问(如管理接口、监控接口)\n3. **端口复用**: 同一端口在不同IP地址上提供不同的服务内容\n4. **测试环境**: 在同一台机器上模拟多个不同的服务端点\n\n**测试方法:**\n\n```bash\n# 测试监听所有地址的端口(假设服务器IP为192.168.1.100)\ncurl http://192.168.1.100:7000\n# 预期输出: 7000\n\n# 测试仅监听localhost的端口(从服务器本机执行)\ncurl http://localhost:7000\n# 预期输出: localhost:7000\n\n# 从外部访问localhost端口(会失败)\ncurl http://192.168.1.100:7000\n# 预期: 连接被拒绝或无响应\n```\n\n**注意事项:**\n\n- `bind` 参数在大多数情况下是可选的,Nginx会自动处理socket绑定\n- 当同一端口需要在多个IP地址上监听时,使用 `bind` 可以避免冲突\n- `localhost` 监听仅限本机访问,适合内部管理接口\n- 如果配置了多个相同的 `listen` 指令,Nginx会报错\n- 使用 `reuseport` 参数可以让多个worker进程共享同一端口,提高并发性能", "subs": ["3.3.1 基本语法", "3.3.2 常用参数", "3.3.4 配置示例: listen.conf"]}, {"title": "3.4 HTTP请求处理流程", "content": "#### 3.4.1 连接建立与请求接收流程图\n\n```mermaid\nsequenceDiagram\n    participant Client as 客户端\n    participant Kernel as 操作系统内核\n    participant Worker as Worker进程\n    participant HTTP as HTTP模块\n\n    Client->>Kernel: SYN(三次握手开始)\n    Kernel->>Client: SYN+ACK\n    Client->>Kernel: ACK(连接建立)\n    Kernel->>Worker: epoll_wait返回(读事件)\n    Worker->>Worker: accept()建立连接\n    Worker->>Worker: 分配连接内存池(512B)\n    Worker->>HTTP: ngx_http_init_connection()\n    HTTP->>Worker: 添加读事件到epoll\n    HTTP->>HTTP: 设置超时(client_header_timeout=60s)\n  \n    Client->>Kernel: HTTP请求(GET /index.html)\n    Kernel->>Worker: epoll_wait返回(读事件)\n    Worker->>Worker: 分配1KB缓冲区(client_header_buffer_size)\n    Worker->>Worker: 分配请求内存池(4KB)\n    Worker->>HTTP: 解析请求行(状态机)\n  \n    alt URL过长\n        HTTP->>HTTP: 分配大缓冲区(large_client_header_buffers 4 8k)\n    end\n  \n    HTTP->>HTTP: 解析请求头(状态机)\n    HTTP->>HTTP: 标识URL和Header\n    HTTP->>HTTP: 移除超时定时器\n    HTTP->>HTTP: 进入11个阶段处理\n```\n\n**关键配置参数:**\n\n| 参数                            | 默认值 | 说明                           |\n| ------------------------------- | ------ | ------------------------------ |\n| `connection_pool_size`        | 512    | 连接内存池初始大小             |\n| `client_header_buffer_size`   | 1k     | 接收请求头的缓冲区大小         |\n| `large_client_header_buffers` | 4 8k   | 大请求头缓冲区(最多4个,每个8k) |\n| `request_pool_size`           | 4k     | 请求内存池大小                 |\n| `client_header_timeout`       | 60s    | 读取请求头超时时间             |\n\n**内存分配时机:**\n\n```\n1. accept()后 → 连接内存池(512B)\n2. 收到第一个字节 → 请求头缓冲区(1KB)\n3. 开始处理请求 → 请求内存池(4KB)\n4. URL或Header过长 → 大缓冲区(最多4×8KB=32KB)\n```\n\n#### 3.4.2 请求处理的11个阶段\n\nNginx将HTTP请求处理划分为11个阶段,每个阶段可以有多个模块参与处理:\n\n```mermaid\ngraph TD\n    A[POST_READ] -->|realip模块| B[SERVER_REWRITE]\n    B -->|rewrite模块| C[FIND_CONFIG]\n    C -->|匹配location| D[REWRITE]\n    D -->|rewrite模块| E[POST_REWRITE]\n    E --> F[PREACCESS]\n    F -->|limit_req/limit_conn| G[ACCESS]\n    G -->|access/auth_basic/auth_request| H[POST_ACCESS]\n    H --> I[PRECONTENT]\n    I -->|try_files/mirror| J[CONTENT]\n    J -->|index/autoindex/static| K[LOG]\n    K -->|log模块| L[请求结束]\n```\n\n**各阶段说明:**\n\n| 阶段           | 说明                  | 主要模块                         |\n| -------------- | --------------------- | -------------------------------- |\n| POST_READ      | 读取请求内容后        | realip                           |\n| SERVER_REWRITE | server块中的rewrite   | rewrite                          |\n| FIND_CONFIG    | 查找location配置      | -                                |\n| REWRITE        | location块中的rewrite | rewrite                          |\n| POST_REWRITE   | rewrite后处理         | -                                |\n| PREACCESS      | 访问控制前            | limit_req, limit_conn            |\n| ACCESS         | 访问控制              | access, auth_basic, auth_request |\n| POST_ACCESS    | 访问控制后            | -                                |\n| PRECONTENT     | 生成内容前            | try_files, mirror                |\n| CONTENT        | 生成内容              | index, autoindex, static         |\n| LOG            | 记录日志              | log                              |\n\n**模块执行顺序:**\n\n模块在同一阶段内的执行顺序由 `ngx_modules.c` 文件中的顺序决定,**从后往前**执行:\n\n```c\n// ngx_modules.c (简化示例)\nngx_module_t *ngx_modules[] = {\n    // ...\n    &ngx_http_limit_conn_module,   // 后定义\n    &ngx_http_limit_req_module,    // 先执行\n    // ...\n};\n```\n\n**重要特性:**\n\n- 同一阶段的模块按照 `ngx_modules.c` 中的**倒序**执行\n- 某些模块执行后可能跳过后续模块(如 `return` 指令)\n- `satisfy` 指令可以改变ACCESS阶段模块的执行逻辑", "subs": ["3.4.1 连接建立与请求接收流程图", "3.4.2 请求处理的11个阶段"]}, {"title": "3.5 正则表达式在Nginx中的应用", "content": "#### 3.5.1 元字符\n\n| 元字符                                                 | 说明                      | 示例                          |\n| ------------------------------------------------------ | ------------------------- | ----------------------------- |\n| `.`                                                  | 匹配任意字符(除换行符)    | `a.c` 匹配 \"abc\", \"a1c\"     |\n| `\\w`                                                 | 匹配字母/数字/下划线/汉字 | `\\w+` 匹配 \"hello123\"       |\n| `\\s`                                                 | 匹配空白符                | `\\s+` 匹配空格、制表符      |\n| `\\d`                                                 | 匹配数字                  | `\\d{3}` 匹配 \"123\"          |\n| `\\b`                                                 | 匹配单词边界              | `\\bword\\b` 匹配独立的\"word\" |\n| `^`                                                  | 匹配字符串开始            | `^http` 匹配以\"http\"开头    |\n| `$` | 匹配字符串结束 | `\\.html$` 匹配以\".html\"结尾 |                           |                               |\n\n#### 3.5.2 重复\n\n| 符号      | 说明      | 示例                                    |\n| --------- | --------- | --------------------------------------- |\n| `*`     | 0次或多次 | `\\d*` 匹配 \"\", \"1\", \"123\"             |\n| `+`     | 1次或多次 | `\\d+` 匹配 \"1\", \"123\"                 |\n| `?`     | 0次或1次  | `\\d?` 匹配 \"\", \"1\"                    |\n| `{n}`   | 恰好n次   | `\\d{3}` 匹配 \"123\"                    |\n| `{n,}`  | 至少n次   | `\\d{3,}` 匹配 \"123\", \"1234\"           |\n| `{n,m}` | n到m次    | `\\d{3,5}` 匹配 \"123\", \"1234\", \"12345\" |\n\n#### 3.5.3 分组与捕获\n\n使用小括号 `()` 进行分组和捕获:\n\n```nginx\n# 示例:URL重写\nlocation ~ ^/article/(\\d+) {\n    # $1 捕获第一个括号内的内容\n    rewrite ^/article/(\\d+)$ /post.php?id=$1 last;\n}\n\n# 示例:复杂URL转换\n# 原始: /admin/website/article/35/edit/upload/party/5.jpg\n# 目标: /static/upload/party/5.jpg\nlocation ~ ^/admin/website/article/(\\d+)/edit/upload/(.+)/(.+)\\.(.+)$ {\n    rewrite ^/admin/website/article/(\\d+)/edit/upload/(.+)/(.+)\\.(.+)$ \n            /static/upload/$2/$3.$4 last;\n    # $1=35, $2=party, $3=5, $4=jpg\n}\n```\n\n#### 3.5.4 测试工具:pcretest\n\n```bash\n# 安装pcre-tools\nyum install pcre-devel\n\n# 使用pcretest测试正则表达式\npcretest\n# 输入正则表达式\n/^\\/admin\\/website\\/article\\/(\\d+)\\/edit\\/upload\\/(.+)\\/(.+)\\.(.+)$/\n\n# 输入测试字符串\n/admin/website/article/35/edit/upload/party/5.jpg\n\n# 输出匹配结果\n 0: /admin/website/article/35/edit/upload/party/5.jpg\n 1: 35\n 2: party\n 3: 5\n 4: jpg\n```\n\n**注意事项:**\n\n- 在Nginx配置中不需要转义斜杠 `/`\n- 在pcretest中需要转义斜杠 `\\/`\n- 使用 `~` 表示大小写敏感的正则匹配\n- 使用 `~*` 表示大小写不敏感的正则匹配", "subs": ["3.5.1 元字符", "3.5.2 重复", "3.5.3 分组与捕获", "3.5.4 测试工具:pcretest"]}, {"title": "3.6 Server Name匹配规则", "content": "#### 3.6.1 基本语法\n\n```nginx\nserver {\n    # 精确匹配\n    server_name example.com;\n  \n    # 多个域名\n    server_name example.com www.example.com;\n  \n    # 泛域名(前缀)\n    server_name *.example.com;\n  \n    # 泛域名(后缀)\n    server_name www.example.*;\n  \n    # 正则表达式\n    server_name ~^www\\d+\\.example\\.com$;\n  \n    # 匹配所有\n    server_name _;\n  \n    # 空Host头\n    server_name \"\";\n}\n```\n\n#### 3.6.2 匹配优先级\n\n```mermaid\ngraph TD\n    A[收到HTTP请求] --> B{1. 精确匹配?}\n    B -->|是| C[使用该server]\n    B -->|否| D{2. 前缀泛域名匹配?}\n    D -->|是| C\n    D -->|否| E{3. 后缀泛域名匹配?}\n    E -->|是| C\n    E -->|否| F{4. 正则表达式匹配?}\n    F -->|是,按文件顺序| C\n    F -->|否| G[使用default_server]\n```\n\n**匹配顺序:**\n\n1. 精确匹配(不含通配符和正则)\n2. 以 `*` 开头的泛域名\n3. 以 `*` 结尾的泛域名\n4. 正则表达式(按在配置文件中出现的顺序)\n5. default_server\n\n**示例:**\n\n```nginx\nserver {\n    listen 80;\n    server_name example.com;  # 优先级1:精确匹配\n}\n\nserver {\n    listen 80;\n    server_name *.example.com;  # 优先级2:前缀泛域名\n}\n\nserver {\n    listen 80;\n    server_name www.example.*;  # 优先级3:后缀泛域名\n}\n\nserver {\n    listen 80;\n    server_name ~^www\\d+\\.example\\.com$;  # 优先级4:正则表达式\n}\n\nserver {\n    listen 80 default_server;  # 优先级5:默认server\n    server_name _;\n}\n```\n\n#### 3.6.3 主域名与server_name_in_redirect\n\n```nginx\nserver {\n    listen 80;\n    server_name primary.example.com secondary.example.com;  # 第一个为主域名\n    server_name_in_redirect on;  # 重定向时使用主域名\n  \n    location /redirect {\n        return 302 /target;\n        # 如果访问 secondary.example.com/redirect\n        # 重定向到 primary.example.com/target (on)\n        # 或 secondary.example.com/target (off)\n    }\n}\n```\n\n#### 3.6.4 正则表达式捕获变量\n\n```nginx\nserver {\n    # 使用数字变量\n    server_name ~^(www\\.)?(.+)$;\n    location / {\n        root /data/$2;  # $2 = example.com\n    }\n}\n\nserver {\n    # 使用命名变量\n    server_name ~^(www\\.)?(?<domain>.+)$;\n    location / {\n        root /data/$domain;  # 更易读\n    }\n}\n```\n\n#### 3.6.5 特殊用法\n\n```nginx\n# 同时匹配带www和不带www\nserver_name .example.com;  # 等价于 example.com *.example.com\n\n# 匹配所有域名\nserver_name _;\n\n# 匹配空Host头\nserver_name \"\";\n```\n\n#### 3.6.5 配置示例: servername_test.conf\n\n**用途:** 演示 `server_name_in_redirect` 指令的作用,控制重定向时使用的主机名\n\n**完整配置:**\n\n```nginx\nserver {\n    # 配置多个server_name,用于测试重定向时的主机名选择\n    # 第一个域名: primary.taohui.tech (主域名)\n    # 第二个域名: second.taohui.tech (备用域名)\n    server_name primary.taohui.tech second.taohui.tech;\n  \n    # server_name_in_redirect指令说明:\n    # - on: 重定向时使用server_name指令中的第一个域名\n    # - off(默认): 重定向时使用请求中的Host头部\n    # \n    # 作用: 统一重定向的域名,避免用户使用不同域名访问时出现混乱\n    server_name_in_redirect on;\n  \n    # 返回302重定向到/redirect路径\n    # 测试场景:\n    # 1. 访问 http://primary.taohui.tech/ \n    #    -> 重定向到 http://primary.taohui.tech/redirect\n    # 2. 访问 http://second.taohui.tech/\n    #    -> 由于server_name_in_redirect为on,会重定向到 http://primary.taohui.tech/redirect\n    #    -> 如果设置为off,则会重定向到 http://second.taohui.tech/redirect\n    return 302 /redirect;\n}\n```\n\n**关键配置项解释:**\n\n- `server_name primary.taohui.tech second.taohui.tech` - 配置多个域名\n\n  - 第一个域名被视为\"主域名\"\n  - 后续域名为备用域名或别名\n  - 所有配置的域名都会匹配到这个server块\n- `server_name_in_redirect on` - 启用主域名重定向\n\n  - **on**: 所有重定向都使用 `server_name` 中的第一个域名(primary.taohui.tech)\n  - **off**: 重定向保持用户请求时使用的域名\n  - 默认值为 `off`\n- `return 302 /redirect` - 返回临时重定向\n\n  - 302状态码表示临时重定向\n  - 重定向到相对路径 `/redirect`\n  - Nginx会自动构造完整的URL(包括协议、域名、端口)\n\n**使用场景:**\n\n1. **域名统一化**: 网站有多个域名(如www和非www),希望统一到主域名\n2. **品牌一致性**: 确保用户最终看到的都是官方主域名\n3. **SEO优化**: 避免多个域名分散搜索引擎权重\n4. **测试环境**: 使用多个测试域名,但希望重定向统一到主域名\n\n**测试方法:**\n\n```bash\n# 测试1: 使用主域名访问\ncurl -I http://primary.taohui.tech/\n# 预期: Location: http://primary.taohui.tech/redirect\n\n# 测试2: 使用备用域名访问(server_name_in_redirect=on)\ncurl -I http://second.taohui.tech/\n# 预期: Location: http://primary.taohui.tech/redirect (注意域名变成了primary)\n\n# 测试3: 如果设置server_name_in_redirect off\n# curl -I http://second.taohui.tech/\n# 预期: Location: http://second.taohui.tech/redirect (保持原域名)\n```\n\n**对比说明:**\n\n| 配置                            | 访问域名            | 重定向Location                         |\n| ------------------------------- | ------------------- | -------------------------------------- |\n| `server_name_in_redirect on`  | primary.taohui.tech | http://primary.taohui.tech/redirect    |\n| `server_name_in_redirect on`  | second.taohui.tech  | http://primary.taohui.tech/redirect ✓ |\n| `server_name_in_redirect off` | primary.taohui.tech | http://primary.taohui.tech/redirect    |\n| `server_name_in_redirect off` | second.taohui.tech  | http://second.taohui.tech/redirect     |\n\n**注意事项:**\n\n- 此指令仅影响Nginx自身生成的重定向(如 `return`, `rewrite`, 目录访问自动添加斜杠等)\n- 不影响应用程序生成的重定向(如PHP、Python应用返回的Location头)\n- 通常与 `absolute_redirect` 和 `port_in_redirect` 配合使用\n- 在使用CDN或反向代理时,需要注意域名的一致性\n- 建议在生产环境中明确设置此参数,避免依赖默认行为\n\n**相关指令:**\n\n- `absolute_redirect` - 控制是否返回绝对路径的重定向(默认on)\n- `port_in_redirect` - 控制重定向URL是否包含端口号(默认on)\n- `server_name_in_redirect` - 控制重定向使用的域名(默认off)", "subs": ["3.6.1 基本语法", "3.6.2 匹配优先级", "3.6.3 主域名与server_name_in_redirect", "3.6.4 正则表达式捕获变量", "3.6.5 特殊用法", "3.6.5 配置示例: servername_test.conf"]}, {"title": "3.7 POST_READ阶段:realip模块", "content": "**功能:** 获取用户真实IP地址\n\n**问题背景:**\n\n- TCP连接的源IP可能是反向代理的IP,而非真实用户IP\n- 需要通过HTTP头部(X-Forwarded-For, X-Real-IP)获取真实IP\n\n**配置指令:**\n\n```nginx\nhttp {\n    # 定义可信地址\n    set_real_ip_from 192.168.1.0/24;\n    set_real_ip_from 10.0.0.0/8;\n  \n    # 从哪个头部取IP\n    real_ip_header X-Forwarded-For;  # 默认X-Real-IP\n  \n    # 是否递归查找\n    real_ip_recursive on;  # 默认off\n  \n    server {\n        location / {\n            return 200 \"Real IP: $remote_addr\\n\";\n        }\n    }\n}\n```\n\n**变量:**\n\n- `$remote_addr` - 被realip模块修改后的真实IP\n- `$realip_remote_addr` - TCP连接的原始源IP\n- `$realip_remote_port` - TCP连接的原始源端口\n\n**编译:** `--with-http_realip_module`\n\n#### 3.7.1 配置示例: realip.conf\n\n**用途:** 演示如何通过X-Forwarded-For头部获取客户端真实IP地址,适用于Nginx部署在反向代理或CDN之后的场景\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name realip.taohui.tech;\n  \n    # 开启debug日志,方便查看realip模块的处理过程\n    # 日志中会显示: \"realip: \\\"原始IP\\\" \\\"真实IP\\\"\"\n    error_log logs/myerror.log debug;\n  \n    # set_real_ip_from指令: 定义可信的代理服务器IP地址\n    # 只有来自这些IP的请求,Nginx才会信任其X-Forwarded-For头部\n    # 语法: set_real_ip_from address | CIDR | unix:\n    # 作用: 防止客户端伪造X-Forwarded-For头部进行IP欺骗\n    set_real_ip_from 116.62.160.193;\n  \n    # 可以配置多个可信代理IP或网段\n    # set_real_ip_from 10.0.0.0/8;\n    # set_real_ip_from 172.16.0.0/12;\n    # set_real_ip_from 192.168.0.0/16;\n  \n    # real_ip_header指令: 指定从哪个HTTP头部获取真实IP\n    # 常见选项:\n    #   - X-Real-IP: 单个IP地址(常用于简单代理)\n    #   - X-Forwarded-For: IP地址链(常用于多级代理)\n    #   - proxy_protocol: 使用PROXY协议\n    # real_ip_header X-Real-IP;  # 方式1: 使用X-Real-IP头部\n    real_ip_header X-Forwarded-For;  # 方式2: 使用X-Forwarded-For头部(推荐)\n  \n    # real_ip_recursive指令: 是否递归查找真实IP\n    # X-Forwarded-For格式: client, proxy1, proxy2, proxy3\n    # \n    # real_ip_recursive off (默认):\n    #   - 从右向左取第一个不在set_real_ip_from中的IP\n    #   - 例: X-Forwarded-For: 1.1.1.1, 2.2.2.2, 3.3.3.3\n    #   - 如果3.3.3.3是可信代理,则取2.2.2.2\n    # \n    # real_ip_recursive on:\n    #   - 从右向左递归查找,跳过所有可信代理IP\n    #   - 例: X-Forwarded-For: 1.1.1.1, 2.2.2.2, 3.3.3.3\n    #   - 如果2.2.2.2和3.3.3.3都是可信代理,则取1.1.1.1\n    #   - 这样可以穿透多级代理获取真实客户端IP\n    # real_ip_recursive off;  # 不递归查找\n    real_ip_recursive on;      # 递归查找(推荐用于多级代理)\n  \n    location / {\n        # 返回处理后的客户端IP\n        # $remote_addr变量已被realip模块修改为真实IP\n        return 200 \"Client real ip: $remote_addr\\n\";\n    }\n}\n```\n\n**关键配置项解释:**\n\n- `set_real_ip_from 116.62.160.193` - 定义可信代理IP\n\n  - 只有来自此IP的请求才会处理X-Forwarded-For\n  - 可以配置多个,支持CIDR格式(如 `10.0.0.0/8`)\n  - 安全关键: 防止客户端伪造IP地址\n- `real_ip_header X-Forwarded-For` - 指定IP来源头部\n\n  - `X-Forwarded-For`: 标准代理头部,格式为 `client, proxy1, proxy2`\n  - `X-Real-IP`: 简单代理头部,只包含一个IP\n  - `proxy_protocol`: PROXY协议(需要代理支持)\n- `real_ip_recursive on` - 递归查找真实IP\n\n  - **off**: 只跳过最后一个可信代理IP\n  - **on**: 跳过所有可信代理IP,找到真正的客户端IP\n  - 多级代理场景必须开启\n\n**使用场景:**\n\n1. **CDN加速**: Nginx部署在CDN(如Cloudflare、阿里云CDN)之后\n2. **负载均衡**: Nginx前面有LVS、HAProxy等四层负载均衡\n3. **反向代理链**: 多级Nginx代理架构\n4. **安全防护**: 需要基于真实IP进行访问控制、限流、日志记录\n\n**X-Forwarded-For处理示例:**\n\n```bash\n# 场景: Client -> CDN -> LB -> Nginx\n# X-Forwarded-For: 1.2.3.4, 5.6.7.8, 9.10.11.12\n\n# 配置:\nset_real_ip_from 9.10.11.12;  # LB的IP\nset_real_ip_from 5.6.7.8;     # CDN的IP\nreal_ip_recursive on;\n\n# 结果: $remote_addr = 1.2.3.4 (真实客户端IP)\n```\n\n**测试方法:**\n\n```bash\n# 测试1: 不带X-Forwarded-For头部\ncurl http://realip.taohui.tech/\n# 输出: Client real ip: <你的真实IP>\n\n# 测试2: 带X-Forwarded-For头部(需要从可信IP发起)\n# 在116.62.160.193服务器上执行:\ncurl -H \"X-Forwarded-For: 1.2.3.4, 5.6.7.8\" http://realip.taohui.tech/\n# 输出: Client real ip: 5.6.7.8 (如果real_ip_recursive off)\n# 输出: Client real ip: 1.2.3.4 (如果real_ip_recursive on且5.6.7.8是可信IP)\n\n# 测试3: 查看debug日志\ntail -f logs/myerror.log | grep realip\n# 输出示例: realip: \"116.62.160.193\" \"1.2.3.4\"\n```\n\n**安全注意事项:**\n\n- **必须配置set_real_ip_from**: 否则任何客户端都可以伪造IP\n- **仅信任已知代理**: 不要使用 `set_real_ip_from 0.0.0.0/0`\n- **验证代理配置**: 确保上游代理正确设置X-Forwarded-For\n- **日志记录**: 使用 `$realip_remote_addr` 记录原始连接IP\n\n**相关变量:**\n\n- `$remote_addr` - 被realip模块修改后的真实客户端IP\n- `$realip_remote_addr` - TCP连接的原始源IP(代理IP)\n- `$realip_remote_port` - TCP连接的原始源端口\n\n**常见问题:**\n\n1. **Q: 为什么$remote_addr没有变化?**\n\n   - A: 检查请求是否来自 `set_real_ip_from` 配置的可信IP\n2. **Q: 多级代理如何配置?**\n\n   - A: 配置所有中间代理IP到 `set_real_ip_from`,并开启 `real_ip_recursive on`\n3. **Q: 如何同时记录真实IP和代理IP?**\n\n   - A: 使用 `$remote_addr`(真实IP) 和 `$realip_remote_addr`(代理IP)", "subs": ["3.7.1 配置示例: realip.conf"]}, {"title": "3.8 REWRITE阶段:rewrite模块", "content": "#### 3.8.1 return指令\n\n**功能:** 立即返回响应,终止请求处理\n\n```nginx\n# 语法\nreturn code [text];\nreturn code URL;\nreturn URL;\n\n# 示例\nlocation /api {\n    return 200 \"Success\";\n    return 404 \"Not Found\";\n    return 301 https://example.com$request_uri;  # 永久重定向\n    return 302 /new-location;  # 临时重定向\n    return 444;  # Nginx特有,关闭连接不返回响应\n}\n```\n\n**HTTP重定向状态码:**\n\n| 状态码 | 说明       | 是否缓存 | 是否允许改变方法   |\n| ------ | ---------- | -------- | ------------------ |\n| 301    | 永久重定向 | 是       | 是(HTTP/1.0不明确) |\n| 302    | 临时重定向 | 否       | 是(HTTP/1.0不明确) |\n| 303    | 临时重定向 | 否       | 是(明确允许)       |\n| 307    | 临时重定向 | 否       | 否(明确禁止)       |\n| 308    | 永久重定向 | 是       | 否(明确禁止)       |\n\n#### 3.8.2 rewrite指令\n\n**功能:** 修改请求URI\n\n```nginx\n# 语法\nrewrite regex replacement [flag];\n\n# flag取值\n# last     - 停止处理当前rewrite模块指令,重新匹配location\n# break    - 停止处理当前rewrite模块指令,继续处理\n# redirect - 返回302临时重定向\n# permanent - 返回301永久重定向\n\n# 示例\nlocation /old {\n    rewrite ^/old/(.*)$ /new/$1 last;\n}\n\nlocation /new {\n    return 200 \"New location: $uri\\n\";\n}\n\n# 复杂示例\nlocation /first {\n    rewrite ^/first/(.*)$ /second/$1 last;\n}\n\nlocation /second {\n    rewrite ^/second/(.*)$ /third/$1 break;\n    return 200 \"Should not reach here\";\n}\n\nlocation /third {\n    return 200 \"Third: $uri\\n\";\n}\n```\n\n**rewrite_log指令:**\n\n```nginx\nrewrite_log on;  # 记录rewrite日志到error_log\n```\n\n#### 3.8.3 配置示例: return.conf\n\n**用途:** 演示return指令与error_page指令的交互,理解Nginx请求处理的优先级和错误页面机制\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name return.taohui.tech;\n    listen 8080;\n  \n    # root指令: 定义静态文件的根目录\n    # 所有静态文件请求都会从html/目录下查找\n    root html/;\n  \n    # error_page指令: 自定义错误页面\n    # 语法: error_page code [code...] [=response_code] uri;\n    # \n    # 当发生404错误时,Nginx会:\n    # 1. 不直接返回404错误页面\n    # 2. 内部重定向到 /403.html\n    # 3. 返回 /403.html 的内容,但HTTP状态码仍为404\n    # \n    # 注意: 这里将404错误映射到403.html是为了演示error_page的工作机制\n    # 实际生产中应该映射到合适的错误页面\n    error_page 404 /403.html;\n  \n    # server级别的return指令\n    # 返回405状态码(Method Not Allowed - 方法不允许)\n    # \n    # 重要: 这个return指令在server块中,但会被location块中的return覆盖\n    # Nginx处理优先级: location块 > server块\n    # 所以访问 / 路径时,实际返回的是location中的404,而不是这里的405\n    return 405;\n  \n    location / {\n        # location级别的return指令\n        # 返回404状态码和自定义文本\n        # \n        # 执行流程:\n        # 1. 客户端访问 http://return.taohui.tech:8080/\n        # 2. 匹配到这个location块\n        # 3. 执行return 404指令,返回404状态码\n        # 4. 触发error_page 404配置\n        # 5. 内部重定向到 /403.html\n        # 6. 如果/403.html存在,返回其内容(状态码仍为404)\n        # 7. 如果/403.html不存在,返回\"find nothing!\\n\"文本\n        return 404 \"find nothing!\\n\";\n    }\n}\n```\n\n**关键配置项解释:**\n\n- `root html/` - 静态文件根目录\n\n  - 所有静态文件请求的基础路径\n  - 例如请求 `/403.html` 会映射到 `html/403.html`\n- `error_page 404 /403.html` - 自定义404错误页面\n\n  - 当发生404错误时,内部重定向到 `/403.html`\n  - 这是一个**内部重定向**,客户端不会感知到URL变化\n  - 最终返回的HTTP状态码仍然是404(不是200)\n  - 可以使用 `error_page 404 =200 /403.html` 来改变返回状态码\n- `return 405` (server级别) - 被location覆盖\n\n  - 在server块中定义,但优先级低于location块\n  - 只有当请求不匹配任何location时才会执行\n  - 本例中,由于有 `location /` 匹配所有请求,所以这个return不会执行\n- `return 404 \"find nothing!\\n\"` (location级别) - 实际执行的返回\n\n  - 立即返回404状态码和文本内容\n  - 会触发 `error_page 404` 配置\n  - 如果 `html/403.html` 存在,会返回该文件内容\n  - 如果不存在,会返回 \"find nothing!\\n\" 文本\n\n**执行流程图:**\n\n```mermaid\ngraph TD\n    A[客户端请求 /路径] --> B[匹配location]\n    B --> C[location /路径]\n    C --> D[执行 return 404 ]\n    D --> E{触发 error_page 404}\n    E --> F[内部重定向到 /403.html]\n    F --> G{}/403.html 是否存在?}\n    G --> |存在| H[返回 403.html 内容状态码404]\n    G --> |不存在| I[返回 find nothing状态码404]\n```\n\n**使用场景:**\n\n1. **自定义错误页面**: 为不同的HTTP错误码提供友好的错误页面\n2. **错误页面统一**: 将多个错误码映射到同一个错误页面\n3. **错误处理测试**: 测试应用程序对不同HTTP状态码的处理\n4. **API接口**: 快速返回特定状态码和消息\n\n**测试方法:**\n\n```bash\n# 测试1: 访问根路径\ncurl -i http://return.taohui.tech:8080/\n# 预期: HTTP/1.1 404 Not Found\n# 内容: 如果html/403.html存在则返回其内容,否则返回\"find nothing!\"\n\n# 测试2: 创建403.html文件后再测试\necho \"<h1>Custom 404 Error Page</h1>\" > html/403.html\ncurl http://return.taohui.tech:8080/\n# 预期: 返回 \"<h1>Custom 404 Error Page</h1>\", 状态码仍为404\n\n# 测试3: 查看完整的HTTP响应头\ncurl -i http://return.taohui.tech:8080/\n# HTTP/1.1 404 Not Found\n# Server: nginx\n# Content-Type: text/html\n# ...\n```\n\n**error_page高级用法:**\n\n```nginx\n# 1. 修改返回状态码\nerror_page 404 =200 /404.html;  # 404错误返回200状态码\n\n# 2. 多个错误码使用同一页面\nerror_page 500 502 503 504 /50x.html;\n\n# 3. 重定向到外部URL\nerror_page 404 =301 http://example.com/notfound;\n\n# 4. 使用命名location\nerror_page 404 @notfound;\nlocation @notfound {\n    return 200 \"Page not found\\n\";\n}\n\n# 5. 代理到上游服务器处理错误\nerror_page 404 /404.php;\nlocation = /404.php {\n    proxy_pass http://backend;\n}\n```\n\n**return指令优先级:**\n\n| 位置       | 优先级 | 说明                       |\n| ---------- | ------ | -------------------------- |\n| location块 | 最高   | 匹配到location后立即执行   |\n| server块   | 中等   | 仅当没有location匹配时执行 |\n| http块     | 最低   | 很少在http块使用return     |\n\n**注意事项:**\n\n- `return` 指令会立即终止请求处理,不会执行后续指令\n- `error_page` 是内部重定向,不是HTTP重定向(客户端看不到URL变化)\n- `error_page` 可以与 `try_files` 配合使用\n- 自定义错误页面应该放在 `root` 指定的目录下\n- 使用 `error_page 404 =200 /404.html` 会改变状态码,可能影响SEO\n- 在location中使用return时,server级别的return会被忽略\n\n**常见错误:**\n\n1. **错误页面不存在**: 如果error_page指定的文件不存在,会返回原始错误\n2. **循环重定向**: error_page指向的location又触发相同错误,导致循环\n3. **状态码混淆**: 使用 `=200` 修改状态码可能导致客户端误判\n\n#### 3.8.4 if指令\n\n**功能:** 条件判断\n\n```nginx\n# 语法\nif (condition) {\n    # 指令\n}\n\n# 条件表达式\nif ($variable) { }              # 变量非空且非\"0\"为真\nif ($variable = \"value\") { }    # 字符串相等\nif ($variable != \"value\") { }   # 字符串不等\nif ($variable ~ regex) { }      # 正则匹配(大小写敏感)\nif ($variable ~* regex) { }     # 正则匹配(大小写不敏感)\nif ($variable !~ regex) { }     # 正则不匹配\nif (-f $request_filename) { }   # 文件存在\nif (!-f $request_filename) { }  # 文件不存在\nif (-d $request_filename) { }   # 目录存在\nif (-e $request_filename) { }   # 文件/目录/软链接存在\nif (-x $request_filename) { }   # 文件可执行\n\n# 示例\nlocation / {\n    # 判断User-Agent\n    if ($http_user_agent ~ MSIE) {\n        return 403 \"IE not supported\";\n    }\n  \n    # 判断请求方法\n    if ($request_method = POST) {\n        return 405;\n    }\n  \n    # 判断文件是否存在\n    if (!-f $request_filename) {\n        return 404;\n    }\n}\n```\n\n#### 3.8.5 配置示例: rewrite.conf\n\n**用途:** 深入演示rewrite指令的四个flag(last、break、redirect、permanent)的区别和使用场景\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name rewrite.taohui.tech;\n  \n    # rewrite_log指令: 开启rewrite日志\n    # 将rewrite指令的执行过程记录到error_log中\n    # 日志级别为notice,可以看到URL重写的详细过程\n    rewrite_log on;\n  \n    # error_log指令: 设置错误日志路径和级别\n    # notice级别可以记录rewrite_log的输出\n    # 日志示例: \"rewritten data: \\\"/second/test\\\", args: \\\"\\\"\"\n    error_log logs/rewrite_error.log notice;\n  \n    # root指令: 静态文件根目录\n    root html/;\n  \n    # ========== 内部重定向测试: last vs break ==========\n  \n    location /first {\n        # rewrite指令语法: rewrite regex replacement [flag];\n        # \n        # flag: last\n        # - 停止处理当前location中的后续rewrite指令\n        # - 使用重写后的URI重新搜索location(重新进入FIND_CONFIG阶段)\n        # - 类似于编程语言中的\"continue\"或\"goto\"\n        # \n        # 执行流程:\n        # 1. 访问 /first/test\n        # 2. 匹配到 location /first\n        # 3. 执行rewrite,URI变为 /second/test\n        # 4. 由于flag是last,重新搜索location\n        # 5. 匹配到 location /second\n        # 6. 执行 location /second 中的指令\n        rewrite /first(.*) /second$1 last;\n    \n        # 这个return不会执行,因为last会重新搜索location\n        return 200 'first!\\n';\n    }\n  \n    location /second {\n        # flag: break\n        # - 停止处理当前location中的后续rewrite指令\n        # - 不会重新搜索location,继续在当前location中处理\n        # - 类似于编程语言中的\"break\"\n        # \n        # 执行流程:\n        # 1. URI已经是 /second/test (从/first重写而来)\n        # 2. 执行rewrite,URI变为 /third/test\n        # 3. 由于flag是break,不重新搜索location\n        # 4. 继续执行当前location中的后续指令\n        # 5. 但是return指令会被执行(注意与注释掉的rewrite对比)\n        rewrite /second(.*) /third$1 break;\n    \n        # 注释掉的rewrite: 如果没有break flag,会继续处理\n        # rewrite /second(.*) /third$1;\n    \n        # 这个return会执行,因为break不会跳出location\n        # 但由于break已经修改了URI,如果后续有try_files或静态文件处理\n        # 会使用新的URI(/third/test)去查找文件\n        return 200 'second!\\n';\n    }\n  \n    location /third {\n        # 这个location不会被访问到(如果从/first进来)\n        # 因为 location /second 中使用了break flag\n        # break不会重新搜索location\n        return 200 'third!\\n';\n    }\n  \n    # ========== HTTP重定向测试: redirect vs permanent ==========\n  \n    location /redirect1 {\n        # flag: permanent\n        # - 返回301永久重定向\n        # - 浏览器会缓存这个重定向\n        # - 搜索引擎会更新索引,将旧URL的权重转移到新URL\n        # - 适用场景: 网站永久性迁移、URL规范化\n        # \n        # 执行流程:\n        # 1. 访问 /redirect1/test\n        # 2. 捕获组 (.*) 匹配 \"/test\"\n        # 3. 替换为 $1,即 \"/test\"\n        # 4. 返回 301 重定向到 /test\n        # 5. 浏览器会缓存此重定向,下次直接访问 /test\n        rewrite /redirect1(.*) $1 permanent;\n    }\n  \n    location /redirect2 {\n        # flag: redirect\n        # - 返回302临时重定向\n        # - 浏览器不会缓存(或缓存时间很短)\n        # - 搜索引擎不会更新索引\n        # - 适用场景: 临时维护、A/B测试、临时跳转\n        # \n        # 302 vs 301 的区别:\n        # - 301: 永久重定向,SEO权重转移,浏览器缓存\n        # - 302: 临时重定向,SEO权重不转移,不缓存\n        rewrite /redirect2(.*) $1 redirect;\n    }\n  \n    location /redirect3 {\n        # 不带flag的rewrite + 完整URL\n        # - 如果replacement以 http:// 或 https:// 开头\n        # - 自动返回302临时重定向(等同于redirect flag)\n        # - 这是一个隐式的redirect行为\n        # \n        # 注意: 这里会重定向到外部URL\n        rewrite /redirect3(.*) http://rewrite.taohui.tech$1;\n    }\n  \n    location /redirect4 {\n        # 带permanent flag + 完整URL\n        # - 返回301永久重定向到指定的完整URL\n        # - 可以重定向到不同的域名\n        # \n        # 使用场景:\n        # - 域名迁移: old-domain.com -> new-domain.com\n        # - 协议升级: http:// -> https://\n        # - 子域名调整: www.example.com -> example.com\n        rewrite /redirect4(.*) http://rewrite.taohui.tech$1 permanent;\n    }\n}\n```\n\n**rewrite flag详细对比:**\n\n| Flag          | 行为                             | 重新搜索location | HTTP状态码 | 使用场景              |\n| ------------- | -------------------------------- | ---------------- | ---------- | --------------------- |\n| `last`      | 停止当前rewrite,重新搜索location | ✓ 是            | 无(内部)   | URL规范化、内部路由   |\n| `break`     | 停止当前rewrite,继续当前location | ✗ 否            | 无(内部)   | 静态文件路径调整      |\n| `redirect`  | 返回302临时重定向                | N/A              | 302        | 临时跳转、维护页面    |\n| `permanent` | 返回301永久重定向                | N/A              | 301        | 域名迁移、URL永久变更 |\n\n**执行流程图:**\n\n```mermaid\ngraph TD\n    A[访问 /first/test] --> B[匹配 location /first]\n    B --> C[rewrite /first.* /second.* last]\n    C --> D[重新搜索location]\n    D --> E[匹配 location /second]\n    E --> F[rewrite /second.* /third.* break]\n    F --> G[不重新搜索,继续当前location]\n    G --> H[执行 return 200 second!]\n    H --> I[返回 second!]\n  \n    J[访问 /redirect1/test] --> K[匹配 location /redirect1]\n    K --> L[rewrite ... permanent]\n    L --> M[返回 301 重定向]\n    M --> N[浏览器跳转到 /test]\n```\n\n**测试方法:**\n\n```bash\n# 测试1: last flag - 会重新搜索location\ncurl http://rewrite.taohui.tech/first/test\n# 预期输出: second!\n# 说明: /first -> /second (last重新搜索) -> 执行/second的return\n\n# 测试2: break flag - 不会重新搜索location\ncurl http://rewrite.taohui.tech/second/test\n# 预期输出: second!\n# 说明: URI被改写为/third,但不重新搜索,继续执行当前location的return\n\n# 测试3: 如果直接访问/third\ncurl http://rewrite.taohui.tech/third/test\n# 预期输出: third!\n\n# 测试4: permanent flag - 301永久重定向\ncurl -I http://rewrite.taohui.tech/redirect1/test\n# 预期: HTTP/1.1 301 Moved Permanently\n#       Location: /test\n\n# 测试5: redirect flag - 302临时重定向\ncurl -I http://rewrite.taohui.tech/redirect2/test\n# 预期: HTTP/1.1 302 Found\n#       Location: /test\n\n# 测试6: 查看rewrite日志\ntail -f logs/rewrite_error.log\n# 输出示例:\n# [notice] rewritten data: \"/second/test\", args: \"\"\n# [notice] rewritten data: \"/third/test\", args: \"\"\n```\n\n**关键概念理解:**\n\n1. **last vs break 的本质区别:**\n\n   - `last`: 重启location匹配流程(FIND_CONFIG阶段)\n   - `break`: 停留在当前location,但URI已改变\n2. **内部重定向 vs HTTP重定向:**\n\n   - 内部重定向(last/break): 客户端不感知,URL不变,服务器内部处理\n   - HTTP重定向(redirect/permanent): 客户端感知,URL改变,浏览器重新请求\n3. **301 vs 302 的选择:**\n\n   - 301: 永久性变更,SEO友好,浏览器会缓存\n   - 302: 临时性变更,不影响SEO,不缓存\n\n**使用场景:**\n\n1. **last**:\n\n   - URL美化: `/product-123` -> `/product/detail?id=123`\n   - 路由重写: `/api/v1/*` -> `/api/v2/*`\n   - 多语言路由: `/en/*` -> `/index.php?lang=en&path=*`\n2. **break**:\n\n   - 静态文件路径调整: `/images/*` -> `/static/img/*`\n   - 防止rewrite循环\n   - 与try_files配合使用\n3. **redirect (302)**:\n\n   - 网站维护页面\n   - A/B测试\n   - 临时活动页面跳转\n4. **permanent (301)**:\n\n   - HTTP升级到HTTPS\n   - 域名迁移\n   - URL规范化(www -> non-www)\n\n**注意事项:**\n\n- `last` 和 `break` 最多执行10次rewrite,防止无限循环\n- `last` 会重新执行所有HTTP处理阶段(POST_READ、REWRITE、FIND_CONFIG等)\n- `break` 只停止REWRITE阶段,继续后续阶段\n- 使用 `rewrite_log on` 可以调试rewrite规则\n- 301重定向会被浏览器永久缓存,修改时需要清除缓存\n- 在location中使用rewrite时,要注意与return、proxy_pass等指令的执行顺序\n\n**常见错误:**\n\n1. **rewrite循环**: 使用last时,新URI又匹配到当前location\n\n   ```nginx\n   location /test {\n       rewrite ^/test(.*)$ /test$1 last;  # 错误!会无限循环\n   }\n   ```\n2. **break后期望重新搜索location**:\n\n   ```nginx\n   location /first {\n       rewrite /first /second break;  # 不会跳转到 location /second\n   }\n   ```\n3. **混淆内部重定向和HTTP重定向**:\n\n   - last/break不会改变浏览器地址栏\n   - redirect/permanent会改变浏览器地址栏", "subs": ["3.8.1 return指令", "3.8.2 rewrite指令", "3.8.3 配置示例: return.conf", "3.8.4 if指令", "3.8.5 配置示例: rewrite.conf"]}, {"title": "3.9 FIND_CONFIG阶段:location匹配", "content": "#### 3.9.1 location语法\n\n```nginx\n# 精确匹配\nlocation = /path { }\n\n# 前缀匹配(优先级高,禁止正则)\nlocation ^~ /path { }\n\n# 前缀匹配(普通)\nlocation /path { }\n\n# 正则匹配(大小写敏感)\nlocation ~ regex { }\n\n# 正则匹配(大小写不敏感)\nlocation ~* regex { }\n\n# 命名location(内部跳转)\nlocation @name { }\n```\n\n#### 3.9.2 匹配优先级\n\n```mermaid\ngraph TD\n    A[开始匹配] --> B{精确匹配 =}\n    B -->|匹配| Z[使用该location]\n    B -->|不匹配| C[记录最长前缀匹配]\n    C --> D{\"最长前缀有 ^~?路径\"}\n    D -->|是| Z\n    D -->|否| E[按顺序尝试正则匹配]\n    E --> F{正则匹配成功?}\n    F -->|是| Z\n    F -->|否| G[使用最长前缀匹配]\n    G --> Z\n```\n\n**匹配顺序:**\n\n1. 精确匹配 `=` (匹配后立即停止)\n2. 前缀匹配 `^~` (匹配后不再尝试正则)\n3. 正则匹配 `~` 或 `~*` (按配置文件顺序,匹配后立即停止)\n4. 普通前缀匹配(最长匹配)\n\n**示例:**\n\n```nginx\nserver {\n    location = /test {\n        return 200 \"Exact match\\n\";\n    }\n  \n    location ^~ /test {\n        return 200 \"Prefix match (no regex)\\n\";\n    }\n  \n    location ~ ^/test$ {\n        return 200 \"Regex match\\n\";\n    }\n  \n    location /test {\n        return 200 \"Prefix match\\n\";\n    }\n}\n\n# 访问 /test → \"Exact match\"\n# 访问 /test/ → \"Prefix match (no regex)\"\n# 访问 /test123 → \"Prefix match\"\n```\n\n#### 3.9.2 配置示例: locations.conf\n\n**用途:** 通过实际测试演示location匹配的优先级顺序,帮助理解精确匹配、前缀匹配、正则匹配的执行规则\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name location.taohui.tech;\n  \n    # 开启debug日志,可以看到location匹配的详细过程\n    # 日志会显示: \"test location: \\\"/Test1/\\\"\"\n    error_log logs/error.log debug;\n  \n    # 注释掉root指令,避免静态文件干扰测试\n    # root html/;\n  \n    # 设置默认Content-Type为text/plain\n    # 这样return返回的文本会以纯文本格式显示\n    default_type text/plain;\n  \n    # merge_slashes指令: 是否合并URI中的多个连续斜杠\n    # off: 不合并,保留原始URI中的多个斜杠\n    # on(默认): 合并多个斜杠为一个\n    # \n    # 示例:\n    # - merge_slashes off: /Test1//Test2 保持不变\n    # - merge_slashes on:  /Test1//Test2 变为 /Test1/Test2\n    # \n    # 设置为off是为了精确测试location匹配规则\n    merge_slashes off;\n  \n    # ========== Location匹配优先级测试 ==========\n    # 优先级顺序(从高到低):\n    # 1. 精确匹配 (=)\n    # 2. 前缀匹配-停止正则 (^~)\n    # 3. 正则匹配 (~, ~*) - 按配置文件中出现的顺序\n    # 4. 前缀匹配 (无修饰符) - 最长匹配优先\n  \n    # 正则匹配1: 区分大小写,匹配以/Test1/结尾的URI\n    # ~ 表示区分大小写的正则匹配\n    # /Test1/$ 中的$表示行尾,必须以/Test1/结尾\n    # \n    # 匹配示例:\n    # ✓ /Test1/\n    # ✗ /test1/ (大小写不匹配)\n    # ✗ /Test1/abc (不是以/Test1/结尾)\n    location ~ /Test1/$ {\n        return 200 'first regular expressions match!\\n';\n    }\n  \n    # 正则匹配2: 不区分大小写,匹配/Test1/后跟单词字符\n    # ~* 表示不区分大小写的正则匹配\n    # (\\w+) 捕获一个或多个单词字符(字母、数字、下划线)\n    # $ 表示行尾\n    # \n    # 匹配示例:\n    # ✓ /Test1/abc\n    # ✓ /test1/ABC (不区分大小写)\n    # ✓ /TEST1/test123\n    # ✗ /Test1/ (没有单词字符)\n    # \n    # 注意: 如果同时匹配多个正则location,使用第一个匹配的\n    location ~* /Test1/(\\w+)$ {\n        return 200 'longest regular expressions match!\\n';\n    }\n  \n    # 前缀匹配-停止正则: ^~ 修饰符\n    # ^~ 表示如果匹配成功,停止搜索正则表达式location\n    # 这是一个\"优先级提升\"的前缀匹配\n    # \n    # 工作原理:\n    # 1. 如果URI以/Test1/开头\n    # 2. 立即使用这个location,不再尝试正则匹配\n    # 3. 即使有正则location也能匹配,也不会执行\n    # \n    # 匹配示例:\n    # ✓ /Test1/\n    # ✓ /Test1/abc\n    # ✓ /Test1/Test2\n    # \n    # 优先级: 高于正则匹配,低于精确匹配\n    location ^~ /Test1/ {\n        return 200 'stop regular expressions match!\\n';\n    }\n  \n    # 前缀匹配2: 更长的前缀\n    # 无修饰符表示普通前缀匹配\n    # 如果没有正则匹配,会使用最长的前缀匹配\n    # \n    # 匹配示例:\n    # ✓ /Test1/Test2\n    # ✓ /Test1/Test2/abc\n    # \n    # 注意: 这个location比下面的/Test1更长,所以优先级更高\n    location /Test1/Test2 {\n        return 200 'longest prefix string match!\\n';\n    }\n  \n    # 前缀匹配1: 较短的前缀\n    # 匹配所有以/Test1开头的URI\n    # \n    # 匹配示例:\n    # ✓ /Test1\n    # ✓ /Test1/\n    # ✓ /Test1/abc\n    # \n    # 注意: 如果有更长的前缀匹配,会优先使用更长的\n    location /Test1 {\n        return 200 'prefix string match!\\n';\n    }\n  \n    # 精确匹配: = 修饰符\n    # 必须完全匹配,一个字符都不能差\n    # 这是优先级最高的匹配方式\n    # \n    # 匹配示例:\n    # ✓ /Test1 (完全匹配)\n    # ✗ /Test1/ (多了斜杠)\n    # ✗ /Test1/abc (多了路径)\n    # ✗ /test1 (大小写不同)\n    # \n    # 优先级: 最高,一旦匹配立即使用,不再查找其他location\n    location = /Test1 {\n        return 200 'exact match!\\n';\n    }\n}\n```\n\n**Location匹配优先级详解:**\n\n| 优先级 | 修饰符 | 名称                   | 匹配规则            | 是否继续搜索    |\n| ------ | ------ | ---------------------- | ------------------- | --------------- |\n| 1      | `=`  | 精确匹配               | URI必须完全相同     | 否,立即使用     |\n| 2      | `^~` | 前缀匹配(停止正则)     | URI以指定字符串开头 | 否,停止正则搜索 |\n| 3      | `~`  | 正则匹配(区分大小写)   | 正则表达式匹配      | 是,按顺序匹配   |\n| 3      | `~*` | 正则匹配(不区分大小写) | 正则表达式匹配      | 是,按顺序匹配   |\n| 4      | 无     | 前缀匹配               | URI以指定字符串开头 | 是,继续正则搜索 |\n\n**匹配流程图:**\n\n```mermaid\ngraph TD\n    A[收到请求URI] --> B{是否有精确匹配 =?}\n    B -->|是| C[使用精确匹配,结束]\n    B -->|否| D[记录最长前缀匹配]\n    D --> E{\"最长前缀是否有 ^~ ?\"}\n    E -->|是| F[\"使用 ^~ 匹配,结束\"]\n    E -->|否| G[按顺序尝试正则匹配]\n    G --> H{是否有正则匹配成功?}\n    H -->|是| I[使用第一个匹配的正则,结束]\n    H -->|否| J{是否有前缀匹配?}\n    J -->|是| K[使用最长前缀匹配,结束]\n    J -->|否| L[返回404]\n```\n\n**测试方法:**\n\n```bash\n# 测试1: 精确匹配 (=) - 优先级最高\ncurl http://location.taohui.tech/Test1\n# 预期输出: exact match!\n# 说明: 完全匹配 location = /Test1\n\n# 测试2: 前缀匹配-停止正则 (^~)\ncurl http://location.taohui.tech/Test1/\n# 预期输出: stop regular expressions match!\n# 说明: 匹配 location ^~ /Test1/,虽然正则也能匹配,但^~停止了正则搜索\n\n# 测试3: 正则匹配 (~)\n# 注意: 由于有 ^~ 匹配,正则实际不会被执行\n# 如果注释掉 ^~ location,则会匹配正则\ncurl http://location.taohui.tech/Test1/\n# 当前输出: stop regular expressions match!\n# 如果注释掉^~: first regular expressions match!\n\n# 测试4: 最长前缀匹配\ncurl http://location.taohui.tech/Test1/Test2\n# 预期输出: stop regular expressions match!\n# 说明: 虽然 /Test1/Test2 是最长前缀,但 ^~ /Test1/ 先匹配并停止搜索\n\n# 测试5: 如果注释掉 ^~ location\n# curl http://location.taohui.tech/Test1/Test2\n# 预期输出: longest prefix string match!\n# 说明: 没有正则匹配,使用最长前缀匹配\n\n# 测试6: 正则匹配(不区分大小写)\n# 需要先注释掉 ^~ location\n# curl http://location.taohui.tech/test1/abc\n# 预期输出: longest regular expressions match!\n\n# 测试7: 查看debug日志\ntail -f logs/error.log | grep \"test location\"\n# 输出示例:\n# [debug] test location: \"=\"\n# [debug] test location: \"^~\"\n# [debug] test location: \"~\"\n```\n\n**实际匹配示例:**\n\n```bash\n# 场景1: 访问 /Test1\n# 匹配过程:\n# 1. 检查精确匹配: location = /Test1 ✓ 匹配成功\n# 2. 立即使用,不再继续\n# 结果: exact match!\n\n# 场景2: 访问 /Test1/\n# 匹配过程:\n# 1. 检查精确匹配: location = /Test1 ✗ 不匹配(多了斜杠)\n# 2. 查找最长前缀: location ^~ /Test1/ ✓ 匹配\n# 3. 由于有^~,停止正则搜索\n# 结果: stop regular expressions match!\n\n# 场景3: 访问 /Test1/abc (假设注释掉^~)\n# 匹配过程:\n# 1. 检查精确匹配: ✗ 无匹配\n# 2. 记录最长前缀: location /Test1 ✓\n# 3. 没有^~,继续正则搜索\n# 4. 正则匹配: location ~* /Test1/(\\w+)$ ✓ 匹配\n# 5. 使用正则匹配\n# 结果: longest regular expressions match!\n\n# 场景4: 访问 /Test1/Test2 (假设注释掉^~和正则)\n# 匹配过程:\n# 1. 检查精确匹配: ✗ 无匹配\n# 2. 查找最长前缀: location /Test1/Test2 ✓ (比/Test1更长)\n# 3. 没有正则匹配\n# 4. 使用最长前缀匹配\n# 结果: longest prefix string match!\n```\n\n**使用场景:**\n\n1. **精确匹配 (=)**:\n\n   - 首页: `location = / { }`\n   - API端点: `location = /api/health { }`\n   - 静态文件: `location = /favicon.ico { }`\n2. **前缀匹配-停止正则 (^~)**:\n\n   - 静态资源目录: `location ^~ /static/ { }`\n   - 上传目录: `location ^~ /uploads/ { }`\n   - 避免被正则误匹配的路径\n3. **正则匹配 (~, ~*)**:\n\n   - 文件扩展名: `location ~ \\.(jpg|png|gif)$ { }`\n   - 动态路由: `location ~ ^/user/(\\d+)$ { }`\n   - 复杂的URL模式\n4. **前缀匹配 (无修饰符)**:\n\n   - API路由: `location /api/ { }`\n   - 代理转发: `location /backend/ { }`\n   - 通用路径匹配\n\n**注意事项:**\n\n- `merge_slashes off` 会保留URI中的多个斜杠,影响匹配结果\n- 正则匹配按配置文件中出现的顺序,第一个匹配的生效\n- `^~` 可以提高性能,避免不必要的正则匹配\n- 精确匹配性能最好,应优先使用\n- location内部可以使用 `@name` 定义命名location,用于内部跳转\n\n**常见错误:**\n\n1. **误以为正则优先级高于前缀**:\n\n   ```nginx\n   location /test { }      # 会先记录这个前缀\n   location ~ /test { }    # 然后才尝试正则\n   ```\n2. **忘记 ^~ 的作用**:\n\n   ```nginx\n   location ^~ /static/ { }  # 会阻止下面的正则匹配\n   location ~ \\.(jpg)$ { }   # /static/a.jpg 不会匹配到这里\n   ```\n3. **正则顺序错误**:\n\n   ```nginx\n   location ~ /test { }      # 更通用的正则\n   location ~ /test/abc { }  # 永远不会被执行\n   ```", "subs": ["3.9.1 location语法", "3.9.2 匹配优先级", "3.9.2 配置示例: locations.conf"]}, {"title": "3.10 PREACCESS阶段:限流限速", "content": "#### 3.10.1 limit_conn模块:限制并发连接数\n\n```nginx\nhttp {\n    # 定义共享内存区域\n    limit_conn_zone $binary_remote_addr zone=addr:10m;\n  \n    # 设置日志级别\n    limit_conn_log_level warn;  # 默认error\n  \n    # 设置返回状态码\n    limit_conn_status 503;  # 默认503\n  \n    server {\n        location /download {\n            # 限制每个IP同时只能有1个连接\n            limit_conn addr 1;\n      \n            # 限速(每秒50字节)\n            limit_rate 50;\n        }\n    }\n}\n```\n\n**关键点:**\n\n- 使用共享内存,对所有Worker进程生效\n- 基于变量(通常是 `$binary_remote_addr`)作为key\n- `binary_remote_addr` 是二进制格式的IP,IPv4只占4字节\n\n#### 3.10.2 limit_req模块:限制请求速率\n\n**算法:** Leaky Bucket(漏桶算法)\n\n```nginx\nhttp {\n    # 定义共享内存区域,限制每分钟2个请求\n    limit_req_zone $binary_remote_addr zone=one:10m rate=2r/m;\n  \n    # 或每秒10个请求\n    limit_req_zone $binary_remote_addr zone=two:10m rate=10r/s;\n  \n    limit_req_log_level warn;\n    limit_req_status 503;\n  \n    server {\n        location / {\n            # 使用限速区域,允许突发3个请求\n            limit_req zone=one burst=3;\n      \n            # nodelay:不延迟处理突发请求,超出直接拒绝\n            limit_req zone=one burst=3 nodelay;\n        }\n    }\n}\n```\n\n**Leaky Bucket算法:**\n\n```\n突发请求 → [桶(burst)] → 匀速处理(rate)\n              ↓\n           超出容量\n              ↓\n           返回503\n```\n\n**limit_conn vs limit_req:**\n\n| 模块       | 限制对象   | 典型场景 |\n| ---------- | ---------- | -------- |\n| limit_conn | 并发连接数 | 下载限制 |\n| limit_req  | 请求速率   | API限流  |\n\n**执行顺序:** limit_req先于limit_conn执行\n\n#### 3.10.3 配置示例: limit_conn.conf\n\n**用途:** 演示limit_conn和limit_req模块的综合使用,实现并发连接数限制和请求速率限制,保护服务器资源\n\n**完整配置:**\n\n```nginx\n# ========== HTTP块配置: 定义限流的共享内存区域 ==========\n\n# limit_conn_zone指令: 定义用于限制并发连接数的共享内存区域\n# 语法: limit_conn_zone key zone=name:size;\n# \n# $binary_remote_addr: 使用客户端IP的二进制格式作为key\n#   - IPv4: 4字节\n#   - IPv6: 16字节\n#   - 比$remote_addr(字符串格式)更节省内存\n# \n# zone=addr:10m: 定义共享内存区域\n#   - 名称: addr\n#   - 大小: 10MB\n#   - 可存储约160,000个IPv4地址的状态(10MB / 64字节)\n#   - 所有worker进程共享这个内存区域\nlimit_conn_zone $binary_remote_addr zone=addr:10m;\n\n# limit_req_zone指令: 定义用于限制请求速率的共享内存区域\n# 语法: limit_req_zone key zone=name:size rate=rate;\n# \n# rate=2r/m: 速率限制\n#   - 2r/m = 每分钟2个请求 = 平均每30秒1个请求\n#   - 也可以使用 r/s (每秒) 或 r/m (每分钟)\n#   - 使用Leaky Bucket(漏桶)算法实现\n# \n# 内存计算:\n#   - 每个IP约占用160字节(包括红黑树节点)\n#   - 10MB可以存储约64,000个IP的速率状态\nlimit_req_zone $binary_remote_addr zone=one:10m rate=2r/m;\n\nserver {\n    server_name limit.taohui.tech;\n  \n    # 静态文件根目录\n    root html/;\n  \n    # 错误日志级别设置为info\n    # 可以看到limit_conn和limit_req的触发日志\n    # 日志示例: \"limiting connections by zone \\\"addr\\\"\"\n    error_log logs/myerror.log info;\n  \n    location / {\n        # ========== 并发连接数限制配置 ==========\n    \n        # limit_conn_status: 超过限制时返回的HTTP状态码\n        # 默认: 503 Service Unavailable\n        # 这里设置为500,可以根据需求自定义(如429 Too Many Requests)\n        limit_conn_status 500;\n    \n        # limit_conn_log_level: 触发限制时的日志级别\n        # 可选值: info, notice, warn, error\n        # warn: 警告级别,方便在日志中快速定位限流事件\n        limit_conn_log_level warn;\n    \n        # limit_rate: 限制向客户端传输响应的速率\n        # 单位: 字节/秒\n        # 50: 每秒传输50字节(非常慢,用于测试)\n        # \n        # 作用:\n        # - 防止单个连接占用过多带宽\n        # - 适用于下载限速场景\n        # - 对所有响应生效,不区分文件大小\n        # \n        # 注意: 这不是请求速率限制,而是响应传输速率限制\n        limit_rate 50;\n    \n        # limit_conn: 限制并发连接数\n        # 语法: limit_conn zone number;\n        # \n        # addr: 使用前面定义的共享内存区域\n        # 1: 每个IP同时只允许1个连接\n        # \n        # 工作原理:\n        # 1. 请求到达时,在共享内存中查找该IP的连接计数\n        # 2. 如果连接数 < 1,允许请求,计数+1\n        # 3. 如果连接数 >= 1,拒绝请求,返回limit_conn_status\n        # 4. 请求结束时,计数-1\n        # \n        # 适用场景:\n        # - 防止单个用户建立过多连接\n        # - 下载限制(配合limit_rate)\n        # - 防止慢速攻击(Slowloris)\n        limit_conn addr 1;\n    \n        # ========== 请求速率限制配置 ==========\n    \n        # limit_req: 限制请求速率\n        # 语法: limit_req zone=name [burst=number] [nodelay | delay=number];\n        # \n        # zone=one: 使用前面定义的共享内存区域(rate=2r/m)\n        # \n        # 不带burst参数的行为:\n        # - 严格按照2r/m的速率处理请求\n        # - 超过速率的请求立即被拒绝\n        # - 返回503错误(或自定义的limit_req_status)\n        # \n        # 示例(rate=2r/m,即30秒1个请求):\n        # - t=0s:  请求1 ✓ 允许\n        # - t=10s: 请求2 ✗ 拒绝(距离上次请求<30s)\n        # - t=30s: 请求3 ✓ 允许\n        # - t=35s: 请求4 ✗ 拒绝\n        limit_req zone=one;\n    \n        # 注释掉的带burst参数的配置:\n        # limit_req zone=one burst=3 nodelay;\n        # \n        # burst=3: 突发请求队列大小\n        #   - 允许最多3个请求排队等待\n        #   - 超过3个的请求会被拒绝\n        # \n        # nodelay: 立即处理突发请求\n        #   - 不等待,立即处理队列中的请求\n        #   - 但仍然消耗速率配额\n        # \n        # 示例(rate=2r/m, burst=3, nodelay):\n        # - 同时发送5个请求\n        # - 请求1: ✓ 立即处理\n        # - 请求2-4: ✓ 放入队列,立即处理(因为nodelay)\n        # - 请求5: ✗ 拒绝(超过burst)\n        # - 但后续30秒内的请求会被拒绝(配额已用完)\n    }\n}\n```\n\n**limit_conn vs limit_req 对比:**\n\n| 特性     | limit_conn       | limit_req          |\n| -------- | ---------------- | ------------------ |\n| 限制对象 | 并发连接数       | 请求速率           |\n| 计数单位 | 连接数           | 请求数/时间        |\n| 算法     | 简单计数器       | Leaky Bucket(漏桶) |\n| 典型用途 | 防止连接耗尽     | 防止请求过载       |\n| 是否排队 | 否,超过立即拒绝  | 可选(burst参数)    |\n| 内存占用 | 较小(~64字节/IP) | 较大(~160字节/IP)  |\n\n**Leaky Bucket算法图解:**\n\n```mermaid\ngraph TD\n    A[新请求到达] --> B{桶中令牌数 > 0?}\n    B -->|是| C[消耗1个令牌]\n    C --> D[处理请求]\n    B -->|否| E{burst队列是否已满?}\n    E -->|未满| F[放入队列等待]\n    F --> G[等待令牌生成]\n    G --> D\n    E -->|已满| H[拒绝请求,返回503]\n  \n    I[令牌生成器] -->|按rate速率| J[向桶中添加令牌]\n    J --> B\n```\n\n**测试方法:**\n\n```bash\n# 测试1: 并发连接数限制(limit_conn addr 1)\n# 打开两个终端,同时执行:\ncurl http://limit.taohui.tech/large_file.zip\n\n# 终端1: 正常下载(速度50字节/秒)\n# 终端2: 返回500错误\n# 说明: 同一IP只能有1个并发连接\n\n# 测试2: 请求速率限制(limit_req zone=one, rate=2r/m)\n# 快速连续发送3个请求:\ncurl http://limit.taohui.tech/ && \\\ncurl http://limit.taohui.tech/ && \\\ncurl http://limit.taohui.tech/\n\n# 请求1: ✓ 成功\n# 请求2: ✗ 503错误(距离请求1 < 30秒)\n# 请求3: ✗ 503错误\n\n# 测试3: 等待30秒后再次请求\nsleep 30\ncurl http://limit.taohui.tech/\n# ✓ 成功(令牌已恢复)\n\n# 测试4: 查看限流日志\ntail -f logs/myerror.log | grep limiting\n# 输出示例:\n# [warn] limiting connections by zone \"addr\", client: 192.168.1.100\n# [warn] limiting requests, excess: 0.000 by zone \"one\", client: 192.168.1.100\n\n# 测试5: 使用ab工具压测\nab -n 10 -c 2 http://limit.taohui.tech/\n# 会看到大量503错误\n```\n\n**使用场景:**\n\n1. **下载限速** (limit_conn + limit_rate):\n\n   ```nginx\n   location /downloads {\n       limit_conn addr 2;      # 每IP最多2个并发下载\n       limit_rate 100k;        # 每连接限速100KB/s\n   }\n   ```\n2. **API速率限制** (limit_req):\n\n   ```nginx\n   location /api {\n       limit_req zone=api_limit burst=10 nodelay;\n       limit_req_status 429;   # 返回429 Too Many Requests\n   }\n   ```\n3. **登录接口保护** (limit_req):\n\n   ```nginx\n   location /login {\n       limit_req zone=login_limit burst=5;  # 允许5次突发\n       limit_req_status 429;\n   }\n   ```\n4. **防止慢速攻击** (limit_conn):\n\n   ```nginx\n   location / {\n       limit_conn addr 10;     # 每IP最多10个连接\n       client_body_timeout 10s;\n       client_header_timeout 10s;\n   }\n   ```\n\n**高级配置:**\n\n```nginx\n# 1. 白名单(不限制特定IP)\ngeo $limit {\n    default 1;\n    10.0.0.0/8 0;      # 内网不限制\n    192.168.1.100 0;   # VIP用户不限制\n}\nmap $limit $limit_key {\n    0 \"\";\n    1 $binary_remote_addr;\n}\nlimit_req_zone $limit_key zone=api:10m rate=10r/s;\n\n# 2. 不同URI不同限制\nlimit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;\nlimit_req_zone $binary_remote_addr zone=strict:10m rate=1r/s;\n\nlocation /api/public {\n    limit_req zone=general burst=20;\n}\nlocation /api/sensitive {\n    limit_req zone=strict burst=2;\n}\n\n# 3. 组合多个限制\nlocation /download {\n    limit_conn addr 1;              # 并发连接限制\n    limit_req zone=one burst=3;     # 请求速率限制\n    limit_rate_after 10m;           # 前10MB不限速\n    limit_rate 100k;                # 之后限速100KB/s\n}\n```\n\n**注意事项:**\n\n- `limit_conn` 统计的是正在处理的连接数,不是历史连接数\n- `limit_req` 使用Leaky Bucket算法,平滑处理突发流量\n- `burst` 参数不是\"允许的额外请求\",而是\"排队等待的请求\"\n- `nodelay` 会立即处理突发请求,但仍消耗速率配额\n- 共享内存大小要根据实际IP数量规划\n- 限流触发时,默认返回503,建议改为429(RFC 6585)\n- 在反向代理场景下,应该基于 `$binary_remote_addr` 而非 `$server_addr`\n\n**常见问题:**\n\n1. **Q: limit_conn限制不生效?**\n\n   - A: 检查是否在http块定义了 `limit_conn_zone`\n   - A: 确认key变量有值(如 `$binary_remote_addr`)\n2. **Q: 为什么设置rate=2r/m,但第2个请求就被拒绝?**\n\n   - A: Leaky Bucket算法是平滑限流,2r/m = 平均30秒1个请求\n3. **Q: burst和nodelay的区别?**\n\n   - A: `burst` 定义队列大小,`nodelay` 决定是否立即处理队列请求\n4. **Q: 如何查看当前有多少IP被限流?**\n\n   - A: 使用Nginx Plus的API,或者监控error_log中的limiting日志", "subs": ["3.10.1 limit_conn模块:限制并发连接数", "3.10.2 limit_req模块:限制请求速率", "3.10.3 配置示例: limit_conn.conf"]}, {"title": "3.11 ACCESS阶段:访问控制", "content": "#### 3.11.1 access模块:IP访问控制\n\n```nginx\nlocation / {\n    deny 192.168.1.1;\n    allow 192.168.1.0/24;\n    allow 10.0.0.0/8;\n    deny all;\n}\n```\n\n**规则:**\n\n- 按顺序匹配,匹配后立即停止\n- 支持IPv4、IPv6、CIDR、all\n\n#### 3.11.2 auth_basic模块:HTTP Basic认证\n\n```nginx\nlocation /admin {\n    auth_basic \"Admin Area\";\n    auth_basic_user_file /etc/nginx/.htpasswd;\n}\n```\n\n**生成密码文件:**\n\n```bash\n# 安装工具\nyum install httpd-tools\n\n# 生成密码文件\nhtpasswd -c /etc/nginx/.htpasswd username\n\n# 添加用户\nhtpasswd /etc/nginx/.htpasswd another_user\n```\n\n**协议流程:**\n\n```mermaid\nsequenceDiagram\n    Client->>Nginx: GET /admin\n    Nginx->>Client: 401 Unauthorized<br/>WWW-Authenticate: Basic realm=\"Admin Area\"\n    Client->>Client: 弹出用户名密码输入框\n    Client->>Nginx: GET /admin<br/>Authorization: Basic base64(user:pass)\n    Nginx->>Nginx: 验证用户名密码\n    alt 验证成功\n        Nginx->>Client: 200 OK\n    else 验证失败\n        Nginx->>Client: 401 Unauthorized\n    end\n```\n\n#### 3.11.3 auth_request模块:第三方认证\n\n```nginx\nlocation / {\n    auth_request /auth;\n    # 认证通过才能访问\n}\n\nlocation = /auth {\n    internal;  # 仅内部访问\n    proxy_pass http://auth-server;\n    proxy_pass_request_body off;\n    proxy_set_header Content-Length \"\";\n}\n```\n\n**工作流程:**\n\n1. 收到请求,生成子请求到 `/auth`\n2. 根据子请求的响应码决定是否放行:\n   - 2xx → 放行\n   - 401/403 → 拒绝\n\n**编译:** `--with-http_auth_request_module`\n\n#### 3.11.4 satisfy指令:组合访问控制\n\n```nginx\nlocation / {\n    satisfy all;  # 默认,所有ACCESS模块都必须通过\n    # satisfy any;  # 任意一个ACCESS模块通过即可\n  \n    allow 192.168.1.0/24;\n    deny all;\n  \n    auth_basic \"Login\";\n    auth_basic_user_file /etc/nginx/.htpasswd;\n}\n```\n\n**satisfy all流程:**\n\n```mermaid\ngraph TD\n    A[请求] --> B{access模块}\n    B -->|拒绝| Z[返回403]\n    B -->|通过| C{auth_basic模块}\n    C -->|拒绝| Z\n    C -->|通过| D{auth_request模块}\n    D -->|拒绝| Z\n    D -->|通过| E[继续处理]\n```\n\n**satisfy any流程:**\n\n```mermaid\ngraph TD\n    A[请求] --> B{access模块}\n    B -->|通过| E[继续处理]\n    B -->|拒绝| C{auth_basic模块}\n    C -->|通过| E\n    C -->|拒绝| D{auth_request模块}\n    D -->|通过| E\n    D -->|拒绝| Z[返回403]\n```\n\n#### 3.11.5 配置示例: access.conf\n\n**用途:** 演示ACCESS阶段的三种认证方式(auth_basic、auth_request、satisfy)的综合使用,实现灵活的访问控制策略\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name access.taohui.tech;\n  \n    # 开启debug日志,查看ACCESS阶段的执行过程\n    # 日志会显示: \"access phase: 7\"\n    error_log logs/error.log debug;\n  \n    # 注释掉root指令,避免静态文件干扰测试\n    # root html/;\n  \n    # 设置默认Content-Type\n    default_type text/plain;\n  \n    # ========== Location 1: auth_basic + satisfy any ==========\n  \n    location /auth_basic {\n        # satisfy指令: 控制多个ACCESS模块的组合逻辑\n        # any: 任意一个模块通过即可(OR逻辑)\n        # all(默认): 所有模块都必须通过(AND逻辑)\n        # \n        # 使用场景:\n        # - 内网IP可以直接访问,外网IP需要认证\n        # - 提供多种认证方式,用户可选其一\n        satisfy any;\n    \n        # auth_basic指令: HTTP Basic认证\n        # 语法: auth_basic string | off;\n        # \n        # \"test auth_basic\": 认证域(realm)名称\n        #   - 会显示在浏览器的认证对话框中\n        #   - 用于标识受保护的资源区域\n        # \n        # 工作流程:\n        # 1. 客户端首次访问,Nginx返回401 Unauthorized\n        # 2. 响应头包含: WWW-Authenticate: Basic realm=\"test auth_basic\"\n        # 3. 浏览器弹出用户名/密码输入框\n        # 4. 用户输入后,浏览器发送 Authorization: Basic base64(user:pass)\n        # 5. Nginx验证用户名密码,通过则允许访问\n        auth_basic \"test auth_basic\";\n    \n        # auth_basic_user_file指令: 指定密码文件路径\n        # 文件格式: username:encrypted_password\n        # \n        # 密码加密方式:\n        # - crypt(): Unix标准加密(不推荐,不安全)\n        # - apr1: Apache MD5(推荐)\n        # - {PLAIN}: 明文(仅用于测试)\n        # - {SHA}: SHA-1(不推荐)\n        # \n        # 生成密码文件:\n        # htpasswd -c examples/auth.pass username\n        # htpasswd -b examples/auth.pass username password\n        auth_basic_user_file examples/auth.pass;\n    \n        # deny all: 拒绝所有IP访问\n        # \n        # 注意: 由于satisfy any,这个规则不会生效\n        # 因为auth_basic已经提供了认证方式\n        # \n        # 逻辑: deny all OR auth_basic = 只要auth_basic通过即可\n        # \n        # 如果改为satisfy all:\n        # 逻辑: deny all AND auth_basic = 永远无法访问(deny all总是拒绝)\n        deny all;\n    }\n  \n    # ========== Location 2: auth_request第三方认证 ==========\n  \n    location / {\n        # auth_request指令: 使用子请求进行认证\n        # 语法: auth_request uri | off;\n        # \n        # /test_auth: 认证子请求的URI\n        #   - Nginx会向这个URI发送子请求\n        #   - 如果子请求返回2xx,认证通过\n        #   - 如果子请求返回401/403,认证失败\n        #   - 其他状态码视为错误\n        # \n        # 工作流程:\n        # 1. 客户端访问 /\n        # 2. Nginx发起子请求到 /test_auth\n        # 3. /test_auth location将请求代理到认证服务器\n        # 4. 认证服务器返回2xx(通过)或401/403(拒绝)\n        # 5. 根据认证结果决定是否允许访问\n        # \n        # 优势:\n        # - 集中式认证:多个location共享同一认证逻辑\n        # - 灵活性高:可以实现复杂的认证逻辑(JWT、OAuth等)\n        # - 与现有认证系统集成\n        auth_request /test_auth;\n    }\n  \n    # ========== Location 3: auth_request认证端点 ==========\n  \n    location = /test_auth {\n        # 这是一个内部location,仅用于auth_request子请求\n        # 不应该被外部直接访问(虽然这里没有设置internal)\n    \n        # proxy_pass: 将认证请求转发到上游认证服务器\n        # http://127.0.0.1:8090/auth_upstream: 认证服务器地址\n        # \n        # 认证服务器需要实现:\n        # - 检查请求头中的认证信息(如Cookie、Token)\n        # - 返回2xx表示认证通过\n        # - 返回401/403表示认证失败\n        proxy_pass http://127.0.0.1:8090/auth_upstream;\n    \n        # proxy_pass_request_body off: 不转发原始请求的body\n        # 原因:\n        # - 认证通常只需要检查头部信息\n        # - 不转发body可以提高性能\n        # - 避免认证服务器接收大量无用数据\n        proxy_pass_request_body off;\n    \n        # proxy_set_header Content-Length \"\": 清空Content-Length头\n        # 原因:\n        # - 由于不转发body,原始的Content-Length已经无效\n        # - 必须清空,否则上游服务器可能等待body数据\n        proxy_set_header Content-Length \"\";\n    \n        # proxy_set_header X-Original-URI $request_uri: 传递原始URI\n        # 作用:\n        # - 让认证服务器知道用户访问的是哪个URI\n        # - 可以实现基于URI的权限控制\n        # - 例如: /admin/* 需要管理员权限\n        proxy_set_header X-Original-URI $request_uri;\n    }\n}\n```\n\n**ACCESS阶段模块执行顺序:**\n\n| 顺序 | 模块                | 功能           | 返回值           |\n| ---- | ------------------- | -------------- | ---------------- |\n| 1    | access (allow/deny) | IP访问控制     | 403 Forbidden    |\n| 2    | auth_basic          | HTTP Basic认证 | 401 Unauthorized |\n| 3    | auth_request        | 第三方认证     | 401/403          |\n\n**satisfy指令行为对比:**\n\n| satisfy    | 逻辑 | 说明                 | 适用场景          |\n| ---------- | ---- | -------------------- | ----------------- |\n| all (默认) | AND  | 所有模块都必须通过   | 多重认证,安全性高 |\n| any        | OR   | 任意一个模块通过即可 | 提供多种认证方式  |\n\n**测试方法:**\n\n```bash\n# 测试1: auth_basic认证(satisfy any)\ncurl http://access.taohui.tech/auth_basic\n# 预期: 401 Unauthorized\n# 响应头: WWW-Authenticate: Basic realm=\"test auth_basic\"\n\n# 测试2: 使用正确的用户名密码\ncurl -u username:password http://access.taohui.tech/auth_basic\n# 预期: 200 OK (如果密码文件中有此用户)\n\n# 测试3: 查看认证头部\necho -n \"username:password\" | base64\n# 输出: dXNlcm5hbWU6cGFzc3dvcmQ=\n\ncurl -H \"Authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQ=\" \\\n     http://access.taohui.tech/auth_basic\n# 预期: 200 OK\n\n# 测试4: auth_request认证\n# 需要先启动认证服务器(监听8090端口)\ncurl http://access.taohui.tech/\n# 预期: 取决于认证服务器的返回\n\n# 测试5: 使用Cookie或Token认证\ncurl -H \"Cookie: session=abc123\" http://access.taohui.tech/\n# 认证服务器会检查Cookie并返回相应状态码\n\n# 测试6: 查看debug日志\ntail -f logs/error.log | grep \"access phase\"\n# 输出示例:\n# [debug] access phase: 7\n# [debug] auth basic: \"username\"\n```\n\n**生成密码文件:**\n\n```bash\n# 方法1: 使用htpasswd工具(推荐)\n# 安装httpd-tools(CentOS)或apache2-utils(Ubuntu)\nyum install httpd-tools\n# 或\napt-get install apache2-utils\n\n# 创建密码文件并添加第一个用户\nhtpasswd -c examples/auth.pass admin\n# 输入密码: ****\n\n# 添加更多用户(不使用-c参数)\nhtpasswd examples/auth.pass user1\nhtpasswd examples/auth.pass user2\n\n# 方法2: 使用openssl生成(无需httpd-tools)\n# 生成apr1格式的密码\necho \"admin:$(openssl passwd -apr1 mypassword)\" >> examples/auth.pass\n\n# 方法3: 使用Python生成\npython3 -c \"import crypt; print('admin:' + crypt.crypt('mypassword', crypt.mksalt(crypt.METHOD_MD5)))\"\n\n# 查看密码文件\ncat examples/auth.pass\n# 输出示例:\n# admin:$apr1$xxx$yyy\n# user1:$apr1$aaa$bbb\n```\n\n**认证服务器示例(Python Flask):**\n\n```python\nfrom flask import Flask, request\n\napp = Flask(__name__)\n\n@app.route('/auth_upstream')\ndef auth():\n    # 检查Cookie中的session\n    session = request.cookies.get('session')\n  \n    # 检查Authorization头\n    auth_header = request.headers.get('Authorization')\n  \n    # 获取原始URI\n    original_uri = request.headers.get('X-Original-URI')\n  \n    # 简单的认证逻辑\n    if session == 'valid_session_id':\n        return '', 200  # 认证通过\n    elif auth_header and auth_header.startswith('Bearer '):\n        token = auth_header[7:]\n        if token == 'valid_token':\n            return '', 200\n  \n    # 认证失败\n    return '', 401\n\nif __name__ == '__main__':\n    app.run(host='127.0.0.1', port=8090)\n```\n\n**使用场景:**\n\n1. **内网免认证,外网需认证** (satisfy any + allow + auth_basic):\n\n   ```nginx\n   location /admin {\n       satisfy any;\n       allow 10.0.0.0/8;      # 内网直接通过\n       deny all;              # 外网被拒绝\n       auth_basic \"Admin\";    # 但可以通过认证\n       auth_basic_user_file /etc/nginx/.htpasswd;\n   }\n   ```\n2. **JWT Token认证** (auth_request):\n\n   ```nginx\n   location /api {\n       auth_request /auth/validate;\n       auth_request_set $user $upstream_http_x_user;\n       proxy_set_header X-User $user;\n       proxy_pass http://backend;\n   }\n   ```\n3. **多重认证** (satisfy all):\n\n   ```nginx\n   location /secure {\n       satisfy all;\n       allow 192.168.1.0/24;  # 必须是内网IP\n       deny all;\n       auth_basic \"Secure\";   # 并且需要认证\n       auth_basic_user_file /etc/nginx/.htpasswd;\n   }\n   ```\n\n**注意事项:**\n\n- `auth_basic` 的密码是Base64编码,不是加密,容易被截获,建议使用HTTPS\n- `auth_request` 的子请求不会转发原始请求的body,只转发头部\n- `satisfy any` 时,只要有一个模块通过即可,其他模块的拒绝会被忽略\n- `satisfy all` 时,所有模块必须通过,任何一个拒绝都会导致请求被拒绝\n- `auth_request` 模块需要编译时添加 `--with-http_auth_request_module`\n- 密码文件的权限应设置为600,避免被其他用户读取\n\n**常见问题:**\n\n1. **Q: auth_basic一直提示401?**\n\n   - A: 检查密码文件路径是否正确\n   - A: 确认密码文件格式正确(username:encrypted_password)\n   - A: 验证密码加密方式(推荐使用apr1)\n2. **Q: auth_request不生效?**\n\n   - A: 确认编译时包含了auth_request模块\n   - A: 检查认证服务器是否正常运行\n   - A: 查看error_log中的子请求日志\n3. **Q: satisfy any时,为什么deny all没有生效?**\n\n   - A: 这是正常的,satisfy any表示任意一个模块通过即可\n   - A: auth_basic通过后,deny all的拒绝会被忽略\n4. **Q: 如何在auth_request中传递认证信息到后端?**\n\n   - A: 使用 `auth_request_set` 指令捕获上游响应头\n   - A: 使用 `proxy_set_header` 将信息传递给后端", "subs": ["3.11.1 access模块:IP访问控制", "3.11.2 auth_basic模块:HTTP Basic认证", "3.11.3 auth_request模块:第三方认证", "3.11.4 satisfy指令:组合访问控制", "3.11.5 配置示例: access.conf"]}, {"title": "3.12 PRECONTENT阶段", "content": "#### 3.12.1 try_files指令\n\n**功能:** 按顺序尝试访问文件,都不存在时跳转到最后一个URI或返回状态码\n\n```nginx\n# 语法\ntry_files file1 file2 ... uri;\ntry_files file1 file2 ... =code;\n\n# 示例1:WordPress\nlocation / {\n    try_files $uri $uri/ /index.php?$args;\n}\n\n# 示例2:静态文件优先,不存在则代理\nlocation / {\n    try_files $uri $uri/ @proxy;\n}\n\nlocation @proxy {\n    proxy_pass http://backend;\n}\n\n# 示例3:维护模式\nlocation / {\n    try_files /maintenance.html $uri $uri/ /index.html;\n}\n```\n\n**注意事项:**\n\n- 最后一个参数是URI或状态码\n- 文件路径由 `root` 或 `alias` 指定\n- 常用于静态文件优先,动态请求降级\n\n#### 3.12.2 配置示例: tryfiles.conf\n\n**用途:** 演示try_files指令的使用,实现文件查找降级和命名location跳转\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name tryfiles.taohui.tech;\n    error_log logs/myerror.log info;\n    root html/;\n    default_type text/plain;\n  \n    location /first {\n        # try_files: 按顺序尝试文件,最后跳转到命名location\n        # 1. /system/maintenance.html - 维护页面\n        # 2. $uri - 请求的原始URI\n        # 3. $uri/index.html - URI作为目录,查找index.html\n        # 4. $uri.html - URI加.html后缀\n        # 5. @lasturl - 都不存在则跳转到命名location\n        try_files /system/maintenance.html\n                  $uri $uri/index.html $uri.html\n                  @lasturl;\n    }\n  \n    # 命名location: 使用@前缀\n    # 只能被内部跳转访问(如try_files、error_page)\n    location @lasturl {\n        return 200 'lasturl!\\n';\n    }\n  \n    location /second {\n        # try_files最后一个参数为状态码\n        # 如果所有文件都不存在,返回404\n        try_files $uri $uri/index.html $uri.html =404;\n    }\n}\n```\n\n**关键点:** try_files按顺序查找文件,支持命名location和状态码作为fallback。\n\n#### 3.12.3 配置示例: mirror.conf\n\n**用途:** 演示mirror模块的流量镜像功能,用于测试环境流量复制\n\n**完整配置:**\n\n```nginx\n# 镜像服务器: 接收复制的流量\nserver {\n    listen 10020;\n    location / {\n        return 200 'mirror response!';\n    }\n}\n```\n\n**关键点:** mirror模块可以将生产流量实时复制到测试环境,用于灰度测试和压力测试。\n\n#### 3.12.4 mirror模块:流量复制\n\n**功能:** 实时复制请求到其他服务器(测试环境/灰度环境)\n\n```nginx\nlocation / {\n    mirror /mirror;\n    mirror_request_body on;  # 默认on,复制请求体\n}\n\nlocation = /mirror {\n    internal;\n    proxy_pass http://test_backend$request_uri;\n}\n```\n\n**特点:**\n\n- 不等待镜像请求的响应\n- 不影响主请求的处理\n- 适用于灰度测试、压力测试\n\n**编译:** 默认编译,可用 `--without-http_mirror_module` 禁用", "subs": ["3.12.1 try_files指令", "3.12.2 配置示例: tryfiles.conf", "3.12.3 配置示例: mirror.conf", "3.12.4 mirror模块:流量复制"]}, {"title": "3.13 CONTENT阶段:内容生成", "content": "#### 3.13.1 static模块:root vs alias\n\n```nginx\n# root:拼接location路径\nlocation /static {\n    root /data;\n    # 访问 /static/file.txt\n    # 实际文件 /data/static/file.txt\n}\n\n# alias:替换location路径\nlocation /static {\n    alias /data/files;\n    # 访问 /static/file.txt\n    # 实际文件 /data/files/file.txt\n}\n```\n\n**区别:**\n\n| 指令  | URL映射 | context                    | 默认值 |\n| ----- | ------- | -------------------------- | ------ |\n| root  | 拼接    | http, server, location, if | html   |\n| alias | 替换    | location                   | 无     |\n\n**static模块变量:**\n\n```nginx\nlocation / {\n    return 200 \"\n        request_filename: $request_filename\n        document_root: $document_root\n        realpath_root: $realpath_root\n    \";\n}\n```\n\n- `$request_filename` - 完整文件路径\n- `$document_root` - root/alias指定的目录\n- `$realpath_root` - 解析软链接后的真实目录\n\n**其他配置:**\n\n```nginx\nlocation / {\n    root /data;\n  \n    # MIME类型映射\n    types {\n        text/html html htm;\n        image/jpeg jpg jpeg;\n    }\n    types_hash_max_size 2048;\n    types_hash_bucket_size 64;\n  \n    # 默认MIME类型\n    default_type application/octet-stream;\n  \n    # 是否记录文件不存在的日志\n    log_not_found off;\n}\n```\n\n**目录访问重定向:**\n\n```nginx\n# 访问目录但URL不以/结尾时,返回301重定向\nlocation /docs {\n    root /data;\n  \n    # 控制重定向行为\n    absolute_redirect on;   # 默认on,返回完整URL\n    server_name_in_redirect off;  # 默认off,使用请求中的Host\n    port_in_redirect on;    # 默认on,包含端口号\n}\n```\n\n#### 3.13.2 index模块\n\n```nginx\nlocation / {\n    root /data;\n    index index.html index.htm;\n}\n\n# 访问 / 时,依次尝试:\n# 1. /data/index.html\n# 2. /data/index.htm\n```\n\n**注意:** index模块优先于autoindex模块执行\n\n#### 3.13.3 autoindex模块:目录列表\n\n```nginx\nlocation /files {\n    root /data;\n    autoindex on;               # 开启目录列表\n    autoindex_exact_size off;   # 显示文件大小(off:KB/MB, on:字节)\n    autoindex_localtime on;     # 使用本地时间\n    autoindex_format html;      # 格式:html/xml/json/jsonp\n}\n```\n\n**效果:** 类似Apache的目录浏览功能\n\n#### 3.13.4 concat模块:合并小文件\n\n**功能:** 一次请求返回多个文件内容(阿里巴巴开源)\n\n```nginx\nlocation /static {\n    concat on;\n    concat_max_files 20;\n    concat_types text/css application/javascript;\n    concat_delimiter \"\\n;;;;\\n\";\n    concat_ignore_file_error on;\n}\n\n# 访问方式\n# /static/??file1.js,file2.js,file3.js\n```\n\n**编译:**\n\n```bash\ngit clone https://github.com/alibaba/nginx-http-concat\n./configure --add-module=/path/to/nginx-http-concat\nmake && make install\n```\n\n#### 3.13.5 配置示例: static.conf (root vs alias)\n\n**用途:** 演示root和alias指令的区别,以及static模块提供的变量\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name static.taohui.tech;\n    error_log logs/myerror.log info;\n  \n    # root指令: 拼接location路径\n    # 访问/root/test.html -> 文件路径: html + /root/test.html = html/root/test.html\n    location /root {\n        root html;\n    }\n  \n    # alias指令: 替换location路径\n    # 访问/alias/test.html -> 文件路径: html (替换/alias) = html/test.html\n    location /alias {\n        alias html;\n    }\n  \n    # root + 正则: 捕获组不能用于root路径\n    # 这个配置是错误的示例,root不支持变量\n    location ~ /root/(\\w+\\.txt) {\n        root html/first/$1;  # 错误!$1不会被替换\n    }\n  \n    # alias + 正则: 捕获组可以用于alias路径\n    # 访问/alias/test.txt -> html/first/test.txt\n    location ~ /alias/(\\w+\\.txt) {\n        alias html/first/$1;  # 正确!$1会被替换为test.txt\n    }\n  \n    # static模块变量演示\n    location /RealPath/ {\n        alias html/realpath/;\n        # $request_filename: 请求文件的完整路径\n        # $document_root: root或alias指令的值\n        # $realpath_root: 解析软链接后的真实路径\n        return 200 '$request_filename:$document_root:$realpath_root\\n';\n    }\n}\n```\n\n**关键点:** root拼接路径,alias替换路径;alias支持变量,root不支持。\n\n#### 3.13.6 配置示例: dirredirect.conf (目录重定向)\n\n**用途:** 演示访问目录时的301重定向行为,以及相关控制指令\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name return.taohui.tech dir.taohui.tech;\n    # 重定向时使用server_name中的第一个域名\n    server_name_in_redirect on;\n    listen 8088;\n    # 重定向URL中包含端口号\n    port_in_redirect on;\n    # 返回绝对路径的重定向(默认on)\n    # absolute_redirect off;  # 如果off,返回相对路径\n  \n    root html/;\n}\n```\n\n**关键点:** 访问目录不带斜杠时,Nginx自动返回301重定向添加斜杠。\n\n#### 3.13.7 配置示例: autoindex.conf (目录索引)\n\n**用途:** 演示autoindex模块的目录列表功能和相关配置\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name autoindex.taohui.tech;\n    listen 8080;\n  \n    location / {\n        alias html/;\n        # 开启目录索引功能\n        autoindex on;\n        # index指令: 优先查找的索引文件\n        # 如果a.html存在,返回a.html内容,不显示目录列表\n        index a.html;\n        # 文件大小显示格式: off=KB/MB/GB, on=字节\n        autoindex_exact_size off;\n        # 输出格式: html/xml/json/jsonp\n        autoindex_format html;\n        # 时间显示: on=本地时间, off=GMT时间\n        autoindex_localtime on;\n    }\n}\n```\n\n**关键点:** autoindex提供类似Apache的目录浏览功能,index文件优先。\n\n#### 3.13.8 配置示例: concat.conf (文件合并)\n\n**用途:** 演示阿里巴巴concat模块,合并多个小文件减少HTTP请求\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name concat.taohui.tech;\n    error_log logs/myerror.log debug;\n    # 全局开启concat功能\n    concat on;\n    root html;\n  \n    location /concat {\n        # 最多合并20个文件\n        concat_max_files 20;\n        # 只合并text/plain类型的文件\n        concat_types text/plain;\n        # 去重: 相同文件只返回一次\n        concat_unique on;\n        # 文件之间的分隔符\n        concat_delimiter ':::';\n        # 忽略文件不存在的错误,继续处理其他文件\n        concat_ignore_file_error on;\n    }\n}\n```\n\n**使用:** 访问 `/concat/??file1.txt,file2.txt,file3.txt` 返回合并后的内容。", "subs": ["3.13.1 static模块:root vs alias", "3.13.2 index模块", "3.13.3 autoindex模块:目录列表", "3.13.4 concat模块:合并小文件", "3.13.5 配置示例: static.conf (root vs alias)", "3.13.6 配置示例: dirredirect.conf (目录重定向)", "3.13.7 配置示例: autoindex.conf (目录索引)", "3.13.8 配置示例: concat.conf (文件合并)"]}, {"title": "3.14 LOG阶段:access_log详解", "content": "#### 3.14.1 log_format指令\n\n```nginx\nhttp {\n    # 定义日志格式\n    log_format main '$remote_addr - $remote_user [$time_local] '\n                    '\"$request\" $status $body_bytes_sent '\n                    '\"$http_referer\" \"$http_user_agent\"';\n  \n    # JSON格式\n    log_format json escape=json '{'\n        '\"time\":\"$time_iso8601\",'\n        '\"remote_addr\":\"$remote_addr\",'\n        '\"request\":\"$request\",'\n        '\"status\":$status,'\n        '\"body_bytes_sent\":$body_bytes_sent,'\n        '\"http_referer\":\"$http_referer\",'\n        '\"http_user_agent\":\"$http_user_agent\"'\n    '}';\n}\n```\n\n#### 3.14.2 access_log指令\n\n```nginx\nhttp {\n    # 全局日志\n    access_log /var/log/nginx/access.log main;\n  \n    server {\n        # server级别日志\n        access_log /var/log/nginx/server.log;\n  \n        location / {\n            # location级别日志\n            access_log /var/log/nginx/location.log;\n      \n            # 条件记录\n            access_log /var/log/nginx/post.log main if=$request_method=POST;\n      \n            # 缓冲\n            access_log /var/log/nginx/buffered.log main buffer=32k flush=5s;\n      \n            # 压缩\n            access_log /var/log/nginx/compressed.log main gzip=5 buffer=64k;\n      \n            # 关闭日志\n            access_log off;\n        }\n    }\n}\n```\n\n**参数说明:**\n\n| 参数             | 说明                      |\n| ---------------- | ------------------------- |\n| `buffer=size`  | 缓冲区大小,满了才写入磁盘 |\n| `flush=time`   | 最长缓冲时间              |\n| `gzip[=level]` | 压缩级别(1-9)             |\n| `if=condition` | 条件记录                  |\n\n**open_log_file_cache:**\n\n```nginx\nhttp {\n    # 缓存日志文件句柄(路径包含变量时有用)\n    open_log_file_cache max=1000 inactive=20s valid=1m min_uses=2;\n}\n```", "subs": ["3.14.1 log_format指令", "3.14.2 access_log指令"]}, {"title": "3.15 HTTP过滤模块", "content": "#### 3.15.1 过滤模块调用流程\n\n```mermaid\ngraph TD\n    A[Content模块生成响应] --> B[Header Filter链]\n    B --> C[Body Filter链]\n  \n    B --> B1[copy_filter]\n    B1 --> B2[postpone_filter]\n    B2 --> B3[header_filter]\n    B3 --> B4[write_filter]\n  \n    C --> C1[copy_filter]\n    C1 --> C2[gzip_filter]\n    C2 --> C3[charset_filter]\n    C3 --> C4[sub_filter]\n    C4 --> C5[addition_filter]\n    C5 --> C6[write_filter]\n```\n\n**关键过滤模块:**\n\n| 模块            | 功能               | 位置   |\n| --------------- | ------------------ | ------ |\n| copy_filter     | 复制响应内容到内存 | 最底层 |\n| postpone_filter | 处理子请求         | 底层   |\n| header_filter   | 构造响应头         | 中层   |\n| gzip_filter     | Gzip压缩           | 中层   |\n| sub_filter      | 字符串替换         | 上层   |\n| addition_filter | 添加内容           | 上层   |\n| write_filter    | 发送响应           | 最顶层 |\n\n**模块顺序:** 在 `ngx_modules.c` 中从下往上执行\n\n#### 3.15.2 sub模块:字符串替换\n\n```nginx\nlocation / {\n    sub_filter 'nginx.org' 'example.com';\n    sub_filter 'NGINX' 'Example' i;  # 忽略大小写\n    sub_filter_once off;  # 替换所有匹配(默认只替换一次)\n    sub_filter_last_modified off;  # 不保留Last-Modified\n    sub_filter_types text/html text/css;  # 指定MIME类型\n}\n```\n\n**编译:** `--with-http_sub_module`\n\n#### 3.15.3 addition模块:添加内容\n\n```nginx\nlocation / {\n    add_before_body /header.html;\n    add_after_body /footer.html;\n    addition_types text/html;\n}\n\nlocation = /header.html {\n    internal;\n    return 200 \"<header>Header Content</header>\";\n}\n\nlocation = /footer.html {\n    internal;\n    return 200 \"<footer>Footer Content</footer>\";\n}\n```\n\n**编译:** `--with-http_addition_module`\n\n#### 3.15.4 配置示例: sub.conf (字符串替换)\n\n**用途:** 演示sub_filter模块的字符串替换功能\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name sub.taohui.tech;\n    error_log logs/myerror.log info;\n  \n    location / {\n        # sub_filter: 替换响应体中的字符串\n        # 第一个参数: 要替换的字符串(支持变量)\n        # 第二个参数: 替换后的字符串\n        # 注意: 大小写敏感,Nginx.oRg只匹配完全相同的大小写\n        sub_filter 'Nginx.oRg' '$host/nginx';\n        sub_filter 'nginX.cOm' '$host/nginx';\n    \n        # sub_filter_once: 是否只替换第一次匹配\n        # on(默认): 只替换第一次出现\n        # off: 替换所有出现\n        sub_filter_once off;\n    \n        # sub_filter_last_modified: 是否保留Last-Modified头\n        # on: 保留(客户端可能使用缓存)\n        # off: 移除(强制客户端重新获取)\n        sub_filter_last_modified on;\n    }\n}\n```\n\n**关键点:** sub_filter用于响应内容的字符串替换,常用于URL重写和品牌替换。\n\n#### 3.15.5 配置示例: addition.conf (添加内容)\n\n**用途:** 演示addition_filter模块在响应前后添加内容\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name addition.taohui.tech;\n    error_log logs/myerror.log info;\n  \n    location / {\n        # add_before_body: 在响应体前添加内容(通过子请求)\n        add_before_body /before_action;\n        # add_after_body: 在响应体后添加内容(通过子请求)\n        add_after_body /after_action;\n        # addition_types: 指定生效的MIME类型,*表示所有类型\n        addition_types *;\n    }\n  \n    # 子请求location: 返回要添加的内容\n    location /before_action {\n        return 200 'new content before\\n';\n    }\n    location /after_action {\n        return 200 'new content after\\n';\n    }\n  \n    # 变量测试location\n    location /testhost {\n        # uninitialized_variable_warn: 未初始化变量是否警告\n        uninitialized_variable_warn on;\n        set $foo 'testhost';\n        # $gzip_ratio: gzip压缩比例(仅在gzip开启时有值)\n        return 200 '$gzip_ratio\\n';\n    }\n}\n```\n\n**关键点:** addition模块通过子请求在响应前后添加内容,常用于统一的页眉页脚。", "subs": ["3.15.1 过滤模块调用流程", "3.15.2 sub模块:字符串替换", "3.15.3 addition模块:添加内容", "3.15.4 配置示例: sub.conf (字符串替换)", "3.15.5 配置示例: addition.conf (添加内容)"]}, {"title": "3.16 Nginx变量", "content": "#### 3.16.1 变量的运行原理\n\n```mermaid\ngraph LR\n    A[提供变量的模块] -->|pre_configuration| B[注册变量名和取值方法]\n    B --> C[变量哈希表]\n    D[使用变量的模块] -->|解析配置| E[记录变量名]\n    F[请求到达] --> G[执行取值方法]\n    G --> H[返回变量值]\n    C --> G\n    E --> G\n```\n\n**核心特性:**\n\n1. **惰性求值** - 只有使用时才计算值\n2. **值可变** - 同一请求中,变量值可能随时间变化\n\n**变量哈希表配置:**\n\n```nginx\nhttp {\n    variables_hash_max_size 1024;\n    variables_hash_bucket_size 64;\n}\n```\n\n#### 3.16.2 HTTP框架提供的变量\n\n**请求相关:**\n\n| 变量                        | 说明                              |\n| --------------------------- | --------------------------------- |\n| `$arg_name`               | URL参数                           |\n| `$args`                   | 完整查询字符串                    |\n| `$is_args`                | 有参数时为\"?\",否则为空            |\n| `$query_string` | 同$args |                                   |\n| `$uri`                    | 当前URI(不含参数)                 |\n| `$request_uri`            | 原始URI(含参数)                   |\n| `$request`                | 完整请求行                        |\n| `$request_method`         | 请求方法                          |\n| `$request_length`         | 请求长度(含头部和body)            |\n| `$request_body`           | 请求体(需特殊配置)                |\n| `$request_body_file`      | 请求体临时文件路径                |\n| `$content_length`         | Content-Length头部                |\n| `$content_type`           | Content-Type头部                  |\n| `$http_name`              | 任意请求头(name小写,横线改下划线) |\n| `$http_host`              | Host头部                          |\n| `$http_user_agent`        | User-Agent头部                    |\n| `$http_referer`           | Referer头部                       |\n| `$http_cookie`            | Cookie头部                        |\n| `$cookie_name`            | 指定Cookie值                      |\n\n**TCP连接相关:**\n\n| 变量                     | 说明                             |\n| ------------------------ | -------------------------------- |\n| `$remote_addr`         | 客户端IP                         |\n| `$remote_port`         | 客户端端口                       |\n| `$binary_remote_addr`  | 二进制格式的客户端IP             |\n| `$server_addr`         | 服务器IP                         |\n| `$server_port`         | 服务器端口                       |\n| `$connection`          | 连接序号                         |\n| `$connection_requests` | 当前连接的请求数                 |\n| `$proxy_protocol_addr` | Proxy Protocol协议中的客户端IP   |\n| `$proxy_protocol_port` | Proxy Protocol协议中的客户端端口 |\n\n**处理过程相关:**\n\n| 变量                    | 说明                        |\n| ----------------------- | --------------------------- |\n| `$request_time`       | 请求处理时间(秒,精确到毫秒) |\n| `$request_completion` | 请求是否完成(\"OK\"或空)      |\n| `$request_id`         | 唯一请求ID(16字节随机数)    |\n| `$request_filename`   | 待访问文件的完整路径        |\n| `$document_root`      | root/alias指定的目录        |\n| `$realpath_root`      | 解析软链接后的真实目录      |\n| `$limit_rate`         | 响应速率限制(字节/秒)       |\n\n**响应相关:**\n\n| 变量                 | 说明           |\n| -------------------- | -------------- |\n| `$status`          | 响应状态码     |\n| `$body_bytes_sent` | 响应body字节数 |\n| `$bytes_sent`      | 响应总字节数   |\n| `$sent_http_name`  | 任意响应头     |\n\n**系统变量:**\n\n| 变量               | 说明                      |\n| ------------------ | ------------------------- |\n| `$time_local`    | 本地时间                  |\n| `$time_iso8601`  | ISO 8601格式时间          |\n| `$nginx_version` | Nginx版本                 |\n| `$pid`           | Worker进程PID             |\n| `$pipe`          | 是否使用管道(\"p\"或\".\")    |\n| `$hostname`      | 主机名                    |\n| `$msec`          | Unix时间戳(秒,精确到毫秒) |\n\n#### 3.16.3 变量模块\n\n**referer模块:防盗链**\n\n```nginx\nlocation /images {\n    valid_referers none blocked server_names\n                   *.example.com example.* ~\\.google\\.;\n  \n    if ($invalid_referer) {\n        return 403 \"Forbidden\";\n    }\n}\n```\n\n**secure_link模块:防盗链(加密)**\n\n```nginx\n# 方式1:带过期时间\nlocation /download {\n    secure_link $arg_md5,$arg_expires;\n    secure_link_md5 \"$secure_link_expires$uri$remote_addr secret\";\n  \n    if ($secure_link = \"\") {\n        return 403;  # 验证失败\n    }\n  \n    if ($secure_link = \"0\") {\n        return 410;  # 已过期\n    }\n  \n    # 验证通过\n    alias /data/files;\n}\n\n# 生成链接(bash)\nexpires=$(date -d \"2025-12-31\" +%s)\nuri=\"/download/file.zip\"\nsecret=\"my_secret_key\"\nmd5=$(echo -n \"${expires}${uri}${remote_addr}${secret}\" | openssl md5 -binary | openssl base64 | tr +/ -_ | tr -d =)\necho \"/download/file.zip?md5=${md5}&expires=${expires}\"\n\n# 方式2:简单模式\nlocation /s/ {\n    secure_link_secret my_secret_key;\n  \n    if ($secure_link = \"\") {\n        return 403;\n    }\n  \n    rewrite ^ /files/$secure_link;\n}\n\nlocation /files {\n    internal;\n    alias /data;\n}\n\n# 生成链接(bash)\nuri=\"/file.zip\"\nsecret=\"my_secret_key\"\nmd5=$(echo -n \"${uri}${secret}\" | openssl md5 -hex | awk '{print $2}')\necho \"/s/${md5}/file.zip\"\n```\n\n**map模块:变量映射**\n\n```nginx\nhttp {\n    # 基于User-Agent判断设备类型\n    map $http_user_agent $mobile {\n        default 0;\n        \"~Opera Mini\" 1;\n        \"~Android\" 1;\n        \"~iPhone\" 1;\n    }\n  \n    # 基于Host判断\n    map $http_host $name {\n        hostnames;  # 支持泛域名\n  \n        default 0;\n        example.com 1;\n        *.example.com 2;\n        www.example.* 3;\n        ~^www\\d+\\.example\\.com$ 4;\n    }\n  \n    server {\n        location / {\n            if ($mobile) {\n                return 200 \"Mobile device\\n\";\n            }\n            return 200 \"Desktop device\\n\";\n        }\n    }\n}\n```\n\n**split_clients模块:AB测试**\n\n```nginx\nhttp {\n    # 基于User-Agent的哈希值按百分比分流\n    split_clients \"$remote_addr$http_user_agent\" $variant {\n        0.5% .one;\n        20% .two;\n        * .three;  # 剩余79.5%\n    }\n  \n    server {\n        location / {\n            root /data/www$variant;\n        }\n    }\n}\n```\n\n**geo模块:IP地址范围匹配**\n\n```nginx\nhttp {\n    # 基于IP地址生成变量\n    geo $country {\n        default US;\n  \n        proxy 192.168.1.0/24;  # 可信代理,从X-Forwarded-For取IP\n  \n        127.0.0.0/8 local;\n        10.0.0.0/8 internal;\n        192.168.1.0/24 UK;\n        192.168.2.0/24 RU;\n    }\n  \n    server {\n        location / {\n            return 200 \"Country: $country\\n\";\n        }\n    }\n}\n```\n\n**geoip模块:地理位置信息**\n\n```nginx\nhttp {\n    # 需要MaxMind GeoIP数据库\n    geoip_country /usr/share/GeoIP/GeoIP.dat;\n    geoip_city /usr/share/GeoIP/GeoIPCity.dat;\n  \n    server {\n        location / {\n            return 200 \"\n                Country: $geoip_country_name ($geoip_country_code)\n                City: $geoip_city\n                Latitude: $geoip_latitude\n                Longitude: $geoip_longitude\n            \";\n        }\n    }\n}\n```\n\n**编译:** `--with-http_geoip_module`\n\n#### 3.16.9 配置示例: var.conf (变量综合演示)\n\n**用途:** 演示Nginx内置变量的使用和自定义日志格式\n\n**完整配置:**\n\n```nginx\n# 自定义日志格式\nlog_format vartest '$remote_addr - $remote_user [$time_local] \"$request\" '\n                   '$status bytes_sent=$bytes_sent body_bytes_sent=$body_bytes_sent \"$http_referer\" '\n                   '\"$http_user_agent\" \"$sent_http_abc\"';\n\nserver {\n    server_name var.taohui.tech localhost;\n    access_log logs/vartest.log vartest;\n    listen 9090;\n  \n    location / {\n        # 设置限速变量\n        set $limit_rate 10k;\n        # 返回各种内置变量的值\n        return 200 '\narg_a: $arg_a,arg_b: $arg_b,args: $args\nconnection: $connection,connection_requests: $connection_requests\ncookie_a: $cookie_a\nuri: $uri,document_uri: $document_uri, request_uri: $request_uri\nrequest: $request\nrequest_id: $request_id\nserver: $server_addr,$server_name,$server_port,$server_protocol\ntcpinfo: $tcpinfo_rtt, $tcpinfo_rttvar, $tcpinfo_snd_cwnd, $tcpinfo_rcv_space \nhost: $host,server_name: $server_name,http_host: $http_host\nlimit_rate: $limit_rate\nhostname: $hostname\ncontent_length: $content_length\nstatus: $status\nbody_bytes_sent: $body_bytes_sent,bytes_sent: $bytes_sent\ntime: $request_time,$msec,$time_iso8601,$time_local\n';\n    }\n}\n```\n\n**关键点:** 演示了Nginx常用内置变量,包括请求参数、连接信息、时间、TCP信息等。\n\n#### 3.16.10 配置示例: referer.conf (防盗链)\n\n**用途:** 使用valid_referers指令实现简单的防盗链功能\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name referer.taohui.tech;\n    error_log logs/myerror.log debug;\n    root html;\n  \n    location / {\n        # valid_referers: 定义合法的Referer\n        # none: 允许Referer为空\n        # blocked: 允许Referer被防火墙或代理删除\n        # server_names: 允许本站域名\n        # *.taohui.pub: 允许通配符域名\n        # www.taohui.org.cn/nginx/: 允许特定URL\n        # ~\\.google\\.: 允许正则匹配(如google.com)\n        valid_referers none blocked server_names\n                       *.taohui.pub www.taohui.org.cn/nginx/\n                       ~\\.google\\.;\n    \n        # $invalid_referer: 如果Referer不合法,值为1\n        if ($invalid_referer) {\n            return 403;\n        }\n    \n        return 200 'valid\\n';\n    }\n}\n```\n\n**关键点:** valid_referers用于防盗链,阻止非法来源的请求。\n\n#### 3.16.11 配置示例: secure_link.conf (安全链接)\n\n**用途:** 使用secure_link模块实现带时效和签名的安全链接\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name securelink.taohui.tech;\n    error_log logs/myerror.log info;\n    default_type text/plain;\n  \n    # 方式1: MD5哈希验证(带过期时间)\n    location / {\n        # secure_link: 从参数获取MD5和过期时间\n        secure_link $arg_md5,$arg_expires;\n        # secure_link_md5: 定义MD5计算方式\n        # 格式: \"$secure_link_expires$uri$remote_addr secret\"\n        secure_link_md5 \"$secure_link_expires$uri$remote_addr secret\";\n    \n        # $secure_link = \"\": MD5验证失败\n        if ($secure_link = \"\") {\n            return 403;\n        }\n    \n        # $secure_link = \"0\": 链接已过期\n        if ($secure_link = \"0\") {\n            return 410;\n        }\n    \n        return 200 '$secure_link:$secure_link_expires\\n';\n    }\n  \n    # 方式2: 简单密钥验证(不带过期时间)\n    location /p/ {\n        # secure_link_secret: 定义密钥\n        secure_link_secret mysecret2;\n    \n        if ($secure_link = \"\") {\n            return 403;\n        }\n    \n        # 验证通过后,重写到实际文件路径\n        rewrite ^ /secure/$secure_link;\n    }\n  \n    location /secure/ {\n        alias html/;\n        internal;  # 只允许内部访问\n    }\n}\n```\n\n**生成安全链接示例:**\n\n```bash\n# 方式1: 带过期时间\nexpires=$(date -d \"2025-12-31\" +%s)\nuri=\"/test.txt\"\nremote_addr=\"192.168.1.100\"\nsecret=\"secret\"\nmd5=$(echo -n \"${expires}${uri}${remote_addr}${secret}\" | openssl md5 -binary | openssl base64 | tr +/ -_ | tr -d =)\necho \"http://securelink.taohui.tech${uri}?md5=${md5}&expires=${expires}\"\n\n# 方式2: 简单密钥\nuri=\"test.txt\"\nsecret=\"mysecret2\"\nmd5=$(echo -n \"${uri}${secret}\" | openssl md5 -hex | cut -d' ' -f2)\necho \"http://securelink.taohui.tech/p/${md5}/${uri}\"\n```\n\n**关键点:** secure_link提供比referer更强的防盗链机制,支持时效和签名验证。\n\n#### 3.16.12 配置示例: map.conf (变量映射)\n\n**用途:** 演示map、split_clients、geo、geoip模块的综合使用\n\n**完整配置:**\n\n```nginx\n# map模块: 根据变量值映射到新变量\nmap $http_host $name {\n    hostnames;  # 启用hostname匹配模式\n    default 0;\n    ~map\\.tao\\w+\\.org.cn 1;  # 正则匹配\n    *.taohui.org.cn 2;        # 通配符匹配\n    map.taohui.tech 3;        # 精确匹配\n    map.taohui.* 4;           # 通配符匹配\n}\n\nmap $http_user_agent $mobile {\n    default 0;\n    \"~Opera Mini\" 1;  # 移动端UA检测\n}\n\nserver {\n    listen 10001;\n    default_type text/plain;\n    location / {\n        return 200 '$name:$mobile\\n';\n    }\n}\n\n# split_clients模块: A/B测试(流量分割)\nsplit_clients \"${http_testcli}\" $variant {\n    0.51%  .one;    # 0.51%的流量\n    20.0%  .two;    # 20%的流量\n    50.5%  .three;  # 50.5%的流量\n    *      \"\";      # 剩余流量(28.99%)\n}\n\nserver {\n    server_name split_clients.taohui.tech;\n    error_log logs/error.log debug;\n    default_type text/plain;\n    location / {\n        return 200 'ABtestfile$variant\\n';\n    }\n}\n\n# geo模块: 基于IP的地理位置映射\ngeo $country {\n    default ZZ;\n    proxy 116.62.160.193;  # 信任的代理IP\n    127.0.0.0/24 US;\n    127.0.0.1/32 RU;\n    10.1.0.0/16 RU;\n    192.168.1.0/24 UK;\n}\n\nserver {\n    server_name geo.taohui.tech;\n    location / {\n        return 200 '$country\\n';\n    }\n}\n\n# geoip模块: 使用MaxMind数据库的地理位置\ngeoip_country /usr/local/share/GeoIP/GeoIP.dat;\ngeoip_city /usr/local/share/GeoIP/GeoLiteCity.dat;\ngeoip_proxy 116.62.160.193/32;\ngeoip_proxy_recursive on;\n\nserver {\n    server_name geoip.taohui.tech;\n    error_log logs/myerror.log info;\n    keepalive_requests 2;\n    keepalive_timeout 75s 20;\n    location / {\n        return 200 'country:$geoip_country_code,$geoip_country_code3,$geoip_country_name\ncountry from city:$geoip_city_country_code,$geoip_city_country_code3,$geoip_city_country_name\ncity:$geoip_area_code,$geoip_city_continent_code,$geoip_dma_code\n$geoip_latitude,$geoip_longitude,$geoip_region,$geoip_region_name,$geoip_city,$geoip_postal_code\n';\n    }\n}\n```\n\n**关键点:**\n\n- map: 变量映射,支持正则和通配符\n- split_clients: A/B测试流量分割\n- geo: 基于IP的简单地理位置\n- geoip: 基于MaxMind数据库的详细地理信息", "subs": ["3.16.1 变量的运行原理", "3.16.2 HTTP框架提供的变量", "3.16.3 变量模块", "3.16.9 配置示例: var.conf (变量综合演示)", "3.16.10 配置示例: referer.conf (防盗链)", "3.16.11 配置示例: secure_link.conf (安全链接)", "3.16.12 配置示例: map.conf (变量映射)"]}, {"title": "3.17 Keepalive连接复用", "content": "**功能:** 在一个TCP连接上处理多个HTTP请求\n\n```nginx\nhttp {\n    # 一个连接最多处理100个请求\n    keepalive_requests 100;\n  \n    # 连接空闲超时时间\n    keepalive_timeout 75s;  # 第一个参数:服务器端超时\n    keepalive_timeout 75s 60s;  # 第二个参数:告诉客户端的超时(Keep-Alive头)\n  \n    # 禁用某些浏览器的keepalive\n    keepalive_disable msie6;\n}\n```\n\n**优点:**\n\n1. 减少握手次数\n2. 减少并发连接数,降低内存消耗\n3. TCP拥塞窗口保持在最佳状态\n\n**协议头部:**\n\n```\n# 请求\nConnection: keep-alive\n\n# 响应\nConnection: keep-alive\nKeep-Alive: timeout=60\n```\n\n---\n\n**第三部分总结:**\n\nHTTP模块是Nginx的核心功能,本部分详细介绍了:\n\n1. **配置指令合并规则** - 理解值指令和动作指令的区别\n2. **11个请求处理阶段** - 掌握模块的执行顺序和跳转规则\n3. **核心模块详解** - realip, rewrite, access, limit等模块的使用\n4. **location匹配规则** - 精确匹配、前缀匹配、正则匹配的优先级\n5. **过滤模块** - 响应内容的加工处理\n6. **Nginx变量** - 惰性求值、变量分类、常用变量\n\n通过本部分的学习,你应该能够:\n\n- 熟练配置HTTP服务器\n- 理解请求的完整处理流程\n- 使用变量实现复杂的业务逻辑\n- 进行访问控制、限流限速\n- 优化连接复用和性能\n\n接下来,我们将学习反向代理与负载均衡的详细配置。\n\n---\n\n**待续:第四部分 - 反向代理与负载均衡**", "subs": ["熟练配置HTTP服务器", "理解请求的完整处理流程", "使用变量实现复杂的业务逻辑", "进行访问控制、限流限速", "优化连接复用和性能"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

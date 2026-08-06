@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>VictoriaMetrics 学习笔记 · 第二册：采集、告警与认证 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>VictoriaMetrics 学习笔记 · 第二册：采集、告警与认证</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "VictoriaMetrics 学习笔记 · 第二册：采集、告警与认证", "intro": "", "parts": [{"title": "第 4 章：vmagent - 数据代理与采集", "sections": [{"title": "4.1 vmagent 概述", "content": "**vmagent** 是一个轻量级的指标采集代理，负责从多种数据源收集指标，进行重新标记（relabeling）、过滤、聚合，然后发送到 VictoriaMetrics 或其他兼容 Prometheus remote_write 协议的存储系统。\n\n**核心功能：**\n\n- **Pull 模式**：抓取 Prometheus 兼容的 exporter\n- **Push 模式**：接受多种协议推送的数据（InfluxDB、OpenTSDB、Graphite、DataDog、OpenTelemetry等）\n- **数据转换**：重新标记、过滤、聚合\n- **高可用**：支持数据复制和分片\n- **流式聚合**：stream aggregation 减少存储和网络开销\n- **缓冲机制**：远程存储不可用时缓冲到磁盘\n- **低资源占用**：比 Prometheus 使用更少的 RAM、CPU、磁盘 I/O\n- **大规模抓取**：支持集群模式分片抓取\n- **多租户写入**：支持向 VictoriaMetrics 集群多租户端点写入\n- **Kafka/PubSub 集成**（Enterprise）\n\n---", "subs": ["Pull 模式", "Push 模式", "数据转换：重新标记、过滤、聚合", "高可用：支持数据复制和分片", "流式聚合：stream aggregation 减少存储和网络开销", "缓冲机制：远程存储不可用时缓冲到磁盘"]}, {"title": "4.2 使用场景", "content": "| 场景                      | 说明                                              |\n| ------------------------- | ------------------------------------------------- |\n| **IoT/边缘监控**    | 不稳定网络环境中缓冲数据，连接恢复后发送          |\n| **Prometheus 替代** | 只负责抓取+转发，资源占用更低                     |\n| **statsd 替代**     | 启用流式聚合后可替代 statsd                       |\n| **灵活指标中继**    | 接受多种格式，relabel 后转发                      |\n| **高可用+复制**     | 向多个存储系统复制数据                            |\n| **分片存储**        | 使用 `-remoteWrite.shardByURL` 在多个存储间分片 |\n\n---", "subs": []}, {"title": "4.3 快速开始", "content": "```bash\n# 仅接收 Push 数据\n./vmagent -remoteWrite.url=http://victoria-metrics:8428/api/v1/write\n\n# 抓取 Prometheus 目标并转发\n./vmagent \\\n  -promscrape.config=prometheus.yml \\\n  -remoteWrite.url=http://victoria-metrics:8428/api/v1/write\n\n# 写入集群\n./vmagent \\\n  -remoteWrite.url=http://vminsert:8480/insert/0/prometheus/api/v1/write\n```\n\n**核心 Flag：**\n\n- `-promscrape.config`：Prometheus 配置文件路径\n- `-remoteWrite.url`：远程存储地址（可多个）\n- `-remoteWrite.tmpDataPath`：缓冲数据路径（默认 `vmagent-remotewrite-data`）\n- `-remoteWrite.maxDiskUsagePerURL`：每 URL 最大磁盘使用（0=无限）\n\n---", "subs": ["-promscrape.config：Prometheus 配置文件路径", "-remoteWrite.url：远程存储地址（可多个）", "-remoteWrite.tmpDataPath：缓冲数据路径（默认 vmagent", "-remoteWrite.maxDiskUsagePerURL：每 URL 最大磁盘"]}, {"title": "4.4 数据处理管道", "content": "**样本处理流程：**\n\n1. **摄入速率限制**：`-maxIngestionRate`\n2. **全局 Relabeling**：`-remoteWrite.relabelConfig`\n3. **复杂度限制**：`-maxLabelsPerTimeseries`、`-maxLabelNameLen/ValueLen`\n4. **基数限制**：`-remoteWrite.maxHourlySeries/maxDailySeries`\n5. **全局聚合**：`-streamAggr.config`、`-streamAggr.dedupInterval`\n6. **复制/分片**：根据 `-remoteWrite.shardByURL` 决定\n7. **Per-URL Relabeling**：`-remoteWrite.urlRelabelConfig`\n8. **Per-URL 聚合**：`-remoteWrite.streamAggr.config`\n9. **Per-URL 额外标签**：`-remoteWrite.label`\n10. **队列缓冲**：缓冲到磁盘（除非 `-remoteWrite.disableOnDiskQueue`）\n11. **发送**：push 到 `-remoteWrite.url`\n\n---", "subs": []}, {"title": "4.5 数据重新标记（Relabeling）", "content": "#### 4.5.1 全局 Relabeling\n\n```yaml\n# relabel-global.yml\n- target_label: env\n  replacement: production\n- action: drop\n  source_labels: [__name__]\n  regex: 'test_.*'\n```\n\n```bash\n./vmagent \\\n  -remoteWrite.url=http://storage:8428/api/v1/write \\\n  -remoteWrite.relabelConfig=relabel-global.yml\n```\n\n#### 4.5.2 Per-URL Relabeling\n\n```bash\n./vmagent \\\n  -remoteWrite.url=http://dev:8428/api/v1/write \\\n  -remoteWrite.urlRelabelConfig=relabel-dev.yml \\\n  -remoteWrite.url=http://prod:8428/api/v1/write \\\n  -remoteWrite.urlRelabelConfig=relabel-prod.yml\n```\n\n> **注意**：Flag 顺序很重要，第一个 `-remoteWrite.urlRelabelConfig` 对应第一个 `-remoteWrite.url`。\n\n#### 4.5.3 添加额外标签\n\n```bash\n./vmagent \\\n  -remoteWrite.url=http://storage:8428/api/v1/write \\\n  -remoteWrite.label=datacenter=us-west \\\n  -remoteWrite.label=cluster=prod\n```\n\n---", "subs": ["4.5.1 全局 Relabeling", "4.5.2 Per-URL Relabeling", "4.5.3 添加额外标签"]}, {"title": "4.6 数据复制与分片", "content": "#### 4.6.1 数据复制（默认）\n\n```bash\n./vmagent \\\n  -remoteWrite.url=http://storage1:8428/api/v1/write \\\n  -remoteWrite.url=http://storage2:8428/api/v1/write\n```\n\n**效果**：每个样本发送到所有存储系统。\n\n#### 4.6.2 数据分片\n\n```bash\n./vmagent \\\n  -remoteWrite.shardByURL \\\n  -remoteWrite.url=http://storage1:8428/api/v1/write \\\n  -remoteWrite.url=http://storage2:8428/api/v1/write\n```\n\n**效果**：每个时序路由到单个存储系统（一致性哈希）。\n\n#### 4.6.3 分片+复制\n\n```bash\n./vmagent \\\n  -remoteWrite.shardByURL \\\n  -remoteWrite.shardByURLReplicas=2 \\\n  -remoteWrite.url=http://storage1:8428/api/v1/write \\\n  -remoteWrite.url=http://storage2:8428/api/v1/write \\\n  -remoteWrite.url=http://storage3:8428/api/v1/write\n```\n\n**效果**：每个样本发送到 2 个不同的存储系统。\n\n---", "subs": ["4.6.1 数据复制（默认）", "4.6.2 数据分片", "4.6.3 分片+复制"]}, {"title": "4.7 流式聚合", "content": "```yaml\n# stream-aggr.yml\n- match: 'http_requests_total'\n  interval: 1m\n  outputs: [total, increase]\n```\n\n```bash\n./vmagent \\\n  -remoteWrite.url=http://storage:8428/api/v1/write \\\n  -streamAggr.config=stream-aggr.yml \\\n  -streamAggr.dedupInterval=60s\n```\n\n**去重示例**：\n\n```bash\n# 合并不同 replica 标签的时序，每 60 秒保留最后一个样本\n./vmagent \\\n  -remoteWrite.url=http://storage:8428/api/v1/write \\\n  -streamAggr.dropInputLabels=replica \\\n  -streamAggr.dedupInterval=60s\n```\n\n---", "subs": []}, {"title": "4.8 多租户", "content": "#### 4.8.1 单租户写入\n\n```bash\n./vmagent \\\n  -remoteWrite.url=http://vminsert:8480/insert/42/prometheus/api/v1/write\n```\n\n#### 4.8.2 多租户写入（基于标签）\n\n```yaml\n# relabel.yml\n- source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_account_id]\n  target_label: vm_account_id\n```\n\n```bash\n./vmagent \\\n  -promscrape.config=prometheus.yml \\\n  -remoteWrite.relabelConfig=relabel.yml \\\n  -remoteWrite.url=http://vminsert:8480/insert/multitenant/prometheus/api/v1/write\n```\n\n---", "subs": ["4.8.1 单租户写入", "4.8.2 多租户写入（基于标签）"]}, {"title": "4.9 集群模式（分片抓取）", "content": "```bash\n# vmagent 实例 0（共 3 个）\n./vmagent \\\n  -promscrape.config=prometheus.yml \\\n  -promscrape.cluster.membersCount=3 \\\n  -promscrape.cluster.memberNum=0 \\\n  -remoteWrite.url=http://storage:8428/api/v1/write\n\n# vmagent 实例 1\n./vmagent \\\n  -promscrape.cluster.membersCount=3 \\\n  -promscrape.cluster.memberNum=1 \\\n  ...\n```\n\n**高可用（复制抓取）：**\n\n```bash\n./vmagent \\\n  -promscrape.cluster.membersCount=6 \\\n  -promscrape.cluster.replicationFactor=2 \\\n  -promscrape.cluster.memberNum=0\n```\n\n**注意**：远程存储端需启用去重 `-dedup.minScrapeInterval`。\n\n---", "subs": []}, {"title": "4.10 自动生成的指标", "content": "| 指标                                    | 说明                           |\n| --------------------------------------- | ------------------------------ |\n| `up`                                  | `1`=抓取成功，`0`=抓取失败 |\n| `scrape_duration_seconds`             | 抓取耗时                       |\n| `scrape_samples_scraped`              | 抓取的样本数                   |\n| `scrape_series_added`                 | 新增时序数（估计）             |\n| `scrape_series_current`               | 当前唯一时序数                 |\n| `scrape_series_limit_samples_dropped` | 因超限丢弃的样本数             |\n\n---", "subs": []}, {"title": "4.11 基数限制", "content": "#### Per-Target 限制\n\n```bash\n./vmagent -promscrape.seriesLimitPerTarget=10000\n```\n\n```yaml\nscrape_configs:\n  - job_name: 'high-cardinality'\n    series_limit: 50000\n```\n\n#### 全局基数限制\n\n```bash\n./vmagent \\\n  -remoteWrite.maxHourlySeries=1000000 \\\n  -remoteWrite.maxDailySeries=10000000\n```\n\n---", "subs": ["Per-Target 限制", "全局基数限制"]}, {"title": "4.12 磁盘持久化", "content": "**默认启用**：\n\n```bash\n./vmagent \\\n  -remoteWrite.tmpDataPath=vmagent-remotewrite-data \\\n  -remoteWrite.maxDiskUsagePerURL=10GB\n```\n\n**禁用磁盘持久化**：\n\n```bash\n./vmagent \\\n  -remoteWrite.disableOnDiskQueue \\\n  -remoteWrite.dropSamplesOnOverload\n```\n\n**行为**：过载时返回 429 或静默丢弃样本。\n\n---", "subs": []}, {"title": "4.13 VictoriaMetrics Remote Write 协议", "content": "**优势**：网络带宽/磁盘 I/O/空间 减少 2x-5x\n\n```bash\n./vmagent \\\n  -remoteWrite.url=http://vm:8428/api/v1/write \\\n  -remoteWrite.forceVMProto \\\n  -remoteWrite.vmProtoCompressLevel=5\n```\n\n- 压缩级别范围：`-22` 到 `22`（默认 `0`）\n\n---", "subs": ["压缩级别范围"]}, {"title": "4.14 性能优化", "content": "#### 降低 RAM 使用\n\n```bash\nGOGC=100 ./vmagent \\\n  -memory.allowedBytes=2GB \\\n  -promscrape.dropOriginalLabels \\\n  -promscrape.noStaleMarkers\n```\n\n#### 降低 CPU 使用\n\n```bash\nGOMAXPROCS=2 ./vmagent \\\n  -promscrape.disableKeepAlive\n```\n\n#### 增加吞吐量\n\n```bash\n./vmagent \\\n  -remoteWrite.queues=8 \\\n  -remoteWrite.maxBlockSize=16MB\n```\n\n---", "subs": ["降低 RAM 使用", "降低 CPU 使用", "增加吞吐量"]}, {"title": "4.15 监控与排查", "content": "**关键端点：**\n\n- `http://vmagent:8429/metrics`：Prometheus 指标\n- `http://vmagent:8429/targets`：所有抓取目标及状态\n- `http://vmagent:8429/service-discovery`：服务发现状态\n- `http://vmagent:8429/config`：当前配置\n- `http://vmagent:8429/ready`：健康检查\n\n**Grafana 仪表板**：[https://grafana.com/grafana/dashboards/12683](https://grafana.com/grafana/dashboards/12683)\n\n**关键监控指标：**\n\n- `vmagent_remotewrite_pending_data_bytes`：待发送数据大小\n- `vmagent_remotewrite_samples_dropped_total`：丢弃的样本数\n- `vmagent_remotewrite_push_failures_total`：写入失败次数\n\n---", "subs": ["http://vmagent:8429/metrics：Prometheus 指标", "http://vmagent:8429/targets：所有抓取目标及状态", "http://vmagent:8429/service-discovery：服务发现", "http://vmagent:8429/config：当前配置", "http://vmagent:8429/ready：健康检查", "vmagent_remotewrite_pending_data_bytes"]}, {"title": "4.16 配置重载", "content": "```bash\n# 方法 1：SIGHUP 信号\nkill -SIGHUP $(pidof vmagent)\n\n# 方法 2：HTTP 端点\ncurl -X POST http://vmagent:8429/-/reload\n\n# 方法 3：自动检查\n./vmagent -promscrape.configCheckInterval=30s\n```\n\n---", "subs": []}, {"title": "4.17 高可用配置", "content": "```bash\n# vmagent 实例 1\n./vmagent \\\n  -promscrape.config=prometheus.yml \\\n  -promscrape.cluster.name=cluster1 \\\n  -remoteWrite.url=http://storage:8428/api/v1/write\n\n# vmagent 实例 2\n./vmagent \\\n  -promscrape.cluster.name=cluster2 \\\n  -remoteWrite.url=http://storage:8428/api/v1/write\n```\n\n**VictoriaMetrics 端去重：**\n\n```bash\n./victoria-metrics -dedup.minScrapeInterval=15s\n```\n\n---", "subs": []}, {"title": "4.18 核心 Flag 总览", "content": "| Category       | 重要 Flag                                                                                         |\n| -------------- | ------------------------------------------------------------------------------------------------- |\n| **核心** | `-promscrape.config`、`-remoteWrite.url`、`-remoteWrite.tmpDataPath`                        |\n| **抓取** | `-promscrape.seriesLimitPerTarget`、`-promscrape.streamParse`、`-promscrape.noStaleMarkers` |\n| **写入** | `-remoteWrite.queues`、`-remoteWrite.maxBlockSize`、`-remoteWrite.shardByURL`               |\n| **限制** | `-remoteWrite.maxHourlySeries`、`-maxLabelsPerTimeseries`、`-maxIngestionRate`              |\n| **集群** | `-promscrape.cluster.membersCount/memberNum/replicationFactor/name`                             |\n\n---", "subs": []}, {"title": "4.19 最佳实践", "content": "- **资源优化**：根据环境调整内存/CPU/吞吐量参数\n- **可靠性**：HA 部署+去重、设置磁盘缓冲上限、监控磁盘使用\n- **安全**：网络隔离+认证（Basic Auth/Bearer Token/mTLS）+最小权限\n- **可观测性**：Grafana 仪表板+告警+调试端点\n\n---\n\n**🎯 第 4 章完成！** 下一步将继续学习 vmalert 组件...\n\n---\n\n---", "subs": ["资源优化：根据环境调整内存/CPU/吞吐量参数", "可靠性：HA 部署+去重、设置磁盘缓冲上限、监控磁盘使用", "安全：网络隔离+认证（Basic Auth/Bearer Token/mTLS）+最", "可观测性：Grafana 仪表板+告警+调试端点"]}]}, {"title": "第 5 章：vmalert - 告警与记录规则组件", "sections": [{"title": "5.1 vmalert 概述", "content": "**核心定位**：vmalert 是 VictoriaMetrics 生态中的告警与记录规则执行引擎，负责：\n\n- 执行告警规则（Alerting Rules）和记录规则（Recording Rules）\n- 对接 Alertmanager 发送告警通知\n- 将记录规则结果持久化到远程存储\n- 兼容 Prometheus 告警规则语法\n\n**与 Prometheus Alertmanager 的关系**：\n\n- vmalert 本身不发送告警通知，而是依赖 Alertmanager\n- 支持与 Alertmanager v0.16.0-alpha 及以上版本集成\n- 可配置多个 Alertmanager 实例实现高可用\n\n**架构特点**：\n\n```mermaid\ngraph LR\n    A[vmalert] -->|查询表达式| B[Datasource<br/>VictoriaMetrics/vmselect]\n    A -->|告警通知| C[Alertmanager]\n    A -->|持久化状态| D[Remote Write<br/>VictoriaMetrics]\n    A -->|恢复状态| E[Remote Read<br/>VictoriaMetrics]\n```\n\n---", "subs": ["执行告警规则（Alerting Rules）和记录规则（Recording Rule", "对接 Alertmanager 发送告警通知", "将记录规则结果持久化到远程存储", "兼容 Prometheus 告警规则语法", "vmalert 本身不发送告警通知", "支持与 Alertmanager v0"]}, {"title": "5.2 核心特性", "content": "#### 5.2.1 数据源集成\n\n**支持的数据源类型**：\n\n1. **VictoriaMetrics 与 MetricsQL**：原生支持，性能最佳\n2. **VictoriaLogs 与 LogsQL**：支持日志数据的告警\n3. **Graphite**：支持 Graphite 表达式的告警和记录规则\n4. **任意 Prometheus HTTP API 兼容数据源**\n\n**数据源配置示例**：\n\n```bash\n# 单节点 VictoriaMetrics\n-datasource.url=http://victoria-metrics:8428\n\n# 集群模式 vmselect\n-datasource.url=http://vmselect:8481/select/0/prometheus\n\n# Graphite 数据源（需设置类型前缀）\n-datasource.appendTypePrefix=true\n```\n\n#### 5.2.2 告警状态持久化\n\n**状态持久化机制**：\n\n- vmalert 默认在内存中保存告警状态\n- 重启会丢失所有活动告警状态\n- 通过配置远程读写可实现状态持久化\n\n**持久化配置**：\n\n```bash\n./vmalert \\\n  -remoteWrite.url=http://victoria-metrics:8428 \\  # 持久化状态\n  -remoteRead.url=http://victoria-metrics:8428      # 恢复状态\n```\n\n**持久化数据**：\n\n- `ALERTS` - 当前活动的告警\n- `ALERTS_FOR_STATE` - 告警的 `for` 状态时间信息\n- 恢复条件：时间序列在最近 1 小时内有更新（由 `-remoteRead.lookback` 控制）\n\n#### 5.2.3 其他核心特性\n\n- ✅ 支持规则回填（Backfilling/Replay）\n- ✅ 可重用的注解模板（Reusable Templates）\n- ✅ 从多种来源加载规则：本地文件、URL、GCS、S3\n- ✅ 检测从不触发的告警规则\n- ✅ 轻量级无额外依赖\n\n---", "subs": ["5.2.1 数据源集成", "5.2.2 告警状态持久化", "5.2.3 其他核心特性"]}, {"title": "5.3 快速开始", "content": "#### 5.3.1 基本配置要求\n\n**必需配置**：\n\n1. **规则列表**（`-rule`）：PromQL/MetricsQL 表达式配置文件\n2. **数据源地址**（`-datasource.url`）：支持 Prometheus HTTP API 的端点\n\n**可选配置**：\n3. **Notifier 地址**（`-notifier.url`）：Alertmanager 实例地址\n4. **Remote Write 地址**（`-remoteWrite.url`）：持久化规则和状态\n5. **Remote Read 地址**（`-remoteRead.url`）：恢复告警状态\n\n#### 5.3.2 启动示例\n\n```bash\n# 构建 vmalert\ngit clone https://github.com/VictoriaMetrics/VictoriaMetrics\ncd VictoriaMetrics\nmake vmalert\n\n# 启动 vmalert\n./bin/vmalert \\\n  -rule=alert.rules \\                          # 规则文件路径（支持通配符）\n  -datasource.url=http://localhost:8428 \\      # 数据源\n  -notifier.url=http://localhost:9093 \\        # Alertmanager URL\n  -notifier.url=http://127.0.0.1:9093 \\        # Alertmanager 副本\n  -remoteWrite.url=http://localhost:8428 \\     # 持久化地址\n  -remoteRead.url=http://localhost:8428 \\      # 恢复地址\n  -external.label=cluster=east-1 \\             # 外部标签\n  -external.label=replica=a                    # 多个外部标签\n```\n\n#### 5.3.3 配置验证\n\n**语法验证**：\n\n```bash\n# 使用 -dryRun 验证配置文件语法\n./vmalert -rule=alert.rules -dryRun\n```\n\n**区分多个 vmalert 实例**：\n\n- 使用 `-external.label` 标识不同的 vmalert 实例\n- 如果规则结果与外部标签冲突，自动添加 `exported_` 前缀\n\n---", "subs": ["5.3.1 基本配置要求", "5.3.2 启动示例", "5.3.3 配置验证"]}, {"title": "5.4 规则配置", "content": "#### 5.4.1 规则文件结构\n\n**YAML 配置格式**：\n\n```yaml\ngroups:\n  - name: <group_name>          # 组名，文件内唯一\n    interval: <duration>        # 评估间隔（默认使用 -evaluationInterval）\n    rules:\n      - <rule_spec>             # 规则定义\n```\n\n#### 5.4.2 Group（规则组）配置\n\n**Group 属性**：\n\n```yaml\ngroups:\n  - name: my_alert_group        # 必需：组名\n    interval: 30s               # 可选：评估间隔\n    eval_offset: 5m             # 可选：评估时间偏移\n    eval_delay: 30s             # 可选：补偿数据延迟\n    limit: 1000                 # 可选：单规则结果数量限制\n    concurrency: 4              # 可选：组内规则并发数（默认 1）\n    type: prometheus            # 可选：规则类型（prometheus/graphite/vlogs）\n    eval_alignment: true        # 可选：评估时间对齐（默认 true）\n  \n    # 可选：请求参数（应用于组内所有规则）\n    params:\n      nocache: [\"1\"]                     # 禁用缓存\n      denyPartialResponse: [\"true\"]      # 拒绝部分响应\n      extra_label: [\"env=dev\"]           # 额外标签过滤\n  \n    # 可选：HTTP 请求头\n    headers:\n      - \"CustomHeader: foo\"\n  \n    # 可选：告警通知头\n    notifier_headers:\n      - \"TenantID: foo\"\n  \n    # 可选：组级标签（高于外部标签）\n    labels:\n      env: production\n      team: platform\n  \n    # 可选：调试模式\n    debug: false\n  \n    rules:\n      - ...\n```\n\n**重要参数说明**：\n\n1. **`eval_offset`**：指定评估的精确时间偏移\n\n   - 例如 `interval: 1h` + `eval_offset: 5m` → 在每小时的第 5 分钟评估\n   - 与 `eval_delay` 互斥\n2. **`eval_delay`**：补偿数据源的查询延迟\n\n   - 默认继承自 `-rule.evalDelay`（默认 30s）\n   - 建议与 VictoriaMetrics 的 `-search.latencyOffset` 保持一致\n3. **`concurrency`**：组内规则并发执行数\n\n   - 提高并发可缩短组的评估时长\n   - 监控指标：`vmalert_iteration_duration_seconds`\n4. **`eval_alignment`**（默认 `true`）：\n\n   - 评估时间戳对齐到组的 interval\n   - 使结果更可预测，与 Grafana/vmui 图表对齐\n\n#### 5.4.3 告警规则（Alerting Rules）\n\n**语法**：\n\n```yaml\n- alert: <alert_name>           # 告警名称，必须是有效的 metric 名称\n  expr: <expression>            # 表达式，根据 type 使用 PromQL/MetricsQL/Graphite\n  \n  for: <duration>               # 可选：触发延迟（默认 0s）\n  keep_firing_for: <duration>   # 可选：延迟告警解除（默认 0s）\n  \n  debug: <bool>                 # 可选：调试模式\n  update_entries_limit: <int>   # 可选：状态更新条目数量限制\n  \n  labels:                       # 可选：添加/覆盖标签\n    severity: warning\n    team: platform\n  \n  annotations:                  # 可选：注解（可使用模板）\n    summary: \"Instance {{ $labels.instance }} down\"\n    description: \"{{ $labels.job }} has been down for {{ $value }} seconds\"\n```\n\n**告警规则示例**：\n\n```yaml\ngroups:\n  - name: instance_down\n    interval: 30s\n    rules:\n      - alert: InstanceDown\n        expr: up == 0\n        for: 5m\n        labels:\n          severity: critical\n        annotations:\n          summary: \"Instance {{ $labels.instance }} is down\"\n          description: \"{{ $labels.job }} has been unavailable for over 5 minutes\"\n```\n\n**重要参数说明**：\n\n1. **`for`**：告警触发延迟\n\n   - `for: 0` 或未设置：表达式返回结果立即触发\n   - `for > 0`：表达式连续返回结果超过指定时长才触发\n   - 状态转换：`inactive` → `pending` → `firing`\n2. **`keep_firing_for`**：延迟告警解除\n\n   - 即使表达式不再返回结果，告警仍持续 firing\n   - 用于 CPU 峰值等短暂事件\n3. **`labels` vs `annotations`**：\n\n   - **labels**：用于唯一标识告警，不要使用动态值（如 `$value`）\n   - **annotations**：可包含任意动态数据或模板\n\n#### 5.4.4 记录规则（Recording Rules）\n\n**语法**：\n\n```yaml\n- record: <metric_name>         # 输出的时间序列名称\n  expr: <expression>            # 表达式\n  \n  labels:                       # 可选：添加标签\n    <label_name>: <label_value>\n  \n  debug: <bool>                 # 可选：调试模式\n  update_entries_limit: <int>   # 可选：状态更新条目限制\n```\n\n**记录规则示例**：\n\n```yaml\ngroups:\n  - name: http_requests_recording\n    interval: 30s\n    rules:\n      - record: job:http_requests:rate5m\n        expr: sum(rate(http_requests_total[5m])) by (job)\n        labels:\n          aggregation: rate5m\n```\n\n**使用场景**：\n\n- 预计算频繁查询的复杂表达式\n- 降采样和聚合历史数据\n- 减少查询响应时间\n\n**注意事项**：\n\n- 需要配置 `-remoteWrite.url` 才能生效\n- 避免规则链式依赖（规则组内顺序执行但持久化异步）\n\n---", "subs": ["5.4.1 规则文件结构", "5.4.2 Group（规则组）配置", "5.4.3 告警规则（Alerting Rules）", "5.4.4 记录规则（Recording Rules）"]}, {"title": "5.5 模板系统", "content": "#### 5.5.1 模板变量\n\n**可用变量**：\n\n| 变量                                                                                | 描述           | 示例                                        |\n| ----------------------------------------------------------------------------------- | -------------- | ------------------------------------------- |\n| `$value` / `.Value` | 当前告警的值 | `Number of connections is {{ $value }}`  |                |                                             |\n| `$activeAt` / `.ActiveAt` | 告警激活时间 | `{{ $activeAt.UnixMilli }}`        |                |                                             |\n| `$labels` / `.Labels`                                                           | 告警标签列表   | `{{ .Labels.instance }}`                  |\n| `$type` / `.Type`                                                               | 规则类型       | `{{ .Type }}` (prometheus/graphite/vlogs) |\n| `$alertID` / `.AlertID`                                                         | 告警 ID        | `{{ .AlertID }}`                          |\n| `$groupID` / `.GroupID`                                                         | 组 ID          | `{{ .GroupID }}`                          |\n| `$expr` / `.Expr` | 告警表达式 | `{{ $expr\\|queryEscape }}`                    |                |                                             |\n| `$for` / `.For`                                                                 | `for` 参数值 | `{{ .For }}`                              |\n| `$externalLabels` / `.ExternalLabels` | 外部标签 | `{{ $externalLabels.dc }}` |                |                                             |\n| `$externalURL` / `.ExternalURL` | 外部 URL | `{{ $externalURL }}`             |                |                                             |\n\n#### 5.5.2 模板函数\n\n**常用函数**：\n\n- **`query`**：执行 MetricsQL 查询\n\n  ```go\n  {{ query \"sort_desc(process_resident_memory_bytes)\" | first | value }}\n  ```\n\n- **`humanize`**：人性化数值显示（100000 → 100K）\n- **`humanizeDuration`**：格式化持续时间\n- **`humanizeTimestamp`**：格式化时间戳\n- **`parseDuration`**：解析时长字符串\n- **`toTime`**：转换 Unix 时间戳为 time.Time\n- **`queryEscape`** / **`pathEscape`**：URL 编码\n- **`jsonEscape`**：JSON 编码\n- **`stripDomain`**：保留域名首部（foo.bar.baz → foo）\n- **`stripPort`**：移除端口（host:port → host）\n\n#### 5.5.3 可重用模板\n\n**定义模板文件**（`grafana-templates.tpl`）：\n\n```go\n{{ define \"grafana.filter\" -}}\n  {{- $labels := .arg0 -}}\n  {{- range $name, $label := . -}}\n    {{- if (ne $name \"arg0\") -}}\n      {{- ( or (index $labels $label) \"All\" ) | printf \"&var-%s=%s\" $label -}}\n    {{- end -}}\n  {{- end -}}\n{{- end -}}\n```\n\n**使用模板**：\n\n```yaml\n# 启动时加载模板文件\n./vmalert -rule.templates=/path/to/*.tpl\n\n# 在规则中使用\ngroups:\n  - name: AlertGroupName\n    rules:\n      - alert: AlertName\n        expr: any_metric > 100\n        annotations:\n          dashboard: '{{ $externalURL }}/d/dashboard?orgId=1{{ template \"grafana.filter\" (args .CommonLabels \"account_id\") }}'\n```\n\n**模板文件热重载**：\n\n- 支持通过 `-rule.templates` 加载多个模板文件\n- 支持通配符（`dir/*.tpl`、`dir/**/*.tpl`）\n- 支持热重载\n\n---", "subs": ["5.5.1 模板变量", "5.5.2 模板函数", "5.5.3 可重用模板"]}, {"title": "5.6 告警源链接", "content": "#### 5.6.1 默认链接格式\n\n**默认链接**：\n\n```\nhttp://<vmalert-addr>/vmalert/alert?group_id=<group_id>&alert_id=<alert_id>\n```\n\n**自定义链接到 vmui**：\n\n```bash\n./bin/vmalert \\\n  -external.url=http://<vmui-addr> \\\n  -external.alert.source='vmui/#/?g0.expr={{.Expr|queryEscape}}'\n```\n\n#### 5.6.2 Grafana 集成链接\n\n**链接到 Grafana Explore**：\n\n```bash\n./bin/vmalert \\\n  -external.url=http://<grafana-addr> \\\n  -external.alert.source='explore?left={\"datasource\":\"{{ if eq .Type \\\"vlogs\\\" }}VictoriaLogs{{ else }}VictoriaMetrics{{ end }}\",\"queries\":[{\"expr\":{{ .Expr|jsonEscape|queryEscape }},\"refId\":\"A\"}],\"range\":{\"from\":\"{{ .ActiveAt.UnixMilli }}\",\"to\":\"now\"}}'\n```\n\n**链接说明**：\n\n- 根据规则类型（`vlogs` / 其他）选择不同数据源\n- 自动填充表达式到 Grafana Explore\n- 时间范围从告警激活时刻到当前\n\n---", "subs": ["5.6.1 默认链接格式", "5.6.2 Grafana 集成链接"]}, {"title": "5.7 多租户支持", "content": "#### 5.7.1 方案一：独立实例\n\n**每租户运行独立 vmalert**：\n\n```bash\n# 租户 123\n/path/to/vmalert \\\n  -datasource.url=http://vmselect:8481/select/123/prometheus \\\n  -remoteWrite.url=http://vminsert:8480/insert/123/prometheus\n\n# 租户 456:789\n/path/to/vmalert \\\n  -datasource.url=http://vmselect:8481/select/456:789/prometheus \\\n  -remoteWrite.url=http://vminsert:8480/insert/456:789/prometheus\n```\n\n#### 5.7.2 方案二：Multitenant 端点\n\n**使用 multitenant 端点 + 组级 params**：\n\n```bash\n./vmalert \\\n  -datasource.url=http://vmselect:8481/select/multitenant/prometheus \\\n  -remoteWrite.url=http://vminsert:8480/insert/multitenant/prometheus\n```\n\n**规则配置**：\n\n```yaml\ngroups:\n  - name: rules_for_tenant_456:789\n    params:\n      extra_label: [\"vm_account_id=456,vm_project_id=789\"]\n    rules:\n      - alert: ...\n```\n\n> ⚠️ **性能提示**：multitenant 端点性能低于直接指定租户 URL\n\n#### 5.7.3 方案三：Enterprise 集群模式\n\n**启用集群模式**（Enterprise 版本）：\n\n```bash\n./vmalert \\\n  -clusterMode \\\n  -datasource.url=http://vmselect:8481 \\        # 不含租户 ID\n  -remoteWrite.url=http://vminsert:8480 \\\n  -defaultTenant.prometheus=123                  # 默认租户\n```\n\n**规则配置**：\n\n```yaml\ngroups:\n  - name: rules_for_tenant_123\n    tenant: \"123\"\n    rules:\n      - alert: ...\n\n  - name: rules_for_tenant_456:789\n    tenant: \"456:789\"\n    rules:\n      - alert: ...\n```\n\n**集群模式特性**：\n\n- 自动为每个组添加租户 ID 到 URL\n- 告警结果包含 `vm_account_id` 和 `vm_project_id` 标签\n- 可在模板中使用租户标签\n- 支持 `-defaultTenant.prometheus` / `-defaultTenant.graphite`\n\n---", "subs": ["5.7.1 方案一：独立实例", "5.7.2 方案二：Multitenant 端点", "5.7.3 方案三：Enterprise 集群模式"]}, {"title": "5.8 拓扑示例", "content": "#### 5.8.1 单节点 VictoriaMetrics\n\n```bash\n./bin/vmalert -rule=rules.yml \\\n  -datasource.url=http://victoriametrics:8428 \\\n  -remoteWrite.url=http://victoriametrics:8428 \\\n  -remoteRead.url=http://victoriametrics:8428 \\\n  -notifier.url=http://alertmanager:9093\n```\n\n```mermaid\ngraph TB\n    A[vmalert] -->|执行规则| B[VictoriaMetrics<br/>Single]\n    A -->|持久化状态| B\n    A -->|恢复状态| B\n    A -->|告警通知| C[Alertmanager]\n```\n\n#### 5.8.2 集群 VictoriaMetrics\n\n```bash\n./bin/vmalert -rule=rules.yml \\\n  -datasource.url=http://vmselect:8481/select/0/prometheus \\\n  -remoteWrite.url=http://vminsert:8480/insert/0/prometheus \\\n  -remoteRead.url=http://vmselect:8481/select/0/prometheus \\\n  -notifier.url=http://alertmanager:9093\n```\n\n```mermaid\ngraph TB\n    A[vmalert] -->|查询| B[vmselect]\n    A -->|写入| C[vminsert]\n    A -->|恢复| B\n    A -->|告警| D[Alertmanager]\n    C --> E[vmstorage]\n    B --> E\n```\n\n#### 5.8.3 高可用 vmalert\n\n**配置多个相同的 vmalert 实例**：\n\n```bash\n# 实例 1\n./bin/vmalert -rule=rules.yml \\\n  -datasource.url=http://victoriametrics:8428 \\\n  -remoteWrite.url=http://victoriametrics:8428 \\\n  -remoteRead.url=http://victoriametrics:8428 \\\n  -notifier.url=http://alertmanager1:9093 \\\n  -notifier.url=http://alertmanagerN:9093\n\n# 实例 2（配置相同）\n./bin/vmalert -rule=rules.yml \\\n  ...\n```\n\n**去重配置**：\n\n- VictoriaMetrics 端启用去重：\n\n  ```bash\n  ./victoria-metrics -dedup.minScrapeInterval=1m\n  ```\n\n- 建议 `-dedup.minScrapeInterval` ≥ vmalert 的 `-evaluationInterval`\n- Alertmanager 自动去重相同标签的告警\n\n```mermaid\ngraph TB\n    A1[vmalert 实例1] -->|规则评估| VM[VictoriaMetrics<br/>with Dedup]\n    A2[vmalert 实例2] -->|规则评估| VM\n    A1 -->|告警| AM1[Alertmanager 1]\n    A1 -->|告警| AM2[Alertmanager N]\n    A2 -->|告警| AM1\n    A2 -->|告警| AM2\n```\n\n#### 5.8.4 降采样与聚合\n\n**使用 vmalert 进行数据聚合**：\n\n```bash\n./bin/vmalert -rule=downsampling-rules.yml \\\n  -datasource.url=http://raw-cluster-vmselect:8481/select/0/prometheus \\\n  -remoteWrite.url=http://aggregated-cluster-vminsert:8480/insert/0/prometheus\n```\n\n**降采样规则示例**：\n\n```yaml\ngroups:\n  - name: downsampling\n    interval: 5m              # 5 分钟评估一次 = 降低分辨率\n    rules:\n      - record: http_requests:avg5m\n        expr: avg_over_time(http_requests[5m])\n```\n\n**使用场景**：\n\n- \"热\"集群：低保留期、高速磁盘、用于实时监控\n- \"冷\"集群：长期保留、较慢/便宜磁盘、低分辨率数据\n- vmalert 从\"热\"集群读取，处理后写入\"冷\"集群\n\n```mermaid\ngraph LR\n    A[Raw Cluster<br/>高分辨率] -->|规则查询| B[vmalert]\n    B -->|聚合结果| C[Aggregated Cluster<br/>低分辨率]\n```\n\n#### 5.8.5 多目标 Remote Write\n\n**使用 vmagent 作为扇出代理**：\n\n```bash\n# vmalert 写入到 vmagent\n./bin/vmalert -rule=rules.yml \\\n  -remoteWrite.url=http://vmagent:8429/api/v1/write\n\n# vmagent 扇出到多个目标\n./bin/vmagent \\\n  -remoteWrite.url=http://vm-cluster1:8428/api/v1/write \\\n  -remoteWrite.url=http://vm-cluster2:8428/api/v1/write\n```\n\n```mermaid\ngraph LR\n    A[vmalert] -->|规则结果| B[vmagent<br/>扇出代理]\n    B --> C[VictoriaMetrics 1]\n    B --> D[VictoriaMetrics 2]\n```\n\n**优势**：\n\n- vmagent 提供数据持久化缓冲\n- 支持 Relabeling 修改时间序列\n- 简化 vmalert 配置\n\n---", "subs": ["5.8.1 单节点 VictoriaMetrics", "5.8.2 集群 VictoriaMetrics", "5.8.3 高可用 vmalert", "5.8.4 降采样与聚合", "5.8.5 多目标 Remote Write"]}, {"title": "5.9 Web 界面与 API", "content": "#### 5.9.1 Web UI\n\n**访问地址**：`http://<vmalert-addr>`\n\n**主要功能**：\n\n- Groups 列表：查看所有规则组和规则\n- Alerts 页面：查看活跃告警\n- 规则详情页：查看规则状态和最近更新\n\n#### 5.9.2 API 端点\n\n| 端点                                              | 描述                         |\n| ------------------------------------------------- | ---------------------------- |\n| `/api/v1/rules`                                 | 所有组和规则列表（支持过滤） |\n| `/api/v1/alerts`                                | 所有活跃告警                 |\n| `/api/v1/notifiers`                             | 所有可用的 notifier          |\n| `/vmalert/api/v1/alert?group_id=<>&alert_id=<>` | 获取告警状态（JSON）         |\n| `/vmalert/api/v1/rule?group_id=<>&rule_id=<>`   | 获取规则状态（JSON）         |\n| `/vmalert/api/v1/group?group_id=<>`             | 获取组状态（JSON）           |\n| `/vmalert/alert?group_id=<>&alert_id=<>`        | 告警状态（Web UI）           |\n| `/vmalert/rule?group_id=<>&rule_id=<>`          | 规则状态（Web UI）           |\n| `/metrics`                                      | 应用指标                     |\n| `/-/reload`                                     | 热重载配置                   |\n\n#### 5.9.3 与 VictoriaMetrics 集成\n\n**单节点访问 vmalert**：\n\n```\nhttp://victoria-metrics:8428/select/0/prometheus/vmalert/\n```\n\n**集群版访问 vmalert**：\n\n```bash\n# 配置 vmselect\n./vmselect -vmalert.proxyURL=http://vmalert:8880\n\n# 访问\nhttp://vmselect:8481/select/0/prometheus/vmalert/\n```\n\n**用途**：\n\n- 与 Grafana Unified Alerting 集成\n- 通过 vmui 访问 vmalert UI\n\n---", "subs": ["5.9.1 Web UI", "5.9.2 API 端点", "5.9.3 与 VictoriaMetrics 集成"]}, {"title": "5.10 规则回填（Replay）", "content": "#### 5.10.1 回填机制\n\n**核心概念**：\n\n- vmalert 可在指定时间范围内重新评估规则\n- 将历史结果通过 Remote Write 回填到存储\n- 用于历史数据转换或修复\n\n**工作模式**：\n\n- 作为 CLI 工具运行，完成后退出\n- 组内规则顺序执行（忽略 `concurrency` 设置）\n- 自动发送 `nocache=1` 防止缓存污染\n\n#### 5.10.2 回填示例\n\n```bash\n./bin/vmalert -rule=path/to/your.rules \\\n  -datasource.url=http://localhost:8428 \\\n  -remoteWrite.url=http://localhost:8428 \\\n  -replay.timeFrom=2021-05-11T07:21:43Z \\\n  -replay.timeTo=2021-05-29T18:40:43Z\n```\n\n**输出示例**：\n\n```\nReplay mode:\nfrom:   2021-05-11 07:21:43 +0000 UTC\nto:     2021-05-29 18:40:43 +0000 UTC\nmax data points per request: 1000\n\nGroup \"ReplayGroup\"\ninterval:       1m0s\nrequests to make:       27\nmax range per request:  16h40m0s\n> Rule \"type:vm_cache_entries:rate5m\"\n27 / 27 [------------------------------------] 100.00% 78 p/s\n```\n\n#### 5.10.3 回填配置参数\n\n| Flag                                  | 说明                       | 默认值   |\n| ------------------------------------- | -------------------------- | -------- |\n| `-replay.timeFrom`                  | 回填起始时间（RFC3339）    | 必需     |\n| `-replay.timeTo`                    | 回填结束时间（RFC3339）    | 当前时间 |\n| `-replay.maxDatapointsPerQuery`     | 单请求最大数据点数         | 1000     |\n| `-replay.ruleRetryAttempts`         | 失败重试次数               | 5        |\n| `-replay.rulesDelay`                | 规则间延迟（用于链式规则） | 1s       |\n| `-replay.disableProgressBar`        | 禁用进度条                 | false    |\n| `-replay.ruleEvaluationConcurrency` | 并发查询数                 | 1        |\n\n**注意事项**：\n\n- 记录规则回填结果应与正常评估一致\n- 告警规则回填产生 `ALERTS` 和 `ALERTS_FOR_STATE` 时间序列\n- Graphite 引擎暂不支持\n- `query` 模板函数在回填时禁用\n\n#### 5.10.4 缓存处理\n\n**问题**：回填可能受响应缓存影响\n\n**解决方案**：\n\n1. 回填期间禁用缓存\n2. 回填后重置缓存内容\n\n---", "subs": ["5.10.1 回填机制", "5.10.2 回填示例", "5.10.3 回填配置参数", "5.10.4 缓存处理"]}, {"title": "5.11 监控与调试", "content": "#### 5.11.1 监控指标\n\n**关键指标**：\n\n- `vmalert_iteration_duration_seconds`：组评估耗时\n- `vmalert_recording_rules_last_evaluation_samples`：记录规则返回的序列数\n- `vmalert_alerting_rules_last_evaluation_series_fetched`：告警规则匹配的序列数\n- `vmalert_alerts_pending`：pending 状态的告警数\n- `vmalert_alerts_firing`：firing 状态的告警数\n- `vmalert_alerts_sent_*`：发送的告警通知数\n\n**推荐告警规则**：\n\n```yaml\n# 记录规则无数据\n- alert: RecordingRulesNoData\n  expr: vmalert_recording_rules_last_evaluation_samples < 1\n  annotations:\n    summary: \"Recording rule {{ $labels.recording }} produces no data\"\n\n# 告警规则从不触发\n- alert: NeverFiringAlerts\n  expr: max(vmalert_alerting_rules_last_evaluation_series_fetched) by(group, alertname) == 0\n  annotations:\n    summary: \"Alert {{ $labels.alertname }} never fires\"\n\n# 评估耗时过长\n- alert: SlowRuleEvaluation\n  expr: vmalert_iteration_duration_seconds > 60\n  annotations:\n    summary: \"Group {{ $labels.group }} evaluation takes {{ $value }}s\"\n```\n\n#### 5.11.2 官方 Grafana Dashboard\n\n**Dashboard ID**：14950\n\n**包含内容**：\n\n- 规则评估统计\n- 告警状态跟踪\n- Notifier 健康状态\n- Remote Write/Read 性能\n\n#### 5.11.3 规则状态调试\n\n**查看规则最近更新**：\n\n1. 打开 vmalert Web UI\n2. 进入 `Groups` 标签\n3. 点击规则旁的 `Details` 链接\n4. 查看 \"Last N updates\" 部分\n\n**状态属性**：\n\n- **Updated at**：实际评估时间\n- **Execution timestamp**：发送给数据源的 `time` 参数\n- **Series returned**：评估返回的序列数\n  - 记录规则：0 表示无结果\n  - 告警规则：0 表示 inactive 状态\n- **Series fetched**：扫描的序列数（用于检测从不触发的告警）\n- **Duration**：评估耗时\n- **cURL**：示例 HTTP 请求（用于调试）\n\n#### 5.11.4 调试模式\n\n**启用方式**：\n\n```yaml\ngroups:\n  - name: TestGroup\n    debug: true        # 组级调试\n    rules:\n      - alert: Conns\n        expr: ...\n        debug: true    # 规则级调试（覆盖组级）\n```\n\n**调试日志示例**：\n\n```\n2022-09-15T13:35:41.155Z  DEBUG alerting rule \"TestGroup\":\"Conns\" at 2022-09-15T15:35:41+02:00: query returned 0 series (elapsed: 5.896041ms, isPartial: false)\n2022-09-15T13:35:56.149Z  DEBUG datasource request: executing POST request with params \"query=sum(vm_tcplistener_conns)&step=15s&time=1663248945\"\n2022-09-15T13:35:56.179Z  DEBUG alerting rule \"TestGroup\":\"Conns\": alert 10705778000901301787 created in state PENDING\n2022-09-15T13:36:56.153Z  DEBUG alerting rule \"TestGroup\":\"Conns\": alert 10705778000901301787 PENDING => FIRING\n```\n\n**日志级别要求**：\n\n```bash\n./vmalert -loggerLevel=INFO  # 确保可以看到 DEBUG 输出\n```\n\n---", "subs": ["5.11.1 监控指标", "5.11.2 官方 Grafana Dashboard", "5.11.3 规则状态调试", "5.11.4 调试模式"]}, {"title": "5.12 常见问题与最佳实践", "content": "#### 5.12.1 常见错误\n\n**1. 组的 interval 设置不当**\n\n```yaml\n# ❌ 错误：interval 小于数据分辨率\ngroups:\n  - name: my_group\n    interval: 10s          # 数据每分钟才有一个点\n    rules:\n      - alert: ...\n        expr: rate(metric[5m])\n\n# ✅ 正确：interval ≥ 数据分辨率\ngroups:\n  - name: my_group\n    interval: 1m\n```\n\n**2. labels 使用动态值**\n\n```yaml\n# ❌ 错误：标签使用动态值\n- alert: HighMemory\n  expr: memory_usage > 80\n  labels:\n    value: \"{{ $value }}\"    # 每次值变化产生新告警\n\n# ✅ 正确：动态值放在 annotations\n- alert: HighMemory\n  expr: memory_usage > 80\n  labels:\n    severity: warning\n  annotations:\n    current_value: \"{{ $value }}\"\n```\n\n**3. 缺失 lookbehind-window**\n\n```yaml\n# ❌ 错误：缺失 lookbehind-window\nexpr: rate(errors_total) > 0\n\n# ✅ 正确：显式指定 lookbehind-window\nexpr: rate(errors_total[5m]) > 0\n```\n\n**建议**：lookbehind-window ≥ 2× 数据分辨率\n\n**4. subquery 缺失 step**\n\n```yaml\n# ❌ 错误：subquery 缺失 step\nexpr: sum(count_over_time((metric == 0)[1h:]))\n\n# ✅ 正确：指定 step\nexpr: sum(count_over_time((metric == 0)[1h:1m]))\n```\n\n#### 5.12.2 数据延迟处理\n\n**问题**：数据在数据源中延迟，导致评估时无数据\n\n**解决方案**：\n\n1. **调整 `-rule.evalDelay`**（默认 30s）\n\n   ```bash\n   ./vmalert -rule.evalDelay=1m  # 延迟 1 分钟再评估\n   ```\n\n2. **增加 lookbehind-window**\n\n   ```yaml\n   # 容忍 10 分钟内的数据延迟\n   expr: max_over_time(node_memory_MemAvailable_bytes[10m]) > 0\n   ```\n\n3. **使用 `eval_delay` 覆盖组设置**\n\n   ```yaml\n   groups:\n     - name: slow_metrics\n       eval_delay: 2m\n   ```\n\n4. **VictoriaMetrics 端调整 `-search.latencyOffset`**\n\n   ```bash\n   ./vmselect -search.latencyOffset=1m\n   ```\n\n#### 5.12.3 抖动告警（Flapping Alerts）\n\n**问题**：告警频繁在 inactive 和 firing 之间切换\n\n**解决方案**：\n\n1. **增加 `for` 延迟**\n\n   ```yaml\n   - alert: HighCPU\n     expr: cpu_usage > 80\n     for: 5m              # 持续 5 分钟才触发\n   ```\n\n2. **增大 lookbehind-window**\n\n   ```yaml\n   # 至少 2× scrape_interval\n   expr: rate(http_errors_total[2m]) > 0\n   ```\n\n3. **使用 `keep_firing_for`**\n\n   ```yaml\n   - alert: CPUSpike\n     expr: cpu_usage > 90\n     keep_firing_for: 5m  # 延迟 5 分钟再解除\n   ```\n\n4. **检测抖动告警**\n\n   ```yaml\n   - alert: FlappingAlert\n     expr: max(changes(vmalert_alerts_firing[24h])) by(group, alertname) > 10\n     annotations:\n       summary: \"Alert {{ $labels.alertname }} flapped {{ $value }} times in 24h\"\n   ```\n\n#### 5.12.4 从不触发的告警\n\n**检测**：\n\n```yaml\n- alert: NeverFiringAlert\n  expr: max(vmalert_alerting_rules_last_evaluation_series_fetched) by(group, alertname) == 0\n  annotations:\n    summary: \"Alert {{ $labels.alertname }} matches no series\"\n```\n\n**原因**：\n\n- 选择器不匹配任何时间序列\n- 标签拼写错误（如 `env=prodd` 应为 `env=prod`）\n- job 名称错误\n\n**调试步骤**：\n\n1. 查看规则详情页的 **Series fetched** 字段\n2. 使用 cURL 示例手动查询验证\n3. 检查选择器语法\n\n#### 5.12.5 相同 labelset 冲突\n\n**错误信息**：\n\n```\nresult contains metrics with the same labelset during evaluation\n```\n\n**原因**：评估后产生重复的标签集\n\n**示例**：\n\n```yaml\n# ❌ 产生冲突\nexpr: {__name__=~\"vmalert_alerts_.*\"} > 0\n\n# 返回：\n# {__name__=\"vmalert_alerts_pending\", job=\"vmalert\", alertname=\"A\"} 12\n# {__name__=\"vmalert_alerts_firing\", job=\"vmalert\", alertname=\"A\"} 0\n# 评估后 __name__ 被丢弃 → 标签集重复\n```\n\n**解决方案**：\n\n```yaml\n# ✅ 使用 label_replace 保留区分标签\nexpr: label_replace({__name__=~\"vmalert_alerts_.*\"}, \"state\", \"$1\", \"__name__\", \"vmalert_alerts_(.*)\")\n```\n\n#### 5.12.6 规则链式依赖\n\n**问题**：规则 B 依赖规则 A 的结果\n\n**原因**：\n\n- 规则组内顺序执行\n- 但持久化到 Remote Write 是异步的\n- 规则 B 可能查询不到规则 A 的结果\n\n**解决方案**：\n\n1. **使用不同组并设置顺序**\n\n   ```yaml\n   groups:\n     - name: step1\n       interval: 1m\n       rules:\n         - record: http_requests:rate5m\n           expr: rate(http_requests[5m])\n\n     - name: step2\n       interval: 1m\n       rules:\n         - record: http_requests:rate5m:sum\n           expr: sum(http_requests:rate5m)  # 依赖 step1\n   ```\n\n2. **确保 interval < 5m**（默认 `-datasource.queryStep`）\n\n   ```yaml\n   groups:\n     - name: step1\n       interval: 2m      # < 5m 才能被后续查询\n   ```\n\n3. **调整 `-datasource.queryStep`**\n\n   ```bash\n   ./vmalert -datasource.queryStep=10m  # 扩大查询回溯窗口\n   ```\n\n4. **使用 `params.step`**\n\n   ```yaml\n   groups:\n     - name: step2\n       params:\n         step: [\"10m\"]   # 确保能查到 step1 的结果\n   ```\n\n#### 5.12.7 性能优化\n\n**1. 调整并发度**\n\n```yaml\ngroups:\n  - name: high_concurrency_group\n    concurrency: 8        # 加速组评估\n```\n\n**2. 调整 datasource 连接池**\n\n```bash\n./vmalert \\\n  -datasource.maxIdleConnections=100 \\      # 建议：groups_total * group.concurrency\n  -datasource.idleConnTimeout=50s\n```\n\n**3. 监控评估耗时**\n\n```yaml\n- alert: SlowGroupEvaluation\n  expr: vmalert_iteration_duration_seconds > 30\n  annotations:\n    summary: \"Group {{ $labels.group }} evaluation too slow: {{ $value }}s\"\n```\n\n**4. 启用结果数量限制**\n\n```yaml\ngroups:\n  - name: limited_group\n    limit: 1000          # 限制单规则产生的序列数\n```\n\n#### 5.12.8 安全建议\n\n**1. 启用 mTLS**（Enterprise）\n\n```bash\n./vmalert -tls -mtls -mtlsCAFile=/path/to/ca.pem\n```\n\n**2. 限制敏感信息暴露**\n\n```bash\n# 不展示 URL 敏感信息\n./vmalert \\\n  -datasource.showURL=false \\\n  -remoteWrite.showURL=false \\\n  -notifier.showURL=false\n```\n\n**3. 使用认证**\n\n```bash\n./vmalert \\\n  -httpAuth.username=admin \\\n  -httpAuth.password=secure_password\n```\n\n**4. 限制 Web UI 访问**\n\n- 使用反向代理限制访问\n- 配置防火墙规则\n- 使用 VPN 或内网隔离\n\n---", "subs": ["5.12.1 常见错误", "5.12.2 数据延迟处理", "5.12.3 抖动告警（Flapping Alerts）", "5.12.4 从不触发的告警", "5.12.5 相同 labelset 冲突", "5.12.6 规则链式依赖", "5.12.7 性能优化", "5.12.8 安全建议"]}, {"title": "5.13 核心 Flag 总览", "content": "#### 5.13.1 必需参数\n\n| Flag                | 说明                                      |\n| ------------------- | ----------------------------------------- |\n| `-datasource.url` | 数据源 URL（Prometheus HTTP API 兼容）    |\n| `-rule`           | 规则文件路径（支持通配符、HTTP、S3、GCS） |\n\n#### 5.13.2 可选参数\n\n**数据源配置**：\n\n- `-datasource.basicAuth.username`：Basic Auth 用户名\n- `-datasource.basicAuth.password`：Basic Auth 密码\n- `-datasource.bearerToken`：Bearer Token\n- `-datasource.headers`：自定义 HTTP 头\n- `-datasource.queryStep`：查询步长（默认 5m）\n- `-datasource.roundDigits`：响应值精度\n- `-datasource.tlsCAFile`：TLS CA 文件\n- `-datasource.tlsCertFile`：TLS 证书文件\n- `-datasource.appendTypePrefix`：根据查询类型添加前缀\n\n**Notifier 配置**：\n\n- `-notifier.url`：Alertmanager URL（可多个）\n- `-notifier.config`：Notifier 配置文件（支持服务发现）\n- `-notifier.blackhole`：黑洞模式（不发送通知）\n- `-notifier.basicAuth.*`：Basic Auth 配置\n- `-notifier.bearerToken`：Bearer Token\n- `-notifier.headers`：自定义 HTTP 头\n\n**Remote Write 配置**：\n\n- `-remoteWrite.url`：持久化 URL\n- `-remoteWrite.concurrency`：写入并发数（默认 `2*cpu`）\n- `-remoteWrite.maxBatchSize`：最大批量大小（默认 10000）\n- `-remoteWrite.maxQueueSize`：最大队列大小（默认 100000）\n- `-remoteWrite.flushInterval`：刷新间隔（默认 2s）\n- `-remoteWrite.basicAuth.*`：Basic Auth 配置\n\n**Remote Read 配置**：\n\n- `-remoteRead.url`：恢复状态 URL\n- `-remoteRead.lookback`：状态回溯时长（默认 1h）\n- `-remoteRead.basicAuth.*`：Basic Auth 配置\n\n**规则评估配置**：\n\n- `-evaluationInterval`：默认评估间隔（默认 1m）\n- `-rule.evalDelay`：评估延迟（默认 30s）\n- `-rule.maxResolveDuration`：最大自动解除时长\n- `-rule.resendDelay`：重发告警最小间隔\n- `-rule.resultsLimit`：规则结果数量限制\n- `-rule.updateEntriesLimit`：状态更新条目限制（默认 20）\n- `-rule.templates`：模板文件路径\n\n**External 配置**：\n\n- `-external.url`：外部 URL（用于告警源链接）\n- `-external.label`：外部标签（可多个）\n- `-external.alert.source`：自定义告警源链接模板\n\n**多租户配置**（Enterprise）：\n\n- `-clusterMode`：启用集群模式\n- `-defaultTenant.prometheus`：默认 Prometheus 租户\n- `-defaultTenant.graphite`：默认 Graphite 租户\n\n**Replay 配置**：\n\n- `-replay.timeFrom`：回填起始时间\n- `-replay.timeTo`：回填结束时间\n- `-replay.maxDatapointsPerQuery`：单请求数据点限制\n- `-replay.rulesDelay`：规则间延迟\n- `-replay.ruleRetryAttempts`：重试次数\n- `-replay.disableProgressBar`：禁用进度条\n\n**HTTP 配置**：\n\n- `-httpListenAddr`：HTTP 监听地址（默认 `:8880`）\n- `-httpAuth.username`：HTTP Basic Auth 用户名\n- `-httpAuth.password`：HTTP Basic Auth 密码\n\n**日志与监控**：\n\n- `-loggerLevel`：日志级别（INFO/WARN/ERROR/FATAL）\n- `-loggerFormat`：日志格式（default/json）\n- `-metrics.exposeMetadata`：暴露 TYPE 和 HELP 元数据\n\n**企业功能**：\n\n- `-tls` / `-mtls`：启用 TLS/mTLS\n- `-tlsCertFile` / `-tlsKeyFile`：TLS 证书和密钥\n- `-s3.credsFilePath`：S3/GCS 凭证文件\n- `-s3.customEndpoint`：自定义 S3 端点（MinIO）\n\n---", "subs": ["5.13.1 必需参数", "5.13.2 可选参数"]}, {"title": "5.14 总结", "content": "**vmalert 核心优势**：\n\n1. ✅ 完全兼容 Prometheus 告警规则语法\n2. ✅ 支持告警状态持久化和恢复\n3. ✅ 灵活的数据源支持（MetricsQL、LogsQL、Graphite）\n4. ✅ 强大的模板系统和可重用模板\n5. ✅ 多租户支持（Enterprise）\n6. ✅ 规则回填能力\n7. ✅ 丰富的监控指标和调试工具\n8. ✅ 高可用部署方案\n\n**典型使用场景**：\n\n- 基于 MetricsQL 的告警监控\n- 预计算复杂查询（记录规则）\n- 历史数据降采样和聚合\n- 多数据中心告警管理\n- 日志告警（VictoriaLogs）\n\n**与 Prometheus Alertmanager 的协作**：\n\n- vmalert：规则评估 + 状态管理\n- Alertmanager：通知路由 + 聚合 + 抑制 + 静默\n\n**🎯 第 5 章完成！** 下一步将继续学习 vmauth 组件...\n\n---\n\n---", "subs": ["基于 MetricsQL 的告警监控", "预计算复杂查询（记录规则）", "历史数据降采样和聚合", "多数据中心告警管理", "日志告警（VictoriaLogs）", "vmalert"]}]}, {"title": "第 6 章：vmauth - 认证与路由组件", "sections": [{"title": "6.1 vmauth 概述", "content": "**核心定位**：vmauth 是一个 HTTP 代理，提供以下功能：\n\n- **认证（Authorization）**：验证客户端身份\n- **路由（Routing）**：根据请求特征转发到不同后端\n- **负载均衡（Load Balancing）**：在多个后端之间分配请求\n\n**典型架构**：\n\n```mermaid\ngraph LR\n    A[客户端] -->|认证+路由| B[vmauth<br/>:8427]\n    B -->|负载均衡| C[Backend 1]\n    B -->|负载均衡| D[Backend 2]\n    B -->|负载均衡| E[Backend N]\n```\n\n**启动方式**：\n\n```bash\n# 基本启动\n/path/to/vmauth -auth.config=/path/to/auth/config.yml\n\n# 默认监听端口：8427（可通过 -httpListenAddr 修改）\n```\n\n---", "subs": ["认证（Authorization）", "路由（Routing）", "负载均衡（Load Balancing）"]}, {"title": "6.2 核心功能", "content": "#### 6.2.1 认证机制\n\nvmauth 支持以下 5 种认证方式：\n\n| 认证方式                | 配置字段                    | HTTP Header                   | 说明                         |\n| ----------------------- | --------------------------- | ----------------------------- | ---------------------------- |\n| **无认证**        | `unauthorized_user`       | -                             | 允许无凭据访问               |\n| **Basic Auth**    | `username` + `password` | `Authorization: Basic ...`  | 用户名密码认证               |\n| **Bearer Token**  | `bearer_token`            | `Authorization: Bearer ...` | Token 认证                   |\n| **mTLS**          | `mtls`                    | -                             | 客户端证书认证（Enterprise） |\n| **自定义 Header** | `auth_token`              | 自定义 Header                 | 任意认证 Token               |\n\n**Basic Auth 示例**：\n\n```yaml\nusers:\n  - username: foo\n    password: bar\n    url_prefix: \"http://victoria-metrics:8428/\"\n```\n\n**Bearer Token 示例**：\n\n```yaml\nusers:\n  - bearer_token: ABCDEF123456\n    url_prefix: \"http://victoria-metrics:8428/\"\n```\n\n**mTLS 示例**（Enterprise）：\n\n```yaml\nusers:\n  - mtls:\n      organizational_unit: finance  # OU 字段匹配\n    url_prefix: \"http://victoriametrics-finance:8428\"\n  - mtls:\n      organization: devops          # O 字段匹配\n    url_prefix: \"http://victoriametrics-devops:8428\"\n```\n\n#### 6.2.2 路由机制\n\nvmauth 可根据以下请求特征进行路由：\n\n| 路由依据              | 配置字段           | 示例                 |\n| --------------------- | ------------------ | -------------------- |\n| **请求路径**    | `src_paths`      | `/api/v1/write`    |\n| **请求主机**    | `src_hosts`      | `app1.example.com` |\n| **查询参数**    | `src_query_args` | `db=foo`           |\n| **HTTP Header** | `src_headers`    | `TenantID: 42`     |\n\n**路径路由示例**：\n\n```yaml\nunauthorized_user:\n  url_map:\n    - src_paths:\n        - \"/app1/.*\"\n      drop_src_path_prefix_parts: 1\n      url_prefix: \"http://app1-backend/\"\n    - src_paths:\n        - \"/app2/.*\"\n      drop_src_path_prefix_parts: 1\n      url_prefix: \"http://app2-backend/\"\n  # 默认路由（不匹配时）\n  default_url: \"http://some-backend/404-page.html\"\n```\n\n**多条件组合路由**：\n\n```yaml\nunauthorized_user:\n  url_map:\n    - src_paths: [\"/app/.*\"]\n      src_hosts: [\".+\\\\.bar\\\\.baz\"]       # 主机名以 .bar.baz 结尾\n      src_query_args: [\"db=abc\"]           # 包含 db=abc 参数\n      src_headers: [\"TenantID: 42\"]        # TenantID header 为 42\n      url_prefix: \"http://app1-backend/\"\n```\n\n#### 6.2.3 负载均衡\n\n**两种负载均衡策略**：\n\n1. **`least_loaded`**（默认）：最少负载轮询\n\n   ```yaml\n   unauthorized_user:\n     url_prefix:\n       - \"http://backend-1:8428/\"\n       - \"http://backend-2:8428/\"\n       - \"http://backend-3:8428/\"\n     load_balancing_policy: least_loaded  # 默认，可省略\n   ```\n\n2. **`first_available`**：优先第一个可用后端（高可用场景）\n\n   ```yaml\n   unauthorized_user:\n     url_prefix:\n       - \"http://victoria-metrics-main:8428/\"\n       - \"http://victoria-metrics-standby1:8428/\"\n       - \"http://victoria-metrics-standby2:8428/\"\n     load_balancing_policy: first_available\n   ```\n\n**自动故障切换**：\n\n- vmauth 自动检测不可用的后端\n- 将请求转发到其他可用后端\n- 支持重启和维护期间无中断\n\n**重试机制**：\n\n```yaml\nunauthorized_user:\n  url_prefix:\n    - http://vmselect1:8481/\n    - http://vmselect2:8481/\n    - http://vmselect3:8481/\n  retry_status_codes: [500, 502, 503]  # 这些状态码时重试其他后端\n```\n\n---", "subs": ["6.2.1 认证机制", "6.2.2 路由机制", "6.2.3 负载均衡"]}, {"title": "6.3 典型使用场景", "content": "#### 6.3.1 简单 HTTP 代理\n\n**无认证代理所有请求**：\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://backend/\"\n```\n\n请求 `http://vmauth:8427/foo/bar` 被代理到 `http://backend/foo/bar`\n\n#### 6.3.2 多后端路由\n\n```yaml\nunauthorized_user:\n  url_map:\n    - src_paths: [\"/vmagent/.*\"]\n      drop_src_path_prefix_parts: 1\n      url_prefix: \"http://vmagent-backend:8429/\"\n    - src_paths: [\"/vmalert/.*\"]\n      drop_src_path_prefix_parts: 1\n      url_prefix: \"http://vmalert-backend:8880/\"\n```\n\n- `http://vmauth:8427/vmagent/api/v1/write` → `http://vmagent-backend:8429/api/v1/write`\n- `http://vmauth:8427/vmalert/api/v1/rules` → `http://vmalert-backend:8880/api/v1/rules`\n\n#### 6.3.3 vmagent 负载均衡\n\n```yaml\nunauthorized_user:\n  url_map:\n    - src_paths:\n        - \"/prometheus/api/v1/write\"\n        - \"/influx/write\"\n        - \"/api/v1/import\"\n        - \"/api/v1/import/.*\"\n      url_prefix:\n        - \"http://vmagent-1:8429/\"\n        - \"http://vmagent-2:8429/\"\n        - \"http://vmagent-3:8429/\"\n```\n\n#### 6.3.4 VictoriaMetrics 集群负载均衡\n\n```yaml\nunauthorized_user:\n  url_map:\n    # 写入负载均衡\n    - src_paths: [\"/insert/.*\"]\n      url_prefix:\n        - \"http://vminsert-1:8480/\"\n        - \"http://vminsert-2:8480/\"\n        - \"http://vminsert-3:8480/\"\n  \n    # 查询负载均衡\n    - src_paths:\n        - \"/select/.*\"\n        - \"/admin/.*\"\n      url_prefix:\n        - \"http://vmselect-1:8481/\"\n        - \"http://vmselect-2:8481/\"\n```\n\n#### 6.3.5 多租户隔离\n\n```yaml\nusers:\n  # 租户1：写入到 AccountID=1\n  - username: tenant1\n    password: \"***\"\n    url_map:\n      - src_paths: [\"/api/v1/write\"]\n        url_prefix: \"http://vminsert:8480/insert/1/prometheus/\"\n      - src_paths:\n          - \"/api/v1/query\"\n          - \"/api/v1/query_range\"\n        url_prefix: \"http://vmselect:8481/select/1/prometheus/\"\n  \n  # 租户2：写入到 AccountID=2\n  - username: tenant2\n    password: \"***\"\n    url_map:\n      - src_paths: [\"/api/v1/write\"]\n        url_prefix: \"http://vminsert:8480/insert/2/prometheus/\"\n      - src_paths:\n          - \"/api/v1/query\"\n          - \"/api/v1/query_range\"\n        url_prefix: \"http://vmselect:8481/select/2/prometheus/\"\n```\n\n#### 6.3.6 TLS 终止代理\n\n```bash\n/path/to/vmauth \\\n  -tls \\\n  -tlsKeyFile=/path/to/tls_key_file \\\n  -tlsCertFile=/path/to/tls_cert_file \\\n  -httpListenAddr=0.0.0.0:443\n```\n\n**自动签发 TLS 证书**（Enterprise）：\n\n```bash\n/path/to/vmauth \\\n  -httpListenAddr=:443 \\\n  -tls \\\n  -tlsAutocertHosts=example.com,www.example.com \\\n  -tlsAutocertEmail=admin@example.com \\\n  -tlsAutocertCacheDir=/var/lib/vmauth/certs\n```\n\n---", "subs": ["6.3.1 简单 HTTP 代理", "6.3.2 多后端路由", "6.3.3 vmagent 负载均衡", "6.3.4 VictoriaMetrics 集群负载均衡", "6.3.5 多租户隔离", "6.3.6 TLS 终止代理"]}, {"title": "6.4 高级特性", "content": "#### 6.4.1 路径前缀删除\n\n**`drop_src_path_prefix_parts`**：删除请求路径的前 N 个部分\n\n**示例**：\n\n```yaml\nunauthorized_user:\n  url_map:\n    - src_paths: [\"/vmagent/.*\"]\n      drop_src_path_prefix_parts: 1  # 删除 /vmagent/\n      url_prefix: \"http://vmagent:8429/\"\n```\n\n转换：\n\n- 请求：`/vmagent/api/v1/write`\n- 转发：`http://vmagent:8429/api/v1/write`\n\n#### 6.4.2 强制添加查询参数\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://victoria-metrics:8428/?extra_label=foo=bar&nocache=1\"\n```\n\n所有请求自动添加 `extra_label=foo=bar` 和 `nocache=1` 查询参数。\n\n#### 6.4.3 修改 HTTP Headers\n\n**添加/删除请求头**：\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://backend:1234/\"\n  headers:\n    - \"TenantID: foobar\"         # 添加 Header\n    - \"X-Forwarded-For:\"         # 删除 Header（空值）\n```\n\n**添加/删除响应头**：\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://backend:1234/\"\n  response_headers:\n    - \"Foo: bar\"                 # 添加响应头\n    - \"Server:\"                  # 删除响应头\n```\n\n**保持原始 Host Header**：\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://backend:1234/\"\n  keep_original_host: true       # 使用客户端的 Host header\n```\n\n#### 6.4.4 后端 IP 发现\n\n**问题**：`vmselect-service` 可能对应多个实例，但通过域名无法负载均衡\n\n**解决方案 1**：手动枚举所有实例\n\n```yaml\nunauthorized_user:\n  url_prefix:\n    - \"http://vmselect-1:8481/\"\n    - \"http://vmselect-2:8481/\"\n    - \"http://vmselect-3:8481/\"\n```\n\n**解决方案 2**：自动发现后端 IP\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://vmselect-service:8481/\"\n  discover_backend_ips: true  # 自动解析域名到多个 IP\n```\n\n**DNS SRV 支持**：\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://srv+vmselect/select/0/prometheus\"\n  discover_backend_ips: true\n```\n\n#### 6.4.5 查询参数合并\n\n**默认行为**：客户端查询参数被 `url_prefix` 中的参数覆盖（安全考虑）\n\n**允许合并特定参数**：\n\n```yaml\nunauthorized_user:\n  merge_query_args: [extra_filters]  # 允许客户端追加 extra_filters\n  url_map:\n    - src_paths: [\"/select/.+\"]\n      url_prefix: 'http://victoria-logs:9428/?extra_filters={env=\"prod\"}'\n```\n\n请求：`/select/logsql/query?extra_filters={team=\"dev\"}&query=error`\n转发：`/select/logsql/query?extra_filters={env=\"prod\"}&extra_filters={team=\"dev\"}&query=error`\n\n#### 6.4.6 并发限制\n\n**全局限制**：\n\n```bash\n./vmauth \\\n  -maxConcurrentRequests=1000 \\              # 全局并发限制\n  -maxConcurrentPerUserRequests=300          # 单用户并发限制\n```\n\n**Per-User 限制**：\n\n```yaml\nusers:\n  - username: foo\n    password: bar\n    url_prefix: \"http://backend/\"\n    max_concurrent_requests: 10  # 该用户最多 10 个并发\n```\n\n**监控指标**：\n\n- `vmauth_concurrent_requests_current`：当前并发数\n- `vmauth_concurrent_requests_limit_reached_total`：429 错误次数\n- `vmauth_user_concurrent_requests_current{username=\"foo\"}`：用户级并发\n\n#### 6.4.7 IP 过滤（Enterprise）\n\n**全局 IP 过滤**：\n\n```yaml\nusers:\n  # 用户配置...\n\nip_filters:\n  allow_list:\n    - 10.0.0.0/24\n    - 1.2.3.4\n  deny_list:\n    - 10.0.0.42\n```\n\n**Per-User IP 过滤**：\n\n```yaml\nusers:\n  - username: foobar\n    password: \"***\"\n    url_prefix: \"http://localhost:8428\"\n    ip_filters:\n      allow_list: [127.0.0.1]\n      real_ip_header: X-Forwarded-For  # 从该 Header 获取真实 IP\n```\n\n**安全建议**：\n\n- ⚠️ 不要在面向公网的 vmauth 使用 `-httpRealIPHeader`\n- ✅ 在公网反向代理处删除 `X-Forwarded-For`\n- ✅ 使用 `-removeXFFHTTPHeaderValue` 替换为真实客户端 IP\n\n---", "subs": ["6.4.1 路径前缀删除", "6.4.2 强制添加查询参数", "6.4.3 修改 HTTP Headers", "6.4.4 后端 IP 发现", "6.4.5 查询参数合并", "6.4.6 并发限制", "6.4.7 IP 过滤（Enterprise）"]}, {"title": "6.5 后端 TLS 配置", "content": "#### 6.5.1 全局 TLS 设置\n\n```bash\n./vmauth \\\n  -backend.tlsInsecureSkipVerify \\         # 跳过 TLS 验证\n  -backend.tlsCAFile=/path/to/ca.pem \\     # TLS CA 文件\n  -backend.tlsCertFile=/path/to/cert.pem \\ # 客户端证书（mTLS）\n  -backend.tlsKeyFile=/path/to/key.pem \\   # 客户端密钥\n  -backend.tlsServerName=example.com       # TLS ServerName\n```\n\n#### 6.5.2 Per-User TLS 设置\n\n```yaml\nusers:\n  - username: foo\n    url_prefix: \"https://backend-with-custom-tls\"\n    tls_insecure_skip_verify: true\n    tls_ca_file: \"/path/to/ca.pem\"\n    tls_cert_file: \"/path/to/cert.pem\"\n    tls_key_file: \"/path/to/key.pem\"\n    tls_server_name: \"custom.example.com\"\n```\n\n---", "subs": ["6.5.1 全局 TLS 设置", "6.5.2 Per-User TLS 设置"]}, {"title": "6.6 配置示例：完整配置文件", "content": "```yaml\n# ===== 用户配置 =====\nusers:\n  # 1. Bearer Token 认证\n  - bearer_token: \"XXXX\"\n    url_prefix: \"http://localhost:8428\"\n  \n  # 2. 自定义 Auth Header\n  - auth_token: \"Foo XXXX\"\n    url_prefix: \"http://localhost:8428\"\n  \n  # 3. Bearer Token + 自定义 Headers\n  - bearer_token: \"YYY\"\n    url_prefix: \"http://localhost:8428\"\n    headers:\n      - \"X-Scope-OrgID: foobar\"\n    response_headers:\n      - \"X-Server-Hostname:\"  # 删除响应头\n  \n  # 4. Basic Auth + 并发限制\n  - username: \"local-single-node\"\n    password: \"***\"\n    url_prefix: \"http://localhost:8428\"\n    max_concurrent_requests: 10\n  \n  # 5. Basic Auth + 查询参数\n  - username: \"local-single-node2\"\n    password: \"***\"\n    url_prefix: \"http://localhost:8428?extra_label=team=dev\"\n  \n  # 6. HTTPS + TLS 跳过验证\n  - username: \"local-single-node-with-tls\"\n    password: \"***\"\n    url_prefix: \"https://localhost\"\n    tls_insecure_skip_verify: true\n  \n  # 7. 集群查询负载均衡\n  - username: \"cluster-select-account-123\"\n    password: \"***\"\n    url_prefix:\n      - \"http://vmselect1:8481/select/123/prometheus\"\n      - \"http://vmselect2:8481/select/123/prometheus\"\n  \n  # 8. 集群写入负载均衡\n  - username: \"cluster-insert-account-42\"\n    password: \"***\"\n    url_prefix:\n      - \"http://vminsert1:8480/insert/42/prometheus\"\n      - \"http://vminsert2:8480/insert/42/prometheus\"\n  \n  # 9. 复杂路由：查询+写入+默认路由\n  - username: \"foobar\"\n    dump_request_on_errors: true  # 调试模式\n    url_map:\n      # 查询路由\n      - src_paths:\n          - \"/api/v1/query\"\n          - \"/api/v1/query_range\"\n          - \"/api/v1/label/[^/]+/values\"\n        url_prefix:\n          - \"http://vmselect1:8481/select/42/prometheus\"\n          - \"http://vmselect2:8481/select/42/prometheus\"\n        retry_status_codes: [500, 502]\n    \n      # 写入路由\n      - src_paths: [\"/api/v1/write\"]\n        url_prefix: \"http://vminsert:8480/insert/42/prometheus\"\n        headers:\n          - \"X-Scope-OrgID: abc\"\n        response_headers:\n          - \"X-Server-Hostname:\"\n        ip_filters:\n          deny_list: [127.0.0.1]\n  \n    # 默认路由（不匹配 url_map）\n    default_url:\n      - \"http://default1:8888/unsupported_url_handler\"\n      - \"http://default2:8888/unsupported_url_handler\"\n\n# ===== 未认证用户配置 =====\nunauthorized_user:\n  url_prefix:\n    - \"http://vmselect-az1/?deny_partial_response=1\"\n    - \"http://vmselect-az2/?deny_partial_response=1\"\n  retry_status_codes: [503, 500]\n\n# ===== 全局 IP 过滤（Enterprise）=====\nip_filters:\n  allow_list: [\"1.2.3.0/24\", \"127.0.0.1\"]\n  deny_list: [10.1.0.1]\n```\n\n**环境变量替换**：\n\n```yaml\nusers:\n  - username: admin\n    password: \"%{ADMIN_PASSWORD}\"  # 从环境变量读取\n    url_prefix: \"http://backend/\"\n```\n\n---", "subs": []}, {"title": "6.7 配置热重载", "content": "**方式 1：发送 SIGHUP 信号**\n\n```bash\nkill -HUP `pidof vmauth`\n```\n\n**方式 2：调用reload 端点**\n\n```bash\ncurl -X POST http://vmauth:8427/-/reload?authKey=<your-key>\n```\n\n**方式 3：自动检测配置变化**\n\n```bash\n./vmauth -auth.config=config.yml -configCheckInterval=30s\n```\n\n---", "subs": []}, {"title": "6.8 安全配置", "content": "#### 6.8.1 启用 HTTPS\n\n```bash\n./vmauth \\\n  -tls \\\n  -tlsCertFile=/path/to/cert.pem \\\n  -tlsKeyFile=/path/to/key.pem \\\n  -httpListenAddr=:443\n```\n\n#### 6.8.2 启用 mTLS（Enterprise）\n\n```bash\n./vmauth \\\n  -tls \\\n  -mtls \\\n  -mtlsCAFile=/path/to/ca.pem \\  # 验证客户端证书的 CA\n  -auth.config=config.yml\n```\n\n#### 6.8.3 保护敏感端点\n\n```bash\n./vmauth \\\n  -reloadAuthKey=<reload-secret> \\    # 保护 /-/reload\n  -flagsAuthKey=<flags-secret> \\      # 保护 /flags\n  -metricsAuthKey=<metrics-secret> \\  # 保护 /metrics\n  -pprofAuthKey=<pprof-secret>        # 保护 /debug/pprof\n```\n\n**或使用独立监听地址**：\n\n```bash\n./vmauth \\\n  -httpListenAddr=:8427 \\               # 对外服务\n  -httpInternalListenAddr=127.0.0.1:8426  # 内部 API\n```\n\n#### 6.8.4 安全建议\n\n1. ✅ 后端服务应在隔离的私有网络中\n2. ✅ 启用 HTTPS 传输认证信息\n3. ✅ 使用 `-removeXFFHTTPHeaderValue` 防止 IP 欺骗\n4. ✅ 限制 `/metrics` 和 `/debug/pprof` 访问\n5. ✅ 使用 IP 过滤限制访问来源\n6. ✅ 设置并发限制防止滥用\n\n---", "subs": ["6.8.1 启用 HTTPS", "6.8.2 启用 mTLS（Enterprise）", "6.8.3 保护敏感端点", "6.8.4 安全建议"]}, {"title": "6.9 监控", "content": "#### 6.9.1 监控指标\n\n**Per-User 指标**：\n\n- `vmauth_user_requests_total{username=\"...\"}` - 用户请求总数\n- `vmauth_user_request_backend_errors_total{username=\"...\"}` - 后端错误数\n- `vmauth_user_request_duration_seconds{username=\"...\"}` - 请求耗时\n- `vmauth_user_concurrent_requests_current{username=\"...\"}` - 当前并发数\n- `vmauth_user_concurrent_requests_capacity{username=\"...\"}` - 并发限制\n- `vmauth_user_concurrent_requests_limit_reached_total{username=\"...\"}` - 429 错误数\n\n**Unauthorized User 指标**：\n\n- `vmauth_unauthorized_user_requests_total`\n- `vmauth_unauthorized_user_request_backend_errors_total`\n- `vmauth_unauthorized_user_request_duration_seconds`\n\n**全局指标**：\n\n- `vmauth_concurrent_requests_current` - 全局当前并发\n- `vmauth_concurrent_requests_capacity` - 全局并发限制\n- `vmauth_concurrent_requests_limit_reached_total` - 全局 429 错误\n\n#### 6.9.2 自定义 Metric 标签\n\n```yaml\nusers:\n  - username: \"secret_user\"\n    name: \"foobar\"  # 指标中使用 username=\"foobar\" 而非 \"secret_user\"\n    metric_labels:\n      dc: eu              # 增加额外标签\n      team: dev\n    url_prefix: \"http://backend/\"\n```\n\n生成指标：\n\n```\nvmauth_user_requests_total{username=\"foobar\", dc=\"eu\", team=\"dev\"}\n```\n\n#### 6.9.3 官方 Dashboard\n\n使用 Grafana Dashboard 监控 vmauth：\n\n- **Dashboard URL**: [https://grafana.com/grafana/dashboards/](https://grafana.com/grafana/dashboards/)\n- 包含请求速率、错误率、延迟、并发等指标\n\n---", "subs": ["6.9.1 监控指标", "6.9.2 自定义 Metric 标签", "6.9.3 官方 Dashboard"]}, {"title": "6.10 核心 Flag 总览", "content": "#### 6.10.1 必需参数\n\n| Flag             | 说明                                    |\n| ---------------- | --------------------------------------- |\n| `-auth.config` | 认证配置文件路径（本地文件或 HTTP URL） |\n\n#### 6.10.2 重要参数\n\n**认证相关**：\n\n- `-httpAuthHeader` - 读取认证 Token 的 HTTP Header（默认 `Authorization`）\n\n**负载均衡**：\n\n- `-loadBalancingPolicy` - 负载均衡策略（`least_loaded` / `first_available`）\n- `-retryStatusCodes` - 重试的 HTTP 状态码列表\n- `-failTimeout` - 故障后端的跳过时长（默认 3s）\n- `-discoverBackendIPs` - 是否发现后端 IP\n- `-discoverBackendIPsInterval` - IP 发现间隔（默认 10s）\n\n**并发控制**：\n\n- `-maxConcurrentRequests` - 全局最大并发（默认 1000）\n- `-maxConcurrentPerUserRequests` - 单用户最大并发（默认 300）\n- `-maxIdleConnsPerBackend` - 每个后端的最大空闲连接（默认 100）\n\n**后端 TLS**：\n\n- `-backend.tlsInsecureSkipVerify` - 跳过后端 TLS 验证\n- `-backend.tlsCAFile` - 后端 TLS CA 文件\n- `-backend.tlsCertFile` - 客户端证书（mTLS）\n- `-backend.tlsKeyFile` - 客户端密钥\n\n**前端 TLS**：\n\n- `-tls` - 启用 TLS\n- `-tlsCertFile` - TLS 证书文件\n- `-tlsKeyFile` - TLS 密钥文件\n- `-mtls` - 启用 mTLS（Enterprise）\n- `-mtlsCAFile` - mTLS CA 文件\n\n**自动 TLS 证书**（Enterprise）：\n\n- `-tlsAutocertHosts` - Let's Encrypt 域名列表\n- `-tlsAutocertEmail` - 联系邮箱\n- `-tlsAutocertCacheDir` - 证书缓存目录\n\n**安全**：\n\n- `-reloadAuthKey` - 保护 `/-/reload` 端点\n- `-flagsAuthKey` - 保护 `/flags` 端点\n- `-metricsAuthKey` - 保护 `/metrics` 端点\n- `-pprofAuthKey` - 保护 `/debug/pprof` 端点\n- `-httpRealIPHeader` - 获取真实 IP 的 Header\n- `-removeXFFHTTPHeaderValue` - 移除 X-Forwarded-For\n\n**配置**：\n\n- `-configCheckInterval` - 配置检查间隔（默认不检查）\n- `-dryRun` - 仅验证配置不运行\n\n**查询参数**：\n\n- `-mergeQueryArgs` - 允许合并的查询参数列表\n\n**请求/响应**：\n\n- `-responseTimeout` - 后端响应超时（默认 5m）\n- `-maxRequestBodySizeToRetry` - 可缓存重试的最大请求体（默认 16KB）\n\n**监听地址**：\n\n- `-httpListenAddr` - 主监听地址（默认 `:8427`）\n- `-httpInternalListenAddr` - 内部 API 监听地址\n\n---", "subs": ["6.10.1 必需参数", "6.10.2 重要参数"]}, {"title": "6.11 常见问题与最佳实践", "content": "#### 6.11.1 配置优先级\n\n**规则匹配顺序**：\n\n1. `url_map` 中的规则按**定义顺序**匹配\n2. 匹配第一个符合条件的规则\n3. 不匹配时使用 `default_url`\n4. 无 `default_url` 则使用 `url_prefix`\n\n**Tips**：将更具体的规则放在前面。\n\n#### 6.11.2 路径前缀处理\n\n**问题**：如何代理 `/vmagent/` 到 vmagent 的根路径？\n\n**解决方案**：\n\n```yaml\nurl_map:\n  - src_paths: [\"/vmagent/.*\"]\n    drop_src_path_prefix_parts: 1\n    url_prefix: \"http://vmagent:8429/\"\n```\n\n**转换示例**：\n\n- `/vmagent/api/v1/write` → `http://vmagent:8429/api/v1/write`\n- `/vmagent/-/reload` → `http://vmagent:8429/-/reload`\n\n#### 6.11.3 高可用部署\n\n**问题**：如何实现 vmauth 高可用？\n\n**解决方案**：\n\n1. 部署多个 vmauth 实例（相同配置）\n2. 使用外部负载均衡器（如 HAProxy、Nginx、云 LB）\n3. 配置健康检查（`/health` 端点）\n\n```\n    +-------------------+\n    | Load Balancer     |\n    +-------------------+\n         /     |     \\\n        /      |      \\\n   vmauth1  vmauth2  vmauth3\n     |        |        |\n     +--------+--------+\n            |\n        Backends\n```\n\n#### 6.11.4 调试技巧\n\n**1. 启用请求错误日志**\n\n```yaml\nusers:\n  - username: foobar\n    dump_request_on_errors: true  # 记录失败请求的详细信息\n    url_map: ...\n```\n\n**2. 验证配置语法**\n\n```bash\n./vmauth -auth.config=config.yml -dryRun\n```\n\n**3. 查看当前配置**\n\n```bash\n# 需要 -flagsAuthKey 保护\ncurl http://vmauth:8427/flags?authKey=<key>\n```\n\n**4. 监控后端健康**\n\n- 查看 `vmauth_user_request_backend_errors_total` 指标\n- 设置告警：错误率超过阈值时触发\n\n#### 6.11.5 性能优化\n\n**1. 调整连接池**\n\n```bash\n./vmauth \\\n  -maxIdleConnsPerBackend=200 \\       # 增加空闲连接池\n  -idleConnTimeout=60s                # 延长空闲连接超时\n```\n\n**2. 调整并发限制**\n\n```bash\n./vmauth \\\n  -maxConcurrentRequests=5000 \\       # 根据负载调整\n  -maxConcurrentPerUserRequests=500\n```\n\n**3. 启用后端 IP 发现**\n\n```yaml\nunauthorized_user:\n  url_prefix: \"http://vmselect-service:8481/\"\n  discover_backend_ips: true\n```\n\n#### 6.11.6 安全加固\n\n**1. 最小权限原则**\n\n- 每个用户只配置必要的 `url_map` 路径\n- 使用 IP 过滤限制访问来源\n\n**2. 避免凭据泄露**\n\n```yaml\nusers:\n  - username: admin\n    password: \"%{ADMIN_PASSWORD}\"  # 使用环境变量\n```\n\n**3. 定期轮换凭据**\n\n- 定期更新 Bearer Token\n- 定期更新用户密码\n- 使用配置热重载应用新凭据\n\n**4. 监控异常访问**\n\n```promql\n# 检测认证失败\nrate(vmauth_http_request_errors_total{reason=\"invalid_auth_token\"}[5m]) > 10\n\n# 检测并发超限\nrate(vmauth_user_concurrent_requests_limit_reached_total[5m]) > 0\n```\n\n---", "subs": ["6.11.1 配置优先级", "6.11.2 路径前缀处理", "6.11.3 高可用部署", "6.11.4 调试技巧", "6.11.5 性能优化", "6.11.6 安全加固"]}, {"title": "6.12 配置参考", "content": "#### 6.12.1 User 配置项\n\n| 字段                           | 类型         | 说明                                    |\n| ------------------------------ | ------------ | --------------------------------------- |\n| `username`                   | string       | Basic Auth 用户名                       |\n| `password`                   | string       | Basic Auth 密码                         |\n| `bearer_token`               | string       | Bearer Token                            |\n| `auth_token`                 | string       | 自定义认证 Token                        |\n| `name`                       | string       | 指标中显示的用户名（覆盖 `username`） |\n| `url_prefix`                 | string/array | 后端 URL（单个或多个）                  |\n| `url_map`                    | array        | URL 路由映射                            |\n| `default_url`                | string/array | 默认 URL（不匹配 url_map 时）           |\n| `headers`                    | array        | 添加/删除的请求头                       |\n| `response_headers`           | array        | 添加/删除的响应头                       |\n| `max_concurrent_requests`    | int          | 最大并发请求数                          |\n| `load_balancing_policy`      | string       | 负载均衡策略                            |\n| `retry_status_codes`         | array        | 重试的状态码                            |\n| `discover_backend_ips`       | bool         | 是否发现后端 IP                         |\n| `drop_src_path_prefix_parts` | int          | 删除路径前缀部分数                      |\n| `keep_original_host`         | bool         | 保持原始 Host header                    |\n| `tls_insecure_skip_verify`   | bool         | 跳过后端 TLS 验证                       |\n| `tls_ca_file`                | string       | 后端 TLS CA 文件                        |\n| `tls_cert_file`              | string       | 后端客户端证书                          |\n| `tls_key_file`               | string       | 后端客户端密钥                          |\n| `tls_server_name`            | string       | 后端 TLS ServerName                     |\n| `ip_filters`                 | object       | IP 过滤配置（Enterprise）               |\n| `metric_labels`              | object       | 额外的指标标签                          |\n| `dump_request_on_errors`     | bool         | 记录失败请求详情                        |\n| `merge_query_args`           | array        | 允许合并的查询参数                      |\n| `mtls`                       | object       | mTLS 匹配规则（Enterprise）             |\n\n#### 6.12.2 URL Map 配置项\n\n| 字段                           | 类型         | 说明                  |\n| ------------------------------ | ------------ | --------------------- |\n| `src_paths`                  | array        | 路径正则匹配列表      |\n| `src_hosts`                  | array        | 主机名正则匹配列表    |\n| `src_query_args`             | array        | 查询参数匹配列表      |\n| `src_headers`                | array        | Header 匹配列表       |\n| `url_prefix`                 | string/array | 后端 URL              |\n| `headers`                    | array        | 请求头修改            |\n| `response_headers`           | array        | 响应头修改            |\n| `drop_src_path_prefix_parts` | int          | 删除路径前缀          |\n| `retry_status_codes`         | array        | 重试状态码            |\n| `load_balancing_policy`      | string       | 负载均衡策略          |\n| `discover_backend_ips`       | bool         | 是否发现后端 IP       |\n| `ip_filters`                 | object       | IP 过滤（Enterprise） |\n\n---", "subs": ["6.12.1 User 配置项", "6.12.2 URL Map 配置项"]}, {"title": "6.13 总结", "content": "**vmauth 核心优势**：\n\n1. ✅ 统一的认证入口（Basic Auth、Bearer Token、mTLS）\n2. ✅ 灵活的路由规则（路径、主机、参数、Header）\n3. ✅ 智能负载均衡（最少负载、优先可用）\n4. ✅ 高可用特性（自动故障切换、重试机制）\n5. ✅ 细粒度并发控制\n6. ✅ 多租户隔离\n7. ✅ 完善的监控指标\n\n**典型应用场景**：\n\n- VictoriaMetrics 集群的统一入口\n- 多租户环境的访问隔离\n- 后端服务的负载均衡\n- TLS 终止代理\n- 基于路径的微服务路由\n\n**与其他组件的协作**：\n\n- **vmagent**：通过 vmauth 负载均衡多个 vmagent 实例\n- **vmalert**：通过 vmauth 访问 VictoriaMetrics\n- **vminsert/vmselect**：通过 vmauth 负载均衡集群组件\n- **Grafana**：通过 vmauth 实现多租户数据隔离\n\n**🎯 第 6 章完成！** 下一步将继续学习 vmbackup 组件...\n\n---\n\n---", "subs": ["VictoriaMetrics 集群的统一入口", "多租户环境的访问隔离", "后端服务的负载均衡", "TLS 终止代理", "基于路径的微服务路由", "vmagent"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

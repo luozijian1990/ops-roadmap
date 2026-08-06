@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Linux 性能优化学习笔记 · 第二册：I/O、网络与方法论 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Linux 性能优化学习笔记 · 第二册：I/O、网络与方法论</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Linux 性能优化学习笔记 · 第二册：I/O、网络与方法论", "intro": "", "parts": [{"title": "第 3 章 · 文件系统与磁盘 I/O 性能", "sections": [{"title": "Linux 文件系统工作原理速览", "content": "<!-- src: sources/linux-performance/03-IO性能篇/23-基础篇-Linux文件系统是怎么工作的.md; sources/linux-performance/03-IO性能篇/32-答疑四-阻塞、非阻塞IO与同步、异步IO的区别和联系.md -->\n\n文件系统把块设备上的持久化空间组织成文件和目录。Linux 通过 VFS 提供统一接口，使普通文件、目录、设备、管道和套接字都能通过相似的系统调用访问。\n\n#### inode、dentry、数据块和超级块\n\n| 结构 | 保存内容 | 主要位置 |\n| --- | --- | --- |\n| inode | 权限、大小、时间、数据块位置等元数据 | 持久化在文件系统并缓存在内存 |\n| dentry | 文件名、父子目录关系和 inode 指针 | 主要是内核内存缓存 |\n| 数据块 | 文件实际内容 | 存储设备 |\n| 超级块 | 文件系统类型、容量和整体状态 | 持久化并缓存在内存 |\n\n文件名不保存在 inode 中，而由目录项把名字映射到 inode。硬链接创建的是新的目录项，但多个名称指向同一个 inode。\n\n```mermaid\ngraph TD\n    A[路径名] --> B[dentry 目录项]\n    B --> C[inode 元数据]\n    C --> D[文件数据块]\n    E[超级块] --> C\n    E --> D\n```\n\n磁盘扇区常见为 512 B 或 4 KiB，文件系统则以逻辑块组织数据，常见块大小为 4 KiB。大量小文件不仅消耗数据空间，还会消耗 inode 和目录项缓存。\n\n#### VFS 与存储路径\n\n应用调用 `open()`、`read()`、`write()` 等接口后，内核经 VFS 找到具体文件系统，再通过页缓存、块层和设备驱动访问存储。\n\n```mermaid\ngraph TD\n    A[应用程序] --> B[系统调用]\n    B --> C[VFS]\n    C --> D[页缓存和元数据缓存]\n    D --> E[Ext4 XFS NFS OverlayFS]\n    E --> F[通用块层或网络栈]\n    F --> G[本地磁盘或网络存储]\n```\n\n文件系统类型大致可分为：\n\n- 本地磁盘文件系统，如 Ext4、XFS；\n- 内存或伪文件系统，如 tmpfs、procfs、sysfs；\n- 网络文件系统，如 NFS、SMB；\n- 叠加文件系统，如容器常用的 OverlayFS。\n\n查看挂载关系和参数：\n\n```bash\nfindmnt\nfindmnt -T /path/to/file\nmount\n```\n\n#### 文件 I/O 的多个维度\n\n这些概念彼此独立，不能混为一谈：\n\n| 维度 | 类型 | 区别 |\n| --- | --- | --- |\n| 标准库缓存 | 缓冲 I/O与非缓冲 I/O | 是否使用 `stdio` 等用户态缓存 |\n| 页缓存 | 缓存 I/O与直接 I/O | 是否绕过内核页缓存 |\n| 调用是否等待 | 阻塞与非阻塞 | 当前线程在暂不可用时是否睡眠 |\n| 完成通知 | 同步与异步 | 提交后是否等待完成结果 |\n| 持久化语义 | 普通写、`fsync`、`O_DSYNC`、`O_SYNC` | 返回时数据和元数据持久化到什么程度 |\n\n`O_DIRECT` 只表示尽量绕过页缓存，不等于异步；`O_NONBLOCK` 也不等于异步 I/O。理解这些维度有助于解释为什么同样是 `write()`，延迟和持久化保证可能完全不同。\n\n#### 阻塞与同步不是同一个维度\n\n阻塞与非阻塞描述调用线程在资源暂不可用时是否等待；同步与异步描述 I/O 完成结果通过什么方式交给应用。可以用二维矩阵理解：\n\n| 调用方式 | 同步完成语义 | 异步完成语义 |\n| --- | --- | --- |\n| 阻塞等待 | `read()` 等到数据可用并复制完成后返回 | 提交异步请求后调用等待接口阻塞到完成 |\n| 非阻塞推进 | `read()` 暂不可用时返回 `EAGAIN`，应用稍后重试 | 提交后继续工作，完成事件到达后再取结果 |\n\n最常见的四种场景：\n\n1. 阻塞同步：线程调用阻塞套接字 `read()`，无数据时睡眠，有数据并复制后返回。\n2. 非阻塞同步：套接字设置 `O_NONBLOCK`，`read()` 无数据时立即返回 `EAGAIN`。\n3. 就绪驱动：`epoll` 通知描述符当前可读写，应用再执行非阻塞 `read()` 或 `write()`。\n4. 完成驱动：Linux AIO 或 `io_uring` 提交请求，完成后通过完成队列返回结果。\n\n第三种仍然主要是同步 I/O：`epoll` 只告诉应用“现在执行 I/O 大概率不会阻塞”，真正的数据复制和错误仍由随后执行的 `read()` 完成。\n\n#### readiness 与 completion\n\n```mermaid\nsequenceDiagram\n    participant App as 应用\n    participant Poll as epoll\n    participant IO as I/O 子系统\n    App->>Poll: 注册可读事件\n    IO-->>Poll: 数据已经就绪\n    Poll-->>App: 返回就绪描述符\n    App->>IO: read 获取数据\n    IO-->>App: 返回数据或 EAGAIN\n```\n\n`epoll` 是 readiness notification。边缘触发模式下，应用通常要循环读取到 `EAGAIN`，否则可能遗留数据而收不到新的边缘事件。\n\n```mermaid\nsequenceDiagram\n    participant App as 应用\n    participant Ring as io_uring\n    participant IO as I/O 子系统\n    App->>Ring: 提交读请求\n    Ring->>IO: 执行 I/O\n    App->>App: 处理其他任务\n    IO-->>Ring: I/O 完成\n    Ring-->>App: 完成队列返回结果\n```\n\n`io_uring` 使用提交队列和完成队列表达 completion notification。应用收到 CQE 时，请求已经完成，可以直接读取结果码和完成字节数。\n\n概念伪代码：\n\n```c\n/* epoll: wait for readiness, then issue synchronous nonblocking I/O */\nevents = epoll_wait(epfd, ready, MAX_EVENTS, timeout);\nfor (int i = 0; i < events; i++) {\n    while ((n = read(ready[i].fd, buf, sizeof(buf))) > 0) {\n        consume(buf, n);\n    }\n    if (n < 0 && errno != EAGAIN) {\n        handle_error(errno);\n    }\n}\n```\n\n```c\n/* io_uring: submit work first, consume completion later */\nprepare_read_sqe(ring, fd, buf, len, offset);\nio_uring_submit(ring);\ndo_other_work();\nio_uring_wait_cqe(ring, &cqe);\nconsume_result(cqe->res);\nio_uring_cqe_seen(ring, cqe);\n```\n\n#### 不同文件类型的非阻塞语义\n\n`O_NONBLOCK` 对套接字、管道、终端等流式对象很重要，但对本地普通文件通常不能提供应用期望的“磁盘未完成就返回 `EAGAIN`”语义。普通文件往往始终被轮询接口视为可读写，实际访问仍可能因缺页、回写或设备 I/O 产生延迟。\n\n因此：\n\n- 高并发网络服务常使用 `epoll` 加非阻塞套接字；\n- 数据库和存储程序使用直接 I/O 时，可评估 Linux AIO 或 `io_uring`；\n- 选择异步接口前，应确认文件系统、I/O engine 和操作类型是否真正支持异步执行；\n- 队列深度增加会提高并行度，也可能放大排队和尾延迟；\n- 异步 I/O 不等于持久化，完成写入后是否需要 `fsync` 取决于数据可靠性要求。\n\n#### 容量问题要同时看块和 inode\n\n```bash\ndf -h\ndf -i\n```\n\n磁盘块未满但 inode 用尽时，同样无法创建新文件。这常见于日志切片、缓存目录、邮件队列和海量小文件。\n\n找出目录空间占用：\n\n```bash\ndu -xhd1 /path | sort -h\n```\n\n找出小文件数量异常的目录时，应限制扫描范围，避免直接在繁忙根文件系统运行高成本的全盘 `find`。\n\n#### 文件系统缓存\n\n页缓存可从 `/proc/meminfo` 观察，inode 和 dentry 等 Slab 缓存可使用：\n\n```bash\nslabtop\ngrep -E 'dentry|inode' /proc/slabinfo\n```\n\n目录扫描、全盘查找和创建大量小文件都会扩大 dentry 与 inode 缓存。缓存可回收不代表永远无风险，若 `SUnreclaim`、目录项或 inode 缓存持续异常增长，仍需检查内核资源和工作负载。\n\n---", "subs": ["inode、dentry、数据块和超级块", "VFS 与存储路径", "文件 I/O 的多个维度", "阻塞与同步不是同一个维度", "readiness 与 completion", "不同文件类型的非阻塞语义", "容量问题要同时看块和 inode", "文件系统缓存"]}, {"title": "磁盘 I/O 工作原理与关键指标", "content": "<!-- src: sources/linux-performance/03-IO性能篇/24-基础篇-Linux磁盘IO是怎么工作的上.md; sources/linux-performance/03-IO性能篇/25-基础篇-Linux磁盘IO是怎么工作的下.md -->\n\n存储性能取决于介质、访问模式、队列、文件系统和应用 I/O 语义。仅看“磁盘速度”无法解释随机小 I/O、顺序大 I/O、同步写和并行异步 I/O 的巨大差异。\n\n#### HDD、SSD 与访问模式\n\n| 维度 | HDD | SSD 或 NVMe |\n| --- | --- | --- |\n| 主要延迟来源 | 寻道和旋转 | 闪存访问、控制器和垃圾回收 |\n| 随机 I/O | 通常较差 | 明显更好但仍受写放大影响 |\n| 顺序 I/O | 吞吐量较高 | 吞吐量很高 |\n| 并行能力 | 相对有限 | 多队列和并行能力较强 |\n\n顺序访问有利于请求合并和预读；随机小块访问更关注 IOPS 和延迟；顺序大块访问更关注吞吐量。\n\n#### Linux 存储 I/O 栈\n\n```mermaid\ngraph TD\n    A[应用和数据库] --> B[VFS 和文件系统]\n    B --> C[页缓存]\n    B --> D[直接 I/O]\n    C --> E[块 I/O]\n    D --> E\n    E --> F[通用块层]\n    F --> G[I/O 调度和多队列]\n    G --> H[设备驱动]\n    H --> I[HDD SSD NVMe RAID 云盘]\n```\n\n通用块层把文件系统请求转换为块 I/O，并完成排队、合并和调度。现代 Linux 通常使用 blk-mq 多队列框架，常见调度器包括：\n\n| 调度器 | 典型目标 |\n| --- | --- |\n| `none` | 尽量减少主机调度开销，常见于高速设备或下层已有调度 |\n| `mq-deadline` | 通过截止时间控制尾延迟和请求饥饿 |\n| `bfq` | 强调带宽公平和交互延迟 |\n| `kyber` | 通过令牌和延迟目标控制队列 |\n\n课程中的 `NOOP`、`deadline` 和 `CFQ` 属于旧的单队列体系。实际机器以 sysfs 中可用项为准：\n\n```bash\ncat /sys/block/<DEVICE>/queue/scheduler\n```\n\n调度器选择依赖设备、虚拟化层和负载，不应机械地认为 SSD 必须使用某一个固定调度器。\n\n#### 五个核心指标\n\n| 指标 | 含义 | 分析重点 |\n| --- | --- | --- |\n| IOPS | 每秒完成的读写请求数 | 随机小 I/O 场景 |\n| 吞吐量 | 每秒传输字节数 | 顺序大 I/O 场景 |\n| 延迟 | 请求从提交到完成的时间 | 平均值和尾延迟 |\n| 队列深度 | 等待和执行中的请求数量 | 是否发生排队 |\n| 利用率 | 设备有 I/O 在处理的时间占比 | 结合并行能力判断 |\n\n`%util` 接近 100% 对传统单队列设备是强烈信号，但对 NVMe、RAID、云盘等可并行设备，不一定表示所有硬件通道已经饱和。必须结合 `await`、队列深度、吞吐量、IOPS 和设备基线。\n\n#### 用 iostat 观察设备\n\n```bash\niostat -xz 1\n```\n\n常见字段：\n\n| 字段 | 含义 |\n| --- | --- |\n| `r/s`、`w/s` | 每秒读写请求数 |\n| `rkB/s`、`wkB/s` | 读写吞吐量 |\n| `r_await`、`w_await` | 读写请求平均完成时间 |\n| `aqu-sz` | 平均队列长度 |\n| `rareq-sz`、`wareq-sz` | 平均请求大小 |\n| `%rrqm`、`%wrqm` | 请求合并比例 |\n| `%util` | 设备忙碌时间比例 |\n\n第一次输出可能是开机以来的平均值，持续采样时优先分析后续区间数据。\n\n#### 用进程工具关联责任主体\n\n```bash\npidstat -d 1\niotop -oPa\n```\n\n`pidstat -d` 给出进程读写带宽和块 I/O 延迟；`iotop` 更适合按实时或累计 I/O 排序。进程发出的写入量与设备实际写入量可能不同，因为页缓存、请求合并、写回和文件系统日志会改变时序和数量。\n\n#### 先建立设备基线\n\n使用 `fio` 按实际负载构造基线：\n\n```bash\nfio --name=randread \\\n  --filename=/path/to/testfile \\\n  --size=4G \\\n  --rw=randread \\\n  --bs=4k \\\n  --ioengine=io_uring \\\n  --iodepth=32 \\\n  --direct=1 \\\n  --runtime=60 \\\n  --time_based \\\n  --group_reporting\n```\n\n写测试可能破坏数据或耗尽空间，必须使用专用测试文件、分区或磁盘。基线至少覆盖实际的块大小、读写比例、随机程度、队列深度、并发数和缓存模式。\n\n---", "subs": ["HDD、SSD 与访问模式", "Linux 存储 I/O 栈", "五个核心指标", "用 iostat 观察设备", "用进程工具关联责任主体", "先建立设备基线"]}, {"title": "揪出疯狂写磁盘的进程", "content": "<!-- src: sources/linux-performance/03-IO性能篇/26-案例篇-如何找出狂打日志的内鬼.md -->\n\n大量日志会同时消耗 CPU、内存页缓存和磁盘 I/O。定位时不要从日志目录盲猜，而应从设备瓶颈逐层关联到进程、文件描述符和应用配置。\n\n#### 从系统现象确认 I/O 瓶颈\n\n```bash\ntop\niostat -xz 1\n```\n\n课程案例的典型特征：\n\n- `iowait` 很高；\n- 磁盘写吞吐量持续增大；\n- 写延迟达到秒级；\n- 队列长度很长；\n- 设备 `%util` 接近 100%。\n\n这些指标共同说明请求排队严重。只看 `iowait` 不够，因为 `iowait` 还受 CPU 调度和其他运行任务影响。\n\n#### 定位写入进程\n\n```bash\npidstat -d 1\niotop -oPa\n```\n\n找到高写入进程后，用系统调用观察写入模式：\n\n```bash\nstrace -f -tt -T -e trace=open,openat,write,pwrite64,fsync,fdatasync -p <PID>\n```\n\n如果只看到文件描述符，可用：\n\n```bash\nlsof -p <PID>\nreadlink /proc/<PID>/fd/<FD>\n```\n\n```mermaid\ngraph TD\n    A[iowait 和写延迟升高] --> B[iostat 确认设备]\n    B --> C[pidstat 或 iotop 找进程]\n    C --> D[strace 观察写入]\n    D --> E[lsof 映射文件描述符]\n    E --> F[确认日志文件]\n    F --> G[检查日志级别 频率 大小和轮转]\n```\n\n课程案例中，Python 进程每隔很短时间写入约 300 MiB 日志，导致设备排队和文件系统日志线程延迟。调高日志级别后，`iowait` 和磁盘利用率回落。\n\n#### 日志优化清单\n\n- 生产默认日志级别合理；\n- 支持运行时动态调级并设置自动恢复；\n- 对单条日志大小和每秒日志量设监控；\n- 日志异步批量写入；\n- 配置轮转、保留期和磁盘配额；\n- 避免同步写每条日志；\n- 将高流量日志与数据库数据隔离；\n- 防止异常对象或请求体被完整重复打印；\n- 建立日志丢弃或降级策略。\n\n降低日志量可能减少排障信息，必须保留错误、审计和关键业务事件。正确做法是结构化、采样和分级，而不是简单关闭所有日志。\n\n---", "subs": ["从系统现象确认 I/O 瓶颈", "定位写入进程", "日志优化清单"]}, {"title": "磁盘 I/O 延迟过高的排查", "content": "<!-- src: sources/linux-performance/03-IO性能篇/27-案例篇-为什么我的磁盘IO延迟很高.md -->\n\n磁盘延迟高时，`strace` 不一定总能直接看到目标 `write()`。多线程、短时文件、工具过滤范围、容器命名空间和系统调用发生在其他线程，都可能让快照式跟踪漏掉关键行为。\n\n#### 先建立责任链\n\n```bash\ntop\niostat -xz 1\npidstat -d 1\n```\n\n先确认：\n\n1. 是否确有设备延迟和队列问题；\n2. 哪个设备异常；\n3. 哪个进程的 I/O 与设备数据一致；\n4. I/O 主要是读还是写。\n\n#### strace 没结果怎么办\n\n先检查是否跟踪了全部线程和正确系统调用：\n\n```bash\nstrace -f -tt -T \\\n  -e trace=open,openat,close,read,pread64,write,pwrite64,fsync,fdatasync \\\n  -p <PID>\n```\n\n仍无结果时，使用内核动态追踪工具：\n\n```bash\nfiletop\nopensnoop\nbiosnoop\nbiotop\n```\n\n工具名称和参数因 BCC 或 bpftrace 版本不同而变化。\n\n| 工具 | 回答的问题 |\n| --- | --- |\n| `filetop` | 哪个线程正在读写哪些文件名 |\n| `opensnoop` | 哪个进程打开了什么路径 |\n| `biosnoop` | 块 I/O 请求的设备、延迟和进程 |\n| `biotop` | 按进程聚合块 I/O |\n\n课程案例中，应用每个请求创建 1000 个临时文件，写入后重新读取，再删除目录。文件短时存在，普通文件检查容易错过；`filetop` 和 `opensnoop` 最终揭示了动态目录和文件路径。\n\n#### 根因是算法还是磁盘\n\n把中间数据写入大量临时文件，再读回内存，会产生：\n\n- 文件创建和删除；\n- inode 与 dentry 操作；\n- 页缓存和脏页；\n- 文件系统日志；\n- 块设备写入和回读；\n- 大量系统调用。\n\n如果数据规模可控，直接在内存中处理通常更高效；规模过大时，可考虑流式处理、批量文件、数据库、对象存储或外部排序，而不是把每条数据拆成独立小文件。\n\n课程案例改为内存处理后，响应时间从数分钟降到数秒。继续优化还应分析算法复杂度和数据结构，而不只是把存储介质从磁盘换成内存。\n\n---", "subs": ["先建立责任链", "strace 没结果怎么办", "根因是算法还是磁盘"]}, {"title": "一条慢 SQL 背后的 I/O 问题", "content": "<!-- src: sources/linux-performance/03-IO性能篇/28-案例篇-一个SQL查询要15秒，这是怎么回事.md -->\n\n数据库慢查询可能表现为 CPU 高，也可能表现为大量随机读、缓存未命中和高 `iowait`。系统工具负责定位到数据库进程和数据文件，数据库工具负责解释 SQL 执行计划。\n\n#### 从设备定位到数据表\n\n```bash\niostat -xz 1\npidstat -d 1\nstrace -f -tt -T -e trace=read,pread64 -p <MYSQL_PID>\nlsof -p <MYSQL_PID>\n```\n\n课程案例中，`mysqld` 持续读取约 32 MiB/s，文件描述符对应 MyISAM 的 `products.MYD` 数据文件，由路径进一步确认数据库和表。\n\n对现代数据库，不应依赖数据文件命名规则作为唯一证据。应同时使用数据库内部视图、慢查询日志和性能模式。\n\n#### 用数据库工具验证执行计划\n\n```sql\nSHOW FULL PROCESSLIST;\nEXPLAIN SELECT *\nFROM products\nWHERE productName = 'geektime';\n```\n\n需要关注：\n\n| 字段 | 含义 |\n| --- | --- |\n| `type` | 访问类型，`ALL` 通常表示全表扫描 |\n| `possible_keys` | 可能使用的索引 |\n| `key` | 实际使用的索引 |\n| `rows` | 预计扫描行数 |\n| `Extra` | 过滤、排序、临时表等附加行为 |\n\n课程案例对查询列建立索引后，响应从约 15 秒降到数毫秒。\n\n```mermaid\ngraph TD\n    A[SQL 响应慢] --> B[iostat 确认磁盘读瓶颈]\n    B --> C[pidstat 定位 mysqld]\n    C --> D[strace 和 lsof 确认数据文件]\n    D --> E[processlist 找 SQL]\n    E --> F[EXPLAIN 查看执行计划]\n    F --> G{是否全表扫描}\n    G -->|是| H[设计合适索引或改写查询]\n    G -->|否| I[继续分析锁 缓存 排序和存储]\n```\n\n#### 系统缓存也会改变结果\n\n案例中的干扰进程频繁执行 `drop_caches`，导致数据库依赖的页缓存不断失效。停止干扰后，即使没有索引，查询也从 15 秒降到约 0.1 秒；但建立索引仍然更快、更稳定。\n\n这说明：\n\n- 热缓存可以掩盖低效 SQL；\n- 冷缓存能放大全表扫描成本；\n- 不能把数据库性能完全建立在不可控的系统页缓存上；\n- 正确索引比“祈祷缓存命中”更可靠；\n- 测试时必须控制缓存状态和干扰负载。\n\n索引会增加写放大、存储占用和维护成本。应根据选择性、查询频率和写入模式设计，不是索引越多越好。\n\n---", "subs": ["从设备定位到数据表", "用数据库工具验证执行计划", "系统缓存也会改变结果"]}, {"title": "Redis 响应慢的 I/O 排查", "content": "<!-- src: sources/linux-performance/03-IO性能篇/29-案例篇-Redis响应严重延迟，如何解决.md -->\n\nRedis 主要在内存中处理数据，但持久化、fork、AOF 重写和客户端错误用法都可能引发磁盘 I/O 和延迟。即使设备未饱和，频繁同步写仍会阻塞请求路径。\n\n#### 发现“查询为何在写盘”\n\n课程案例中，CPU、内存和磁盘利用率都没有明显达到极限，但查询接口很慢，而且存在持续磁盘写。\n\n```bash\npidstat -d 1\nstrace -f -tt -T -e trace=write,fsync,fdatasync -p <REDIS_PID>\nlsof -p <REDIS_PID>\n```\n\n结果显示 Redis 频繁写 `/data/appendonly.aof`，每次写后执行 `fdatasync()`。\n\n检查配置：\n\n```bash\nredis-cli CONFIG GET appendonly\nredis-cli CONFIG GET appendfsync\n```\n\n| `appendfsync` | 持久化语义 | 性能影响 |\n| --- | --- | --- |\n| `always` | 每次写命令同步 | 最保守，延迟和 IOPS 压力最大 |\n| `everysec` | 通常每秒同步 | 性能和数据安全的常见折中 |\n| `no` | 交给操作系统写回 | 性能较好但持久化窗口更大 |\n\n选择必须基于业务可接受的数据丢失窗口，不能为了降低延迟直接关闭持久化。\n\n#### 客户端也可能制造无意义写入\n\n`strace` 还显示，每次 `GET` 返回匹配值后，客户端又发起 `SADD`，把查询中间结果写回 Redis。因为开启 AOF，这些临时写操作又变成磁盘同步。\n\n```mermaid\nsequenceDiagram\n    participant App as 查询应用\n    participant Redis as Redis\n    participant AOF as AOF 文件\n    App->>Redis: GET\n    Redis-->>App: 返回值\n    App->>Redis: SADD 临时结果\n    Redis->>AOF: 追加命令\n    Redis->>AOF: fdatasync\n    Redis-->>App: 返回完成\n```\n\n课程先把 `appendfsync` 从 `always` 改为 `everysec`，响应从约 10 秒降到约 0.9 秒；再移除查询路径中不必要的 Redis 临时写，降到约 0.2 秒。\n\n#### Redis I/O 排查清单\n\n- AOF 和 RDB 策略是否符合数据安全要求；\n- `appendfsync` 是否过于激进；\n- AOF 重写是否与业务高峰重叠；\n- fork 时内存和 Copy-on-Write 是否造成压力；\n- 慢命令和大 Key；\n- 是否使用 `KEYS` 或大范围 `SCAN`；\n- 客户端是否存在 N+1 请求；\n- Pipeline 或 Lua 是否能减少网络往返；\n- 临时结果是否应该保存在应用内存；\n- 数据目录是否与其他高 I/O 服务共盘。\n\n---", "subs": ["发现“查询为何在写盘”", "客户端也可能制造无意义写入", "Redis I/O 排查清单"]}, {"title": "I/O 性能问题的快速定位流程", "content": "<!-- src: sources/linux-performance/03-IO性能篇/30-套路篇-如何迅速分析出系统IO的瓶颈在哪里.md -->\n\nI/O 排障的主线是：先确认设备是否异常，再关联责任进程，随后定位文件、块设备或网络存储，最后结合应用语义解释为什么会产生这些 I/O。\n\n#### 文件系统与磁盘指标\n\n| 层次 | 核心指标 |\n| --- | --- |\n| 文件系统容量 | 数据块、inode、挂载参数 |\n| 文件系统缓存 | 页缓存、dentry、inode、Slab |\n| 设备负载 | IOPS、吞吐量、延迟、队列、利用率 |\n| 进程 I/O | 读写字节、取消写、I/O 延迟 |\n| I/O 语义 | 顺序或随机、同步或异步、缓存或直接 |\n\n#### 四步定位法\n\n```mermaid\ngraph TD\n    A[业务延迟或 iowait 告警] --> B[iostat 确认设备瓶颈]\n    B --> C[pidstat 或 iotop 定位进程]\n    C --> D[分析进程 I/O 行为]\n    D --> E[strace lsof filetop biosnoop]\n    E --> F[结合应用和存储原理]\n    F --> G[形成根因]\n    G --> H[修复并复测]\n```\n\n常用起手式：\n\n```bash\niostat -xz 1\nvmstat 1\npidstat -d 1\niotop -oPa\n```\n\n专项工具：\n\n| 问题 | 工具 |\n| --- | --- |\n| 文件系统空间 | `df -h`、`du` |\n| inode 用尽 | `df -i` |\n| Slab 异常 | `slabtop` |\n| 进程打开文件 | `lsof`、`/proc/<PID>/fd` |\n| 系统调用 | `strace` |\n| 短时打开文件 | `opensnoop` |\n| 文件读写热点 | `filetop` |\n| 块 I/O 延迟 | `biosnoop`、`biotop` |\n| 块层完整事件 | `blktrace` |\n| 网络文件系统 | 网络延迟、重传和服务端指标 |\n\n#### 诊断时必须问的问题\n\n1. 是读还是写？\n2. 是随机还是顺序？\n3. 平均请求多大？\n4. 是否同步持久化？\n5. 是否命中页缓存？\n6. 哪个设备或远端存储？\n7. 哪个进程、线程和文件？\n8. I/O 是否是业务必需？\n9. 是否有其他进程干扰？\n10. 当前指标相对设备基线如何？\n\n---", "subs": ["文件系统与磁盘指标", "四步定位法", "诊断时必须问的问题"]}, {"title": "磁盘 I/O 性能优化的常用手段", "content": "<!-- src: sources/linux-performance/03-IO性能篇/31-套路篇-磁盘IO性能优化的几个思路.md -->\n\nI/O 优化前要用与业务相近的负载建立基线。优化目标可能是更高 IOPS、更高吞吐量、更低尾延迟、更强持久化或更公平的资源分配，无法用单一指标概括。\n\n#### 使用 fio 建立可比基线\n\n```bash\nfio --name=workload \\\n  --filename=/path/to/testfile \\\n  --size=8G \\\n  --rw=randrw \\\n  --rwmixread=70 \\\n  --bs=8k \\\n  --ioengine=io_uring \\\n  --iodepth=32 \\\n  --numjobs=4 \\\n  --direct=1 \\\n  --runtime=120 \\\n  --time_based \\\n  --group_reporting\n```\n\n重点查看：\n\n- IOPS 和带宽；\n- 平均延迟；\n- P95、P99、P99.9 延迟；\n- 队列深度；\n- CPU 消耗；\n- 测试期间的 `iostat` 设备表现。\n\n测试裸盘写会破坏数据。生产设备不得直接运行破坏性基准。\n\n#### 读懂 fio 报告\n\nfio 报告中最容易混淆的是三种延迟：\n\n| 指标 | 含义 | 异常时优先检查 |\n| --- | --- | --- |\n| `slat` | 从 fio 创建请求到请求提交的时间 | CPU、内存、锁、提交路径 |\n| `clat` | 请求提交到完成的时间 | 设备、文件系统、队列 |\n| `lat` | 请求创建到完成的总时间 | 近似为 `slat + clat` |\n\n示例摘要：\n\n```text\nread: IOPS=4257, BW=16.6MiB/s\nslat (usec): avg=4.29\nclat (usec): avg=15024.30\nlat  (usec): avg=15029.12\nclat percentiles (usec):\n  50.00th=2540\n  95.00th=45876\n  99.00th=46924\n  99.99th=404751\n```\n\n这个结果不能只总结为“平均延迟 15 ms”。P50 约为 2.5 ms，而 P99.99 超过 400 ms，说明存在明显长尾。若业务是同步请求，长尾可能直接转化为接口超时。\n\n同时检查：\n\n- `IOPS` 是否符合块大小和设备能力；\n- `BW` 是否接近链路或云盘吞吐上限；\n- `io` 总量是否达到预期；\n- `IO depths` 是否真的维持目标队列深度；\n- `issued` 中是否有 short 或 dropped；\n- CPU 的 `usr`、`sys` 和上下文切换是否异常；\n- `Disk stats` 的利用率是否接近饱和；\n- 测试期间 `iostat -xz 1` 的 `await` 和队列是否同步升高。\n\nIOPS 与带宽的近似关系：\n\n```text\n带宽 ≈ IOPS × 单次 I/O 大小\n```\n\n例如 4 KiB 随机读达到 100000 IOPS，数据吞吐约为 390 MiB/s。若换成 1 MiB 顺序读，设备通常先达到吞吐上限而不是 IOPS 上限。\n\n#### 判断瓶颈位于哪里\n\n| fio 表现 | 可能方向 |\n| --- | --- |\n| `slat` 高，`clat` 正常 | 提交线程、CPU、内存或同步开销 |\n| `clat` 随队列深度快速升高 | 设备或后端已经饱和 |\n| IOPS 不升，CPU 单核打满 | I/O engine 或提交路径受 CPU 限制 |\n| 带宽达到固定上限 | 设备、控制器、云盘或网络存储限速 |\n| P99 波动但平均值稳定 | 写回、GC、共享设备干扰或固件行为 |\n| direct 模式快，缓存模式抖动 | 页缓存、脏页回写或内存回收 |\n\n逐级改变队列深度比只测一个参数更有意义：\n\n```bash\nfor depth in 1 2 4 8 16 32 64; do\n  fio --name=depth-\"$depth\" \\\n    --filename=/path/to/testfile \\\n    --rw=randread \\\n    --bs=4k \\\n    --ioengine=io_uring \\\n    --iodepth=\"$depth\" \\\n    --direct=1 \\\n    --runtime=60 \\\n    --time_based \\\n    --output=\"fio-depth-${depth}.json\" \\\n    --output-format=json\ndone\n```\n\n把 IOPS、P99 与队列深度画在同一张图上。吞吐停止增长而延迟继续上升的位置，就是不应继续加深队列的重要信号。\n\n#### 让基准更接近生产负载\n\n合成负载至少要匹配：\n\n- 顺序或随机比例；\n- 读写比例；\n- 块大小分布；\n- 并发任务数和队列深度；\n- direct 或 page cache；\n- `fsync` 频率；\n- 文件数量和工作集大小；\n- 稳态运行时间。\n\n如果能在受控环境运行 fio，可记录其 I/O 日志：\n\n```bash\nfio --name=capture \\\n  --filename=/path/to/testfile \\\n  --rw=randrw \\\n  --write_iolog=workload.iolog \\\n  --runtime=60 \\\n  --time_based\n```\n\n在隔离测试环境重放：\n\n```bash\nfio --name=replay \\\n  --filename=/path/to/clone \\\n  --read_iolog=workload.iolog \\\n  --replay_redirect=/path/to/clone\n```\n\n对于无法改造的生产应用，可在严格控制开销的前提下，用 `blktrace` 记录块设备请求，再转换为 fio 可重放的日志：\n\n```bash\nblktrace -d /dev/<DEVICE> -o trace\nblkparse -i trace -d trace.bin\nfio --name=replay --filename=/dev/<TEST_DEVICE> --read_iolog=trace.bin\n```\n\n重放必须使用数据副本或专用测试设备。原始 trace 可能包含真实 LBA、写操作和业务访问模式，直接在生产盘或未清理的目标盘重放会破坏数据。\n\n重放也不是完美复制：它无法自动还原应用思考时间、页缓存状态、文件系统元数据、数据库锁和网络依赖。最终仍要用业务压测验证优化效果。\n\n#### 应用层优化\n\n- 用顺序或追加写代替随机写；\n- 合并小请求，使用批量 I/O；\n- 充分利用页缓存或设计应用缓存；\n- 高频相同区域访问可评估 `mmap`；\n- 避免每个请求执行 `fsync`；\n- 使用异步 I/O 和合理队列深度；\n- 减少临时文件和重复序列化；\n- 优化数据库索引和访问路径；\n- 使用 cgroups v2 `io` 控制器限制异常服务；\n- 降低网络存储往返和小请求数量。\n\n#### 文件系统层优化\n\n- 根据负载和运维能力选择 Ext4、XFS 等文件系统；\n- 评估 `noatime` 等挂载参数；\n- 合理设置日志和持久化模式；\n- 控制脏页比例和写回节奏；\n- 调整 `vfs_cache_pressure` 前先确认元数据缓存问题；\n- 不需要持久化的数据可考虑 tmpfs；\n- 避免目录中过量小文件；\n- 为数据库、日志和临时数据设计合理目录与卷布局。\n\n脏页参数会影响吞吐和延迟。积累更多脏页可提高批量写吞吐，但也会放大写回尖峰和数据风险。\n\n#### 设备和架构层优化\n\n- 使用更快的 SSD 或 NVMe；\n- 使用 RAID 提高性能或可靠性；\n- 将数据库、日志和备份分离到不同设备；\n- 调整预读以匹配顺序访问；\n- 选择适合设备与负载的 I/O 调度器；\n- 为云盘配置足够 IOPS 和吞吐量；\n- 检查多路径、控制器和队列；\n- 监控 SMART、内核错误和设备超时；\n- 扩容前确认瓶颈不在应用算法或同步策略。\n\n查看硬件和内核错误：\n\n```bash\ndmesg -T | grep -i -E 'error|timeout|reset|I/O'\nsmartctl -a /dev/<DEVICE>\n```\n\n#### 优化的正确顺序\n\n```mermaid\ngraph TD\n    A[定义业务延迟和吞吐目标] --> B[建立 I/O 基线]\n    B --> C[定位主要瓶颈层]\n    C --> D{是否能减少 I/O}\n    D -->|是| E[算法 缓存 批处理 索引]\n    D -->|否| F[优化 I/O 模式和持久化]\n    F --> G[文件系统和设备调优]\n    E --> H[相同负载复测]\n    G --> H\n    H --> I[比较业务指标和尾延迟]\n```\n\n减少不必要的 I/O 往往比调内核参数收益更大。只有在应用 I/O 合理、瓶颈确实位于文件系统或设备层时，系统参数和硬件升级才是主要手段。", "subs": ["使用 fio 建立可比基线", "读懂 fio 报告", "判断瓶颈位于哪里", "让基准更接近生产负载", "应用层优化", "文件系统层优化", "设备和架构层优化", "优化的正确顺序"]}]}, {"title": "第 4 章 · 网络性能分析与优化", "sections": [{"title": "Linux 网络基础：协议栈与收发流程", "content": "<!-- src: sources/linux-performance/04-网络性能篇/33-关于Linux网络，你必须知道这些上.md; sources/linux-performance/04-网络性能篇/34-关于Linux网络，你必须知道这些下.md; sources/linux-performance/04-网络性能篇/45-答疑五-网络收发过程中，缓冲区位置在哪里.md -->\n\n网络性能问题经常同时表现为延迟升高、吞吐下降、连接失败和 CPU 使用率上升。排查前必须先理解数据包经过了哪些层，以及每一层有哪些队列、缓存和统计指标。\n\n#### 从 TCP/IP 模型理解网络栈\n\nLinux 网络通常按四层 TCP/IP 模型理解：\n\n| 层级 | 典型协议 | Linux 中的主要职责 |\n|---|---|---|\n| 应用层 | HTTP、DNS、RPC | 请求编解码、业务处理、连接复用 |\n| 传输层 | TCP、UDP | 连接、可靠传输、流量控制、拥塞控制 |\n| 网络层 | IP、ICMP | 寻址、路由、分片、转发 |\n| 网络接口层 | Ethernet、ARP | 帧封装、邻居解析、网卡收发 |\n\n发送数据时，各层依次增加协议头；接收数据时，各层反向解析并去掉协议头。应用看到的响应时间，是应用处理、协议栈处理、排队和链路传输时间的总和。\n\n```mermaid\ngraph LR\n    A[应用数据] --> B[TCP 或 UDP 报文]\n    B --> C[IP 数据包]\n    C --> D[以太网帧]\n    D --> E[网卡发送]\n    E --> F[网络链路]\n```\n\n#### 接收数据的关键路径\n\n典型接收流程如下：\n\n1. 网卡收到网络帧，通过 DMA 写入内存中的接收环形队列。\n2. 网卡触发硬中断，驱动安排 NAPI 轮询或软中断处理。\n3. 内核构造或关联 `sk_buff`，进入链路层和 IP 层处理。\n4. TCP 或 UDP 根据四元组找到对应套接字。\n5. 数据进入套接字接收缓冲区。\n6. 应用通过 `read`、`recv` 等系统调用取走数据。\n\n```mermaid\ngraph TD\n    A[网卡收到帧] --> B[DMA 写入接收环]\n    B --> C[硬中断通知]\n    C --> D[NAPI 和软中断]\n    D --> E[链路层处理]\n    E --> F[IP 层处理]\n    F --> G[TCP 或 UDP 处理]\n    G --> H[套接字接收缓冲区]\n    H --> I[应用读取]\n```\n\n高包速场景下，瓶颈可能不在带宽，而在网卡队列、中断、软中断、协议栈或应用取包速度。接收缓冲区满时，后续数据可能被丢弃，TCP 还会引发重传和吞吐下降。\n\n#### 发送数据的关键路径\n\n发送路径大致相反：\n\n1. 应用调用 `write` 或 `send`。\n2. 数据复制或映射到套接字发送缓冲区。\n3. TCP 或 UDP、IP 和链路层完成封装。\n4. 数据经过流量控制队列和网卡驱动。\n5. 网卡通过 DMA 读取发送描述符并发出数据。\n6. 发送完成后，硬中断或轮询回收描述符。\n\n发送缓冲区堆积通常说明应用产生数据的速度超过网络实际发送速度，也可能是对端接收窗口过小、拥塞控制收缩、链路丢包或设备队列拥堵。\n\n#### 收发路径中的三层缓冲区\n\n“网络缓冲区”不是一个单独的区域。一次收包通常会经过网卡队列、协议栈包对象和套接字缓冲区，它们的所有者、生命周期和观测方法都不同。\n\n| 层次 | 典型对象 | 所在位置 | 主要作用 |\n|---|---|---|---|\n| 网卡收发环 | RX/TX descriptor ring | 驱动管理的主机内存和设备可访问 DMA 区域 | 在网卡与驱动之间传递描述符 |\n| 协议栈包对象 | `sk_buff` | 内核内存 | 保存包元数据并关联数据区 |\n| 套接字缓冲区 | receive/send queue | 每个 socket 对应的内核内存 | 在协议栈与应用之间排队 |\n| 应用缓冲区 | 用户态数组或对象 | 进程虚拟地址空间 | 应用读取和组织业务数据 |\n\n网卡可能有自己的片上缓存，但 Linux 中常说的 RX/TX ring 通常是驱动配置、网卡可通过 DMA 访问的主机内存队列。ring 中主要是描述符，不应简单理解为一块无限扩大的包缓存。\n\n`sk_buff` 是 Linux 网络栈的核心包描述对象。它保存协议头位置、长度、路由、校验和和设备等元数据，并指向实际数据区。数据经过不同协议层时，内核通常移动指针、修改元数据或克隆引用，不会在每一层都完整复制一次。\n\n套接字接收缓冲区保存已经通过协议处理、等待应用读取的数据；发送缓冲区保存应用已经提交、但尚未完成发送或确认的数据。它们属于内核内存，不计入进程 RSS，却会随着连接数和排队数据量增长。\n\n`sk_buff`、socket、conntrack 等对象还会使用 Slab 分配器。因此，网络流量导致内核内存增长时，不能只看进程内存：\n\n```bash\nethtool -g eth0\nethtool -S eth0\nss -m\ncat /proc/net/sockstat\ncat /proc/net/sockstat6\nslabtop\n```\n\n重点解释：\n\n- `ethtool -g` 查看网卡 ring 的当前值和硬件允许的最大值；\n- `ethtool -S` 查看驱动级丢包、队列和错误计数；\n- `ss -m` 查看单个套接字的接收、发送、转发和内存占用；\n- `/proc/net/sockstat` 汇总 socket 数量与 TCP 内存页；\n- `slabtop` 用于确认 `skbuff_head_cache`、`TCP` 和 conntrack 相关 Slab 是否异常增长。\n\n扩大 ring 可以吸收短时突发，但会增加排队时间和内存占用。扩大套接字缓冲区能改善高带宽时延积链路的吞吐，也可能掩盖应用读取不及时并放大尾延迟。调优前必须先找出真正发生丢包或排队的层次。\n\n#### 谁在执行网络协议栈\n\n网络协议栈并非只由 `ksoftirqd` 执行。接收和发送路径会跨越多个执行上下文：\n\n| 执行上下文 | 主要工作 | 典型现象 |\n|---|---|---|\n| 硬中断 | 确认设备事件并安排后续处理 | `/proc/interrupts` 中网卡 IRQ 增长 |\n| NAPI 与软中断 | 批量收包并运行协议栈接收路径 | `NET_RX` softirq 增长 |\n| 当前进程上下文 | 执行 `send`、`recv` 和部分协议处理 | 应用 CPU 时间增加 |\n| `ksoftirqd` | 软中断积压时延后处理 | 某个 `ksoftirqd/N` CPU 很高 |\n| 定时器与工作队列 | 重传、邻居维护和延后任务 | 定时器或内核线程活动增加 |\n\n典型协作关系如下：\n\n```mermaid\ngraph TD\n    A[网卡产生事件] --> B[硬中断确认]\n    B --> C[NAPI 轮询]\n    C --> D[NET RX 软中断]\n    D --> E[协议栈处理]\n    E --> F[套接字队列]\n    G[应用系统调用] --> E\n    D --> H{预算是否耗尽}\n    H -->|是| I[ksoftirqd 延后处理]\n    H -->|否| F\n```\n\n在负载较轻时，软中断可能在中断返回路径或当前 CPU 上直接完成；只有积压、预算耗尽或需要延后时，才会明显看到 `ksoftirqd`。因此，`ksoftirqd` 不高不能证明协议栈没有消耗 CPU，`ksoftirqd` 很高也只是提示该 CPU 的软中断处理出现压力。\n\n联合观察：\n\n```bash\nwatch -n 1 'grep -E \"NET_RX|NET_TX\" /proc/softirqs'\nmpstat -P ALL 1\nsar -n DEV 1\ncat /proc/interrupts\ncat /proc/net/softnet_stat\n```\n\n若某个 CPU 的 `NET_RX`、网卡 IRQ 和软中断时间同时偏高，应继续检查 RSS 队列、中断亲和性、RPS/RFS 和应用连接分布，而不是直接增加 socket 缓冲区。\n\n#### 先掌握六类核心指标\n\n| 指标 | 回答的问题 |\n|---|---|\n| 带宽 | 链路理论上每秒能传输多少比特 |\n| 吞吐量 | 实际每秒传输了多少有效数据 |\n| PPS | 每秒处理多少个网络包 |\n| 延迟 | 单次或端到端请求需要多长时间 |\n| 丢包与重传 | 链路或协议栈是否在丢失数据 |\n| 连接数 | 当前和单位时间内承载多少连接 |\n\n小包业务可能先耗尽 PPS 和 CPU，大包业务更容易接近带宽上限。因此，只看 `MB/s` 无法解释所有网络瓶颈。\n\n#### 基础观测命令\n\n查看接口地址、状态和累计统计：\n\n```bash\nip addr\nip -s link\n```\n\n重点关注：\n\n- `errors`：校验、帧、驱动或设备错误；\n- `dropped`：协议栈、队列或设备来不及处理；\n- `overrun`：接收速度超过缓冲或处理能力；\n- 接收和发送的包数、字节数是否符合预期。\n\n查看实时接口吞吐和包速：\n\n```bash\nsar -n DEV 1\n```\n\n查看套接字和协议统计：\n\n```bash\nss -s\nss -lntp\nss -antpi\nnstat\n```\n\n对已建立连接，`Recv-Q` 持续增长意味着应用读取不及时；`Send-Q` 持续增长意味着数据尚未被对端确认或无法及时发送。监听套接字的队列含义不同，要结合 `ss -lnt` 的监听状态判断接受队列是否接近上限。", "subs": ["从 TCP/IP 模型理解网络栈", "接收数据的关键路径", "发送数据的关键路径", "收发路径中的三层缓冲区", "谁在执行网络协议栈", "先掌握六类核心指标", "基础观测命令"]}, {"title": "从 C10K 到 C1000K：高并发模型的演进", "content": "<!-- src: sources/linux-performance/04-网络性能篇/35-基础篇-C10K和C1000K回顾.md -->\n\nC10K 指单机同时处理一万个连接的问题。困难不只是连接数量，而是传统“一连接一进程”或“一连接一线程”模型带来的上下文切换、栈内存和调度开销。\n\n#### I/O 模型的演进\n\n| 模型 | 特征 | 主要限制 |\n|---|---|---|\n| 阻塞 I/O | 每个执行单元等待一个连接 | 线程和切换成本高 |\n| `select` | 单线程监控多个文件描述符 | 集合大小和线性扫描成本 |\n| `poll` | 用数组管理文件描述符 | 每次仍需遍历全部描述符 |\n| `epoll` | 只返回就绪事件 | 更适合大量长连接 |\n\n`epoll` 常见两种触发模式：\n\n- 水平触发：只要描述符仍可读写，就持续通知，编程简单；\n- 边缘触发：状态发生变化时通知，通常配合非阻塞 I/O，并持续读写到 `EAGAIN`。\n\n边缘触发不天然比水平触发快。若事件循环、缓冲区处理或错误处理不正确，反而会造成连接卡死和饥饿。\n\n#### 常见高并发架构\n\n```mermaid\ngraph TD\n    A[监听端口] --> B[主进程]\n    B --> C[工作进程一]\n    B --> D[工作进程二]\n    B --> E[工作进程三]\n    C --> F[epoll 事件循环]\n    D --> G[epoll 事件循环]\n    E --> H[epoll 事件循环]\n```\n\n常见设计包括：\n\n- 主进程监听，多个工作进程处理连接；\n- 多进程共享监听套接字；\n- 使用 `SO_REUSEPORT` 让每个工作进程拥有独立监听队列；\n- 事件循环负责网络 I/O，独立线程池负责阻塞任务；\n- 使用连接池、异步调用和批处理降低下游等待。\n\n#### C1000K 的资源约束\n\n百万连接会放大每个连接的固定成本。需要系统检查：\n\n- 文件描述符上限；\n- 每连接套接字缓冲区和应用对象内存；\n- TCP 连接状态和定时器开销；\n- `conntrack` 表容量；\n- 监听队列和接受队列；\n- 临时端口范围；\n- 网卡多队列、中断和软中断分布；\n- 带宽、PPS 与 CPU 是否匹配；\n- 应用事件循环中是否存在阻塞操作。\n\n查看进程和系统文件描述符限制：\n\n```bash\nulimit -n\ncat /proc/sys/fs/file-max\ncat /proc/<PID>/limits\n```\n\n查看连接状态分布：\n\n```bash\nss -ant | awk 'NR>1 {count[$1]++} END {for (s in count) print s, count[s]}'\n```\n\n#### 五元组与 65535 端口误区\n\n一条 TCP 连接由五元组标识：\n\n```text\n协议 源 IP 源端口 目标 IP 目标端口\n```\n\n服务端可以在一个固定监听端口上接收大量连接，因为不同客户端的源 IP 和源端口会生成不同五元组。因此，“TCP 端口只有 65535 个”不等于“一台服务器最多只能建立 65535 条连接”。\n\n主动发起连接的一端通常由内核分配临时端口。它能向同一个目标 IP 和目标端口建立的并发连接数量，会受到本地 IP、临时端口范围、仍占用端口的连接状态以及内核复用规则限制：\n\n```bash\nsysctl net.ipv4.ip_local_port_range\nss -s\nss -ant state time-wait\n```\n\n例如临时端口范围为 `32768 60999` 时，单个本地 IP 对同一目标五元组组合可用的端口空间远小于 65535。增加目标地址、目标端口或本地源 IP，可以形成更多不同五元组，但是否允许复用仍取决于绑定方式、连接状态和内核规则。\n\n端口耗尽常见现象包括：\n\n- 主动建连返回 `EADDRNOTAVAIL` 或连接失败；\n- `TIME_WAIT` 数量很大；\n- 连接池未复用，短连接创建速率过高；\n- NAT 出口的公网 IP 和源端口空间耗尽；\n- 压测机先耗尽临时端口，错误地判断服务端到达上限。\n\n容量测试时应分别记录客户端与服务端的连接状态、端口范围、文件描述符和错误日志。优先通过长连接、连接池和 HTTP 多路复用减少端口周转，再考虑增加源 IP 或扩大经过评估的临时端口范围。\n\n#### 容量估算不能只数连接\n\n每个连接占用 20 KiB 内存时，一百万连接就需要约 20 GiB，仅此还未包括应用对象、页表、队列和操作系统开销。连接空闲与持续传输的成本差异也很大。\n\n容量模型至少应包括：\n\n```text\n总内存 ≈ 基础内存 + 连接数 × 单连接内存 + 活跃请求内存\nCPU 需求 ≈ 每秒连接建立成本 + PPS 处理成本 + 业务计算成本\n```\n\n当单机调优复杂度超过收益时，应优先考虑负载均衡和水平扩展。XDP、AF_XDP 或 DPDK 适合协议处理成为核心瓶颈的极端场景，不应替代常规架构扩容。", "subs": ["I/O 模型的演进", "常见高并发架构", "C1000K 的资源约束", "五元组与 65535 端口误区", "容量估算不能只数连接"]}, {"title": "网络性能的评估方法与指标", "content": "<!-- src: sources/linux-performance/04-网络性能篇/36-套路篇-怎么评估系统的网络性能.md -->\n\n网络基准测试必须先明确测试层级。用 HTTP 压测结果推断网卡 PPS，或用 `ping` 结果代表业务延迟，都会得到错误结论。\n\n#### 按层选择工具\n\n| 测试目标 | 推荐工具 | 主要结果 |\n|---|---|---|\n| ICMP 往返 | `ping`、`hping3` | RTT、丢包、抖动 |\n| TCP 或 UDP 吞吐 | `iperf3`、`netperf` | 吞吐、重传、抖动、丢包 |\n| 包处理能力 | `pktgen`、专业流量发生器 | PPS、丢包、CPU |\n| HTTP 服务 | `wrk`、`ab`、`k6` | RPS、延迟分位数、错误率 |\n\n#### TCP 吞吐测试\n\n服务端：\n\n```bash\niperf3 -s -p 10000\n```\n\n客户端：\n\n```bash\niperf3 -c 192.168.0.30 -p 10000 -t 30 -P 4\n```\n\n观察：\n\n- 发送端和接收端吞吐是否一致；\n- TCP 重传数量；\n- 并行流增加后吞吐是否上升；\n- 测试两端 CPU 是否先饱和；\n- 网卡是否达到带宽或 PPS 上限。\n\nUDP 测试需指定目标速率，并同时关注丢包率和抖动：\n\n```bash\niperf3 -c 192.168.0.30 -u -b 500M -t 30\n```\n\n#### 应用层性能测试\n\n```bash\nwrk --latency -t4 -c200 -d60s http://192.168.0.30/\n```\n\n不能只记录平均延迟，应至少记录：\n\n- 请求吞吐 RPS；\n- P50、P90、P95、P99 延迟；\n- 超时和错误率；\n- 建连与连接复用策略；\n- 响应大小；\n- 服务端和压测端资源利用率。\n\n#### 一次可信的网络测试\n\n```mermaid\ngraph TD\n    A[明确业务目标] --> B[选择测试层级]\n    B --> C[固定拓扑和配置]\n    C --> D[预热]\n    D --> E[逐级增加负载]\n    E --> F[同步采集两端指标]\n    F --> G[记录吞吐 延迟 错误]\n    G --> H[重复测试并比较]\n```\n\n测试应尽量使用独立客户端和服务端。压测机 CPU、端口、文件描述符或网卡先达到上限时，测到的是客户端能力，而不是被测服务能力。\n\n#### 用 pktgen 测量小包 PPS\n\n`iperf3` 适合测 TCP 或 UDP 吞吐，无法单独回答内核每秒能处理多少个最小包。需要评估驱动、软中断和协议栈的 PPS 能力时，可在隔离测试网络使用内核 `pktgen`。\n\n下面示例从 `eth0` 发送 100 万个 64 字节二层帧。目标地址和 MAC 必须替换为测试环境中的真实值：\n\n```bash\nsudo modprobe pktgen\n\necho rem_device_all | sudo tee /proc/net/pktgen/kpktgend_0\necho add_device eth0 | sudo tee /proc/net/pktgen/kpktgend_0\n\necho 'count 1000000' | sudo tee /proc/net/pktgen/eth0\necho 'pkt_size 64' | sudo tee /proc/net/pktgen/eth0\necho 'dst 192.168.0.30' | sudo tee /proc/net/pktgen/eth0\necho 'dst_mac 02:00:00:00:00:30' | sudo tee /proc/net/pktgen/eth0\necho 'delay 0' | sudo tee /proc/net/pktgen/eth0\n\necho start | sudo tee /proc/net/pktgen/pgctrl\ncat /proc/net/pktgen/eth0\n```\n\n`pktgen` 会以尽可能高的速率发包，可能占满链路和 CPU，只能在专用压测机、隔离网段和明确限流的环境执行。多队列测试还需要将不同发送线程绑定到对应 CPU 和网卡队列，避免所有流量落到同一个队列。\n\n结果中应至少记录：\n\n- 总包数和运行时间；\n- 实际 PPS 与 Mbps；\n- 发送错误和丢包；\n- 发送端每个 CPU 的软中断与系统时间；\n- 接收端驱动丢包和 `softnet_stat` 增量；\n- 测试期间的包大小、队列数、MTU 和卸载配置。\n\n同步采集两端指标：\n\n```bash\nmpstat -P ALL 1\nsar -n DEV 1\nwatch -n 1 'grep -E \"NET_RX|NET_TX\" /proc/softirqs'\nethtool -S eth0\ncat /proc/net/softnet_stat\n```\n\n如果发送端单核先满，结果是流量发生器上限；如果接收端 `rx_missed_errors`、队列丢包或 `softnet_stat` 丢包增长，才说明接收路径到达瓶颈。测试必须逐级升压，并保留吞吐、PPS、CPU 和丢包的拐点。\n\n#### 64 字节包的线速 PPS\n\n以 1 Gbit/s 以太网为例，64 字节最小帧在线路上还要考虑 8 字节前导码与起始定界符、12 字节帧间隙。理论 PPS 约为：\n\n```text\n1,000,000,000 / ((64 + 20) × 8) ≈ 1,488,095 PPS\n```\n\n这约为 1.488 Mpps。10 Gbit/s 时理论值约为 14.88 Mpps。该计算用于理解物理线速，不等于应用有效吞吐，也没有自动包含所有隧道、VLAN 和上层协议开销。\n\n包越小，每比特有效载荷越少，每秒需要执行的描述符处理、中断、路由和协议栈操作越多。因此网络设备标称达到 10 Gbit/s，不代表它能以 14.88 Mpps 稳定处理复杂防火墙、NAT 或应用逻辑。\n\n#### 线速不等于有效吞吐\n\n以太网传输包含帧头、帧间隙、前导码和校验等额外开销。小包时协议开销占比更高，因此同样的带宽会对应更高的 PPS 压力。评估时应区分：\n\n- 物理链路速率；\n- 二层实际吞吐；\n- TCP 或 UDP 有效负载吞吐；\n- 应用层有效数据吞吐。", "subs": ["按层选择工具", "TCP 吞吐测试", "应用层性能测试", "一次可信的网络测试", "用 pktgen 测量小包 PPS", "64 字节包的线速 PPS", "线速不等于有效吞吐"]}, {"title": "DNS 解析时快时慢的排查", "content": "<!-- src: sources/linux-performance/04-网络性能篇/37-案例篇-DNS解析时快时慢，我该怎么办.md -->\n\nDNS 延迟会直接叠加到首次连接和请求延迟中。解析偶发变慢时，应区分本地配置、缓存命中、解析器性能、网络质量和权威 DNS 链路。\n\n#### 先理解解析路径\n\n```mermaid\ngraph LR\n    A[应用查询域名] --> B[本地 hosts 和缓存]\n    B --> C[递归解析器]\n    C --> D[根域名服务器]\n    D --> E[顶级域名服务器]\n    E --> F[权威域名服务器]\n    F --> C\n    C --> A\n```\n\n大多数 DNS 查询使用 UDP 53。响应过大、截断或特定操作会回退到 TCP，因此排查时不能只过滤 UDP。\n\n#### 检查本机解析配置\n\n```bash\ncat /etc/resolv.conf\ngrep '^hosts:' /etc/nsswitch.conf\nresolvectl status\n```\n\n确认：\n\n- 是否配置可达的 DNS 服务器；\n- 名称服务顺序是否符合预期；\n- 搜索域是否导致多次无效查询；\n- 容器、systemd-resolved 或 NetworkManager 是否改写配置；\n- 多个解析器之间是否有一个响应很慢。\n\n#### 用 dig 分解问题\n\n```bash\ndig example.com\ndig @8.8.8.8 example.com\ndig +trace example.com\ndig example.com A\ndig example.com AAAA\n```\n\n重点查看 `Query time`、返回码、应答服务器、TTL 和是否发生重试。对同一域名连续查询，可判断首次缓存未命中与后续命中的差异。\n\n抓取 DNS 查询：\n\n```bash\ntcpdump -i any -nn '(udp port 53 or tcp port 53)'\n```\n\n若请求发出后长时间没有响应，检查解析器可达性、丢包和防火墙；若响应很快但应用仍慢，继续检查应用是否串行查询、重复解析或被搜索域放大。\n\n#### 三类 DNS 故障的证据链\n\nDNS 慢不能只凭一次 `dig` 下结论。应把现象、假设、网络包和复测结果串起来。\n\n##### 解析器配置错误\n\n现象是所有域名首次访问都超时，或只有特定网络环境失败。假设是 `/etc/resolv.conf`、systemd-resolved、容器 DNS 或搜索域配置错误。\n\n```bash\ncat /etc/resolv.conf\nresolvectl status\ngetent ahosts example.com\ntcpdump -i any -nn '(udp port 53 or tcp port 53)'\n```\n\n关键证据包括：\n\n- 查询发往不可达或已经下线的地址；\n- 配置多个 DNS 时，总是第一个服务器超时后才切换；\n- 搜索域把一个短名称扩展成多次无效查询；\n- 应用报解析失败，但抓包中没有 DNS 请求，说明问题可能在 NSS、应用缓存或 namespace 内；\n- 主机可解析而容器不可解析，说明两者看到的配置或网络 namespace 不同。\n\n修复后要同时用 `getent` 和应用自身请求复测，因为 `dig` 直接查询 DNS，不一定走与应用完全相同的 NSS 路径。\n\n##### 解析器链路丢包或高延迟\n\n现象是解析偶发慢，抓包能看到查询发出，但响应迟到或需要重试。分别指定解析器进行对比：\n\n```bash\ndig @192.168.0.53 example.com +stats\ndig @192.168.0.54 example.com +stats\nping -c 10 192.168.0.53\nmtr -rwzc 20 192.168.0.53\n```\n\n证据链应包括同一时间段的 `Query time`、DNS 重试、路径丢包、UDP 与 TCP 回退，以及其他解析器是否正常。若仅一个解析器慢，优先处理该解析器或路径；若所有解析器都慢，再检查本机队列、防火墙、出口拥塞和应用并发。\n\n##### 缓存未命中或上游递归慢\n\n现象是同一域名第一次查询慢，紧接着重复查询明显变快。连续记录返回服务器、TTL 和耗时：\n\n```bash\nfor i in $(seq 1 5); do\n  dig example.com +stats |\n    awk '/status:|Query time:|SERVER:|ANSWER SECTION/'\n  sleep 1\ndone\n```\n\n如果第一次慢、后续快且 TTL 递减，通常说明后续命中了递归解析器缓存。若每次都慢，可能是缓存未生效、TTL 极短、查询类型不同，或请求被分配给不同解析节点。\n\n`dig +trace` 会自行迭代查询根、顶级域和权威服务器，适合检查委派链，但它与普通递归解析路径不同，不能用一次 `+trace` 的总耗时直接代表应用解析耗时。\n\n#### 验证本地 DNS 缓存收益\n\n本地缓存可以由 systemd-resolved、dnsmasq、Unbound 或应用内解析器提供。选择哪一种不重要，关键是证明请求确实经过缓存，并区分冷缓存与热缓存。\n\n以监听在本机 `127.0.0.1:53` 的缓存服务为例：\n\n```bash\nfor i in $(seq 1 5); do\n  dig @127.0.0.1 example.com +stats |\n    awk '/status:|Query time:|SERVER:/'\ndone\n```\n\n验证步骤：\n\n1. 清理缓存，记录第一次查询的冷缓存耗时。\n2. 在 TTL 有效期内重复查询，记录热缓存 P50 和 P99。\n3. 抓包确认热查询没有重复访问上游。\n4. 监控缓存命中、未命中、失败和过期刷新。\n5. 停止本地缓存或切回原解析路径，用相同请求量做对照。\n6. 检查应用错误率、连接建立时间和总请求尾延迟是否改善。\n\n清理缓存的命令与软件相关。例如 systemd-resolved 可使用：\n\n```bash\nsudo resolvectl flush-caches\nresolvectl statistics\n```\n\n优化不能只展示一次热缓存的微秒级结果。还要验证缓存服务重启、上游不可达、记录过期、负缓存和高并发突发时的行为，避免本地缓存成为新的单点。\n\n#### 常见优化方法\n\n- 部署或启用本地 DNS 缓存；\n- 使用就近、稳定且冗余的递归解析器；\n- 正确设置和尊重 TTL；\n- 复用连接，减少每次请求都解析域名；\n- 对高频域名预热或异步刷新；\n- 谨慎使用 stale cache 和负缓存；\n- 监控解析成功率、P95 和 P99 延迟；\n- 避免把远端 DNS 故障隐藏成无上限重试。\n\n本地缓存能降低延迟和上游压力，但也会带来数据过期风险。优化目标不是永久缓存，而是在正确性与可用性之间控制刷新策略。", "subs": ["先理解解析路径", "检查本机解析配置", "用 dig 分解问题", "三类 DNS 故障的证据链", "验证本地 DNS 缓存收益", "常见优化方法"]}, {"title": "用 tcpdump 与 Wireshark 抓包分析", "content": "<!-- src: sources/linux-performance/04-网络性能篇/38-案例篇-怎么使用tcpdump和Wireshark分析网络流量.md -->\n\n抓包适合回答“线上到底发了什么”。它能验证握手、重传、乱序、零窗口、RST、DNS 超时和应用协议交互，但不能替代系统指标和应用日志。\n\n#### tcpdump 常用参数\n\n```bash\ntcpdump -i eth0 -nn -c 100\ntcpdump -i any -nn host 192.168.0.30\ntcpdump -i eth0 -nn 'tcp port 443'\ntcpdump -i eth0 -nn 'tcp[tcpflags] & tcp-syn != 0'\ntcpdump -i eth0 -nn -s 0 -w capture.pcap\n```\n\n常用过滤条件：\n\n| 条件 | 示例 |\n|---|---|\n| 主机 | `host 192.168.0.30` |\n| 源或目标 | `src host ...`、`dst host ...` |\n| 网络 | `net 192.168.0.0/24` |\n| 端口 | `port 443`、`portrange 8000-8100` |\n| 协议 | `tcp`、`udp`、`icmp` |\n| 组合 | `and`、`or`、`not` |\n\n生产环境抓包应限制接口、过滤条件、包数量、抓取长度和文件轮转，避免磁盘占满。明文协议中可能包含令牌、Cookie 和业务数据，必须控制文件权限和留存范围。\n\n#### Wireshark 分析步骤\n\n1. 用显示过滤器缩小到目标主机、端口或连接。\n2. 选择 `Follow TCP Stream` 聚焦单条会话。\n3. 查看 TCP 流图和时间顺序。\n4. 检查握手耗时、请求响应间隔和关闭过程。\n5. 过滤重传、乱序、重复 ACK、零窗口和 RST。\n6. 将异常包时间与应用日志、系统指标对齐。\n\n常用显示过滤器：\n\n```text\ntcp.stream eq 24\ntcp.analysis.retransmission\ntcp.analysis.duplicate_ack\ntcp.analysis.zero_window\ntcp.flags.reset == 1\ndns\n```\n\n#### 一个容易忽略的案例\n\n`ping` 输出首行域名解析很慢，但后续 RTT 正常，不一定是 ICMP 网络延迟，也可能是正向或反向 DNS 查询超时。可使用：\n\n```bash\nping -n 192.168.0.30\n```\n\n禁用名称解析后若立即恢复，问题应转向 DNS，而不是继续优化 ICMP 或链路。\n\n#### 抓包分析的边界\n\n- 网卡卸载可能让本机抓到的包长度和校验和看起来异常；\n- 在客户端、服务端和中间设备抓包，观察结果可能不同；\n- 抓包只能看到经过采集点的流量；\n- 加密协议通常只能分析握手、包长和时序；\n- 时间戳精度和主机时钟会影响跨机器比较。", "subs": ["tcpdump 常用参数", "Wireshark 分析步骤", "一个容易忽略的案例", "抓包分析的边界"]}, {"title": "缓解 DDoS 攻击导致的性能下降", "content": "<!-- src: sources/linux-performance/04-网络性能篇/39-案例篇-怎么缓解DDoS攻击带来的性能下降问题.md -->\n\nDDoS 的目标是耗尽带宽、协议栈状态或应用资源。处置时首先识别攻击消耗的资源，再决定是在本机、边界还是上游清洗。\n\n#### 三类常见资源耗尽\n\n| 类型 | 典型方式 | 主要症状 |\n|---|---|---|\n| 带宽耗尽 | UDP flood、反射放大 | 入站带宽打满、正常流量无法进入 |\n| 协议栈耗尽 | SYN flood、连接状态攻击 | PPS 高、SYN_RECV 多、队列溢出 |\n| 应用耗尽 | 慢请求、高成本接口 | 连接未必多，但线程或下游资源耗尽 |\n\n#### 识别 SYN flood\n\n```bash\nsar -n DEV 1\nss -ant state syn-recv\nnetstat -s | grep -i -E 'listen|SYN|drop'\ntcpdump -i eth0 -nn 'tcp[tcpflags] & tcp-syn != 0'\n```\n\n典型特征是：\n\n- PPS 很高但每包很小；\n- 大量连接长期停留在 `SYN_RECV`；\n- SYN 数量远高于握手完成数量；\n- 监听队列溢出；\n- 软中断 CPU 升高。\n\n#### 分层缓解\n\n```mermaid\ngraph TD\n    A[发现异常流量] --> B{入口带宽是否已满}\n    B -->|是| C[联系运营商和清洗服务]\n    B -->|否| D[识别协议和来源]\n    D --> E[边界 ACL 和限速]\n    E --> F[负载均衡和防火墙]\n    F --> G[主机协议栈保护]\n    G --> H[应用鉴权 限流 缓存]\n```\n\n本机可以采取：\n\n- 启用并确认 SYN cookies 作为队列压力下的保护机制；\n- 合理扩大监听队列和应用 backlog；\n- 降低无效半连接保留时间需谨慎评估；\n- 对来源、端口和协议做限速；\n- 将高成本请求放到鉴权和限流之后；\n- 使用缓存、熔断和降级保护下游。\n\n检查相关配置：\n\n```bash\nsysctl net.ipv4.tcp_syncookies\nsysctl net.ipv4.tcp_max_syn_backlog\nsysctl net.core.somaxconn\n```\n\n不要盲目复制一组 sysctl 数值。队列扩大只能吸收短时突发，无法解决持续超过处理能力的攻击。\n\n#### 本机防护的上限\n\n流量到达服务器之前，入口带宽若已经被占满，本机丢包规则不会恢复外部连通性。大规模攻击需要：\n\n- 运营商侧黑洞或流量牵引；\n- 高防 IP 和流量清洗；\n- CDN、Anycast 或 WAF；\n- 云平台 DDoS 防护；\n- 跨地域和多入口架构。\n\n缓解后应同时验证正常用户成功率、尾延迟和误杀率，不能只确认攻击流量下降。", "subs": ["三类常见资源耗尽", "识别 SYN flood", "分层缓解", "本机防护的上限"]}, {"title": "网络请求延迟变大的排查", "content": "<!-- src: sources/linux-performance/04-网络性能篇/40-案例篇-网络请求延迟变大了，我该怎么办.md -->\n\n网络请求延迟包含 DNS、建连、TLS、传输、排队和应用处理时间。应先判断慢在网络路径还是应用交互，再逐层缩小范围。\n\n#### 先分解延迟\n\n```text\n总请求时间 =\nDNS 时间 +\nTCP 建连时间 +\nTLS 握手时间 +\n服务端排队与处理时间 +\n数据传输时间\n```\n\n基础检查：\n\n```bash\nping -c 10 192.168.0.30\ntraceroute 192.168.0.30\nhping3 -S -p 8080 -c 10 192.168.0.30\ncurl -o /dev/null -sS -w \\\n'dns=%{time_namelookup} connect=%{time_connect} tls=%{time_appconnect} start=%{time_starttransfer} total=%{time_total}\\n' \\\nhttp://192.168.0.30:8080/\n```\n\n如果单次握手和请求正常，但并发压测变慢，应重点检查排队、锁、连接池、套接字缓冲区和 TCP 小包交互。\n\n#### 延迟确认与 Nagle 的相互作用\n\n课程案例中：\n\n1. 服务端先发送响应的第一个小分段。\n2. 客户端启用延迟 ACK，等待一段时间再确认。\n3. 服务端启用 Nagle，存在未确认数据时暂缓发送后续小分段。\n4. 双方相互等待，形成约 40 ms 的额外延迟。\n\n```mermaid\nsequenceDiagram\n    participant C as 客户端\n    participant S as 服务端\n    C->>S: HTTP 请求\n    S->>C: 响应分段一\n    Note over C: 延迟确认等待\n    Note over S: Nagle 等待确认\n    C->>S: ACK\n    S->>C: 响应分段二\n```\n\n抓包可以看到第一个响应分段与 ACK 之间存在固定时间间隔，第二个分段又紧随 ACK 发出。这比“网络偶尔慢”的描述更接近根因。\n\n案例中的 Nginx 配置为：\n\n```nginx\ntcp_nodelay off;\n```\n\n改为：\n\n```nginx\ntcp_nodelay on;\n```\n\n服务端不再等待前一小包 ACK，延迟显著下降。`TCP_NODELAY` 是否适合开启取决于业务：交互式、小响应服务通常重视低延迟；大块顺序传输则应同时考虑包合并和吞吐。\n\n#### 网络延迟排查流程\n\n```mermaid\ngraph TD\n    A[请求延迟升高] --> B[拆分 DNS 建连 TLS 首字节]\n    B --> C{基础 RTT 是否升高}\n    C -->|是| D[检查路由 丢包 拥塞]\n    C -->|否| E{并发时才变慢}\n    E -->|是| F[检查队列 连接池 CPU]\n    E -->|否| G[抓取单连接时序]\n    F --> G\n    G --> H[定位重传 窗口 ACK 小包]\n    H --> I[修改单一变量]\n    I --> J[相同负载复测]\n```\n\n固定约 40 ms、200 ms、1 秒等阶梯状延迟，往往意味着定时器、重试或超时，应优先寻找协议和应用中的等待机制。", "subs": ["先分解延迟", "延迟确认与 Nagle 的相互作用", "网络延迟排查流程"]}, {"title": "NAT 性能问题的分析与优化", "content": "<!-- src: sources/linux-performance/04-网络性能篇/41-案例篇-如何优化NAT性能上.md; sources/linux-performance/04-网络性能篇/42-案例篇-如何优化NAT性能下.md; sources/linux-performance/04-网络性能篇/45-答疑五-网络收发过程中，缓冲区位置在哪里.md -->\n\nNAT 通过重写源地址、目标地址或端口实现地址转换。Linux NAT 基于 Netfilter 和连接跟踪，规则匹配之外还需要维护连接状态，因此会增加 CPU、内存和查表开销。\n\n#### NAT 的主要类型\n\n| 类型 | 转换内容 | 常见场景 |\n|---|---|---|\n| SNAT | 修改源地址或源端口 | 内网共享公网出口 |\n| DNAT | 修改目标地址或目标端口 | 公网入口映射到后端 |\n| 双向 NAT | 同时使用 SNAT 和 DNAT | 浮动 IP、一对一映射 |\n\n典型 Netfilter 路径：\n\n```mermaid\ngraph LR\n    A[数据包进入] --> B[PREROUTING]\n    B --> C[路由判断]\n    C --> D{本机还是转发}\n    D -->|本机| E[INPUT]\n    D -->|转发| F[FORWARD]\n    F --> G[POSTROUTING]\n    E --> H[本机应用]\n    H --> I[OUTPUT]\n    I --> G\n```\n\nDNAT 常位于 `PREROUTING`，SNAT 或 `MASQUERADE` 常位于 `POSTROUTING`。转发场景还需要启用：\n\n```bash\nsysctl net.ipv4.ip_forward\n```\n\n#### MASQUERADE 如何处理端口冲突\n\n多个内网客户端可能使用相同源端口访问同一个外部服务。例如：\n\n```text\n10.0.0.10:40000 -> 203.0.113.20:443\n10.0.0.11:40000 -> 203.0.113.20:443\n```\n\n经过同一个公网 IP 做 `MASQUERADE` 后，两条连接不能拥有完全相同的转换后五元组。Netfilter 会结合 conntrack 状态为每条连接保存原始方向和回复方向的 tuple：端口可用时尽量保留原源端口，发生冲突时选择其他可用源端口。\n\n```mermaid\ngraph LR\n    A[内网连接一] --> C[NAT 网关]\n    B[内网连接二] --> C\n    C --> D[公网地址端口一]\n    C --> E[公网地址端口二]\n    D --> F[同一外部服务]\n    E --> F\n```\n\n因此，同一个公网 IP 面向同一个目标地址和端口时，仍然受到可用源端口空间限制。大量短连接、长时间 `TIME_WAIT`、多个租户共享出口或单一热门目标，都可能增加端口分配压力。\n\n排查时同时检查：\n\n```bash\nconntrack -S\nconntrack -L -o extended\nsysctl net.netfilter.nf_conntrack_count\nsysctl net.netfilter.nf_conntrack_max\nsysctl net.ipv4.ip_local_port_range\nnstat\n```\n\n故障可能表现为新连接间歇失败，但已有连接仍正常；conntrack 表尚未满，公网源端口却已对特定目标组合耗尽。只增大 `nf_conntrack_max` 无法增加单个公网 IP 的端口空间。\n\n优化顺序是先减少短连接并复用连接，再缩短经过验证的无效状态生命周期；容量仍不足时，增加公网源 IP、按目的地址分流或水平扩展 NAT 网关。每次调整后应以相同连接建立速率复测成功率、P99 建连延迟、conntrack 使用率和端口分布。\n\n#### conntrack 为什么会成为瓶颈\n\n连接跟踪表使用五元组和状态记录连接。NAT 首包建立映射，后续包查找并复用状态。当连接创建速率高、连接数量大或超时过长时，可能出现：\n\n- `nf_conntrack` 表接近或达到上限；\n- 新连接被丢弃；\n- 查表和锁竞争增加；\n- 内核内存消耗升高；\n- NAT 网关软中断 CPU 升高。\n\n检查：\n\n```bash\nsysctl net.netfilter.nf_conntrack_count\nsysctl net.netfilter.nf_conntrack_max\nsysctl net.netfilter.nf_conntrack_buckets\ndmesg -T | grep -i conntrack\nconntrack -S\n```\n\n内核日志出现 `nf_conntrack: table full, dropping packet` 时，已经有新流量因状态表容量不足被丢弃。\n\n#### NAT 性能排查\n\n1. 建立不经过 NAT 的网络性能基线。\n2. 使用相同负载测试 NAT 路径。\n3. 比较吞吐、PPS、延迟、丢包和 CPU。\n4. 检查 `conntrack` 使用率与增长速度。\n5. 检查网卡队列、软中断和丢包点。\n6. 分析规则数量和匹配顺序。\n7. 修改一个变量后重复相同测试。\n\n```bash\nsar -n DEV 1\nmpstat -P ALL 1\nsoftnet_stat=$(cat /proc/net/softnet_stat)\nss -s\nnstat\n```\n\n`/proc/net/softnet_stat` 为十六进制计数，适合由监控或脚本解析并观察增量，不能只看一次快照。\n\n#### 优化方向\n\n- 根据连接峰值和内存预算调整 `nf_conntrack_max`；\n- 合理设置哈希桶数量，避免过长冲突链；\n- 按真实连接生命周期调整 conntrack 超时；\n- 删除冗余规则，将高命中规则前置；\n- 对无需状态跟踪的可信无状态流量评估 `NOTRACK`；\n- 拆分和水平扩展 NAT 网关；\n- 使用多队列、RSS、RPS 或 RFS 分散包处理；\n- 避免容器网络路径中不必要的多层 NAT；\n- 在更高吞吐场景评估 eBPF、XDP 或硬件卸载。\n\n缩短超时可能提前删除仍有效的连接，增大表容量会消耗更多内核内存，绕过 conntrack 还会改变防火墙与 NAT 语义。每项优化都需要容量估算和回归测试。", "subs": ["NAT 的主要类型", "MASQUERADE 如何处理端口冲突", "conntrack 为什么会成为瓶颈", "NAT 性能排查", "优化方向"]}, {"title": "网络性能优化的常用手段", "content": "<!-- src: sources/linux-performance/04-网络性能篇/43-套路篇-网络性能优化的几个思路上.md; sources/linux-performance/04-网络性能篇/44-套路篇-网络性能优化的几个思路下.md -->\n\n网络优化应从业务目标出发，按应用、套接字、协议栈、网卡和架构逐层处理。最有效的优化通常是减少请求次数、传输数据量和同步等待，而不是直接修改内核参数。\n\n#### 应用层\n\n- 使用长连接和连接池，减少握手；\n- 使用异步 I/O、`epoll` 和合理工作进程模型；\n- 避免在事件循环中执行阻塞任务；\n- 合并请求和响应，减少小包；\n- 压缩或使用更紧凑的序列化协议；\n- 使用缓存、CDN 和就近接入；\n- 限流、熔断和降级保护下游；\n- 复用 DNS 结果并遵守 TTL；\n- 用 P99 延迟和错误率约束优化结果。\n\n#### 套接字与 TCP\n\n查看缓冲区和 TCP 自动调优范围：\n\n```bash\nsysctl net.core.rmem_max\nsysctl net.core.wmem_max\nsysctl net.ipv4.tcp_rmem\nsysctl net.ipv4.tcp_wmem\nsysctl net.ipv4.ip_local_port_range\n```\n\n带宽时延积可帮助估算在途数据量：\n\n```text\nBDP = 链路带宽 × 往返时间\n```\n\n高带宽、高 RTT 链路需要足够窗口才能跑满吞吐，但缓冲区并非越大越好。过大的队列会增加内存并可能造成缓冲膨胀和尾延迟。\n\n按场景评估：\n\n- `TCP_NODELAY`：减少交互式小消息等待；\n- `TCP_CORK`：帮助应用聚合分段；\n- `SO_RCVBUF` 和 `SO_SNDBUF`：显式设置套接字缓冲区；\n- keepalive：发现长期失效连接；\n- 合理监听 backlog：吸收连接突发；\n- 扩大临时端口范围：缓解大量主动连接端口不足。\n\n不要使用已经废弃的 `tcp_tw_recycle`。`TIME_WAIT` 是 TCP 正确性机制，应先通过连接复用、减少短连接和架构调整降低数量。\n\n#### 网络层与链路层\n\n- 优化路由，减少跨地域和不必要中转；\n- 保持路径 MTU 一致，特别关注隧道和容器网络；\n- 正确处理 ICMP，避免路径 MTU 发现失败；\n- 使用流量控制和 QoS 保护关键流量；\n- 调整网卡 ring buffer 前确认是否存在队列丢包；\n- 使用 RSS 将不同流分散到多队列；\n- 使用 RPS、RFS 或 XPS 优化 CPU 分布；\n- 评估 GRO、GSO、TSO 和校验和卸载；\n- 检查中断亲和性和 NUMA 本地性。\n\n查看网卡能力和队列：\n\n```bash\nethtool -k eth0\nethtool -g eth0\nethtool -l eth0\nethtool -S eth0\ncat /proc/interrupts\n```\n\n卸载通常能降低 CPU，但也可能增加批处理延迟，或让抓包结果与线上实际帧不同。低延迟和高吞吐场景的最佳配置可能相反。\n\n#### 网络优化闭环\n\n```mermaid\ngraph TD\n    A[定义吞吐 延迟 错误目标] --> B[采集业务和系统基线]\n    B --> C[确认瓶颈层级]\n    C --> D{能否减少网络工作}\n    D -->|是| E[缓存 合并 压缩 复用]\n    D -->|否| F[优化队列 协议栈 网卡]\n    E --> G[固定负载复测]\n    F --> G\n    G --> H[比较 P99 吞吐 错误 CPU]\n    H --> I{目标是否达成}\n    I -->|否| C\n    I -->|是| J[灰度发布和持续监控]\n```\n\n优化时每次只改变少量变量，记录旧值和回滚方式。只有业务指标改善、错误率不升高、资源消耗可接受，才算完成一次有效的网络优化。", "subs": ["应用层", "套接字与 TCP", "网络层与链路层", "网络优化闭环"]}]}, {"title": "第 5 章 · 综合实战与方法论", "sections": [{"title": "容器化应用启动变慢的分析", "content": "<!-- src: sources/linux-performance/05-综合实战篇/46-案例篇-为什么应用容器化后，启动慢了很多.md; sources/linux-performance/05-综合实战篇/58-答疑六-容器冷启动如何性能分析.md -->\n\n应用进入容器后，代码本身可能没有变化，但运行环境增加了 cgroup、namespace、叠加文件系统、虚拟网络和编排平台。分析容器性能时，既要看容器内的应用，也要回到宿主机观察内核资源限制。\n\n#### 先定义启动时间\n\n“容器启动慢”至少可能指：\n\n- 镜像拉取慢；\n- 容器创建和挂载慢；\n- 进程启动慢；\n- 应用初始化慢；\n- 健康检查通过慢；\n- 流量真正可用慢。\n\n应分别记录以下时间点：\n\n```text\n镜像就绪\n容器创建\n主进程启动\n端口监听\nreadiness 成功\n首个有效请求成功\n```\n\n只看容器状态为 `Running`，不能说明应用已经可以服务。\n\n#### 建立冷启动事件时间线\n\n冷启动分析的第一步不是立即运行 profiler，而是找到哪一段时间增长。把编排事件、容器运行时、应用日志和探针结果对齐到同一条时间线：\n\n```mermaid\ngraph LR\n    A[调度到节点] --> B[镜像准备]\n    B --> C[容器创建]\n    C --> D[主进程执行]\n    D --> E[应用初始化]\n    E --> F[端口监听]\n    F --> G[就绪检查通过]\n    G --> H[首个请求成功]\n```\n\nDocker 环境可先记录事件：\n\n```bash\ndocker events \\\n  --filter container=<CONTAINER> \\\n  --format '{{.TimeNano}} {{.Status}}'\n\ndocker inspect <CONTAINER> \\\n  --format '{{json .State}}'\n```\n\nKubernetes 环境查看 Pod 条件、容器状态和事件：\n\n```bash\nkubectl get pod <POD> -n <NAMESPACE> -o json\nkubectl get events -n <NAMESPACE> \\\n  --field-selector involvedObject.name=<POD> \\\n  --sort-by=.lastTimestamp\nkubectl logs -n <NAMESPACE> <POD> --timestamps\n```\n\n应用应主动记录单调时钟下的初始化阶段，例如配置加载、类加载、数据库连接、迁移、缓存预热、端口监听和 readiness。跨主机比较前还要确认时钟同步，因为墙上时间偏差会制造错误的先后关系。\n\n时间线能快速区分：\n\n| 慢阶段 | 首选假设 | 第一批证据 |\n|---|---|---|\n| 调度到容器创建 | 调度、镜像、CNI、CSI | Pod 事件、运行时日志、镜像缓存 |\n| 主进程到端口监听 | CPU、缺页、动态链接、应用初始化 | cgroup、perf、应用阶段日志 |\n| 端口监听到就绪 | 依赖、预热、探针配置 | RED、DNS、连接池、探针日志 |\n| 就绪到首个成功请求 | 路由传播、负载均衡、sidecar | 入口日志、Trace、网络事件 |\n\n#### 为冷启动选择正确的火焰图\n\n火焰图的外观相似，但采样事件不同，回答的问题也不同：\n\n| 类型 | 数据来源 | 回答的问题 |\n|---|---|---|\n| on-CPU 火焰图 | CPU 周期或定时采样 | CPU 时间花在哪些调用栈 |\n| off-CPU 火焰图 | 调度切出到唤醒的阻塞时间 | 线程在等待什么 |\n| 缺页火焰图 | page fault 事件 | 哪些调用栈触发缺页 |\n| 分配火焰图 | malloc 或运行时分配事件 | 哪些调用栈分配内存 |\n\n对宿主机可见的容器主进程 PID 采集 on-CPU 栈：\n\n```bash\nHOST_PID=$(docker inspect \\\n  --format '{{.State.Pid}}' <CONTAINER>)\nsudo perf record -F 99 -g -p \"$HOST_PID\" -- sleep 20\nsudo perf report\n```\n\n若 CPU 利用率不高但启动仍慢，转向 off-CPU 分析。BCC 工具名称会随发行版变化，常见调用形式为：\n\n```bash\nsudo offcputime-bpfcc -p \"$HOST_PID\" 20 > offcpu.stacks\n```\n\n采集缺页调用栈：\n\n```bash\nsudo perf record \\\n  -e page-faults \\\n  -g -p \"$HOST_PID\" \\\n  -- sleep 20\nsudo perf report\n```\n\n`page-faults` 火焰图只说明缺页发生在哪里，不等于完整的“内存占用火焰图”。要分析仍存活的分配、泄漏或分配速率，应使用语言运行时 profiler、`memleak` 或带分配与释放关联的工具。\n\n分析时把三类结果与 cgroup 指标对齐：\n\n```bash\ncat cpu.stat\ncat memory.current\ncat memory.events\ncat io.stat\n```\n\n如果 on-CPU 栈集中在解压、类加载或编译，优先减少启动计算并提高启动 CPU 配额；如果 off-CPU 栈集中在 DNS、connect 或文件 I/O，继续追踪对应依赖；如果缺页或分配激增，检查镜像文件布局、预热策略和内存限制。\n\n#### 用 RED 验证启动后的可服务性\n\n容器进入 `Running` 只代表主进程存在。应从入口请求记录 RED：\n\n- Rate：探针请求和真实请求速率；\n- Errors：连接拒绝、超时、非成功状态；\n- Duration：从建连到完整响应的分位数。\n\n冷启动实验至少重复多次，并区分：\n\n- 节点已有镜像与首次拉取镜像；\n- 已有依赖连接与首次建连；\n- 热文件缓存与冷文件缓存；\n- 单实例启动与并发扩容；\n- 无流量启动与启动即承载流量。\n\n修复后不能只比较进程启动时间，还要比较 readiness 时间、首个成功请求时间、启动窗口错误率和稳态资源。这样才能避免“进程更快启动，但更早接收流量并大量失败”的伪优化。\n\n#### 课程案例的两个问题\n\n案例给 Tomcat 容器设置：\n\n```bash\ndocker run --cpus 0.1 -m 512M ...\n```\n\n第一个问题是容器被 OOM 杀死。可检查：\n\n```bash\ndocker ps -a\ndocker inspect <CONTAINER> --format '{{json .State}}'\ndmesg -T | grep -i -E 'oom|killed process'\n```\n\n`OOMKilled=true`、退出码 `137` 和内核 OOM 日志共同证明进程因内存限制退出。应用申请 256 MiB，不代表容器只需 256 MiB；JVM 堆、元空间、线程栈、直接内存、共享库和页缓存都占用内存。\n\n现代 JVM 通常支持容器资源感知，但仍应显式规划：\n\n```text\n容器内存限制 =\nJVM 堆 +\n元空间 +\n直接内存 +\n线程栈 +\n本地库 +\n页缓存 +\n安全余量\n```\n\n查看容器实际限制时，应以 cgroup 为准。cgroup v2 可从容器对应目录查看：\n\n```bash\ncat memory.max\ncat memory.current\ncat memory.events\n```\n\n第二个问题是 CPU 配额过低。主机总体 CPU 很空闲，Java 进程却只能使用约 10% CPU，启动线程长时间等待调度。\n\n```bash\npidstat -t -p <PID> 1\ndocker stats\n```\n\n若线程 `%wait` 高、容器 CPU 接近配额，而宿主机仍空闲，应检查 CPU quota 和 throttling。cgroup v2 可查看：\n\n```bash\ncat cpu.max\ncat cpu.stat\n```\n\n其中 `nr_throttled` 和 `throttled_usec` 持续增长，说明容器因配额被节流。\n\n#### 容器慢启动排查流程\n\n```mermaid\ngraph TD\n    A[应用启动慢] --> B[拆分镜像 容器 进程 就绪时间]\n    B --> C[检查退出状态和日志]\n    C --> D{是否 OOM 或重启}\n    D -->|是| E[核对 cgroup 内存和应用内存模型]\n    D -->|否| F[采集 CPU 内存 I/O 网络]\n    F --> G{是否 CPU 节流}\n    G -->|是| H[调整配额或减少启动计算]\n    G -->|否| I[检查镜像层 存储 DNS 依赖]\n    E --> J[修复后重测首个可用请求]\n    H --> J\n    I --> J\n```\n\n还应检查：\n\n- 镜像层是否过大、节点是否需要重新拉取；\n- overlayfs 是否产生大量小文件或写时复制；\n- 启动时是否串行访问 DNS、数据库、配置中心；\n- CNI、CSI 和 sidecar 是否延迟 Pod 就绪；\n- readiness 探针是否过严或过早；\n- 启动期间是否执行迁移、预热和大规模缓存加载。\n\n资源限制不能简单删除。正确做法是压测并估算启动与稳态资源，分别设置合理的 request、limit 和应用内部上限。", "subs": ["先定义启动时间", "建立冷启动事件时间线", "为冷启动选择正确的火焰图", "用 RED 验证启动后的可服务性", "课程案例的两个问题", "容器慢启动排查流程"]}, {"title": "服务器偶发丢包的系统排查", "content": "<!-- src: sources/linux-performance/05-综合实战篇/47-案例篇-服务器总是时不时丢包，我该怎么办上.md; sources/linux-performance/05-综合实战篇/48-案例篇-服务器总是时不时丢包，我该怎么办下.md -->\n\n丢包可能发生在客户端、链路、中间设备、服务端网卡、协议栈、Netfilter、套接字和应用。偶发丢包必须依靠分层计数器的增量和多点抓包定位。\n\n#### 丢包路径全景\n\n```mermaid\ngraph TD\n    A[物理链路和交换网络] --> B[网卡硬件和接收环]\n    B --> C[驱动和 softnet]\n    C --> D[qdisc 和流量控制]\n    D --> E[IP 路由和分片]\n    E --> F[Netfilter 和 conntrack]\n    F --> G[TCP 或 UDP]\n    G --> H[套接字缓冲区]\n    H --> I[应用队列和处理]\n```\n\n每层都要回答两个问题：\n\n1. 该层的丢包计数是否增长？\n2. 上一层看到了包，下一层是否没有看到？\n\n#### 第一层：接口、驱动和队列\n\n```bash\nip -s link show dev eth0\nethtool -S eth0\nethtool -g eth0\nsar -n DEV 1\n```\n\n重点关注 CRC、frame、missed、fifo、overrun、no buffer 和 dropped 等计数。不同驱动字段名不同，应根据网卡驱动文档解释。\n\n检查 softnet：\n\n```bash\ncat /proc/net/softnet_stat\n```\n\n第二列等字段出现持续增量时，可能说明软中断处理不及或 backlog 溢出。应使用脚本或监控解析十六进制数据，并按 CPU 比较。\n\n#### 第二层：qdisc 与流量控制\n\n```bash\ntc -s qdisc show dev eth0\ntc -s filter show dev eth0 ingress\n```\n\n课程案例中，`netem` 人为配置了丢包：\n\n```text\nqdisc netem ... loss 30%\n```\n\n`tc` 的 `dropped` 计数能够直接证明 qdisc 丢包。生产环境还可能因限速器、队列溢出或 QoS 策略丢包。\n\n#### 第三层：协议统计\n\n```bash\nnstat -az\nnetstat -s\nss -s\n```\n\n关注：\n\n- IP 丢弃和重组失败；\n- TCP 重传、超时和 SYN 重传；\n- 监听队列溢出；\n- UDP 接收缓冲区错误；\n- ICMP 错误；\n- 零窗口和接收窗口问题。\n\n计数器是系统启动后的累计值，必须比较故障窗口前后的增量。\n\n#### 第四层：Netfilter 与 conntrack\n\n```bash\niptables -t filter -nvL\nnft list ruleset\nsysctl net.netfilter.nf_conntrack_count\nsysctl net.netfilter.nf_conntrack_max\nconntrack -S\ndmesg -T | grep -i conntrack\n```\n\n课程案例中，`INPUT` 和 `OUTPUT` 链的随机 `DROP` 规则命中计数持续增长。规则计数比仅阅读规则文本更快，因为它直接显示哪些规则处理了实际流量。\n\n#### 第五层：MTU 与数据包大小\n\n案例中 SYN 可以成功，HTTP GET 却超时。抓包显示三次握手完成，但看不到应用数据；接口 `RX-DRP` 增长，最终发现容器网卡 MTU 只有 100。\n\n检查：\n\n```bash\nip link show dev eth0\ntracepath <DESTINATION>\nping -M do -s 1472 <DESTINATION>\n```\n\n隧道、VXLAN、VPN、容器网络会增加额外头部。MTU 不一致且 ICMP 被错误拦截时，容易形成路径 MTU 黑洞，表现为小包正常、大包超时。\n\n#### 用多点抓包确定丢包区间\n\n在客户端、服务端宿主机、容器命名空间和必要的中间设备同时抓包：\n\n```bash\ntcpdump -i any -nn -s 0 -w host.pcap 'host <PEER>'\n```\n\n如果包出现在客户端发送口，却没有出现在服务端物理网卡，问题在网络路径；若出现在宿主机但没有进入容器，检查桥接、veth、Netfilter 和 MTU；若进入套接字但应用没有响应，转向应用线程和队列。", "subs": ["丢包路径全景", "第一层：接口、驱动和队列", "第二层：qdisc 与流量控制", "第三层：协议统计", "第四层：Netfilter 与 conntrack", "第五层：MTU 与数据包大小", "用多点抓包确定丢包区间"]}, {"title": "内核线程占用 CPU 过高的定位", "content": "<!-- src: sources/linux-performance/05-综合实战篇/49-案例篇-内核线程CPU利用率太高，我该怎么办.md -->\n\n内核线程名称通常显示在方括号中，由 `kthreadd` 管理。内核线程 CPU 高只是现象，其名称可以提供排查方向。\n\n#### 常见内核线程\n\n| 线程 | 主要职责 | CPU 高时优先检查 |\n|---|---|---|\n| `ksoftirqd/N` | 延后处理软中断 | 网络包速、中断分布、softnet |\n| `kswapd` | 内存回收 | 内存压力、回收、Swap |\n| `kworker` | 内核工作队列 | 设备、驱动、异步内核任务 |\n| `migration/N` | CPU 任务迁移 | 调度、亲和性、负载不均 |\n| `jbd2` | 文件系统日志 | 写入、提交、存储延迟 |\n| `kcompactd` | 内存规整 | 大页、碎片、内存压力 |\n\n查看：\n\n```bash\nps -e -o pid,ppid,psr,stat,comm,wchan:32 | grep '^\\| \\['\ntop -H\npidstat -u -w -p ALL 1\n```\n\n#### ksoftirqd 高的分析\n\n先确认软中断类型和 CPU 分布：\n\n```bash\nmpstat -P ALL 1\nwatch -n 1 cat /proc/softirqs\ncat /proc/interrupts\nsar -n DEV 1\n```\n\n若 `NET_RX` 快速增长、网络 PPS 同时升高，应检查：\n\n- 是否存在 SYN flood 或异常流量；\n- 网卡队列和中断是否集中在少量 CPU；\n- RSS、RPS、RFS 和 irqbalance 配置；\n- softnet 是否丢包；\n- Netfilter、bridge、容器 NAT 是否增加处理路径。\n\n#### 用 perf 观察内核调用栈\n\n```bash\nperf record -a -g -p <KSOFTIRQD_PID> -- sleep 30\nperf report\n```\n\n课程案例的热点链路包含：\n\n```text\nnet_rx_action\nnetif_receive_skb\nbr_handle_frame\nbr_nf_pre_routing\nip_forward\n```\n\n这说明 CPU 主要消耗在网络接收、Linux bridge、Netfilter 和转发，而不是普通用户态代码。\n\n生成火焰图时，横向宽度表示采样占比，纵向表示调用栈深度。火焰图不表示函数横向执行顺序。\n\n#### 从热点回到业务原因\n\n```mermaid\ngraph TD\n    A[发现内核线程 CPU 高] --> B[根据线程职责选择子系统]\n    B --> C[确认中断 队列 I/O 或回收指标]\n    C --> D[perf 采样调用栈]\n    D --> E[识别热点内核路径]\n    E --> F[映射到流量 设备 配置和应用]\n    F --> G[修复根因并复测]\n```\n\n不要直接提高内核线程优先级或绑定 CPU 来掩盖问题。应先解释“为什么产生了这么多内核工作”，再决定分散负载、减少工作还是扩容。", "subs": ["常见内核线程", "ksoftirqd 高的分析", "用 perf 观察内核调用栈", "从热点回到业务原因"]}, {"title": "动态追踪：定位疑难性能问题的利器", "content": "<!-- src: sources/linux-performance/05-综合实战篇/50-案例篇-动态追踪怎么用上.md; sources/linux-performance/05-综合实战篇/51-案例篇-动态追踪怎么用下.md -->\n\n动态追踪是在服务运行期间，通过探针采集内核或用户态事件。它适合处理难复现、持续时间短、传统指标无法解释的问题。\n\n#### 三类事件源\n\n| 事件源 | 说明 | 示例 |\n|---|---|---|\n| 硬件事件 | CPU 性能监控计数器 | 周期、缓存未命中、分支失败 |\n| 静态探针 | 预先编译进代码 | tracepoint、USDT |\n| 动态探针 | 运行时附加到函数 | kprobe、kretprobe、uprobe |\n\n静态 tracepoint 接口通常比直接依赖内核函数名更稳定。kprobe 灵活，但内核版本变化可能导致函数名、参数或内联行为变化。\n\n#### 工具如何选择\n\n| 需求 | 工具 |\n|---|---|\n| 找 CPU 热点和调用栈 | `perf` 与火焰图 |\n| 跟踪内核函数调用关系 | `ftrace`、`trace-cmd` |\n| 跟踪系统调用 | `perf trace`、eBPF 工具 |\n| 对事件聚合、直方图和关联 | eBPF、BCC、bpftrace |\n| 旧内核或特定 RHEL 环境 | SystemTap |\n| 容器系统活动观测 | eBPF 工具、sysdig |\n\n#### 从问题选择探针\n\n探针越靠近稳定接口，脚本跨版本可用性通常越好。选择顺序可以是：\n\n1. 已有指标、日志和 profile 能回答时，不增加动态探针。\n2. 有稳定 tracepoint 时优先使用 tracepoint。\n3. 需要内核函数内部细节时使用 kprobe 或 `perf probe`。\n4. 需要用户态函数时使用 uprobe、USDT 或语言 profiler。\n5. 高频事件优先在内核中聚合，只向用户态输出统计结果。\n\n先查询系统提供的事件和参数格式：\n\n```bash\nsudo perf list tracepoint\nsudo bpftrace -l 'tracepoint:syscalls:sys_enter_openat'\ncat /sys/kernel/tracing/events/syscalls/sys_enter_openat/format\n```\n\ntracepoint 的 `format` 文件说明字段名称、偏移和类型。直接猜测参数位置，可能在架构或内核升级后得到错误数据。\n\n#### 完整实操：定位启动期间的慢 openat\n\n假设一个服务冷启动 P99 从 8 秒升至 25 秒，CPU 与磁盘带宽都不高，应用日志显示配置加载阶段变慢。初步假设是大量文件打开被慢存储、锁或路径查找阻塞。\n\n第一步先用低开销指标限定问题窗口：\n\n```bash\npidstat -d -w -p <PID> 1\nstrace -c -f -p <PID>\n```\n\n如果 `openat` 次数或耗时占比异常，再用稳定的系统调用 tracepoint 统计延迟分布。创建 `openat-latency.bt`：\n\n```bpftrace\ntracepoint:syscalls:sys_enter_openat\n/pid == $1/\n{\n  @start[tid] = nsecs;\n}\n\ntracepoint:syscalls:sys_exit_openat\n/@start[tid]/\n{\n  @latency_us = hist((nsecs - @start[tid]) / 1000);\n  delete(@start[tid]);\n}\n\ninterval:s:30\n{\n  exit();\n}\n\nEND\n{\n  clear(@start);\n}\n```\n\n运行时把目标 PID 作为第一个参数：\n\n```bash\nsudo bpftrace openat-latency.bt <PID>\n```\n\n直方图若显示大部分调用低于 100 微秒，但少量调用落在 100 毫秒以上，就证明平均值掩盖了长尾。下一步只在短时间内采集路径参数：\n\n```bpftrace\ntracepoint:syscalls:sys_enter_openat\n/pid == $1/\n{\n  printf(\"%s\\n\", str(args.filename));\n}\n\ninterval:s:5\n{\n  exit();\n}\n```\n\n参数可能包含敏感路径，生产采集必须限定 PID、持续时间和输出权限。高基数路径不应长期作为 map key，否则会增加内核 map 内存和用户态输出压力。\n\n同时用 I/O、挂载和调度证据验证假设：\n\n```bash\niostat -xz 1\npidstat -d -w -p <PID> 1\nfindmnt -T /path/from/trace\ncat /proc/<PID>/mountinfo\n```\n\n可能形成的证据链：\n\n```text\n现象：配置加载阶段增加 17 秒\n假设：容器首次访问远端挂载上的大量小文件\n指标：CPU 低且进程自愿切换和 I/O 等待增加\n工具：openat tracepoint 延迟直方图和路径采样\n证据：长尾调用集中到同一远端挂载目录\n修复：合并配置文件并在本地卷预热\n复测：相同冷缓存条件下启动 P99 恢复到 9 秒\n```\n\n这类闭环比“看到 `openat` 很多，所以文件系统慢”更可靠，因为调用次数、单次延迟、目标路径和业务阶段已经相互对应。\n\n#### 何时使用 perf probe 和 uprobe\n\n若 tracepoint 只能看到系统调用边界，而问题位于自研程序的 `load_config` 函数内部，可使用用户态 uprobe。先确认二进制、Build ID 和符号：\n\n```bash\nfile /path/to/app\nreadelf -n /path/to/app | grep -A2 'Build ID'\nnm -C /path/to/app | grep load_config\nperf probe -x /path/to/app --funcs | grep load_config\n```\n\n添加入口和返回探针：\n\n```bash\nsudo perf probe -x /path/to/app \\\n  --add 'load_config'\nsudo perf probe -x /path/to/app \\\n  --add 'load_config%return'\n\nsudo perf record \\\n  -e probe_app:load_config \\\n  -e probe_app:load_config__return \\\n  -p <PID> -- sleep 20\nsudo perf script\n```\n\n实际事件组名称取决于二进制名称和 `perf probe` 输出，应先用 `perf probe --list` 核对。若二进制带 DWARF 调试信息，可尝试按变量名读取参数：\n\n```bash\nsudo perf probe -x /path/to/app \\\n  --vars 'load_config'\nsudo perf probe -x /path/to/app \\\n  --add 'load_config path:string'\n```\n\n编译器优化可能内联函数、删除变量或让变量只在部分指令范围内可见。没有调试信息时，也可按 ABI 寄存器或偏移取值，但这依赖 CPU 架构、函数版本和编译结果，不适合直接复制到其他机器。\n\n结束后清理动态事件：\n\n```bash\nsudo perf probe --list\nsudo perf probe --del 'probe_app:*'\n```\n\n探针清理是实验的一部分。遗留探针会污染后续采集，也可能让其他工程师误判当前系统配置。\n\n#### 用 eBPF 做内核侧聚合\n\n对高频事件逐条 `printf` 会产生大量输出。bpftrace、BCC 或 libbpf 工具的优势之一，是先在内核 map 中聚合，再周期性读取。\n\n例如按进程名统计每秒调度切换次数：\n\n```bpftrace\ntracepoint:sched:sched_switch\n{\n  @[comm] = count();\n}\n\ninterval:s:10\n{\n  print(@);\n  clear(@);\n}\n```\n\n这个示例适合发现切换异常的进程，但不能直接证明锁竞争。若目标是调度延迟，应使用 `runqlat`；若目标是阻塞调用栈，应使用 `offcputime`。工具输出必须对应具体假设。\n\n现代 eBPF 工具可借助 BTF 获得内核类型信息并提高跨内核版本适配能力，但 BTF 不会消除所有兼容问题。tracepoint 字段、内核配置、helper 可用性、锁定策略和发行版补丁仍可能影响脚本。\n\n#### 动态追踪失败时的检查清单\n\n| 现象 | 优先检查 |\n|---|---|\n| 找不到 tracepoint | tracefs 是否挂载、内核是否启用对应事件 |\n| `perf probe` 找不到函数 | 符号被裁剪、函数被内联、名称改变 |\n| 变量不可用 | 缺少 DWARF、优化后变量生命周期改变 |\n| eBPF 加载被拒绝 | 权限、锁定模式、LSM、内核配置、验证器日志 |\n| 容器内看不到目标 | PID、mount、user 和 cgroup namespace |\n| 调用栈大量未知符号 | 内核符号、应用调试符号、JIT map、栈展开方式 |\n\n容器场景通常应在宿主机使用宿主机 PID 附加探针：\n\n```bash\ndocker inspect <CONTAINER> \\\n  --format '{{.State.Pid}}'\nnsenter -t <HOST_PID> -m -p -n -- \\\n  readlink /proc/self/exe\n```\n\n目标二进制若只存在于容器 mount namespace，工具需要能访问对应文件和符号。用户 namespace、只读 `/sys`、缺失 capabilities 或宿主机安全策略也会阻止采集。不要为了方便直接给业务容器长期授予 `--privileged`，应使用受控的宿主机诊断流程或专用观测组件。\n\n#### ftrace 与 trace-cmd\n\n现代系统通常将接口挂载在：\n\n```bash\n/sys/kernel/tracing\n```\n\n也可能位于：\n\n```bash\n/sys/kernel/debug/tracing\n```\n\n使用前查看可用跟踪器和事件：\n\n```bash\ncat /sys/kernel/tracing/available_tracers\ncat /sys/kernel/tracing/available_events\n```\n\n`trace-cmd` 可简化手工读写 tracefs：\n\n```bash\ntrace-cmd record -p function_graph -g <KERNEL_FUNCTION> <COMMAND>\ntrace-cmd report\n```\n\n#### perf 动态探针\n\n```bash\nperf list\nperf probe --add '<KERNEL_FUNCTION>'\nperf record -e probe:<EVENT> -aR -- sleep 10\nperf script\nperf probe --del probe:<EVENT>\n```\n\n跟踪用户态函数时可指定二进制：\n\n```bash\nperf probe -x /path/to/binary '<FUNCTION>'\n```\n\n用户态符号、未被内联的函数和调试信息会显著影响可追踪性。\n\n#### eBPF 的价值\n\neBPF 程序在经过验证后加载到内核，可在事件发生时过滤、聚合并通过 map 输出结果。相比输出每个原始事件，在内核中先做计数或直方图能显著降低数据量。\n\n常用现成工具包括：\n\n```text\nexecsnoop\nopensnoop\nbiolatency\nrunqlat\noffcputime\ntcplife\ntcpconnect\nprofile\n```\n\n优先使用成熟工具和稳定 tracepoint。自行编写脚本前要确认内核版本、BTF、权限、符号和容器命名空间。\n\n#### 生产使用安全\n\n- 先限定 PID、cgroup、CPU、事件和持续时间；\n- 优先聚合，不输出每个高频事件；\n- 估算探针频率和数据量；\n- 设置自动停止时间；\n- 避免读取敏感参数和业务数据；\n- 记录工具版本、内核版本和脚本；\n- 在压测环境评估开销；\n- 跟踪结束后清理探针。\n\n动态追踪不是零开销。探针附加到高频路径、采集调用栈或输出大量事件时，可能明显影响服务。", "subs": ["三类事件源", "工具如何选择", "从问题选择探针", "完整实操：定位启动期间的慢 openat", "何时使用 perf probe 和 uprobe", "用 eBPF 做内核侧聚合", "动态追踪失败时的检查清单", "ftrace 与 trace", "perf 动态探针", "eBPF 的价值", "生产使用安全"]}, {"title": "服务吞吐量骤降的分析", "content": "<!-- src: sources/linux-performance/05-综合实战篇/52-案例篇-服务吞吐量下降很厉害，怎么分析.md -->\n\n吞吐下降经常不是单一瓶颈。修复第一个限制后，负载继续上升，第二个限制才会暴露，因此必须在每轮优化后重新观察完整指标。\n\n#### 先确认吞吐是否真实下降\n\n压测同时记录：\n\n- 成功请求吞吐；\n- 总请求吞吐；\n- 非成功状态码；\n- 连接、读写和超时错误；\n- 延迟分位数；\n- 客户端资源；\n- 服务端 CPU、内存、I/O 和网络。\n\n课程案例中，`wrk` 显示总 RPS 较低且全部是异常响应。只看 `Requests/sec` 会误把失败请求也当作业务能力。\n\n#### 瓶颈一：连接跟踪表满\n\n```bash\ndmesg -T | grep -i conntrack\nsysctl net.netfilter.nf_conntrack_count\nsysctl net.netfilter.nf_conntrack_max\n```\n\n当 count 等于 max，且日志出现 table full，说明新连接被丢弃。应根据峰值并发、连接寿命、内存预算和哈希桶规划容量，而不是照抄一个大数值。\n\n#### 瓶颈二：应用工作进程不足\n\nNginx 返回 `499` 表示客户端在服务端响应前关闭连接。PHP-FPM 日志又显示达到 `max_children`，说明下游工作进程不足。\n\n工作进程数应受两个条件约束：\n\n```text\n按内存上限 = 可分配内存 ÷ 单进程峰值内存\n按 CPU 上限 = CPU 核数与单请求 CPU 成本允许的并行度\n```\n\n工作进程过多会增加内存、上下文切换和下游压力。\n\n#### 瓶颈三：监听队列溢出\n\n```bash\nnstat -az | grep -E 'ListenOverflows|ListenDrops'\nss -lntp\nsysctl net.core.somaxconn\n```\n\n监听套接字的应用 backlog 还会受 `somaxconn` 上限影响。扩队列只能吸收短时突发；若应用长期处理不过来，队列更大只会增加等待延迟。\n\n#### 瓶颈四：临时端口耗尽\n\nNginx 作为 PHP-FPM 客户端，需要为后端连接分配临时端口。检查：\n\n```bash\nsysctl net.ipv4.ip_local_port_range\nss -s\nss -ant state time-wait\n```\n\n应优先使用后端长连接和连接池，减少短连接。扩大端口范围和评估 `tcp_tw_reuse` 只能解决特定的主动连接场景，不能随意破坏 `TIME_WAIT` 的协议语义。\n\n#### 用火焰图发现后续热点\n\n前述限制解除后，CPU 成为新瓶颈。火焰图中 `inet_hash_connect` 和端口可用性检查变宽，说明大量短连接让临时端口分配成为热点。\n\n完整分析链：\n\n```mermaid\ngraph TD\n    A[吞吐下降] --> B[区分成功吞吐和失败吞吐]\n    B --> C[检查状态码和连接错误]\n    C --> D[检查 conntrack 和丢包]\n    D --> E[检查工作进程和依赖]\n    E --> F[检查监听队列]\n    F --> G[检查临时端口和短连接]\n    G --> H[perf 和火焰图找热点]\n    H --> I[逐项修改并重复压测]\n```\n\n每轮都要重新检查错误率和 P99。吞吐升高但错误更多，不是优化成功。", "subs": ["先确认吞吐是否真实下降", "瓶颈一：连接跟踪表满", "瓶颈二：应用工作进程不足", "瓶颈三：监听队列溢出", "瓶颈四：临时端口耗尽", "用火焰图发现后续热点"]}, {"title": "系统监控体系的搭建思路", "content": "<!-- src: sources/linux-performance/05-综合实战篇/53-套路篇-系统监控的综合思路.md -->\n\n瞬时故障在工程师登录服务器时往往已经消失。监控的作用是保存故障现场、发现趋势并在用户大量感知前告警。\n\n#### USE 方法\n\nUSE 将每种资源归纳为：\n\n- Utilization：资源实际被使用的比例；\n- Saturation：资源无法立即接受更多工作时的排队程度；\n- Errors：错误事件数量。\n\n| 资源 | 使用率 | 饱和度 | 错误 |\n|---|---|---|---|\n| CPU | user、system、softirq | 运行队列、调度等待 | 节流、机器检查 |\n| 内存 | 已用、工作集 | 回收、Swap、分配等待 | OOM、分配失败 |\n| 磁盘 | busy、吞吐 | 队列、I/O 延迟 | 超时、reset、介质错误 |\n| 网络 | 带宽、PPS | 队列、softnet | drop、error、retransmit |\n| 文件描述符 | 已用比例 | 接近限制 | 分配失败 |\n| conntrack | count 比例 | 查表与创建压力 | table full、drop |\n\n使用率不高不代表没有瓶颈。例如磁盘利用率不高但单次请求延迟很高，仍可能影响同步业务。\n\n#### 监控系统的组成\n\n```mermaid\ngraph LR\n    A[目标和 Exporter] --> B[采集]\n    B --> C[时序存储]\n    C --> D[查询和规则]\n    D --> E[告警管理]\n    C --> F[可视化]\n    E --> G[值班和处置]\n```\n\n典型 Prometheus 体系包括：\n\n- exporter 或应用指标端点；\n- 服务发现；\n- Prometheus 拉取和时序存储；\n- PromQL 记录规则与告警规则；\n- Alertmanager 分组、路由、抑制和静默；\n- Grafana 仪表盘；\n- 长期存储或远程写入。\n\n#### 告警设计\n\n有效告警必须包含：\n\n- 受影响服务和范围；\n- 当前值、阈值和持续时间；\n- 用户影响或 SLO 风险；\n- 相关仪表盘和日志链接；\n- 排障手册；\n- 明确责任团队。\n\n避免单点瞬时阈值告警。更可靠的方法是使用持续窗口、变化率、错误预算消耗和多信号关联。\n\n#### 监控自身也要被监控\n\n应监控抓取失败、指标延迟、规则执行时间、存储容量、远程写入积压、告警发送失败和高基数。标签中直接加入请求 ID、用户 ID 等无限集合，会造成时序爆炸。", "subs": ["USE 方法", "监控系统的组成", "告警设计", "监控自身也要被监控"]}, {"title": "应用监控的设计思路", "content": "<!-- src: sources/linux-performance/05-综合实战篇/54-套路篇-应用监控的一般思路.md -->\n\n应用监控首先关注用户请求，而不是主机资源。CPU 很低时，应用仍可能因锁、连接池或依赖超时而变慢。\n\n#### 黄金信号\n\n应用核心指标可归纳为：\n\n| 指标 | 说明 |\n|---|---|\n| 流量 | 请求数、并发数、消息数 |\n| 错误 | 错误率、状态码、失败类型 |\n| 延迟 | P50、P95、P99 和超时 |\n| 饱和度 | 线程池、连接池、队列、限流 |\n\n课程使用“请求数、错误率、响应时间”三个指标；工程实践中应补充饱和度，才能更早发现容量不足。\n\n拿到黄金信号后，可以按“**哪个信号异常**”分诊到不同的调查路径和处置动作。下面这棵分诊树是“四大黄金信号”（含饱和度，比 RED 多一维）的实践化总结：异常先定位到具体信号，再决定走哪条路径。\n\n```mermaid\ngraph TD\n    A[用户报告:系统异常] --> B[检查四大黄金信号]\n    B --> C{哪个信号异常?}\n    C -->|延迟| D[区分成功/失败请求]\n    D --> D1{哪个高?}\n    D1 -->|成功高| D2[性能问题 → 查 USE → 优化资源/代码]\n    D1 -->|失败高| D3[慢失败 → 快速失败/超时治理]\n    C -->|流量| E{上升 or 下降?}\n    E -->|上升| E1{合法流量?}\n    E1 -->|是| E2[扩容]\n    E1 -->|否| E3[限流/封禁]\n    E -->|下降| E4[检查上游是否断流]\n    C -->|错误率| F[按服务分解 → 定位问题服务]\n    F --> F1{错误类型?}\n    F1 -->|4xx| F2[多为客户端]\n    F1 -->|5xx| F3[服务端 → 查依赖健康 → 降级/熔断]\n    C -->|饱和度| G[识别瓶颈资源]\n    G --> G1{哪种资源?}\n    G1 -->|CPU| G2[扩容/优化]\n    G1 -->|内存| G3[区分增长与泄漏]\n    G1 -->|连接| G4[增加连接池]\n    G1 -->|磁盘| G5[清理/扩容]\n    G --> G6[预测影响时间 → 主动扩容]\n    C -->|多个异常| H[级联失败 → 优先怀疑饱和度 → 紧急扩容 → 逐步恢复]\n```\n\n这棵树好用，但有几个叶子不能机械照搬，要按全书口径理解：\n\n- **4xx 不一定是客户端问题**：`429`（限流）和坏部署导致的 `400/404` 其实是服务端策略，要结合发布记录判断；\n- **内存饱和 ≠ 一定泄漏**：先区分“正常增长”和“泄漏”（见 2.4），缓存和队列增长是常态；\n- **多个信号同时异常优先怀疑饱和度**，是启发式而非定论，仍需用证据链确认首要原因（见 5.8）；\n- 每轮处置后都要**重新看错误率和 P99**，吞吐升高但错误更多不是优化成功。\n\n本质上这是把“黄金信号 → RED/USE → 处置”串起来：延迟和饱和度两支最终都落到 USE 资源维度，与后文“RED 与 USE 的联合视角”呼应。\n\n#### 从入口到内部\n\n应用可观测性至少包括：\n\n1. 入口请求指标；\n2. 进程 CPU、内存、I/O 和网络；\n3. 数据库、缓存、消息队列等依赖调用；\n4. 线程池、连接池和任务队列；\n5. 核心业务步骤耗时；\n6. 日志上下文；\n7. 分布式追踪。\n\n```mermaid\ngraph TD\n    A[用户请求] --> B[入口指标]\n    B --> C[服务内部阶段]\n    C --> D[下游依赖]\n    B --> E[结构化日志]\n    C --> F[Trace Span]\n    D --> F\n    C --> G[进程和运行时指标]\n```\n\n#### 指标、日志和追踪的分工\n\n- 指标适合聚合、趋势、告警和容量判断；\n- 日志适合错误上下文和离散事件；\n- 追踪适合一次请求跨服务的时序与因果关系；\n- Profiling 适合定位持续消耗 CPU 或内存的代码路径。\n\n三者应通过服务名、实例、环境、版本和 trace ID 关联，但要控制标签基数。\n\n#### 厂商无关的日志数据链路\n\n日志系统不是“把文件发到搜索引擎”这么简单。完整链路应包含：\n\n```mermaid\ngraph LR\n    A[应用输出] --> B[本地采集]\n    B --> C[解析和脱敏]\n    C --> D[缓冲和传输]\n    D --> E[存储和索引]\n    E --> F[查询和关联]\n    F --> G[告警和处置]\n```\n\n各阶段的职责如下：\n\n| 阶段 | 关键设计 |\n|---|---|\n| 应用输出 | 结构化字段、级别、时间、服务和 trace ID |\n| 本地采集 | 文件轮转、容器 stdout、断点续传 |\n| 解析和脱敏 | schema 校验、敏感字段删除、时间规范化 |\n| 缓冲和传输 | 背压、批量、压缩、重试和磁盘队列 |\n| 存储和索引 | 保留周期、冷热分层、索引基数和成本 |\n| 查询和关联 | 按服务、版本、实例、trace ID 定位 |\n| 告警和处置 | 聚合、去重、抑制、链接排障上下文 |\n\n建议采用稳定字段：\n\n```json\n{\n  \"timestamp\": \"2026-06-14T10:00:00.123Z\",\n  \"severity\": \"ERROR\",\n  \"service\": \"checkout\",\n  \"instance\": \"checkout-7d9f\",\n  \"version\": \"2026.06.14.1\",\n  \"trace_id\": \"4f8d...\",\n  \"span_id\": \"98ab...\",\n  \"event\": \"dependency_timeout\",\n  \"duration_ms\": 1203,\n  \"dependency\": \"inventory\"\n}\n```\n\n日志正文可读不代表字段可查询。生产 schema 应明确类型、必填字段和版本，避免同一个 `duration` 字段有时是字符串、有时是数字，或不同服务使用秒与毫秒却不注明单位。\n\n日志链路本身也需要监控：\n\n- 每秒采集和丢弃条数；\n- 解析失败和 schema 不匹配；\n- 缓冲队列深度和磁盘占用；\n- 端到端摄取延迟；\n- 存储写入和查询错误；\n- 高基数字段与索引增长；\n- 告警规则执行和通知失败。\n\n#### 指标 日志 Trace 与 Profile 的关联\n\n四种信号各自回答不同问题：\n\n```text\n指标说明问题是否普遍发生\nTrace 说明一次请求慢在哪一段\n日志说明该步骤发生了什么\nProfile 说明代码把资源花在哪里\n```\n\n一个实用调查流程是：\n\n1. 指标告警发现某版本的错误率与 P99 同时升高。\n2. 从延迟直方图或 exemplar 打开一条慢 Trace。\n3. 根据 span 的服务、实例和 trace ID 检索同一请求日志。\n4. 确认慢点集中在本服务 CPU 后，打开同版本同时间段的 profile。\n5. 找到热点函数，回到代码和发布差异形成修复假设。\n\ntrace ID 适合写入日志和 Trace，不应直接作为指标标签，否则每个请求都会创建新时序。指标只保留低基数维度，如服务、区域、版本和状态类别。\n\n#### 持续 Profiling\n\n事故期间临时执行 `perf` 容易错过短暂热点。持续 Profiling 以低频采样长期保存 CPU、off-CPU、分配或锁竞争调用栈，使工程师可以比较故障前后和版本之间的差异。\n\n设计时要控制：\n\n- 采样频率和 CPU 开销；\n- 调用栈深度与符号化成本；\n- profile 保留周期；\n- 服务、版本、实例等低基数标签；\n- 源码与 Build ID 的对应关系；\n- JIT 语言的动态符号；\n- 多租户隔离和函数名中的敏感信息。\n\n持续 profile 与普通监控的价值不同：它不适合按单个请求精确还原因果，而适合回答“过去十分钟哪个调用栈的 CPU 占比从 5% 增长到 35%”。最终仍要把热点时间窗与 RED、USE、发布和 Trace 对齐。\n\n#### RED 与 USE 的联合视角\n\n微服务入口使用 RED：\n\n- Rate：请求速率；\n- Errors：错误数量或比例；\n- Duration：请求耗时分布。\n\n主机、容器和依赖资源使用 USE：\n\n- Utilization：资源使用率；\n- Saturation：队列和等待；\n- Errors：资源错误。\n\nRED 先确定用户影响和异常服务，USE 再确认该服务依赖的 CPU、内存、I/O、网络或内核资源是否饱和。二者通过相同的服务、实例、版本和时间窗口关联，避免从一条主机 CPU 告警直接推断业务根因。\n\n#### 可观测性必须服务于问题\n\n每个关键接口都应能回答：\n\n- 当前成功率和尾延迟是多少；\n- 哪个版本或区域异常；\n- 时间花在本服务还是下游；\n- 哪类错误增长；\n- 是否接近线程池、连接池或队列上限；\n- 发布前后有何变化。\n\n只采集很多数据却无法回答这些问题，不算完整的应用监控。", "subs": ["黄金信号", "从入口到内部", "指标、日志和追踪的分工", "厂商无关的日志数据链路", "指标 日志 Trace 与 Profile 的关联", "持续 Profiling", "RED 与 USE 的联合视角", "可观测性必须服务于问题"]}, {"title": "性能问题分析的通用步骤", "content": "<!-- src: sources/linux-performance/05-综合实战篇/55-套路篇-分析性能问题的一般步骤.md -->\n\n性能分析的核心不是依次运行所有工具，而是建立假设，并用最小成本的证据排除错误方向。\n\n#### 第一步：明确问题\n\n先问清：\n\n- 哪个业务指标异常；\n- 从什么时候开始；\n- 影响哪些用户、实例和区域；\n- 是持续、周期还是突发；\n- 最近是否发布、扩容或变更配置；\n- 正常基线和目标是多少。\n\n“机器很慢”不是可分析的问题。“支付接口 P99 从 200 ms 升到 2 s，错误率从 0.1% 升到 3%，只影响新版本实例”才是有效问题描述。\n\n#### 第二步：保护现场\n\n- 保存监控时间窗口；\n- 记录版本、配置、拓扑和变更；\n- 保存日志、trace、profile 和必要抓包；\n- 记录容器重启、OOM 和内核日志；\n- 避免未经记录地连续修改参数。\n\n严重故障应先止损，但止损操作也要记录，以便事后解释指标变化。\n\n#### 第三步：从业务到资源\n\n```mermaid\ngraph TD\n    A[业务吞吐 延迟 错误] --> B{入口还是依赖}\n    B --> C[应用指标 日志 Trace]\n    C --> D{资源是否饱和}\n    D --> E[CPU]\n    D --> F[内存]\n    D --> G[I/O]\n    D --> H[网络]\n    D --> I[内核软件资源]\n    E --> J[进程 线程 函数]\n    F --> J\n    G --> J\n    H --> J\n    I --> J\n```\n\n系统资源使用 USE 方法，应用使用流量、错误、延迟和饱和度。两条路径最终应关联到同一时间线。\n\n#### 第四步：形成并验证假设\n\n例如：\n\n```text\n现象：P99 上升且磁盘 await 同时上升\n假设：日志同步写导致请求阻塞\n证据：pidstat 显示目标进程写入增加\n验证：strace 或 eBPF 显示高频 fsync\n修复：批量提交并隔离日志盘\n复测：相同负载下 P99 和 await 恢复\n```\n\n证据链至少包含业务表现、资源指标和具体执行行为。相关性只能生成假设，不能直接证明因果。\n\n#### 第五步：修复和复盘\n\n修复后要：\n\n- 使用相同负载复测；\n- 比较成功吞吐、尾延迟和错误；\n- 检查是否产生新的资源瓶颈；\n- 灰度并设置回滚条件；\n- 补充监控、告警和自动化测试；\n- 记录根因、促成因素和改进项。", "subs": ["第一步：明确问题", "第二步：保护现场", "第三步：从业务到资源", "第四步：形成并验证假设", "第五步：修复和复盘"]}, {"title": "性能优化的通用方法论", "content": "<!-- src: sources/linux-performance/05-综合实战篇/56-套路篇-优化性能问题的一般方法.md -->\n\n性能优化应由目标和证据驱动。优化不是让某个指标更漂亮，而是在正确性和成本约束下改善用户可感知的吞吐、延迟或容量。\n\n#### 优先减少工作量\n\n通常按以下顺序收益更稳定：\n\n1. 删除不必要的计算、I/O 和网络请求；\n2. 改进算法、数据结构和查询；\n3. 缓存重复结果；\n4. 合并、批处理和异步化；\n5. 降低锁竞争和共享状态；\n6. 调整并发模型；\n7. 调整系统参数；\n8. 升级硬件或水平扩展。\n\n系统参数只能改变资源上限和调度方式，不能消除低效业务逻辑。\n\n#### 资源优化视角\n\n| 资源 | 常见方向 |\n|---|---|\n| CPU | 减少计算、改善缓存局部性、降低切换、并行化 |\n| 内存 | 控制生命周期、减少复制、内存池、修复泄漏 |\n| I/O | 缓存、顺序写、批处理、异步 I/O、分离设备 |\n| 网络 | 连接复用、减少请求、压缩、就近访问、多队列 |\n| 架构 | 分片、队列、CDN、负载均衡、水平扩展 |\n\n#### 并发与排队\n\n增加并发只在资源尚有余量时提升吞吐。当资源饱和后，更多并发会扩大队列和尾延迟。\n\nLittle 定律可用于理解稳定系统：\n\n```text\n系统内平均请求数 = 平均到达率 × 平均停留时间\n```\n\n吞吐固定时，响应时间增加意味着系统内排队请求增加。容量规划应同时约束并发、队列长度和超时。\n\n#### 建立优化实验\n\n```mermaid\ngraph TD\n    A[定义目标和约束] --> B[建立可重复基线]\n    B --> C[定位最大瓶颈]\n    C --> D[提出单一改动]\n    D --> E[压测和正确性验证]\n    E --> F{收益是否稳定}\n    F -->|否| G[回滚并更新假设]\n    F -->|是| H[灰度发布]\n    H --> I[生产监控和复盘]\n```\n\n每个实验记录：\n\n- 负载模型和数据集；\n- 软件、内核和硬件版本；\n- 修改前后配置；\n- 多次运行结果；\n- P50、P95、P99、吞吐和错误率；\n- CPU、内存、I/O、网络与成本变化；\n- 回滚方式。\n\n#### 避免常见误区\n\n- 不因平均值改善就忽略尾延迟；\n- 不用失败请求堆高吞吐数字；\n- 不在没有基线时修改大量参数；\n- 不把缓存命中建立在错误过期策略上；\n- 不用无限队列掩盖处理能力不足；\n- 不用单机极限优化替代合理水平扩展；\n- 不牺牲正确性、可维护性和故障恢复能力。\n\n性能目标达标后应停止继续复杂化。过早优化和追求绝对极限，往往会增加长期运维成本。", "subs": ["优先减少工作量", "资源优化视角", "并发与排队", "建立优化实验", "避免常见误区"]}, {"title": "Linux 性能工具全景速查", "content": "<!-- src: sources/linux-performance/05-综合实战篇/57-套路篇-Linux性能工具速查.md -->\n\n工具选择应从“需要验证哪个指标或假设”出发。先使用低开销全局工具定位子系统，再进入进程、线程和函数级工具。\n\n#### 全局概览\n\n```bash\nuptime\ntop\nvmstat 1\nmpstat -P ALL 1\npidstat 1\ndmesg -T\n```\n\n#### CPU\n\n| 目标 | 工具 |\n|---|---|\n| 平均负载 | `uptime`、`top`、`/proc/loadavg` |\n| 各 CPU 使用率 | `mpstat`、`sar -u` |\n| 进程和线程 | `top -H`、`pidstat -t` |\n| 上下文切换 | `vmstat`、`pidstat -w` |\n| 中断与软中断 | `/proc/interrupts`、`/proc/softirqs` |\n| 热点和硬件事件 | `perf top`、`perf record`、`perf stat` |\n| 调用栈可视化 | 火焰图 |\n\n#### 内存\n\n| 目标 | 工具 |\n|---|---|\n| 系统内存 | `free`、`vmstat`、`/proc/meminfo` |\n| 进程内存 | `ps`、`pidstat -r`、`pmap` |\n| 内存映射 | `/proc/<PID>/smaps`、`pmap -x` |\n| Swap 和换页 | `vmstat`、`sar -W` |\n| Slab | `slabtop`、`/proc/slabinfo` |\n| 缓存命中 | `cachestat`、`cachetop` |\n| 泄漏 | 应用 profiler、Valgrind、eBPF `memleak` |\n\n#### 文件系统和磁盘 I/O\n\n| 目标 | 工具 |\n|---|---|\n| 文件系统容量 | `df`、`du` |\n| inode | `df -i` |\n| 设备延迟和利用率 | `iostat -xz 1` |\n| 进程 I/O | `pidstat -d`、`iotop` |\n| 打开文件 | `lsof`、`/proc/<PID>/fd` |\n| 系统调用 | `strace -c`、`perf trace` |\n| 块 I/O 延迟分布 | `biolatency`、`bpftrace` |\n| 基准测试 | `fio` |\n\n#### 网络\n\n| 目标 | 工具 |\n|---|---|\n| 接口统计 | `ip -s link`、`ethtool -S` |\n| 吞吐和 PPS | `sar -n DEV` |\n| 套接字 | `ss` |\n| 协议统计 | `nstat`、`snmp`、`netstat -s` |\n| 路由和路径 | `ip route`、`traceroute`、`tracepath` |\n| 延迟和丢包 | `ping`、`hping3`、`mtr` |\n| 抓包 | `tcpdump`、Wireshark |\n| 带宽基准 | `iperf3` |\n| HTTP 基准 | `wrk`、`k6` |\n\n#### 动态追踪\n\n| 问题 | 工具 |\n|---|---|\n| CPU 热点 | `perf`、火焰图 |\n| 调度延迟 | `runqlat` |\n| 阻塞调用栈 | `offcputime` |\n| 短进程 | `execsnoop` |\n| 文件打开 | `opensnoop` |\n| TCP 生命周期 | `tcplife`、`tcpconnect` |\n| 自定义事件 | `bpftrace`、BCC、libbpf 工具 |\n| 内核函数图 | `ftrace`、`trace-cmd` |\n\n#### 工具使用的层次\n\n```mermaid\ngraph TD\n    A[业务监控发现异常] --> B[全局资源概览]\n    B --> C[确认 CPU 内存 I/O 网络]\n    C --> D[定位进程和线程]\n    D --> E[定位系统调用 函数 队列]\n    E --> F[动态追踪或抓包验证]\n    F --> G[修复并基准复测]\n```\n\n工具输出必须结合系统和应用原理解释。工具越深入，通常权限、开销和使用风险越高，因此要逐层使用，并优先利用已有监控数据缩小范围。", "subs": ["全局概览", "CPU", "内存", "文件系统和磁盘 I/O", "网络", "动态追踪", "工具使用的层次"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

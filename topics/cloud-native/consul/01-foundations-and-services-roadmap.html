@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Consul 学习笔记 · 第一册：基础、架构与服务管理 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Consul 学习笔记 · 第一册：基础、架构与服务管理</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Consul 学习笔记 · 第一册：基础、架构与服务管理", "intro": "> **文档目标**: 系统性学习 Consul 相关原理，为运维工程师/SRE 提供专业技术参考\n>\n> **来源**: HashiCorp Consul 官方文档\n>\n> **版本**: v1.0 | **更新日期**: 2024-12-05\n\n---", "parts": [{"title": "第1章 为什么选择 Consul", "sections": [{"title": "1.1 Consul 概述", "content": "#### 什么是 Consul\n\n**Consul** 是 HashiCorp 开发的一款开源工具，专为现代分布式系统设计，提供以下核心功能：\n\n| 功能                 | 描述                                      |\n| -------------------- | ----------------------------------------- |\n| **服务发现**   | 自动注册和发现服务，支持 DNS 和 HTTP 接口 |\n| **健康检查**   | 实时监控服务和节点健康状态                |\n| **KV 存储**    | 分布式键值存储，用于动态配置和协调        |\n| **服务网格**   | 安全的服务间通信，支持 mTLS 加密          |\n| **多数据中心** | 原生支持跨数据中心部署和联邦              |\n\n#### Consul 核心架构\n\n```mermaid\ngraph TD\n    subgraph Datacenter1[\"数据中心 1\"]\n        S1[Server 1<br>Leader]\n        S2[Server 2<br>Follower]\n        S3[Server 3<br>Follower]\n        C1[Client 1]\n        C2[Client 2]\n      \n        S1 <-->|Raft| S2\n        S1 <-->|Raft| S3\n        S2 <-->|Raft| S3\n        C1 -->|RPC| S1\n        C2 -->|RPC| S1\n    end\n  \n    subgraph Datacenter2[\"数据中心 2\"]\n        S4[Server 4<br>Leader]\n        C3[Client 3]\n        C3 -->|RPC| S4\n    end\n  \n    S1 <-->|WAN Gossip| S4\n```\n\n#### Consul 的核心优势\n\n1. **简单易用**: 单一二进制文件，零依赖，开箱即用\n2. **高可用**: 基于 Raft 协议的强一致性保证\n3. **可扩展**: 支持数千节点的大规模集群\n4. **多平台**: 支持 Linux、Windows、macOS 等多种操作系统\n5. **丰富生态**: 与 Terraform、Vault、Nomad 等 HashiCorp 产品深度集成\n\n---", "subs": ["什么是 Consul", "Consul 核心架构", "Consul 的核心优势"]}, {"title": "1.2 与服务网格产品对比", "content": "#### 服务网格对比表\n\n| 特性                 | Consul Connect     | Istio           | Linkerd               |\n| -------------------- | ------------------ | --------------- | --------------------- |\n| **架构复杂度** | 低                 | 高              | 中                    |\n| **多数据中心** | 原生支持           | 需额外配置      | 需额外配置            |\n| **代理支持**   | Envoy/内置代理     | Envoy           | Linkerd-proxy         |\n| **控制平面**   | Consul Server      | Istiod          | Linkerd Control Plane |\n| **平台支持**   | Kubernetes/VM/裸机 | 主要 Kubernetes | Kubernetes            |\n| **学习曲线**   | 较低               | 较高            | 中等                  |\n\n#### Consul 服务网格核心特点\n\n```mermaid\ngraph LR\n    subgraph ServiceMesh[\"Consul Service Mesh\"]\n        SvcA[Service A] --> ProxyA[Sidecar Proxy]\n        ProxyA -->|mTLS| ProxyB[Sidecar Proxy]\n        ProxyB --> SvcB[Service B]\n    end\n  \n    ConsulServer[Consul Server] -->|Config| ProxyA\n    ConsulServer -->|Config| ProxyB\n    ConsulServer -->|Certificate| ProxyA\n    ConsulServer -->|Certificate| ProxyB\n```\n\n**Consul Connect 优势**:\n\n1. **统一控制平面**: 服务发现与服务网格共用同一控制平面\n2. **渐进式采用**: 可逐步从传统架构迁移到服务网格\n3. **平台无关**: 不仅限于 Kubernetes，支持 VM 和裸机部署\n4. **内置 CA**: 自动管理证书生命周期\n\n---", "subs": ["服务网格对比表", "Consul 服务网格核心特点"]}, {"title": "1.3 与 DNS 工具对比", "content": "#### DNS 服务发现对比\n\n| 特性                 | Consul DNS | CoreDNS    | BIND      | AWS Route53 |\n| -------------------- | ---------- | ---------- | --------- | ----------- |\n| **动态更新**   | 实时       | 需配置     | 手动/脚本 | API 调用    |\n| **健康检查**   | 内置集成   | 需外部工具 | 无        | 需配合 ELB  |\n| **服务感知**   | 原生支持   | 插件支持   | 不支持    | 不支持      |\n| **多数据中心** | 原生支持   | 需配置     | 需配置    | 区域隔离    |\n\n#### Consul DNS 工作流程\n\n```mermaid\ngraph TD\n    App[Application] -->|DNS Query| ConsulDNS[Consul DNS Interface]\n    ConsulDNS --> Catalog[Service Catalog]\n  \n    Catalog --> HC{Health Check}\n    HC -->|Healthy| ReturnIP[Return Healthy IPs]\n    HC -->|Unhealthy| Filter[Filter Out]\n  \n    ReturnIP --> App\n  \n    subgraph HealthChecks[\"健康检查类型\"]\n        HTTP[HTTP Check]\n        TCP[TCP Check]\n        Script[Script Check]\n        TTL[TTL Check]\n        gRPC[gRPC Check]\n    end\n```\n\n**Consul DNS 优势**:\n\n1. **服务健康感知**: 只返回健康的服务实例 IP\n2. **零代码改造**: 应用只需修改 DNS 解析即可接入\n3. **负载均衡**: 支持基于标签的路由和负载均衡\n4. **缓存机制**: 支持 DNS 缓存以提高性能\n\n---", "subs": ["DNS 服务发现对比", "Consul DNS 工作流程"]}, {"title": "1.4 与配置管理工具对比", "content": "#### 动态配置 vs 静态配置\n\n传统配置管理工具（如 Ansible、Puppet、Chef）主要关注**静态配置**，而 Consul 专注于**动态配置**。\n\n| 特性                 | Consul | Ansible | Puppet | Chef   |\n| -------------------- | ------ | ------- | ------ | ------ |\n| **配置类型**   | 动态   | 静态    | 静态   | 静态   |\n| **实时响应**   | 支持   | 不支持  | 有限   | 有限   |\n| **服务发现**   | 内置   | 无      | 无     | 无     |\n| **健康检查**   | 内置   | 无      | 无     | 无     |\n| **Watch 机制** | 支持   | 不支持  | 不支持 | 不支持 |\n\n#### Consul 动态配置工作流\n\n```mermaid\ngraph TD\n    subgraph DynamicConfig[\"Consul 动态配置\"]\n        KV[Consul KV Store] -->|Watch| CTS[Consul-Terraform-Sync]\n        CTS -->|Update| Terraform[Terraform]\n        Terraform -->|Provision| Infra[Infrastructure]\n    end\n  \n    subgraph ServiceDiscovery[\"服务发现联动\"]\n        Service[Service Register] --> Catalog[Consul Catalog]\n        Catalog -->|Event| CTS\n    end\n  \n    Infra -->|Firewall Rules| FW[防火墙]\n    Infra -->|LB Config| LB[负载均衡器]\n```\n\n**Consul 配置管理优势**:\n\n1. **动态响应服务变化**: 服务扩缩容时自动更新配置\n2. **与 Terraform 集成**: Consul-Terraform-Sync (CTS) 实现基础设施自动化\n3. **分离关注点**: 配置管理与服务发现分离，简化工作流\n4. **多数据中心独立运行**: 每个数据中心可独立配置\n\n#### 静态与动态配置协作\n\n> **最佳实践**: Consul 不是替代传统配置管理工具，而是与其协作。\n>\n> - **静态配置**: 使用 Ansible/Puppet 进行初始化部署\n> - **动态配置**: 使用 Consul 响应运行时变化\n\n```mermaid\ngraph LR\n    subgraph Static[\"静态配置层\"]\n        Ansible[Ansible] --> BaseConfig[基础配置]\n        BaseConfig --> OS[操作系统]\n        BaseConfig --> Packages[软件包]\n    end\n  \n    subgraph Dynamic[\"动态配置层\"]\n        Consul[Consul] --> ServiceConfig[服务配置]\n        ServiceConfig --> Endpoints[服务端点]\n        ServiceConfig --> Secrets[密钥凭证]\n    end\n  \n    OS --> App[Application]\n    Packages --> App\n    Endpoints --> App\n    Secrets --> App\n```\n\n---", "subs": ["动态配置 vs 静态配置", "Consul 动态配置工作流", "静态与动态配置协作"]}, {"title": "1.5 与 API 网关对比", "content": "#### API 网关对比\n\n| 特性                   | Consul API Gateway | Kong          | NGINX Plus | AWS API Gateway |\n| ---------------------- | ------------------ | ------------- | ---------- | --------------- |\n| **服务发现集成** | 原生 Consul        | 需配置        | 需配置     | AWS 服务集成    |\n| **服务网格集成** | Consul Connect     | 独立          | 独立       | 不支持          |\n| **流量管理**     | 支持               | 丰富          | 丰富       | 支持            |\n| **安全认证**     | ACL/mTLS           | 多种插件      | 多种       | IAM/Cognito     |\n| **部署方式**     | K8s/VM             | K8s/VM/Docker | K8s/VM     | 托管服务        |\n\n#### Consul API Gateway 架构\n\n```mermaid\ngraph TD\n    Client[External Client] -->|HTTPS| APIGateway[Consul API Gateway]\n  \n    subgraph ConsulMesh[\"Consul Service Mesh\"]\n        APIGateway -->|mTLS| SvcA[Service A]\n        APIGateway -->|mTLS| SvcB[Service B]\n        SvcA -->|mTLS| SvcC[Service C]\n    end\n  \n    ConsulServer[Consul Server] -->|Config| APIGateway\n    ConsulServer -->|Service Discovery| APIGateway\n```\n\n#### 网关类型说明\n\nConsul 提供三种网关类型：\n\n| 网关类型                      | 用途                 | 场景                       |\n| ----------------------------- | -------------------- | -------------------------- |\n| **API Gateway**         | 南北向流量入口       | 外部客户端访问内部服务     |\n| **Ingress Gateway**     | 外部流量进入服务网格 | 非 mesh 服务访问 mesh 服务 |\n| **Terminating Gateway** | 服务网格访问外部服务 | mesh 服务访问外部数据库等  |\n| **Mesh Gateway**        | 跨数据中心流量       | 多数据中心服务通信         |\n\n```mermaid\ngraph TD\n    subgraph External[\"外部\"]\n        ExtClient[External Client]\n        ExtDB[(External Database)]\n    end\n  \n    subgraph DC1[\"数据中心 1\"]\n        IG[Ingress Gateway]\n        TG[Terminating Gateway]\n        MG1[Mesh Gateway]\n        SvcA1[Service A]\n    end\n  \n    subgraph DC2[\"数据中心 2\"]\n        MG2[Mesh Gateway]\n        SvcA2[Service A]\n    end\n  \n    ExtClient -->|入站| IG\n    IG --> SvcA1\n    SvcA1 -->|出站| TG\n    TG --> ExtDB\n  \n    SvcA1 --> MG1\n    MG1 <-->|跨DC| MG2\n    MG2 --> SvcA2\n```\n\n---", "subs": ["API 网关对比", "Consul API Gateway 架构", "网关类型说明"]}, {"title": "1.6 本章小结", "content": "#### Consul 选型决策树\n\n```mermaid\ngraph TD\n    Start[需要服务发现?] -->|Yes| Q1{需要多数据中心?}\n    Start -->|No| Other[考虑其他方案]\n  \n    Q1 -->|Yes| Consul1[Consul 强推荐]\n    Q1 -->|No| Q2{需要服务网格?}\n  \n    Q2 -->|Yes| Q3{是否仅 K8s 环境?}\n    Q2 -->|No| Q4{需要 KV 存储?}\n  \n    Q3 -->|Yes| Compare[对比 Istio/Linkerd]\n    Q3 -->|No| Consul2[Consul 推荐]\n  \n    Q4 -->|Yes| Consul3[Consul 适合]\n    Q4 -->|No| SimpleDNS[简单 DNS 方案]\n```\n\n#### 关键要点回顾\n\n| 场景                 | Consul 优势            |\n| -------------------- | ---------------------- |\n| **多数据中心** | 原生支持，无需额外组件 |\n| **混合环境**   | 同时支持 K8s、VM、裸机 |\n| **渐进式迁移** | 可逐步引入服务网格     |\n| **动态配置**   | 实时响应服务变化       |\n| **简化运维**   | 单一工具解决多个问题   |\n\n---\n\n> **下一章**: [第2章 核心概念](#第2章-核心概念) - 深入理解服务发现和服务网格的原理\n\n---", "subs": ["Consul 选型决策树", "关键要点回顾"]}]}, {"title": "第2章 核心概念", "sections": [{"title": "2.1 服务发现 (Service Discovery)", "content": "本章深入介绍 Consul 的两个核心概念：**服务发现 (Service Discovery)** 和 **服务网格 (Service Mesh)**。这两个概念是 Consul 的基础，理解它们对于掌握 Consul 至关重要。\n\n---\n\n\n#### 什么是服务发现\n\n**服务发现**是一种允许服务自动注册和发现其他服务的机制。在现代分布式系统中，服务实例的数量和位置会动态变化，服务发现解决了\"如何找到我需要调用的服务\"这一核心问题。\n\n#### 服务发现的核心优势\n\n| 优势                         | 描述                               |\n| ---------------------------- | ---------------------------------- |\n| **动态 IP 和端口发现** | 自动发现服务的网络位置，无需硬编码 |\n| **简化水平扩展**       | 新实例自动加入负载均衡池           |\n| **应用解耦**           | 将发现逻辑从应用中抽离             |\n| **可靠通信**           | 通过健康检查确保只路由到健康实例   |\n| **负载均衡**           | 自动在健康实例间分发请求           |\n| **快速部署**           | 高速发现缩短部署时间               |\n| **自动注册/注销**      | 服务生命周期自动管理               |\n\n#### 服务发现工作原理\n\n服务发现使用服务的**身份标识**而非传统的 IP 地址和端口来定位服务。服务目录动态维护所有服务的访问信息。\n\n```mermaid\ngraph TD\n    subgraph ServiceLifecycle[\"服务生命周期\"]\n        NewSvc[新服务实例启动] --> Register[注册到服务目录]\n        Register --> Catalog[(Service Catalog)]\n        Catalog --> LBPool[加入负载均衡池]\n      \n        OldSvc[旧实例下线] --> Deregister[从服务目录注销]\n        Deregister --> Remove[移出负载均衡池]\n    end\n  \n    subgraph Consumer[\"服务消费者\"]\n        App[Application] -->|DNS Query| DNS[Consul DNS]\n        DNS --> Catalog\n        Catalog -->|Healthy IPs| App\n    end\n```\n\n#### 服务发现的两种模式\n\n##### 客户端发现模式 (Client-Side Discovery)\n\n在客户端发现模式中，**服务消费者**负责确定可用服务实例并进行负载均衡。\n\n```mermaid\ngraph LR\n    subgraph ClientSide[\"客户端发现\"]\n        Consumer[Service Consumer] -->|1. Query| Catalog[(Service Catalog)]\n        Catalog -->|2. Return All IPs| Consumer\n        Consumer -->|3. Select and Request| SvcA[Service Instance A]\n        Consumer -.->|or| SvcB[Service Instance B]\n        Consumer -.->|or| SvcC[Service Instance C]\n    end\n```\n\n**特点**:\n\n- 客户端感知所有服务实例\n- 客户端负责负载均衡逻辑\n- 客户端直接连接服务实例\n\n##### 服务端发现模式 (Server-Side Discovery)\n\n在服务端发现模式中，服务消费者通过**中间层（如 Consul）** 查询服务目录并路由请求。\n\n```mermaid\ngraph LR\n    subgraph ServerSide[\"服务端发现\"]\n        Consumer[Service Consumer] -->|1. Query| Consul[Consul]\n        Consul -->|2. Query| Catalog[(Service Catalog)]\n        Consul -->|3. Route Request| SvcA[Healthy Instance]\n    end\n```\n\n**特点**:\n\n- 客户端只需知道 Consul 地址\n- 发现逻辑集中管理\n- 更适合现代云原生应用\n\n> **Consul 采用服务端发现模式**，将服务发现逻辑从应用中解耦，使应用更轻量、更快速。\n\n#### 服务发现 vs 传统负载均衡\n\n| 对比项                  | 服务发现 (Consul) | 传统负载均衡器      |\n| ----------------------- | ----------------- | ------------------- |\n| **注册/注销速度** | 毫秒级            | 秒/分钟级           |\n| **高可用设计**    | 多节点对等架构    | 主备模式            |\n| **状态管理**      | 点对点状态同步    | 中心化存储          |\n| **基础设施依赖**  | 平台无关          | 依赖特定硬件/云服务 |\n| **动态响应**      | 实时              | 延迟较高            |\n\n#### Consul 服务发现架构\n\n```mermaid\ngraph TD\n    subgraph Apps[\"应用层\"]\n        App1[Web App]\n        App2[API Service]\n        App3[Database]\n    end\n  \n    subgraph Agents[\"Consul Agent 层\"]\n        CA1[Consul Agent]\n        CA2[Consul Agent]\n        CA3[Consul Agent]\n    end\n  \n    subgraph Servers[\"Consul Server 集群\"]\n        S1[Server 1<br>Leader]\n        S2[Server 2]\n        S3[Server 3]\n        S1 <--> S2\n        S2 <--> S3\n        S1 <--> S3\n    end\n  \n    App1 --> CA1\n    App2 --> CA2\n    App3 --> CA3\n  \n    CA1 -->|Register/Query| S1\n    CA2 -->|Register/Query| S1\n    CA3 -->|Register/Query| S1\n```\n\n#### 服务发现实现方式\n\nConsul 可以部署在多种环境中：\n\n| 平台                  | 部署方式          |\n| --------------------- | ----------------- |\n| **虚拟机 (VM)** | 安装 Consul Agent |\n| **容器**        | Sidecar 模式      |\n| **Kubernetes**  | Consul Helm Chart |\n| **Nomad**       | 原生集成          |\n| **Serverless**  | 通过 API 注册     |\n\n---", "subs": ["什么是服务发现", "服务发现的核心优势", "服务发现工作原理", "服务发现的两种模式", "服务发现 vs 传统负载均衡", "Consul 服务发现架构", "服务发现实现方式"]}, {"title": "2.2 服务网格 (Service Mesh)", "content": "#### 什么是服务网格\n\n**服务网格**是一个专门处理服务间通信的基础设施层。它提供了统一的方式来处理服务间的流量管理、安全、可观测性等问题。\n\n#### 服务网格的核心功能\n\n| 功能类别             | 具体功能               |\n| -------------------- | ---------------------- |\n| **服务发现**   | 自动发现和注册服务     |\n| **健康监控**   | 应用健康状态监控       |\n| **负载均衡**   | 智能流量分发           |\n| **流量管理**   | 路由、重试、超时、熔断 |\n| **加密**       | 服务间 mTLS 加密       |\n| **可观测性**   | 追踪、指标、日志       |\n| **认证授权**   | 服务身份验证和访问控制 |\n| **网络自动化** | 动态配置网络策略       |\n\n#### 零信任安全模型\n\n服务网格的一个重要应用场景是实现**零信任 (Zero Trust)** 安全模型。\n\n> **零信任原则**: 不信任任何人，始终验证。\n\n```mermaid\ngraph TD\n    subgraph Traditional[\"传统安全模型\"]\n        Perimeter[网络边界防护]\n        Internal[内部网络<br>默认信任]\n    end\n  \n    subgraph ZeroTrust[\"零信任模型\"]\n        Verify[每次访问都验证]\n        Identity[基于身份的访问]\n        Encrypt[端到端加密]\n        MinPriv[最小权限原则]\n    end\n  \n    Traditional -->|演进| ZeroTrust\n```\n\n**传统安全模型的问题**:\n\n- 聚焦网络边界防护\n- 内部网络默认信任\n- 云环境网络边界模糊\n- 内部威胁难以防范\n\n**零信任模型的优势**:\n\n- 所有通信都需要身份验证\n- 使用 TLS 证书加密传输\n- 细粒度的访问控制策略\n- 适应云原生动态环境\n\n#### 服务网格架构\n\n服务网格通常由**控制平面 (Control Plane)** 和**数据平面 (Data Plane)** 组成。\n\n```mermaid\ngraph TD\n    subgraph ControlPlane[\"控制平面 - Consul Server\"]\n        Registry[(服务注册表)]\n        CA[证书颁发机构]\n        Policy[策略管理]\n        Config[配置分发]\n    end\n  \n    subgraph DataPlane[\"数据平面 - Sidecar Proxy\"]\n        subgraph Pod1[\"Pod/VM 1\"]\n            SvcA[Service A]\n            ProxyA[Envoy Proxy]\n        end\n      \n        subgraph Pod2[\"Pod/VM 2\"]\n            SvcB[Service B]\n            ProxyB[Envoy Proxy]\n        end\n    end\n  \n    CA -->|Certificates| ProxyA\n    CA -->|Certificates| ProxyB\n    Policy -->|Rules| ProxyA\n    Policy -->|Rules| ProxyB\n  \n    SvcA --> ProxyA\n    ProxyA <-->|mTLS| ProxyB\n    ProxyB --> SvcB\n```\n\n##### 控制平面职责\n\n| 职责               | 描述                 |\n| ------------------ | -------------------- |\n| **服务注册** | 维护所有服务的注册表 |\n| **证书管理** | 签发和轮换 TLS 证书  |\n| **健康检查** | 检测服务健康状态     |\n| **策略执行** | 分发和执行安全策略   |\n| **配置管理** | 分发代理配置         |\n\n##### 数据平面职责\n\n| 职责               | 描述                 |\n| ------------------ | -------------------- |\n| **请求代理** | 代理服务间的所有流量 |\n| **负载均衡** | 在服务实例间分发请求 |\n| **加密通信** | 使用 mTLS 加密流量   |\n| **可观测性** | 收集指标、追踪和日志 |\n| **流量控制** | 实现重试、超时、熔断 |\n\n#### API 网关 vs 服务网格\n\n```mermaid\ngraph TD\n    subgraph External[\"外部网络\"]\n        ExtClient[外部客户端]\n    end\n  \n    subgraph NorthSouth[\"南北向流量\"]\n        APIGW[API Gateway]\n    end\n  \n    subgraph EastWest[\"东西向流量 - Service Mesh\"]\n        SvcA[Service A] <-->|mTLS| SvcB[Service B]\n        SvcB <-->|mTLS| SvcC[Service C]\n        SvcA <-->|mTLS| SvcC\n    end\n  \n    ExtClient -->|HTTPS| APIGW\n    APIGW --> SvcA\n```\n\n| 对比项                 | API 网关             | 服务网格                   |\n| ---------------------- | -------------------- | -------------------------- |\n| **流量方向**     | 南北向 (入站/出站)   | 东西向 (服务间)            |\n| **主要功能**     | 入口管理、认证、限流 | 服务间通信、安全、可观测性 |\n| **部署位置**     | 网络边缘             | 服务旁边 (Sidecar)         |\n| **服务感知**     | 有限                 | 完全感知                   |\n| **生命周期管理** | 不管理               | 自动跟踪                   |\n\n#### 服务网格解决的问题\n\n##### 1. 动态基础设施挑战\n\n```mermaid\ngraph LR\n    subgraph Dynamic[\"动态基础设施\"]\n        VM1[VM 短生命周期]\n        Container[容器快速回收]\n        Serverless[Serverless 函数]\n    end\n  \n    Dynamic --> Problem{IP 地址频繁变化}\n    Problem --> Solution[服务网格<br>基于身份的发现]\n```\n\n##### 2. 智能流量管理\n\n服务网格提供 L7 层流量管理能力：\n\n| 功能                   | 描述                         |\n| ---------------------- | ---------------------------- |\n| **负载均衡**     | 多种算法 (轮询、最少连接等)  |\n| **流量分割**     | 金丝雀发布、蓝绿部署         |\n| **动态故障转移** | 自动切换到健康实例           |\n| **自定义路由**   | 基于 Header、Path 等规则路由 |\n| **重试机制**     | 自动重试失败请求             |\n| **熔断器**       | 防止级联故障                 |\n\n##### 3. 细粒度安全策略\n\n```mermaid\ngraph TD\n    subgraph Traditional[\"传统 IP 防火墙\"]\n        FW[Firewall Rule]\n        IP1[\"Allow 10.0.0.0/8\"]\n        IP2[\"Allow 192.168.0.0/16\"]\n        FW --> IP1\n        FW --> IP2\n    end\n  \n    subgraph ServiceMesh[\"服务网格策略\"]\n        Intention[Service Intention]\n        Allow1[\"web -> api: ALLOW\"]\n        Allow2[\"api -> db: ALLOW\"]\n        Deny[\"*: DENY\"]\n        Intention --> Allow1\n        Intention --> Allow2\n        Intention --> Deny\n    end\n  \n    Traditional -->|演进| ServiceMesh\n```\n\n**服务网格安全优势**:\n\n- 从 IP 地址模型转向服务身份模型\n- 无需担心 IP 地址频繁变化\n- 支持跨云环境而不增加复杂性\n- 默认拒绝，显式允许\n\n#### Consul 作为服务网格\n\nConsul 是一个**多平台服务网格**，具有以下特点：\n\n```mermaid\ngraph TD\n    subgraph ConsulMesh[\"Consul Service Mesh\"]\n        subgraph ControlPlane[\"控制平面\"]\n            ConsulServer[Consul Server Cluster]\n        end\n      \n        subgraph DataPlane[\"数据平面\"]\n            Envoy1[Envoy Proxy]\n            Envoy2[Envoy Proxy]\n            Envoy3[Envoy Proxy]\n        end\n      \n        subgraph Platforms[\"支持的平台\"]\n            K8s[Kubernetes]\n            VM[Virtual Machines]\n            Nomad[Nomad]\n            ECS[AWS ECS]\n        end\n    end\n  \n    ConsulServer -->|Config/Certs| Envoy1\n    ConsulServer -->|Config/Certs| Envoy2\n    ConsulServer -->|Config/Certs| Envoy3\n```\n\n##### Consul 服务网格特性\n\n| 特性                 | 描述                     |\n| -------------------- | ------------------------ |\n| **多平台支持** | Kubernetes、VM、Nomad 等 |\n| **多云支持**   | 跨云环境统一管理         |\n| **Envoy 集成** | 一流的 Envoy 代理支持    |\n| **Connect**    | 内置的服务间安全通信     |\n| **Intentions** | 基于服务的访问控制       |\n| **可观测性**   | 内置指标和追踪集成       |\n\n#### 部署选项\n\n| 部署方式                  | 适用场景               |\n| ------------------------- | ---------------------- |\n| **自托管 Consul**   | 完全控制，适合大型组织 |\n| **HCP Consul**      | 托管服务，降低运维负担 |\n| **Kubernetes Helm** | K8s 原生部署           |\n| **Terraform**       | 基础设施即代码部署     |\n\n---", "subs": ["什么是服务网格", "服务网格的核心功能", "零信任安全模型", "服务网格架构", "API 网关 vs 服务网格", "服务网格解决的问题", "Consul 作为服务网格", "部署选项"]}, {"title": "2.3 本章小结", "content": "#### 服务发现 vs 服务网格\n\n```mermaid\ngraph TD\n    subgraph ServiceDiscovery[\"服务发现\"]\n        SD1[服务注册]\n        SD2[服务查找]\n        SD3[健康检查]\n        SD4[DNS 接口]\n    end\n  \n    subgraph ServiceMesh[\"服务网格\"]\n        SM1[服务发现]\n        SM2[安全通信 mTLS]\n        SM3[流量管理]\n        SM4[可观测性]\n        SM5[策略执行]\n    end\n  \n    ServiceDiscovery -->|是基础| ServiceMesh\n```\n\n#### 关键概念回顾\n\n| 概念                 | 要点                              |\n| -------------------- | --------------------------------- |\n| **服务发现**   | 动态定位服务实例，基于身份而非 IP |\n| **服务目录**   | 集中维护所有服务信息的注册表      |\n| **控制平面**   | 管理配置、证书、策略的中心组件    |\n| **数据平面**   | 处理实际流量的 Sidecar 代理       |\n| **零信任**     | 始终验证，从不信任                |\n| **mTLS**       | 双向 TLS 认证和加密               |\n| **Intentions** | Consul 的服务间访问控制规则       |\n\n#### 核心架构总览\n\n```mermaid\ngraph TD\n    subgraph Consul[\"Consul 核心架构\"]\n        subgraph Server[\"Server 集群\"]\n            Leader[Leader]\n            Follower1[Follower]\n            Follower2[Follower]\n        end\n      \n        subgraph Features[\"核心功能\"]\n            SD[服务发现]\n            KV[KV 存储]\n            Mesh[服务网格]\n            ACL[访问控制]\n        end\n      \n        subgraph Client[\"Client Agent\"]\n            Service[服务注册]\n            Health[健康检查]\n            Proxy[Sidecar Proxy]\n        end\n    end\n  \n    Leader <--> Follower1\n    Leader <--> Follower2\n    Follower1 <--> Follower2\n  \n    Client --> Server\n```\n\n---\n\n> **下一章**: [第3章 快速入门](#第3章-快速入门) - 安装部署 Consul 并了解基本术语和端口配置\n\n---", "subs": ["服务发现 vs 服务网格", "关键概念回顾", "核心架构总览"]}]}, {"title": "第3章 快速入门", "sections": [{"title": "3.1 安装 Consul", "content": "本章介绍 Consul 的安装部署、核心术语、端口配置以及生产环境部署的最佳实践。\n\n---\n\n\n#### 安装方式\n\nConsul 提供多种安装方式：\n\n| 安装方式                  | 适用场景         |\n| ------------------------- | ---------------- |\n| **预编译二进制**    | 最简单，推荐方式 |\n| **包管理器**        | yum/apt 系统集成 |\n| **Docker**          | 容器化部署       |\n| **源码编译**        | 自定义构建       |\n| **Kubernetes Helm** | K8s 环境         |\n\n#### 二进制安装 (推荐)\n\n```bash\n# 下载最新版本 (以 Linux amd64 为例)\nwget https://releases.hashicorp.com/consul/1.16.0/consul_1.16.0_linux_amd64.zip\n\n# 解压\nunzip consul_1.16.0_linux_amd64.zip\n\n# 移动到系统路径\nsudo mv consul /usr/local/bin/\n\n# 验证安装\nconsul version\n```\n\n#### 包管理器安装\n\n**CentOS/RHEL:**\n\n```bash\n# 添加 HashiCorp 仓库\nsudo yum install -y yum-utils\nsudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo\n\n# 安装 Consul\nsudo yum install -y consul\n```\n\n**Ubuntu/Debian:**\n\n```bash\n# 添加 GPG 密钥\nwget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg\n\n# 添加仓库\necho \"deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main\" | sudo tee /etc/apt/sources.list.d/hashicorp.list\n\n# 安装\nsudo apt update && sudo apt install consul\n```\n\n#### Docker 安装\n\n```bash\n# 拉取镜像\ndocker pull hashicorp/consul:latest\n\n# 运行开发模式\ndocker run -d --name=consul-dev -p 8500:8500 hashicorp/consul agent -dev -client=0.0.0.0\n```\n\n---", "subs": ["安装方式", "二进制安装 (推荐)", "包管理器安装", "Docker 安装"]}, {"title": "3.2 术语表", "content": "#### 核心角色术语\n\n| 术语               | 说明                                                                   |\n| ------------------ | ---------------------------------------------------------------------- |\n| **Agent**    | 运行在每个 Consul 节点上的长时间守护进程，可以是 Client 或 Server 模式 |\n| **Client**   | 转发所有 RPC 请求到 Server，参与 LAN Gossip，无状态，资源消耗低        |\n| **Server**   | 参与 Raft 选举、维护集群状态、响应 RPC 查询、WAN Gossip 通信           |\n| **Leader**   | Server 集群中的领导者，负责处理所有写请求和复制日志                    |\n| **Follower** | Server 集群中的跟随者，复制 Leader 的日志                              |\n\n#### 网络术语\n\n| 术语                 | 说明                                             |\n| -------------------- | ------------------------------------------------ |\n| **Datacenter** | 私有、低延迟、高带宽的网络环境                   |\n| **LAN Gossip** | 同一数据中心内节点间的 Gossip 通信               |\n| **WAN Gossip** | 跨数据中心的 Server 间 Gossip 通信               |\n| **RPC**        | 远程过程调用，Client 与 Server 间的请求/响应机制 |\n\n#### 协议术语\n\n| 术语                | 说明                                           |\n| ------------------- | ---------------------------------------------- |\n| **Consensus** | 共识协议，基于 Raft 实现 Leader 选举和日志复制 |\n| **Gossip**    | 八卦协议，用于成员管理、故障检测和事件广播     |\n| **Raft**      | 分布式一致性算法，保证数据强一致性             |\n\n#### 功能术语\n\n| 术语                        | 说明                                       |\n| --------------------------- | ------------------------------------------ |\n| **Service Discovery** | 服务发现，自动注册和查找服务               |\n| **Service Mesh**      | 服务网格，Sidecar 代理模式的服务间安全通信 |\n| **Service Catalog**   | 服务目录，存储所有注册服务的信息           |\n| **Health Check**      | 健康检查，监控服务和节点状态               |\n| **ACL**               | 访问控制列表，权限管理系统                 |\n| **KV Store**          | 键值存储，动态配置和协调                   |\n| **Intentions**        | 服务间访问控制规则                         |\n| **mTLS**              | 双向 TLS 认证加密                          |\n\n```mermaid\ngraph TD\n    subgraph Cluster[\"Consul Cluster\"]\n        subgraph Servers[\"Server 节点\"]\n            Leader[Leader Server]\n            F1[Follower Server]\n            F2[Follower Server]\n        end\n      \n        subgraph Clients[\"Client 节点\"]\n            C1[Client Agent]\n            C2[Client Agent]\n            C3[Client Agent]\n        end\n    end\n  \n    Leader <-->|Raft| F1\n    Leader <-->|Raft| F2\n    F1 <-->|Raft| F2\n  \n    C1 -->|RPC| Leader\n    C2 -->|RPC| Leader\n    C3 -->|RPC| Leader\n  \n    C1 <-->|LAN Gossip| C2\n    C2 <-->|LAN Gossip| C3\n```\n\n---", "subs": ["核心角色术语", "网络术语", "协议术语", "功能术语"]}, {"title": "3.3 必需端口", "content": "#### 端口列表\n\n| 端口           | 协议    | 用途       | 说明                        |\n| -------------- | ------- | ---------- | --------------------------- |\n| **8300** | TCP     | Server RPC | Server 间 RPC 通信          |\n| **8301** | TCP/UDP | Serf LAN   | LAN Gossip，所有 Agent 必需 |\n| **8302** | TCP/UDP | Serf WAN   | WAN Gossip，仅 Server 需要  |\n| **8500** | TCP     | HTTP API   | HTTP API 接口               |\n| **8501** | TCP     | HTTPS API  | HTTPS API 接口 (可选)       |\n| **8502** | TCP     | gRPC API   | gRPC API 接口 (可选)        |\n| **8503** | TCP     | gRPC TLS   | gRPC TLS 接口 (可选)        |\n| **8600** | TCP/UDP | DNS        | DNS 接口                    |\n\n#### 端口流量图\n\n```mermaid\ngraph LR\n    subgraph External[\"外部访问\"]\n        App[Application]\n        DNS[DNS Client]\n    end\n  \n    subgraph ConsulPorts[\"Consul 端口\"]\n        P8500[8500 HTTP API]\n        P8600[8600 DNS]\n        P8301[8301 Serf LAN]\n        P8302[8302 Serf WAN]\n        P8300[8300 Server RPC]\n    end\n  \n    App -->|HTTP/HTTPS| P8500\n    DNS -->|DNS Query| P8600\n  \n    subgraph Internal[\"内部通信\"]\n        Agent1[Agent]\n        Agent2[Agent]\n        Server1[Server]\n        Server2[Server]\n    end\n  \n    Agent1 <-->|8301| Agent2\n    Server1 <-->|8300| Server2\n    Server1 <-->|8302| Server2\n```\n\n#### 防火墙配置示例\n\n```bash\n# Server 节点防火墙规则 (firewalld)\nfirewall-cmd --permanent --add-port=8300/tcp   # Server RPC\nfirewall-cmd --permanent --add-port=8301/tcp   # Serf LAN\nfirewall-cmd --permanent --add-port=8301/udp\nfirewall-cmd --permanent --add-port=8302/tcp   # Serf WAN\nfirewall-cmd --permanent --add-port=8302/udp\nfirewall-cmd --permanent --add-port=8500/tcp   # HTTP API\nfirewall-cmd --permanent --add-port=8600/tcp   # DNS\nfirewall-cmd --permanent --add-port=8600/udp\nfirewall-cmd --reload\n\n# Client 节点防火墙规则\nfirewall-cmd --permanent --add-port=8301/tcp\nfirewall-cmd --permanent --add-port=8301/udp\nfirewall-cmd --permanent --add-port=8500/tcp\nfirewall-cmd --permanent --add-port=8600/tcp\nfirewall-cmd --permanent --add-port=8600/udp\nfirewall-cmd --reload\n```\n\n---", "subs": ["端口列表", "端口流量图", "防火墙配置示例"]}, {"title": "3.4 数据中心引导", "content": "#### 集群引导流程\n\n在集群开始服务之前，必须完成 **Leader 选举**。引导 (Bootstrap) 是将初始 Server 节点组成集群的过程。\n\n```mermaid\ngraph TD\n    Start[启动 Consul Server] --> Config[配置 bootstrap_expect]\n    Config --> Wait[等待其他 Server]\n    Wait --> Join{节点数量达到?}\n    Join -->|No| Wait\n    Join -->|Yes| Election[触发 Leader 选举]\n    Election --> Leader[选出 Leader]\n    Leader --> Ready[集群就绪]\n    Ready --> Clients[Client 节点加入]\n```\n\n#### 集群规模建议\n\n| 生产环境           | Server 数量 | 说明                            |\n| ------------------ | ----------- | ------------------------------- |\n| **最小规模** | 3           | 容忍 1 个节点故障               |\n| **推荐规模** | 5           | 容忍 2 个节点故障               |\n| **大规模**   | 7           | 容忍 3 个节点故障，选举时间更长 |\n\n> **警告**: 单节点部署在故障时会导致数据丢失，不推荐用于生产环境。\n\n#### 自动引导配置\n\n使用 `bootstrap_expect` 自动引导集群：\n\n```json\n{\n  \"bootstrap_expect\": 3,\n  \"retry_join\": [\"server1\", \"server2\", \"server3\"]\n}\n```\n\n---", "subs": ["集群引导流程", "集群规模建议", "自动引导配置"]}, {"title": "3.5 生产环境部署配置", "content": "#### 目录结构准备\n\n```bash\n# 创建配置和数据目录\nmkdir -p /etc/consul.d /data/consul /var/log/consul\n\n# 设置权限 (如果使用专用用户)\nchown -R consul:consul /etc/consul.d /data/consul /var/log/consul\n```\n\n#### Server 配置示例\n\n```bash\ncat > /etc/consul.d/server.json << 'EOF'\n{\n    \"advertise_addr\": \"192.168.1.10\",\n    \"bind_addr\": \"0.0.0.0\",\n    \"bootstrap_expect\": 3,\n    \"client_addr\": \"0.0.0.0\",\n    \"data_dir\": \"/data/consul\",\n    \"datacenter\": \"dc1\",\n    \"log_level\": \"INFO\",\n    \"log_file\": \"/var/log/consul/consul.log\",\n    \"node_meta\": {\n        \"env\": \"prod\",\n        \"host\": \"consul-server01.dc1.example.com\",\n        \"host_name\": \"consul-server01\",\n        \"host_type\": \"server\",\n        \"region\": \"dc1\"\n    },\n    \"log_json\": true,\n    \"log_level\": \"info\",\n    \"log_rotate_max_files\": 10,\n    \"log_rotate_duration\": \"24h\",\n    \"log_file\": \"/data/consul/logs/\",\n    \"node_name\": \"consul-server01\",\n    \"retry_join\": [\n        \"consul-server01\",\n        \"consul-server02\",\n        \"consul-server03\"\n    ],\n    \"retry_join_wan\": [\n        \"consul-server01.dc2.example.com\",\n        \"consul-server02.dc2.example.com\"\n    ],\n    \"server\": true,\n    \"ui\": true,\n    \"performance\": {\n        \"raft_multiplier\": 1\n    }\n}\nEOF\n```\n\n#### Server 配置参数说明\n\n| 参数                 | 说明                                 |\n| -------------------- | ------------------------------------ |\n| `advertise_addr`   | 对外通告的 IP 地址                   |\n| `bind_addr`        | 绑定地址，`0.0.0.0` 表示所有接口   |\n| `bootstrap_expect` | 预期 Server 数量，达到后自动选举     |\n| `client_addr`      | HTTP/DNS 接口监听地址                |\n| `data_dir`         | 数据存储目录                         |\n| `datacenter`       | 数据中心名称                         |\n| `node_name`        | 节点名称，集群内唯一                 |\n| `retry_join`       | 同数据中心 Server 列表，自动重试加入 |\n| `retry_join_wan`   | 跨数据中心 Server 列表 (WAN)         |\n| `server`           | 是否为 Server 模式                   |\n| `ui`               | 是否启用 Web UI                      |\n\n#### Client (Agent) 配置示例\n\n```bash\ncat > /etc/consul.d/client.json << 'EOF'\n{\n    \"data_dir\": \"/data/consul\",\n    \"datacenter\": \"dc1\",\n    \"enable_script_checks\": true,\n    \"bind_addr\": \"192.168.1.100\",\n    \"client_addr\": \"0.0.0.0\",\n    \"node_name\": \"consul-agent01\",\n    \"log_json\": true,\n    \"log_level\": \"info\",\n    \"log_rotate_max_files\": 10,\n    \"log_rotate_duration\": \"24h\",\n    \"log_file\": \"/data/consul/logs/\",\n    \"retry_join\": [\n        \"consul-server01\",\n        \"consul-server02\",\n        \"consul-server03\"\n    ],\n    \"retry_interval\": \"30s\",\n    \"rejoin_after_leave\": true,\n    \"start_join\": [\n        \"consul-server01\",\n        \"consul-server02\",\n        \"consul-server03\"\n    ]\n}\nEOF\n```\n\n#### Client 配置参数说明\n\n| 参数                     | 说明                        |\n| ------------------------ | --------------------------- |\n| `enable_script_checks` | 允许脚本类型健康检查        |\n| `retry_join`           | Server 地址列表，断开后重试 |\n| `retry_interval`       | 重试间隔                    |\n| `rejoin_after_leave`   | 离开后是否重新加入          |\n| `start_join`           | 启动时加入的 Server 地址    |\n\n---", "subs": ["目录结构准备", "Server 配置示例", "Server 配置参数说明", "Client (Agent) 配置示例", "Client 配置参数说明"]}, {"title": "3.6 Systemd 服务配置", "content": "#### Server 节点 Systemd 配置\n\n```bash\ncat > /etc/systemd/system/consul.service << 'EOF'\n[Unit]\nDescription=HashiCorp Consul - A service mesh solution\nDocumentation=https://www.consul.io/\nRequires=network-online.target\nAfter=network-online.target\nConditionFileNotEmpty=/etc/consul.d/server.json\n\n[Service]\nType=notify\nUser=consul\nGroup=consul\nExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d\nExecReload=/bin/kill --signal HUP $MAINPID\nKillMode=process\nKillSignal=SIGTERM\nRestart=on-failure\nRestartSec=5\nLimitNOFILE=65536\n\n# 生产环境建议配置\nTimeoutStartSec=0\nTimeoutStopSec=30\n\n[Install]\nWantedBy=multi-user.target\nEOF\n```\n\n#### Client 节点 Systemd 配置\n\n```bash\ncat > /etc/systemd/system/consul.service << 'EOF'\n[Unit]\nDescription=HashiCorp Consul - A service mesh solution\nDocumentation=https://www.consul.io/\nRequires=network-online.target\nAfter=network-online.target\nConditionFileNotEmpty=/etc/consul.d/client.json\n\n[Service]\nType=notify\nUser=consul\nGroup=consul\nExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d\nExecReload=/bin/kill --signal HUP $MAINPID\nKillMode=process\nKillSignal=SIGTERM\nRestart=on-failure\nRestartSec=5\nLimitNOFILE=65536\n\n[Install]\nWantedBy=multi-user.target\nEOF\n```\n\n#### 创建 Consul 用户\n\n```bash\n# 创建 consul 系统用户\nuseradd --system --home /etc/consul.d --shell /bin/false consul\n\n# 设置目录权限\nchown -R consul:consul /etc/consul.d /data/consul /var/log/consul\n```\n\n#### 服务管理命令\n\n```bash\n# 重新加载 systemd 配置\nsystemctl daemon-reload\n\n# 启动 Consul\nsystemctl start consul\n\n# 设置开机自启\nsystemctl enable consul\n\n# 查看状态\nsystemctl status consul\n\n# 查看日志\njournalctl -u consul -f\n\n# 重新加载配置 (不重启)\nsystemctl reload consul\n\n# 停止服务\nsystemctl stop consul\n```\n\n#### 集群管理命令\n\n```bash\n# 查看集群成员\nconsul members\n\n# 查看集群成员 (详细信息)\nconsul members -detailed\n\n# 查看 Server 状态\nconsul operator raft list-peers\n\n# 查看集群信息\nconsul info\n\n# 手动加入集群\nconsul join <server_ip>\n\n# 优雅离开集群\nconsul leave\n```\n\n---", "subs": ["Server 节点 Systemd 配置", "Client 节点 Systemd 配置", "创建 Consul 用户", "服务管理命令", "集群管理命令"]}, {"title": "3.7 云自动加入", "content": "Consul 支持通过云平台标签自动发现并加入集群节点，无需手动配置 IP 地址。\n\n#### 支持的云平台\n\n| 云平台       | Provider 名称    |\n| ------------ | ---------------- |\n| AWS          | `aws`          |\n| Azure        | `azure`        |\n| Google Cloud | `gce`          |\n| 阿里云       | `aliyun`       |\n| 腾讯云       | `tencentcloud` |\n| Kubernetes   | `k8s`          |\n| vSphere      | `vsphere`      |\n\n#### AWS 配置示例\n\n```json\n{\n  \"retry_join\": [\n    \"provider=aws tag_key=consul tag_value=server region=ap-southeast-1\"\n  ]\n}\n```\n\n#### 阿里云配置示例\n\n```json\n{\n  \"retry_join\": [\n    \"provider=aliyun region=cn-hangzhou tag_key=consul tag_value=server access_key_id=xxx access_key_secret=xxx\"\n  ]\n}\n```\n\n#### Kubernetes 配置示例\n\n```json\n{\n  \"retry_join\": [\n    \"provider=k8s label_selector=\\\"app=consul,component=server\\\"\"\n  ]\n}\n```\n\n#### 云自动加入流程\n\n```mermaid\ngraph TD\n    Start[Consul Agent 启动] --> Provider[识别云提供商]\n    Provider --> Query[查询具有指定标签的实例]\n    Query --> Filter[过滤返回的 IP 列表]\n    Filter --> Join[尝试加入各节点]\n    Join --> Success{加入成功?}\n    Success -->|Yes| Ready[集群就绪]\n    Success -->|No| Retry[等待 retry_interval]\n    Retry --> Query\n```\n\n---", "subs": ["支持的云平台", "AWS 配置示例", "阿里云配置示例", "Kubernetes 配置示例", "云自动加入流程"]}, {"title": "3.8 服务器性能优化", "content": "#### Raft 性能参数\n\nConsul 的默认配置针对低端硬件优化，生产环境应调整为高性能配置。\n\n| raft_multiplier    | 适用场景          | HeartbeatTimeout | ElectionTimeout |\n| ------------------ | ----------------- | ---------------- | --------------- |\n| **5 (默认)** | 低端硬件/开发环境 | 5000ms           | 5000ms          |\n| **1 (推荐)** | 生产环境          | 1000ms           | 1000ms          |\n\n#### 高性能配置\n\n```json\n{\n  \"performance\": {\n    \"raft_multiplier\": 1\n  }\n}\n```\n\n> **重要**: 高性能配置可以更快检测 Leader 故障并完成选举，但需要稳定的网络环境。\n\n#### 硬件建议\n\n| 资源           | 最小配置 | 推荐配置 | 大规模集群 |\n| -------------- | -------- | -------- | ---------- |\n| **CPU**  | 2 核     | 4 核     | 8+ 核      |\n| **内存** | 2 GB     | 8 GB     | 16+ GB     |\n| **磁盘** | HDD      | SSD      | NVMe SSD   |\n| **网络** | 1 Gbps   | 10 Gbps  | 10+ Gbps   |\n\n#### 性能调优参数\n\n```json\n{\n  \"performance\": {\n    \"raft_multiplier\": 1\n  },\n  \"limits\": {\n    \"http_max_conns_per_client\": 200,\n    \"rpc_max_conns_per_client\": 100\n  },\n  \"dns_config\": {\n    \"allow_stale\": true,\n    \"max_stale\": \"87600h\",\n    \"node_ttl\": \"10s\",\n    \"service_ttl\": {\n      \"*\": \"10s\"\n    }\n  }\n}\n```\n\n#### 内存使用监控\n\n```bash\n# 查看运行时内存分配\nconsul info | grep alloc_bytes\n\n# 查看 Raft 状态\nconsul operator raft list-peers\n```\n\n#### 写密集型工作负载优化\n\n```mermaid\ngraph TD\n    Write[写请求] --> Leader[Leader Server]\n    Leader --> Log[写入 Raft 日志]\n    Log --> Disk{磁盘类型}\n    Disk -->|HDD| Slow[延迟高]\n    Disk -->|SSD| Fast[延迟低]\n    Fast --> Replicate[复制到 Follower]\n```\n\n**建议**:\n\n- 使用 SSD 或 NVMe 存储\n- 增加 `ulimit` 文件描述符限制\n- 配置客户端 RPC 限流\n\n#### 读密集型工作负载优化\n\n```json\n{\n  \"dns_config\": {\n    \"allow_stale\": true\n  }\n}\n```\n\n启用 `allow_stale` 允许从任意 Server 读取数据，减轻 Leader 压力。\n\n---", "subs": ["Raft 性能参数", "高性能配置", "硬件建议", "性能调优参数", "内存使用监控", "写密集型工作负载优化", "读密集型工作负载优化"]}, {"title": "3.9 本章小结", "content": "#### 快速部署检查清单\n\n```mermaid\ngraph TD\n    A[安装 Consul] --> B[创建目录结构]\n    B --> C[配置 Server]\n    C --> D[配置 Systemd]\n    D --> E[启动 Server 集群]\n    E --> F[验证 Leader 选举]\n    F --> G[配置 Client]\n    G --> H[Client 加入集群]\n    H --> I[验证集群状态]\n```\n\n#### 关键配置要点\n\n| 配置项               | Server         | Client           |\n| -------------------- | -------------- | ---------------- |\n| `server`           | `true`       | `false` 或省略 |\n| `bootstrap_expect` | 设置           | 不需要           |\n| `ui`               | 可选           | 不需要           |\n| `retry_join`       | 其他 Server    | 所有 Server      |\n| `retry_join_wan`   | 其他 DC Server | 不需要           |\n\n#### 生产环境最佳实践\n\n1. **使用奇数个 Server** (3 或 5)\n2. **配置 raft_multiplier=1** 获得高性能\n3. **使用 SSD 存储** 提升写入性能\n4. **配置 systemd** 确保服务自动恢复\n5. **开启 allow_stale** 分散读负载\n6. **配置日志轮转** 避免磁盘占满\n\n---\n\n> **下一章**: [第4章 架构原理](#第4章-架构原理) - 深入了解 Consul 的 Raft 共识、Gossip 协议和反熵机制\n\n---", "subs": ["快速部署检查清单", "关键配置要点", "生产环境最佳实践"]}]}, {"title": "第4章 架构原理", "sections": [{"title": "4.1 架构概述", "content": "本章深入讲解 Consul 的核心架构原理，包括 Raft 共识协议、Gossip 协议、反熵机制等关键技术。\n\n---\n\n\n#### 控制平面架构\n\nConsul 提供一个**控制平面 (Control Plane)**，用于注册、访问和保护网络中部署的服务。控制平面维护一个中央注册表来跟踪服务及其 IP 地址。\n\n```mermaid\ngraph TD\n    subgraph ControlPlane[\"控制平面\"]\n        subgraph Servers[\"Server 集群\"]\n            Leader[Leader Server]\n            F1[Follower]\n            F2[Follower]\n            Leader <-->|Raft| F1\n            Leader <-->|Raft| F2\n            F1 <-->|Raft| F2\n        end\n    end\n    \n    subgraph DataPlane[\"数据平面\"]\n        subgraph Clients[\"Client Agents\"]\n            C1[Client 1]\n            C2[Client 2]\n            C3[Client 3]\n        end\n        \n        subgraph Proxies[\"Sidecar Proxies\"]\n            P1[Envoy]\n            P2[Envoy]\n            P3[Envoy]\n        end\n    end\n    \n    C1 -->|RPC 8300| Leader\n    C2 -->|RPC 8300| Leader\n    C3 -->|RPC 8300| Leader\n    \n    C1 <-->|Gossip 8301| C2\n    C2 <-->|Gossip 8301| C3\n```\n\n#### 单数据中心架构\n\n| 组件 | 数量建议 | 职责 |\n|------|---------|------|\n| **Server** | 3 或 5 | 存储状态、处理查询、Raft 共识 |\n| **Client** | 无限制 | 转发 RPC、执行健康检查、Gossip |\n| **Leader** | 1 | 处理所有写入和事务 |\n\n#### 多数据中心架构\n\n```mermaid\ngraph TD\n    subgraph DC1[\"数据中心 1 - Primary\"]\n        S1[Server Leader]\n        S2[Server Follower]\n        C1[Client Agent]\n        \n        S1 <-->|Raft| S2\n        C1 -->|RPC| S1\n    end\n    \n    subgraph DC2[\"数据中心 2 - Secondary\"]\n        S3[Server Leader]\n        S4[Server Follower]\n        C2[Client Agent]\n        \n        S3 <-->|Raft| S4\n        C2 -->|RPC| S3\n    end\n    \n    S1 <-->|WAN Gossip 8302| S3\n    \n    C1 -.->|跨DC请求| S3\n```\n\n**WAN 联邦特点**:\n\n- 需要指定一个**主数据中心 (Primary Datacenter)**\n- 主数据中心存储权威信息 (ACL、配置等)\n- 跨数据中心请求通过 WAN Gossip 转发\n- 默认使用 TCP 8302 端口\n\n#### 集群与数据中心\n\n| 术语 | 定义 |\n|------|------|\n| **Datacenter** | 最小的 Consul 基础设施单元，可执行基本操作 |\n| **Cluster** | 一组相互感知的 Consul Agent |\n| **Admin Partition** | (Enterprise) 共享相同 Server 的隔离网络区域 |\n\n---", "subs": ["控制平面架构", "单数据中心架构", "多数据中心架构", "集群与数据中心"]}, {"title": "4.2 提高 Consul 弹性", "content": "#### 故障容忍度\n\nConsul 的容错能力由**投票 Server (Voting Server)** 的配置决定。\n\n| Server 数量 | Quorum 大小 | 可容忍故障数 |\n|------------|-------------|-------------|\n| 1 | 1 | 0 (不推荐) |\n| 2 | 2 | 0 |\n| **3** | 2 | **1** |\n| 4 | 3 | 1 |\n| **5** | 3 | **2** |\n| 6 | 4 | 2 |\n| 7 | 4 | 3 |\n\n> **推荐**: 生产环境使用 3 或 5 个 Server。\n\n#### 可用区分布策略\n\n```mermaid\ngraph TD\n    subgraph AZ1[\"可用区 1\"]\n        S1[Server 1]\n        S2[Server 2]\n    end\n    \n    subgraph AZ2[\"可用区 2\"]\n        S3[Server 3]\n        S4[Server 4]\n    end\n    \n    subgraph AZ3[\"可用区 3\"]\n        S5[Server 5]\n    end\n    \n    S1 <--> S3\n    S1 <--> S5\n    S3 <--> S5\n```\n\n**最佳实践**:\n\n- 将 Server 分布在 3 个可用区\n- 每个可用区最多 2 个 Server\n- 单个可用区故障不会导致集群不可用\n\n#### 冗余区 (Enterprise)\n\n| 配置 | 即时容错 | 乐观容错 |\n|------|---------|---------|\n| 3 Server (无冗余区) | 1 | 1 |\n| 6 Server / 3 冗余区 | 1 | 4 |\n| 9 Server / 3 冗余区 | 1 | 7 |\n\n**乐观容错** = 即时容错 + 健康备份投票者数量\n\n---", "subs": ["故障容忍度", "可用区分布策略", "冗余区 (Enterprise)"]}, {"title": "4.3 反熵机制 (Anti-Entropy)", "content": "#### 什么是反熵\n\n**熵 (Entropy)** 是系统趋向无序的倾向。Consul 的反熵机制用于对抗这种倾向，即使在组件故障时也能保持集群状态有序。\n\n#### Agent 与 Catalog\n\n```mermaid\ngraph TD\n    subgraph Agent[\"Agent 本地状态\"]\n        LocalSvc[本地服务注册]\n        LocalCheck[本地健康检查]\n        LocalState[本地状态]\n    end\n    \n    subgraph Catalog[\"全局 Catalog\"]\n        GlobalSvc[全局服务目录]\n        GlobalCheck[全局健康状态]\n        GlobalState[集群状态]\n    end\n    \n    Agent -->|Anti-Entropy Sync| Catalog\n    \n    LocalSvc -->|注册同步| GlobalSvc\n    LocalCheck -->|健康同步| GlobalCheck\n```\n\n#### 反熵工作流程\n\n```mermaid\nsequenceDiagram\n    participant Agent\n    participant Catalog\n    \n    Note over Agent: 本地注册新服务\n    Agent->>Catalog: 同步: 注册服务\n    Catalog-->>Agent: 确认\n    \n    Note over Agent: 健康检查状态变更\n    Agent->>Catalog: 同步: 更新健康状态\n    Catalog-->>Agent: 确认\n    \n    Note over Agent: 定期同步周期\n    Agent->>Catalog: 周期性同步\n    Catalog-->>Agent: 差异对账\n```\n\n#### 同步间隔\n\n| 集群规模 | 同步间隔 |\n|---------|---------|\n| 小型集群 | 约 1 分钟 |\n| 中型集群 | 约 2-3 分钟 |\n| 大型集群 | 约 5 分钟 |\n\n> **注意**: 每个 Agent 会在间隔窗口内随机选择开始时间，避免**惊群效应**。\n\n#### 反熵失败场景\n\n- Agent 配置错误\n- 磁盘 I/O 问题 (磁盘满、权限问题)\n- 网络问题 (Agent 无法与 Server 通信)\n\n---", "subs": ["什么是反熵", "Agent 与 Catalog", "反熵工作流程", "同步间隔", "反熵失败场景"]}, {"title": "4.4 共识协议 (Raft)", "content": "#### Raft 协议概述\n\nConsul 使用 **Raft** 共识算法来保证状态的一致性和容错性。Raft 基于 Paxos，但设计更简单、更易理解。\n\n#### Raft 核心概念\n\n| 概念 | 说明 |\n|------|------|\n| **Log** | 日志条目，任何集群变更都是一条日志 |\n| **FSM** | 有限状态机，日志应用后的状态 |\n| **Peer Set** | 参与日志复制的所有成员集合 |\n| **Leader** | 负责接收新日志、复制到 Follower |\n| **Committed** | 日志已持久化到 Quorum 数量的节点 |\n\n#### Raft 工作流程\n\n```mermaid\nsequenceDiagram\n    participant Client\n    participant Leader\n    participant F1 as Follower 1\n    participant F2 as Follower 2\n    \n    Client->>Leader: 1. 写请求\n    Leader->>Leader: 2. 写入本地日志\n    \n    par 并行复制\n        Leader->>F1: 3. 复制日志\n        Leader->>F2: 3. 复制日志\n    end\n    \n    F1-->>Leader: 4. 确认\n    F2-->>Leader: 4. 确认\n    \n    Note over Leader: 5. Quorum 达成, 日志 Committed\n    \n    Leader->>Leader: 6. 应用到 FSM\n    Leader-->>Client: 7. 返回结果\n```\n\n#### Leader 选举\n\n```mermaid\ngraph TD\n    Start[所有节点启动为 Follower] --> Timeout{选举超时?}\n    Timeout -->|Yes| Candidate[转为 Candidate]\n    Candidate --> Vote[请求投票]\n    Vote --> Majority{获得多数票?}\n    Majority -->|Yes| Leader[成为 Leader]\n    Majority -->|No| Follower[回退为 Follower]\n    Leader --> Heartbeat[发送心跳]\n    Heartbeat --> Timeout\n    Follower --> Timeout\n```\n\n#### 一致性模式\n\n| 模式 | 说明 | 适用场景 |\n|------|------|---------|\n| **default** | 依赖 Leader 租约，可能返回过期数据 | 一般读取 |\n| **stale** | 任意 Server 可响应，数据可能过期 50ms | 高性能读取 |\n| **consistent** | 强一致性，需要 Leader 确认 | 关键数据 |\n\n#### 快照与日志压缩\n\n```mermaid\ngraph LR\n    Log1[Log 1] --> Log2[Log 2]\n    Log2 --> Log3[Log 3]\n    Log3 --> Snapshot[Snapshot at Index 3]\n    Snapshot --> Log4[Log 4]\n    Log4 --> Log5[Log 5]\n    \n    Snapshot -.->|压缩| Compacted[旧日志删除]\n```\n\n**优势**:\n\n- 防止日志无限增长\n- 加速新节点同步\n- 使用 MemDB 支持快照期间继续处理请求\n\n---", "subs": ["Raft 协议概述", "Raft 核心概念", "Raft 工作流程", "Leader 选举", "一致性模式", "快照与日志压缩"]}, {"title": "4.5 Gossip 协议", "content": "#### Gossip 协议概述\n\nConsul 使用 **Serf** 库实现 Gossip 协议，用于成员管理、故障检测和事件广播。\n\n#### 两种 Gossip Pool\n\n```mermaid\ngraph TD\n    subgraph LANPool[\"LAN Gossip Pool\"]\n        direction LR\n        C1[Client 1]\n        C2[Client 2]\n        S1[Server 1]\n        S2[Server 2]\n        \n        C1 <-->|UDP 8301| C2\n        C1 <-->|UDP 8301| S1\n        S1 <-->|UDP 8301| S2\n    end\n    \n    subgraph WANPool[\"WAN Gossip Pool\"]\n        direction LR\n        S1DC1[DC1 Server]\n        S1DC2[DC2 Server]\n        \n        S1DC1 <-->|TCP/UDP 8302| S1DC2\n    end\n```\n\n| 类型 | 参与者 | 端口 | 用途 |\n|------|--------|------|------|\n| **LAN Gossip** | 同 DC 所有 Agent | 8301 | 成员管理、故障检测 |\n| **WAN Gossip** | 所有 DC 的 Server | 8302 | 跨 DC 服务器发现 |\n\n#### Gossip 协议特点\n\n1. **随机节点通信**: 主要使用 UDP\n2. **成员管理**: 自动发现和维护集群成员\n3. **故障检测**: 快速检测节点故障\n4. **事件广播**: 向集群广播事件\n\n#### Lifeguard 增强\n\nConsul 使用 **Lifeguard** 增强 SWIM 协议，解决了传统 Gossip 的一些问题：\n\n- 更准确的故障检测\n- 减少误报\n- 适应网络延迟变化\n\n---", "subs": ["Gossip 协议概述", "两种 Gossip Pool", "Gossip 协议特点", "Lifeguard 增强"]}, {"title": "4.6 Jepsen 测试", "content": "Jepsen 是一个测试分布式系统一致性的框架。Consul 通过了 Jepsen 测试，验证了其：\n\n- Raft 实现的正确性\n- 在网络分区下的行为\n- 数据一致性保证\n\n---", "subs": ["Raft 实现的正确性", "在网络分区下的行为", "数据一致性保证"]}, {"title": "4.7 网络坐标", "content": "#### 什么是网络坐标\n\nConsul 使用 **Serf** 的网络坐标功能计算节点间的网络往返时间 (RTT)，实现**就近路由**。\n\n#### 网络坐标应用\n\n| 应用 | 说明 |\n|------|------|\n| **consul rtt** | 查询任意两节点间的 RTT |\n| **Prepared Queries** | 基于 RTT 的自动故障转移 |\n| **Geo Failover** | 地理位置感知的服务路由 |\n\n#### RTT 计算示例\n\n```mermaid\ngraph TD\n    subgraph DC1[\"数据中心 1 - 北京\"]\n        S1[Server 1]\n    end\n    \n    subgraph DC2[\"数据中心 2 - 上海\"]\n        S2[Server 2]\n    end\n    \n    subgraph DC3[\"数据中心 3 - 广州\"]\n        S3[Server 3]\n    end\n    \n    S1 <-->|RTT: 20ms| S2\n    S2 <-->|RTT: 30ms| S3\n    S1 <-->|RTT: 40ms| S3\n    \n    Client[客户端 - 上海] -->|就近访问| S2\n```\n\n#### 坐标兼容性\n\n> **重要**: LAN 坐标和 WAN 坐标**不兼容**。LAN 坐标只能与 LAN 坐标计算，WAN 坐标只能与 WAN 坐标计算。\n\n---", "subs": ["什么是网络坐标", "网络坐标应用", "RTT 计算示例", "坐标兼容性"]}, {"title": "4.8 大规模部署", "content": "#### 规模建议\n\n| 指标 | 建议值 | 说明 |\n|------|--------|------|\n| **每 DC Client 数** | ≤ 5,000 | 超过可能导致 Gossip 不稳定 |\n| **Server 数量** | 3 或 5 | 使用冗余区可达 6 |\n| **服务实例** | 无硬性限制 | 取决于硬件和网络 |\n\n#### 爆炸半径控制\n\n```mermaid\ngraph TD\n    subgraph Bad[\"不推荐: 单大型集群\"]\n        BigDC[10,000+ Clients]\n        BigDC -->|故障| AllDown[全部受影响]\n    end\n    \n    subgraph Good[\"推荐: 多小型集群\"]\n        DC1[DC1: 2,000 Clients]\n        DC2[DC2: 2,000 Clients]\n        DC3[DC3: 2,000 Clients]\n        \n        DC1 -->|故障| Partial[仅 DC1 受影响]\n        DC2 -->|正常| OK1[继续服务]\n        DC3 -->|正常| OK2[继续服务]\n    end\n```\n\n#### 读写负载优化\n\n##### 读密集型优化\n\n```mermaid\ngraph TD\n    subgraph ReadHeavy[\"读密集型优化\"]\n        Client[DNS Query] -->|Stale Mode| AnyServer[任意 Server]\n        AnyServer -->|快速返回| Client\n    end\n```\n\n| 策略 | 配置 | 效果 |\n|------|------|------|\n| **Stale Reads** | `allow_stale: true` | 分散读负载到所有 Server |\n| **DNS TTL** | 配置合理 TTL | 减少 DNS 查询次数 |\n| **Read Replicas** | Enterprise | 增加只读副本 |\n\n##### 写密集型优化\n\n| 策略 | 说明 |\n|------|------|\n| **NVMe SSD** | 使用高性能存储 |\n| **Provisioned IOPS** | 云环境使用预置 IOPS |\n| **NoFreelistSync** | 减少 BoltDB 写放大 |\n\n#### Raft 数据库管理\n\n##### 日志压缩\n\n```mermaid\ngraph LR\n    subgraph RaftLog[\"Raft 日志管理\"]\n        Logs[日志累积] --> Snapshot[生成快照]\n        Snapshot --> Truncate[截断旧日志]\n        Truncate --> TrailingLogs[保留尾部日志]\n    end\n```\n\n##### 防止快照安装循环\n\n| 指标 | 建议 |\n|------|------|\n| `raft.leader.oldestLogAge` | 应至少是 `raft.rpc.installSnapshot` 的 2 倍 |\n| `raft_trailing_logs` | 按需增加以防止循环 |\n\n#### 服务网格扩展\n\n```mermaid\ngraph TD\n    subgraph MeshScale[\"服务网格扩展考虑\"]\n        Instances[服务实例数] --> Certificates[证书签发负载]\n        TransparentProxy[透明代理] --> XDSLoad[XDS 配置推送]\n        Intentions[访问意图] --> PropagationLoad[策略传播]\n    end\n```\n\n**注意事项**:\n\n- 不要将 `permissive intention` 与透明代理一起使用\n- 调整 `csr_max_concurrent` 控制证书签发并发\n\n#### KV 存储限制\n\n| 限制项 | 值 |\n|--------|-----|\n| 单个 Value 大小 | < 512 KB |\n| 单事务操作数 | < 64 |\n| 总数据大小 | < 1 GB |\n| Key 数量 | 建议 < 10,000 |\n\n---", "subs": ["规模建议", "爆炸半径控制", "读写负载优化", "Raft 数据库管理", "服务网格扩展", "KV 存储限制"]}, {"title": "4.9 本章小结", "content": "#### 架构核心组件\n\n```mermaid\ngraph TD\n    subgraph Architecture[\"Consul 架构总览\"]\n        subgraph Consensus[\"共识层\"]\n            Raft[Raft 协议]\n            BoltDB[(BoltDB)]\n            MemDB[(MemDB)]\n        end\n        \n        subgraph Gossip[\"通信层\"]\n            LANGossip[LAN Gossip]\n            WANGossip[WAN Gossip]\n            Serf[Serf 库]\n        end\n        \n        subgraph Sync[\"同步层\"]\n            AntiEntropy[反熵机制]\n            Catalog[服务目录]\n        end\n    end\n    \n    Raft --> BoltDB\n    Raft --> MemDB\n    Serf --> LANGossip\n    Serf --> WANGossip\n    AntiEntropy --> Catalog\n```\n\n#### 关键协议对比\n\n| 协议 | 用途 | 端口 | 特点 |\n|------|------|------|------|\n| **Raft** | 共识协议 | 8300 | 强一致性、Leader 选举 |\n| **Gossip** | 成员管理 | 8301/8302 | 最终一致、故障检测 |\n| **Anti-Entropy** | 状态同步 | - | 定期对账、自愈 |\n\n#### 生产环境架构建议\n\n1. **Server 配置**:\n   - 3 或 5 个 Server\n   - 分布在 3 个可用区\n   - 使用 SSD 存储\n\n2. **Client 限制**:\n   - 每 DC 最多 5,000 Client\n   - 减少 Gossip 池大小\n\n3. **性能调优**:\n   - 读密集: 启用 Stale Reads\n   - 写密集: 使用 NVMe SSD\n\n4. **监控指标**:\n   - `consul.raft.leader.lastContact`\n   - `consul.serf.queue.Intent`\n   - `consul.rpc.query`\n\n---\n\n> **下一章**: [第5章 服务管理](#第5章-服务管理) - 深入了解服务注册、健康检查和 DNS 发现\n\n---", "subs": ["架构核心组件", "关键协议对比", "生产环境架构建议"]}]}, {"title": "第5章 服务管理", "sections": [{"title": "5.1 服务管理概述", "content": "本章详细介绍 Consul 中服务的定义、注册、健康检查和 DNS 发现等核心功能。\n\n---\n\n\n#### 服务发现工作流程\n\n```mermaid\ngraph TD\n    Define[1. 定义服务] --> Register[2. 注册服务]\n    Register --> HealthCheck[3. 健康检查]\n    HealthCheck --> Query[4. 服务查询]\n    \n    subgraph Definition[\"服务定义\"]\n        JSON[JSON/HCL 配置文件]\n        API[HTTP API]\n        K8s[Kubernetes CRD]\n    end\n    \n    subgraph Discovery[\"服务发现\"]\n        DNS[DNS 查询]\n        HTTPAPI[HTTP API]\n        Mesh[Service Mesh]\n    end\n    \n    Define --> Definition\n    Query --> Discovery\n```\n\n#### 服务管理核心流程\n\n| 阶段 | 描述 | 方式 |\n|------|------|------|\n| **定义服务** | 创建服务配置文件 | JSON, HCL, YAML |\n| **注册服务** | 向 Consul Agent 注册 | CLI, API, 配置重载 |\n| **健康检查** | 验证服务可用性 | Script, HTTP, TCP, gRPC |\n| **服务发现** | 查询可用服务实例 | DNS, HTTP API |\n\n---", "subs": ["服务发现工作流程", "服务管理核心流程"]}, {"title": "5.2 定义服务", "content": "#### 服务定义基础\n\n服务定义是一个配置文件，包含服务的名称、端口、地址等信息。\n\n**最小配置示例:**\n\n```json\n{\n  \"service\": {\n    \"name\": \"web\",\n    \"port\": 80\n  }\n}\n```\n\n**完整配置示例:**\n\n```hcl\nservice {\n  name = \"redis\"\n  id   = \"redis-primary\"\n  port = 6379\n  \n  tags = [\"primary\", \"v1\"]\n  \n  meta = {\n    version = \"5.0\"\n    env     = \"production\"\n  }\n  \n  address = \"192.168.1.100\"\n  \n  tagged_addresses {\n    lan {\n      address = \"192.168.1.100\"\n      port    = 6379\n    }\n    wan {\n      address = \"203.0.113.50\"\n      port    = 6379\n    }\n  }\n  \n  checks = [\n    {\n      id       = \"redis-health\"\n      name     = \"Redis TCP Check\"\n      tcp      = \"localhost:6379\"\n      interval = \"10s\"\n      timeout  = \"3s\"\n    }\n  ]\n  \n  weights {\n    passing = 10\n    warning = 1\n  }\n}\n```\n\n#### 服务配置参数\n\n| 参数 | 类型 | 必需 | 说明 |\n|------|------|------|------|\n| `name` | string | ✅ | 服务名称，用于 DNS 查询 |\n| `id` | string | | 服务实例 ID，节点内唯一 |\n| `port` | integer | | 服务端口号 |\n| `address` | string | | 服务地址，默认为 Agent 地址 |\n| `tags` | []string | | 服务标签，用于过滤和路由 |\n| `meta` | object | | 自定义元数据键值对 |\n| `weights` | object | | DNS SRV 响应权重 |\n| `checks` | []object | | 健康检查定义 |\n| `token` | string | | ACL Token (启用 ACL 时必需) |\n\n#### 多服务定义\n\n可以在一个配置文件中定义多个服务：\n\n```hcl\nservices {\n  id   = \"redis-primary\"\n  name = \"redis\"\n  tags = [\"primary\"]\n  port = 6379\n}\n\nservices {\n  id   = \"redis-replica\"\n  name = \"redis\"\n  tags = [\"replica\"]\n  port = 6380\n}\n```\n\n#### 服务定义流程\n\n```mermaid\ngraph TD\n    Create[创建服务定义文件] --> Validate{语法验证}\n    Validate -->|通过| Place[放置到配置目录]\n    Validate -->|失败| Fix[修复语法错误]\n    Fix --> Validate\n    Place --> Reload[重载 Agent]\n    Reload --> Active[服务激活]\n```\n\n---", "subs": ["服务定义基础", "服务配置参数", "多服务定义", "服务定义流程"]}, {"title": "5.3 健康检查", "content": "#### 健康检查类型\n\nConsul 支持多种类型的健康检查：\n\n```mermaid\ngraph TD\n    subgraph CheckTypes[\"健康检查类型\"]\n        Script[Script 脚本检查]\n        HTTP[HTTP 检查]\n        TCP[TCP 检查]\n        UDP[UDP 检查]\n        gRPC[gRPC 检查]\n        TTL[TTL 被动检查]\n        Docker[Docker 检查]\n        Alias[Alias 别名检查]\n        H2Ping[H2ping HTTP2 检查]\n        OSService[OSService 系统服务检查]\n    end\n```\n\n| 检查类型 | 适用场景 | 特点 |\n|---------|---------|------|\n| **Script** | 自定义检查逻辑 | 通过退出码判断状态 |\n| **HTTP** | Web 服务 | 最常用，根据状态码判断 |\n| **TCP** | 任意 TCP 服务 | 验证端口可达性 |\n| **UDP** | UDP 服务 | 发送数据报验证响应 |\n| **gRPC** | gRPC 服务 | 支持标准健康检查协议 |\n| **TTL** | 应用主动上报 | 被动等待心跳 |\n| **Alias** | 关联服务 | 复用其他服务状态 |\n\n#### HTTP 检查配置\n\n```json\n{\n  \"check\": {\n    \"id\": \"api-health\",\n    \"name\": \"HTTP API Health\",\n    \"http\": \"http://localhost:8080/health\",\n    \"method\": \"GET\",\n    \"interval\": \"10s\",\n    \"timeout\": \"3s\",\n    \"header\": {\n      \"Authorization\": [\"Bearer token123\"]\n    },\n    \"tls_skip_verify\": false\n  }\n}\n```\n\n**HTTP 状态码含义:**\n\n- `200-299`: 健康 (passing)\n- `429`: 警告 (warning)\n- 其他: 故障 (critical)\n\n#### TCP 检查配置\n\n```json\n{\n  \"check\": {\n    \"id\": \"mysql-tcp\",\n    \"name\": \"MySQL TCP Check\",\n    \"tcp\": \"localhost:3306\",\n    \"interval\": \"10s\",\n    \"timeout\": \"5s\"\n  }\n}\n```\n\n#### Script 检查配置\n\n```hcl\ncheck {\n  id       = \"mem-check\"\n  name     = \"Memory Usage\"\n  args     = [\"/usr/local/bin/check_mem.py\", \"-limit\", \"256MB\"]\n  interval = \"30s\"\n  timeout  = \"10s\"\n}\n```\n\n**退出码含义:**\n\n- `0`: 健康 (passing)\n- `1`: 警告 (warning)\n- `其他`: 故障 (critical)\n\n> **安全警告**: 使用 `enable_local_script_checks` 而非 `enable_script_checks`，避免远程执行漏洞。\n\n#### gRPC 检查配置\n\n```json\n{\n  \"check\": {\n    \"id\": \"grpc-health\",\n    \"name\": \"gRPC Health Check\",\n    \"grpc\": \"localhost:50051\",\n    \"grpc_use_tls\": true,\n    \"interval\": \"10s\"\n  }\n}\n```\n\n可以指定特定服务：`\"grpc\": \"localhost:50051/my_service\"`\n\n#### TTL 检查配置\n\nTTL 检查是**被动检查**，需要应用程序主动调用 API 更新状态：\n\n```json\n{\n  \"check\": {\n    \"id\": \"app-ttl\",\n    \"name\": \"Application Heartbeat\",\n    \"ttl\": \"30s\",\n    \"notes\": \"App sends heartbeat every 10s\"\n  }\n}\n```\n\n**更新 TTL 状态:**\n\n```bash\n# 更新为 passing\ncurl -X PUT http://localhost:8500/v1/agent/check/pass/app-ttl\n\n# 更新为 warning\ncurl -X PUT http://localhost:8500/v1/agent/check/warn/app-ttl\n\n# 更新为 critical\ncurl -X PUT http://localhost:8500/v1/agent/check/fail/app-ttl\n```\n\n#### 多健康检查\n\n```json\n{\n  \"checks\": [\n    {\n      \"id\": \"http-check\",\n      \"http\": \"http://localhost:8080/health\",\n      \"interval\": \"10s\"\n    },\n    {\n      \"id\": \"tcp-check\",\n      \"tcp\": \"localhost:8080\",\n      \"interval\": \"5s\"\n    },\n    {\n      \"id\": \"mem-check\",\n      \"args\": [\"/bin/check_mem\"],\n      \"interval\": \"30s\"\n    }\n  ]\n}\n```\n\n#### 健康检查流程\n\n```mermaid\nsequenceDiagram\n    participant Agent\n    participant Service\n    participant Catalog\n    \n    loop 每个检查间隔\n        Agent->>Service: 执行健康检查\n        Service-->>Agent: 返回状态\n        Agent->>Agent: 更新本地状态\n        Agent->>Catalog: 同步状态 (Anti-Entropy)\n    end\n    \n    Note over Catalog: 不健康服务从 DNS 响应中移除\n```\n\n---", "subs": ["健康检查类型", "HTTP 检查配置", "TCP 检查配置", "Script 检查配置", "gRPC 检查配置", "TTL 检查配置", "多健康检查", "健康检查流程"]}, {"title": "5.4 服务注册", "content": "#### 注册方式\n\n| 方式 | 场景 | 持久化 |\n|------|------|--------|\n| **配置文件** | 推荐，启动时加载 | ✅ Agent 重启后保留 |\n| **CLI 命令** | 临时测试 | ❌ 重启后丢失 |\n| **HTTP API** | 动态注册 | ❌ 重启后丢失 |\n\n#### 配置文件注册 (推荐)\n\n```bash\n# 1. 创建服务配置文件\ncat > /etc/consul.d/web-service.json << 'EOF'\n{\n  \"service\": {\n    \"name\": \"web\",\n    \"port\": 8080,\n    \"checks\": [\n      {\n        \"http\": \"http://localhost:8080/health\",\n        \"interval\": \"10s\"\n      }\n    ]\n  }\n}\nEOF\n\n# 2. 重载 Agent 配置\nconsul reload\n# 或\nsystemctl reload consul\n```\n\n#### CLI 注册\n\n```bash\nconsul services register /path/to/web-service.json\n```\n\n#### API 注册\n\n```bash\ncurl -X PUT \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"Name\": \"web\",\n    \"Port\": 8080,\n    \"Check\": {\n      \"HTTP\": \"http://localhost:8080/health\",\n      \"Interval\": \"10s\"\n    }\n  }' \\\n  http://localhost:8500/v1/agent/service/register\n```\n\n#### 注销服务\n\n```bash\n# CLI 注销\nconsul services deregister /path/to/web-service.json\n\n# API 注销\ncurl -X PUT http://localhost:8500/v1/agent/service/deregister/web\n```\n\n---", "subs": ["注册方式", "配置文件注册 (推荐)", "CLI 注册", "API 注册", "注销服务"]}, {"title": "5.5 DNS 服务发现", "content": "#### DNS 查询格式\n\nConsul DNS 提供简单的服务发现机制，无需修改应用程序代码。\n\n```mermaid\ngraph LR\n    App[应用程序] -->|DNS Query| Consul[Consul Agent :8600]\n    Consul -->|A/SRV Record| App\n```\n\n#### 节点查询\n\n```bash\n# 格式: <node>.node[.<datacenter>].consul\ndig @127.0.0.1 -p 8600 web-server.node.consul\n\n# 指定数据中心\ndig @127.0.0.1 -p 8600 web-server.node.dc1.consul\n```\n\n#### 服务查询\n\n```bash\n# 格式: [<tag>.]<service>.service[.<datacenter>].consul\n\n# 查询所有 web 服务\ndig @127.0.0.1 -p 8600 web.service.consul\n\n# 查询带 primary 标签的 web 服务\ndig @127.0.0.1 -p 8600 primary.web.service.consul\n\n# 查询 dc2 数据中心的 web 服务\ndig @127.0.0.1 -p 8600 web.service.dc2.consul\n\n# 获取 SRV 记录 (包含端口)\ndig @127.0.0.1 -p 8600 web.service.consul SRV\n```\n\n#### RFC 2782 SRV 查询\n\n```bash\n# 格式: _<service>._<protocol>.service.consul\ndig @127.0.0.1 -p 8600 _web._tcp.service.consul SRV\n\n# 按标签过滤\ndig @127.0.0.1 -p 8600 _redis._primary.service.consul SRV\n```\n\n#### DNS 查询类型对比\n\n| 查询类型 | 返回记录 | 用途 |\n|---------|---------|------|\n| **A/AAAA** | IP 地址 | 基本服务发现 |\n| **SRV** | IP + 端口 + 权重 | 完整服务信息 |\n| **TXT** | 元数据 | 服务元信息 |\n\n#### Service Mesh DNS 查询\n\n```bash\n# Connect 代理服务\ndig @127.0.0.1 -p 8600 web.connect.consul\n\n# 虚拟 IP (透明代理)\ndig @127.0.0.1 -p 8600 web.virtual.consul\n\n# Ingress Gateway\ndig @127.0.0.1 -p 8600 web.ingress.consul\n```\n\n#### DNS 发现流程\n\n```mermaid\nsequenceDiagram\n    participant App as 应用程序\n    participant DNS as Consul DNS\n    participant Catalog as 服务目录\n    \n    App->>DNS: web.service.consul\n    DNS->>Catalog: 查询健康的 web 实例\n    Catalog-->>DNS: 返回实例列表\n    DNS-->>App: A 记录 (随机顺序)\n    App->>App: 连接到返回的 IP\n```\n\n#### Enterprise DNS 查询\n\n```bash\n# 指定命名空间和分区\ndig @127.0.0.1 -p 8600 web.service.prod.ns.internal.ap.dc1.consul\n\n# 跨 Peer 查询\ndig @127.0.0.1 -p 8600 web.service.peer1.peer.consul\n```\n\n---", "subs": ["DNS 查询格式", "节点查询", "服务查询", "RFC 2782 SRV 查询", "DNS 查询类型对比", "Service Mesh DNS 查询", "DNS 发现流程", "Enterprise DNS 查询"]}, {"title": "5.6 Prepared Queries (预备查询)", "content": "#### 什么是 Prepared Query\n\nPrepared Query 是预定义的复杂 DNS 查询，支持：\n\n- 多标签过滤\n- 跨数据中心故障转移\n- 模板匹配\n\n#### 创建 Prepared Query\n\n```bash\ncurl -X POST http://localhost:8500/v1/query \\\n  -d '{\n    \"Name\": \"web-geo\",\n    \"Service\": {\n      \"Service\": \"web\",\n      \"Failover\": {\n        \"NearestN\": 3\n      },\n      \"OnlyPassing\": true\n    }\n  }'\n```\n\n#### 执行 Prepared Query\n\n```bash\n# 通过 DNS\ndig @127.0.0.1 -p 8600 web-geo.query.consul\n\n# 通过 API\ncurl http://localhost:8500/v1/query/web-geo/execute\n```\n\n---", "subs": ["什么是 Prepared Query", "创建 Prepared Query", "执行 Prepared Query"]}, {"title": "5.7 配置参考", "content": "#### 服务权重配置\n\n```hcl\nservice {\n  name = \"web\"\n  \n  weights {\n    passing = 10    # 健康实例权重\n    warning = 1     # 警告实例权重 (critical 默认排除)\n  }\n}\n```\n\n#### 标签地址配置\n\n```json\n{\n  \"service\": {\n    \"name\": \"api\",\n    \"address\": \"192.168.1.100\",\n    \"port\": 8080,\n    \"tagged_addresses\": {\n      \"lan\": {\n        \"address\": \"192.168.1.100\",\n        \"port\": 8080\n      },\n      \"wan\": {\n        \"address\": \"203.0.113.50\",\n        \"port\": 443\n      },\n      \"virtual\": {\n        \"address\": \"240.0.0.1\",\n        \"port\": 8080\n      }\n    }\n  }\n}\n```\n\n#### Enable Tag Override\n\n允许外部系统修改服务标签，适用于外部监控系统作为标签权威来源的场景：\n\n```hcl\nservice {\n  name = \"redis\"\n  enable_tag_override = true\n}\n```\n\n---", "subs": ["服务权重配置", "标签地址配置", "Enable Tag Override"]}, {"title": "5.8 本章小结", "content": "#### 服务管理完整流程\n\n```mermaid\ngraph TD\n    Define[定义服务配置] --> Register[注册到 Agent]\n    Register --> Check[健康检查运行]\n    Check --> Sync[Anti-Entropy 同步]\n    Sync --> Catalog[写入服务目录]\n    Catalog --> DNS[DNS 可发现]\n    Catalog --> API[API 可查询]\n    \n    subgraph Lifecycle[\"服务生命周期\"]\n        Define\n        Register\n        Check\n    end\n    \n    subgraph Discovery[\"服务发现\"]\n        DNS\n        API\n    end\n```\n\n#### 健康检查选型\n\n| 场景 | 推荐检查类型 |\n|------|-------------|\n| HTTP/REST API | HTTP Check |\n| 数据库 (MySQL, Redis) | TCP Check |\n| gRPC 服务 | gRPC Check |\n| 自定义逻辑 | Script Check |\n| 应用主动上报 | TTL Check |\n| 关联服务 | Alias Check |\n\n#### 最佳实践\n\n1. **使用配置文件注册服务** - 确保 Agent 重启后服务持久化\n2. **配置多个健康检查** - HTTP + TCP 双保险\n3. **设置合理的超时和间隔** - 避免误判\n4. **使用 DNS TTL 缓存** - 减少查询压力\n5. **使用 Prepared Query** - 实现高级路由和故障转移\n6. **为服务添加元数据** - 便于管理和过滤\n\n#### 服务配置检查清单\n\n```mermaid\ngraph TD\n    A{服务名称设置?} -->|Yes| B{端口配置?}\n    B -->|Yes| C{健康检查?}\n    C -->|Yes| D{标签设置?}\n    D -->|Yes| E{元数据?}\n    E -->|Yes| F[完成]\n    \n    A -->|No| A1[必须设置 name]\n    B -->|No| B1[建议设置 port]\n    C -->|No| C1[必须配置健康检查]\n```\n\n---\n\n> **下一章**: [第6章 动态应用配置](#第6章-动态应用配置) - 学习 Consul KV Store 的使用和最佳实践\n\n---", "subs": ["服务管理完整流程", "健康检查选型", "最佳实践", "服务配置检查清单"]}]}, {"title": "第6章 动态应用配置", "sections": [{"title": "6.1 KV Store 概述", "content": "本章介绍 Consul 的键值存储 (KV Store)、会话 (Sessions) 机制和监控 (Watches) 功能，这些是实现动态配置管理和分布式协调的核心组件。\n\n---\n\n\n#### 什么是 Consul KV\n\nConsul KV 是一个分布式键值存储系统，可用于：\n\n- 动态配置管理\n- 服务协调\n- 特性开关 (Feature Flags)\n- Leader 选举\n\n```mermaid\ngraph TD\n    subgraph Applications[\"应用程序\"]\n        App1[App 1]\n        App2[App 2]\n        App3[App 3]\n    end\n    \n    subgraph ConsulKV[\"Consul KV Store\"]\n        KV[(KV Database)]\n        Leader[Leader Server]\n    end\n    \n    App1 -->|Read/Write| KV\n    App2 -->|Read/Write| KV\n    App3 -->|Read/Write| KV\n    \n    KV --> Leader\n    Leader -->|Raft Replication| Followers[Follower Servers]\n```\n\n#### KV 访问方式\n\n| 方式 | 用途 | 示例 |\n|------|------|------|\n| **CLI** | 运维管理 | `consul kv get/put` |\n| **HTTP API** | 应用集成 | `/v1/kv/` |\n| **UI** | 可视化管理 | Web 界面 |\n\n#### 基本操作\n\n```bash\n# 写入键值\nconsul kv put config/db/host \"192.168.1.100\"\nconsul kv put config/db/port \"3306\"\n\n# 读取键值\nconsul kv get config/db/host\n\n# 读取所有键\nconsul kv get -recurse config/\n\n# 删除键值\nconsul kv delete config/db/host\n\n# 删除前缀下所有键\nconsul kv delete -recurse config/db/\n```\n\n#### HTTP API 操作\n\n```bash\n# 写入\ncurl -X PUT -d 'myvalue' http://localhost:8500/v1/kv/mykey\n\n# 读取\ncurl http://localhost:8500/v1/kv/mykey\n\n# 读取并解码 (Value 是 Base64 编码)\ncurl -s http://localhost:8500/v1/kv/mykey | jq -r '.[0].Value' | base64 -d\n\n# 删除\ncurl -X DELETE http://localhost:8500/v1/kv/mykey\n\n# 递归读取\ncurl http://localhost:8500/v1/kv/config/?recurse\n```\n\n#### Key 命名规范\n\n| 推荐 | 不推荐 |\n|------|--------|\n| 使用 `/` 组织层级 | 使用特殊字符 `*`, `?`, `'` |\n| 使用 URL 安全字符 | 使用过长的 Key 名称 |\n| 采用命名空间前缀 | 无组织的扁平结构 |\n\n**推荐的 Key 结构:**\n\n```\nconfig/\n├── app/\n│   ├── database/\n│   │   ├── host\n│   │   ├── port\n│   │   └── password\n│   └── cache/\n│       ├── host\n│       └── ttl\n└── feature-flags/\n    ├── new-ui\n    └── beta-feature\n```\n\n#### KV 使用限制\n\n| 限制项 | 建议值 |\n|--------|--------|\n| 单个 Value 大小 | < 512 KB |\n| 事务操作数 | < 64 |\n| 总数据大小 | < 1 GB |\n| Key 数量 | < 10,000 |\n\n---", "subs": ["什么是 Consul KV", "KV 访问方式", "基本操作", "HTTP API 操作", "Key 命名规范", "KV 使用限制"]}, {"title": "6.2 Sessions 与分布式锁", "content": "#### Session 概述\n\nSession 是 Consul 中实现分布式锁的核心机制，它将节点、健康检查和 KV 数据绑定在一起。\n\n```mermaid\ngraph TD\n    subgraph Session[\"Session 组件\"]\n        Node[Node 节点]\n        Checks[Health Checks]\n        TTL[Session TTL]\n        Behavior[Invalidation Behavior]\n    end\n    \n    subgraph KVLock[\"KV 锁\"]\n        Key[(KV Key)]\n        Lock[Lock 状态]\n    end\n    \n    Session -->|acquire| Lock\n    Lock -->|release| Session\n    \n    Node --> Session\n    Checks --> Session\n```\n\n#### Session 生命周期\n\nSession 在以下情况会失效：\n\n- 节点注销\n- 关联的健康检查变为 `critical`\n- Session 被显式销毁\n- TTL 过期\n\n#### 创建 Session\n\n```bash\n# 创建基本 Session\ncurl -X PUT http://localhost:8500/v1/session/create \\\n  -d '{\n    \"Name\": \"my-app-lock\",\n    \"TTL\": \"30s\",\n    \"Behavior\": \"release\"\n  }'\n\n# 返回 Session ID\n# {\"ID\":\"adf4238a-882b-9ddc-4a9d-5b6758e4159e\"}\n```\n\n#### Session 参数\n\n| 参数 | 说明 | 默认值 |\n|------|------|--------|\n| `Name` | Session 名称 | 空 |\n| `Node` | 绑定的节点 | 当前 Agent |\n| `Checks` | 关联的健康检查 | `[\"serfHealth\"]` |\n| `TTL` | 超时时间 (10s-86400s) | 无 |\n| `Behavior` | 失效行为 | `release` |\n| `LockDelay` | 锁延迟 (0-60s) | 15s |\n\n#### 失效行为 (Behavior)\n\n| 行为 | 说明 |\n|------|------|\n| `release` | 释放锁，保留 Key 值 |\n| `delete` | 删除持有的 Key |\n\n#### 分布式锁操作\n\n```mermaid\nsequenceDiagram\n    participant App1\n    participant Consul\n    participant App2\n    \n    App1->>Consul: 1. 创建 Session\n    Consul-->>App1: Session ID\n    \n    App1->>Consul: 2. acquire 锁 (Key + Session)\n    Consul-->>App1: true (获取成功)\n    \n    App2->>Consul: 3. acquire 锁 (同一 Key)\n    Consul-->>App2: false (锁被占用)\n    \n    Note over App1: 执行关键业务\n    \n    App1->>Consul: 4. release 锁\n    Consul-->>App1: 成功\n    \n    App2->>Consul: 5. acquire 锁\n    Consul-->>App2: true (获取成功)\n```\n\n#### 获取锁 (acquire)\n\n```bash\n# 使用 Session 获取锁\ncurl -X PUT -d 'locked-by-app1' \\\n  \"http://localhost:8500/v1/kv/locks/my-service?acquire=$SESSION_ID\"\n\n# 返回 true 表示成功，false 表示失败\n```\n\n#### 释放锁 (release)\n\n```bash\n# 释放锁\ncurl -X PUT \\\n  \"http://localhost:8500/v1/kv/locks/my-service?release=$SESSION_ID\"\n```\n\n#### 锁的关键字段\n\n| 字段 | 说明 |\n|------|------|\n| `LockIndex` | 锁获取次数，每次 acquire 递增 |\n| `Session` | 持有锁的 Session ID |\n| `ModifyIndex` | 最后修改索引 |\n\n**Sequencer 概念**: `(Key, LockIndex, Session)` 三元组可用作唯一序列号，验证请求是否来自当前锁持有者。\n\n#### Lock Delay\n\nLock Delay 是一个安全机制：\n\n- Session 失效后，锁在指定时间内不能被重新获取\n- 给原持有者时间检测失效并停止处理\n- 默认 15 秒，可设置 0-60 秒\n\n#### Leader 选举示例\n\n```mermaid\ngraph TD\n    subgraph Cluster[\"应用集群\"]\n        App1[Instance 1]\n        App2[Instance 2]\n        App3[Instance 3]\n    end\n    \n    subgraph Election[\"Leader 选举\"]\n        Key[leader/my-app]\n        Lock{谁持有锁?}\n    end\n    \n    App1 -->|acquire| Lock\n    App2 -->|acquire| Lock\n    App3 -->|acquire| Lock\n    \n    Lock -->|成功| Leader[Leader]\n    Lock -->|失败| Follower[Follower]\n```\n\n---", "subs": ["Session 概述", "Session 生命周期", "创建 Session", "Session 参数", "失效行为 (Behavior)", "分布式锁操作", "获取锁 (acquire)", "释放锁 (release)", "锁的关键字段", "Lock Delay", "Leader 选举示例"]}, {"title": "6.3 Watches 监控", "content": "#### Watches 概述\n\nWatches 使用 HTTP API 的阻塞查询 (Blocking Queries) 监控数据变化，并在数据更新时调用处理器。\n\n```mermaid\ngraph TD\n    Watch[Watch 监控] -->|轮询| Consul[Consul API]\n    Consul -->|数据变化| Watch\n    Watch -->|触发| Handler[Handler 处理器]\n    \n    Handler --> Script[Script 脚本]\n    Handler --> HTTP[HTTP Endpoint]\n```\n\n#### Watch 类型\n\n| 类型 | 监控对象 | 参数 |\n|------|---------|------|\n| `key` | 单个 Key | `key` |\n| `keyprefix` | Key 前缀 | `prefix` |\n| `services` | 服务列表 | 无 |\n| `nodes` | 节点列表 | 无 |\n| `service` | 服务实例 | `service`, `tag` |\n| `checks` | 健康检查 | `service`, `state` |\n| `event` | 用户事件 | `name` |\n\n#### Handler 类型\n\n##### Script Handler\n\n```json\n{\n  \"watches\": [\n    {\n      \"type\": \"key\",\n      \"key\": \"config/app/version\",\n      \"args\": [\"/usr/local/bin/on-config-change.sh\"]\n    }\n  ]\n}\n```\n\nHandler 脚本通过 stdin 接收 JSON 数据，`CONSUL_INDEX` 环境变量包含 Consul 索引。\n\n##### HTTP Handler\n\n```json\n{\n  \"watches\": [\n    {\n      \"type\": \"key\",\n      \"key\": \"config/app/version\",\n      \"handler_type\": \"http\",\n      \"http_handler_config\": {\n        \"path\": \"https://localhost:8080/webhook\",\n        \"method\": \"POST\",\n        \"timeout\": \"10s\",\n        \"tls_skip_verify\": false\n      }\n    }\n  ]\n}\n```\n\n#### Watch 配置示例\n\n##### 监控单个 Key\n\n```hcl\nwatches = [\n  {\n    type = \"key\"\n    key  = \"config/database/connection\"\n    args = [\"/usr/local/bin/reload-db-config.sh\"]\n  }\n]\n```\n\n**CLI 方式:**\n\n```bash\nconsul watch -type=key -key=config/database/connection /usr/local/bin/reload-db-config.sh\n```\n\n**输出格式:**\n\n```json\n{\n  \"Key\": \"config/database/connection\",\n  \"CreateIndex\": 1793,\n  \"ModifyIndex\": 1850,\n  \"LockIndex\": 0,\n  \"Flags\": 0,\n  \"Value\": \"aG9zdD0xOTIuMTY4LjEuMTAw\",\n  \"Session\": \"\"\n}\n```\n\n##### 监控 Key 前缀\n\n```hcl\nwatches = [\n  {\n    type   = \"keyprefix\"\n    prefix = \"config/app/\"\n    args   = [\"/usr/local/bin/reload-app-config.sh\"]\n  }\n]\n```\n\n**CLI 方式:**\n\n```bash\nconsul watch -type=keyprefix -prefix=config/app/ /usr/local/bin/reload-app-config.sh\n```\n\n##### 监控服务实例\n\n```json\n{\n  \"watches\": [\n    {\n      \"type\": \"service\",\n      \"service\": \"redis\",\n      \"tag\": \"primary\",\n      \"passingonly\": true,\n      \"args\": [\"/usr/local/bin/update-redis-config.sh\"]\n    }\n  ]\n}\n```\n\n**CLI 方式:**\n\n```bash\nconsul watch -type=service -service=redis -tag=primary /usr/local/bin/update-redis-config.sh\n```\n\n##### 监控健康检查\n\n```hcl\n# 按状态监控\nwatches = [\n  {\n    type  = \"checks\"\n    state = \"critical\"\n    args  = [\"/usr/local/bin/alert-critical.sh\"]\n  }\n]\n\n# 按服务监控\nwatches = [\n  {\n    type    = \"checks\"\n    service = \"web\"\n    args    = [\"/usr/local/bin/check-web-health.sh\"]\n  }\n]\n```\n\n##### 监控用户事件\n\n```hcl\nwatches = [\n  {\n    type = \"event\"\n    name = \"deploy\"\n    args = [\"/usr/local/bin/handle-deploy-event.sh\"]\n  }\n]\n```\n\n**触发事件:**\n\n```bash\nconsul event -name=deploy '{\"version\": \"1.2.3\"}'\n```\n\n#### Watch 数据流\n\n```mermaid\nsequenceDiagram\n    participant Watch as Consul Watch\n    participant API as Consul API\n    participant Handler as Handler\n    \n    loop 阻塞查询循环\n        Watch->>API: 阻塞查询 (带 Index)\n        Note over API: 等待数据变化\n        API-->>Watch: 新数据 + 新 Index\n        Watch->>Handler: 调用 Handler\n        Handler-->>Watch: 处理完成\n    end\n```\n\n---", "subs": ["Watches 概述", "Watch 类型", "Handler 类型", "Watch 配置示例", "Watch 数据流"]}, {"title": "6.4 Consul Template", "content": "#### 什么是 Consul Template\n\nConsul Template 是一个独立工具，可监控 Consul 数据变化并自动渲染配置文件模板。\n\n```mermaid\ngraph LR\n    Consul[(Consul)] -->|Watch| Template[Consul Template]\n    Template -->|Render| Config[配置文件]\n    Config -->|Reload| Service[Service]\n```\n\n#### 安装 Consul Template\n\n```bash\n# 下载并安装\nwget https://releases.hashicorp.com/consul-template/0.33.0/consul-template_0.33.0_linux_amd64.zip\nunzip consul-template_0.33.0_linux_amd64.zip\nmv consul-template /usr/local/bin/\n```\n\n#### 模板示例\n\n**Nginx 配置模板 (nginx.conf.ctmpl):**\n\n```nginx\nupstream backend {\n{{- range service \"web\" }}\n  server {{ .Address }}:{{ .Port }};\n{{- end }}\n}\n\nserver {\n  listen 80;\n  \n  location / {\n    proxy_pass http://backend;\n  }\n}\n```\n\n**运行 Consul Template:**\n\n```bash\nconsul-template \\\n  -consul-addr=\"localhost:8500\" \\\n  -template=\"nginx.conf.ctmpl:nginx.conf:nginx -s reload\"\n```\n\n#### 常用模板函数\n\n| 函数 | 说明 |\n|------|------|\n| `key \"path\"` | 读取 KV 值 |\n| `service \"name\"` | 获取服务实例 |\n| `services` | 列出所有服务 |\n| `node` | 当前节点信息 |\n| `env \"VAR\"` | 环境变量 |\n\n**KV 模板示例:**\n\n```\ndatabase:\n  host: {{ key \"config/db/host\" }}\n  port: {{ key \"config/db/port\" }}\n  user: {{ key \"config/db/user\" }}\n```\n\n---", "subs": ["什么是 Consul Template", "安装 Consul Template", "模板示例", "常用模板函数"]}, {"title": "6.5 本章小结", "content": "#### 动态配置组件关系\n\n```mermaid\ngraph TD\n    subgraph DynamicConfig[\"动态应用配置\"]\n        KV[KV Store]\n        Session[Sessions]\n        Watch[Watches]\n        Template[Consul Template]\n    end\n    \n    KV -->|存储配置| App[应用程序]\n    Session -->|分布式锁| App\n    Watch -->|监控变化| Handler[Handler]\n    Template -->|生成配置| ConfigFile[配置文件]\n    \n    KV --> Session\n    KV --> Watch\n    Watch --> Template\n```\n\n#### 功能对比\n\n| 功能 | 用途 | 特点 |\n|------|------|------|\n| **KV Store** | 配置存储 | 简单键值对，支持层级 |\n| **Sessions** | 分布式锁 | 与健康检查绑定，自动失效 |\n| **Watches** | 变更监控 | 阻塞查询，实时通知 |\n| **Consul Template** | 配置渲染 | 模板语法，自动重载 |\n\n#### 使用场景\n\n| 场景 | 推荐方案 |\n|------|---------|\n| 配置中心 | KV Store + Watches |\n| Leader 选举 | Sessions + KV Lock |\n| 服务发现配置生成 | Consul Template |\n| 特性开关 | KV Store + Watch |\n| 分布式任务协调 | Sessions + KV |\n\n#### 最佳实践\n\n1. **KV 管理**:\n   - 使用层级结构组织 Key\n   - 设置 ACL 保护敏感配置\n   - 定期备份 KV 数据\n\n2. **Sessions**:\n   - 设置合理的 TTL\n   - 使用 Lock Delay 防止脑裂\n   - 关联健康检查确保活性\n\n3. **Watches**:\n   - Handler 脚本要幂等\n   - 设置合理超时\n   - 日志记录处理结果\n\n4. **Consul Template**:\n   - 测试模板语法\n   - 使用 `-dry` 验证输出\n   - 配置服务重载命令\n\n---\n\n> **下一章**: [第7章 安全](#第7章-安全) - 了解 Consul 的安全配置和最佳实践\n\n---", "subs": ["动态配置组件关系", "功能对比", "使用场景", "最佳实践"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

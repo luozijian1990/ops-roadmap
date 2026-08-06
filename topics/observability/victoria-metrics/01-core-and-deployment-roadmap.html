@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>VictoriaMetrics 学习笔记 · 第一册：核心架构与部署 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>VictoriaMetrics 学习笔记 · 第一册：核心架构与部署</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "VictoriaMetrics 学习笔记 · 第一册：核心架构与部署", "intro": "> 本学习笔记基于 VictoriaMetrics 官方文档整理，旨在帮助初学者系统学习 VictoriaMetrics 时序数据库及其生态组件。\n\n---", "parts": [{"title": "第 1 章：快速入门指南", "sections": [{"title": "🌟 VictoriaMetrics 生态全景", "content": "```mermaid\ngraph TB\n    subgraph Data_Sources[数据源]\n        A1[Prometheus]\n        A2[应用程序]\n        A3[Exporters]\n        A4[基础设施]\n    end\n  \n    subgraph Collection[数据采集层]\n        B[vmagent<br/>数据采集代理]\n    end\n  \n    subgraph Storage[存储层]\n        C1[VictoriaMetrics<br/>单机版]\n        C2[VictoriaMetrics Cluster<br/>vminsert + vmstorage + vmselect]\n    end\n  \n    subgraph Auth[认证路由层]\n        D[vmauth<br/>认证与负载均衡]\n    end\n  \n    subgraph Alert[告警层]\n        E[vmalert<br/>告警与记录规则]\n        F[Alertmanager]\n    end\n  \n    subgraph Backup[备份恢复层]\n        G1[vmbackup<br/>数据备份]\n        G2[vmrestore<br/>数据恢复]\n        G3[对象存储<br/>S3/GCS/Azure]\n    end\n  \n    subgraph Visualization[可视化层]\n        H[Grafana]\n    end\n  \n    A1 & A2 & A3 & A4 -->|push/scrape| B\n    B -->|remote write| D\n    D -->|route & auth| C1\n    D -->|route & auth| C2\n  \n    C1 & C2 -.->|query| E\n    E -->|alerts| F\n  \n    C1 & C2 -->|backup| G1\n    G1 -->|store| G3\n    G3 -->|restore| G2\n    G2 -.->|recover to| C1\n    G2 -.->|recover to| C2\n  \n    D -->|query API| H\n    C1 & C2 -.->|query| H\n  \n    style B fill:#e1f5ff\n    style C1 fill:#ffe1e1\n    style C2 fill:#ffe1e1\n    style D fill:#fff4e1\n    style E fill:#e8f5e1\n    style G1 fill:#f0e1ff\n    style G2 fill:#f0e1ff\n```\n\n**核心组件说明**：\n\n- **vmagent**：采集和转发指标数据，支持 Prometheus remote write 协议\n- **VictoriaMetrics**：时序数据存储引擎（单机版或集群版）\n- **vmauth**：认证、路由和负载均衡代理\n- **vmalert**：执行告警规则和记录规则\n- **vmbackup/vmrestore**：数据备份和恢复工具\n\n---", "subs": ["vmagent", "VictoriaMetrics", "vmauth", "vmalert", "vmbackup/vmrestore"]}, {"title": "1.1 VictoriaMetrics 概述", "content": "VictoriaMetrics 是一个高性能的时序数据库和监控解决方案，支持单机和集群两种部署模式。\n\n#### 1.1.1 产品形态\n\nVictoriaMetrics 提供以下几种发行版本：\n\n| 产品形态                                | 说明                                  | 适用场景                                                 |\n| --------------------------------------- | ------------------------------------- | -------------------------------------------------------- |\n| **Single-server-VictoriaMetrics** | all-in-one 二进制文件，易于运行和维护 | 中小规模监控，完美支持垂直扩展，可轻松处理数百万指标     |\n| **VictoriaMetrics Cluster**       | 由多个组件构成，支持水平扩展          | 大规模监控场景，需要高可用性和水平扩展能力               |\n| **VictoriaMetrics Cloud**         | 云托管版本                            | 无需担心 DevOps 运维任务（配置调优、监控、日志、备份等） |\n\n#### 1.1.2 单机版 vs 集群版架构对比\n\n```mermaid\ngraph TB\n    subgraph Single[\"单机版架构 (Single-server)\"]\n        direction TB\n        S1[vmagent<br/>数据采集] -->|remote write| S2[VictoriaMetrics<br/>All-in-One]\n        S2 -->|query| S3[Grafana]\n        S4[vmalert] -.->|query rules| S2\n  \n        style S2 fill:#ffe1e1\n    end\n  \n    subgraph Cluster[\"集群版架构 (Cluster)\"]\n        direction TB\n        C1[vmagent<br/>数据采集] -->|remote write| C2[vminsert<br/>写入节点]\n        C2 -->|distribute| C3[vmstorage<br/>存储节点]\n        C3 -->|query| C4[vmselect<br/>查询节点]\n        C4 -->|results| C5[Grafana]\n        C6[vmalert] -.->|query rules| C4\n  \n        style C2 fill:#e1f5ff\n        style C3 fill:#ffe1e1\n        style C4 fill:#fff4e1\n    end\n  \n    Note1[\"单机版特点:<br/>✓ 简单易部署<br/>✓ 垂直扩展<br/>✓ 适合中小规模\"] -.-> Single\n    Note2[\"集群版特点:<br/>✓ 水平扩展<br/>✓ 高可用性<br/>✓ 适合大规模\"] -.-> Cluster\n```\n\n**选择建议**：\n\n- **单机版**：数据量 < 每秒百万样本，垂直扩展足够\n- **集群版**：数据量 > 每秒百万样本，需要水平扩展和高可用\n\n#### 1.1.3 安装包形式\n\nVictoriaMetrics 提供多种安装方式：\n\n- **Docker 镜像**：可从 [Docker Hub](https://hub.docker.com/r/victoriametrics/victoria-metrics/) 和 [Quay](https://quay.io/repository/victoriametrics/victoria-metrics) 获取\n- **Helm Charts**：适用于 Kubernetes 环境\n- **Kubernetes Operator**：声明式管理 VictoriaMetrics\n- **二进制发行版**：直接下载可执行文件\n- **Ansible Roles**：自动化部署\n- **源代码**：支持从源码构建\n- **云平台模板**：Linode、DigitalOcean 等\n\n> [!TIP]\n> VictoriaMetrics 开发节奏很快，建议定期查看 [CHANGELOG](https://github.com/VictoriaMetrics/VictoriaMetrics/blob/master/docs/CHANGELOG.md) 并执行常规升级。\n\n---", "subs": ["1.1.1 产品形态", "1.1.2 单机版 vs 集群版架构对比", "1.1.3 安装包形式"]}, {"title": "1.2 部署方式详解", "content": "#### 1.2.1 在 VictoriaMetrics Cloud 上启动\n\n```mermaid\ngraph TD\n    A[访问 VictoriaMetrics Cloud] --> B[注册账号 免费]\n    B --> C[获得 $200 试用额度]\n    C --> D{选择部署模式}\n    D --> E[Single Node 单机版]\n    D --> F[Cluster 集群版]\n    E --> G[跟随快速入门指南配置]\n    F --> G\n```\n\n**步骤：**\n\n1. 访问 [VictoriaMetrics Cloud](https://victoriametrics.com/products/cloud/) 并注册（免费）\n2. 注册后立即获得 **$200 试用额度**\n3. 可用于运行单机版或集群版\n4. 按照官方快速入门指南进行配置\n\n**优势：**\n\n- 无需关心基础设施管理\n- 自动处理配置调优、监控、日志收集、访问保护、软件更新、备份等\n\n---\n\n#### 1.2.2 使用 Docker 启动单机版\n\n##### 基本启动命令\n\n```bash\n# 拉取最新镜像\ndocker pull victoriametrics/victoria-metrics:v1.130.0\n\n# 启动容器\ndocker run -it --rm \\\n  -v `pwd`/victoria-metrics-data:/victoria-metrics-data \\\n  -p 8428:8428 \\\n  victoriametrics/victoria-metrics:v1.130.0 \\\n  --selfScrapeInterval=5s \\\n  -storageDataPath=victoria-metrics-data\n```\n\n##### 重要 Flag 参数说明\n\n| Flag 参数                | 说明                      | 示例值                       | 必需 |\n| ------------------------ | ------------------------- | ---------------------------- | ---- |\n| `-storageDataPath`     | 数据存储路径              | `victoria-metrics-data`    | ✅   |\n| `--selfScrapeInterval` | 自我抓取指标的间隔时间    | `5s`                       | ❌   |\n| `-p 8428:8428`         | 端口映射（Docker 参数）   | 将容器 8428 端口映射到宿主机 | ✅   |\n| `-v`                   | 数据卷挂载（Docker 参数） | 持久化存储数据               | ✅   |\n\n##### 启动成功标志\n\n启动成功后，你会看到如下输出：\n\n```\nstarted server at http://0.0.0.0:8428/\npartition \"2025_03\" has been created\n```\n\n##### 访问界面\n\n启动成功后，可访问以下界面：\n\n| 界面                    | URL                                                                       | 说明                    |\n| ----------------------- | ------------------------------------------------------------------------- | ----------------------- |\n| **VMUI 图形界面** | [http://localhost:8428/vmui](http://localhost:8428/vmui)                     | Web 图形界面            |\n| **指标浏览器**    | [http://localhost:8428/vmui/#/metrics](http://localhost:8428/vmui/#/metrics) | 查看所有可用指标        |\n| **查询界面**      | [http://localhost:8428/vmui](http://localhost:8428/vmui)                     | 执行 PromQL 查询        |\n| **HTTP 端点列表** | [http://localhost:8428](http://localhost:8428)                               | 查看所有可用的 API 端点 |\n\n> [!NOTE]\n> 使用 `--selfScrapeInterval=5s` 后，VictoriaMetrics 会抓取自身指标，约 **30 秒**后这些指标可供查询。可尝试查询 `process_cpu_cores_available` 等指标。\n\n##### 企业版镜像\n\n企业版镜像请参考 [官方文档](https://docs.victoriametrics.com/enterprise/)。\n\n---\n\n#### 1.2.3 使用 Docker 启动集群版\n\n##### 启动命令\n\n```bash\n# 克隆仓库\ngit clone https://github.com/VictoriaMetrics/VictoriaMetrics && cd VictoriaMetrics\n\n# 启动集群环境\nmake docker-vm-cluster-up\n```\n\n##### 启动成功标志\n\n```\n✔ Container vmstorage-1        Started\n✔ Container vmselect-1         Started\n✔ Container vminsert           Started\n✔ Container vmagent            Started\n```\n\n##### 集群组件说明\n\n```mermaid\ngraph TD\n    A[数据源] --> B[vmagent]\n    B --> C[vminsert]\n    C --> D1[vmstorage-1]\n    C --> D2[vmstorage-2]\n    C --> D3[vmstorage-N]\n  \n    E[查询客户端] --> F[vmselect]\n    F --> D1\n    F --> D2\n    F --> D3\n  \n    G[Grafana] --> F\n```\n\n该命令会启动一组 VictoriaMetrics 组件：\n\n| 组件                | 作用                                          |\n| ------------------- | --------------------------------------------- |\n| **vmstorage** | 数据存储组件，负责持久化存储时序数据          |\n| **vminsert**  | 数据写入代理，接收数据并分发到 vmstorage      |\n| **vmselect**  | 数据查询代理，从 vmstorage 读取数据并响应查询 |\n| **vmagent**   | 指标采集组件，兼容 Prometheus 协议            |\n| **Grafana**   | 可视化界面                                    |\n\n##### 访问界面\n\n| 界面              | URL                                                                     | 凭据                              |\n| ----------------- | ----------------------------------------------------------------------- | --------------------------------- |\n| **Grafana** | [http://localhost:3000/](http://localhost:3000/)                           | 用户名:`admin`, 密码: `admin` |\n| **VMUI**    | [http://localhost:8427/select/0/vmui](http://localhost:8427/select/0/vmui) | 无需认证                          |\n\n##### 自定义配置\n\n> [!TIP]\n> 可以通过编辑 `compose-vm-cluster.yml` 文件进一步自定义集群配置，如调整组件数量、资源限制、端口映射等。\n\n---\n\n#### 1.2.4 使用二进制文件启动单机版\n\n##### 安装步骤\n\n**步骤 1：下载二进制文件**\n\n从 [GitHub Releases](https://github.com/VictoriaMetrics/VictoriaMetrics/releases) 下载适合你操作系统和架构的二进制文件。\n\n> [!NOTE]\n> 企业版二进制文件请参考 [官方企业版文档](https://docs.victoriametrics.com/enterprise/)。\n\n**步骤 2：解压到系统目录**\n\n```bash\nsudo tar -xvf <victoriametrics-archive> -C /usr/local/bin\n```\n\n替换 `<victoriametrics-archive>` 为实际下载的文件名。\n\n**步骤 3：创建系统用户**\n\n```bash\nsudo useradd -s /usr/sbin/nologin victoriametrics\n```\n\n**步骤 4：创建数据存储目录**\n\n```bash\nsudo mkdir -p /var/lib/victoria-metrics && \\\nsudo chown -R victoriametrics:victoriametrics /var/lib/victoria-metrics\n```\n\n**步骤 5：创建 systemd 服务**\n\n```bash\nsudo bash -c 'cat <<END >/etc/systemd/system/victoriametrics.service\n[Unit]\nDescription=VictoriaMetrics service\nAfter=network.target\n\n[Service]\nType=simple\nUser=victoriametrics\nGroup=victoriametrics\nExecStart=/usr/local/bin/victoria-metrics-prod -storageDataPath=/var/lib/victoria-metrics -retentionPeriod=90d -selfScrapeInterval=10s\nSyslogIdentifier=victoriametrics\nRestart=always\n\nPrivateTmp=yes\nProtectHome=yes\nNoNewPrivileges=yes\nProtectSystem=full\n\n[Install]\nWantedBy=multi-user.target\nEND'\n```\n\n##### 服务配置中的重要 Flag 参数\n\n| Flag 参数               | 说明          | 示例值                        | 推荐值            |\n| ----------------------- | ------------- | ----------------------------- | ----------------- |\n| `-storageDataPath`    | 数据存储路径  | `/var/lib/victoria-metrics` | 根据磁盘容量规划  |\n| `-retentionPeriod`    | 数据保留周期  | `90d`（90 天）              | 根据业务需求设置  |\n| `-selfScrapeInterval` | 自我抓取间隔  | `10s`                       | `10s` - `30s` |\n| `-httpListenAddr`     | HTTP 监听地址 | `:8428`（默认）             | 根据安全需求调整  |\n\n> [!IMPORTANT]\n> 可以在 `ExecStart` 行添加额外的命令行 flag 参数来自定义配置。例如：\n>\n> - `-memory.allowedPercent=80` - 限制内存使用百分比\n> - `-search.maxQueryDuration=60s` - 限制查询最大执行时间\n\n**步骤 6：启动并启用服务**\n\n```bash\n# 重载 systemd 配置并启动服务\nsudo systemctl daemon-reload && sudo systemctl enable --now victoriametrics.service\n\n# 检查服务状态\nsudo systemctl status victoriametrics.service\n```\n\n**步骤 7：验证安装**\n\n服务运行后，访问以下地址验证：\n\n- **VMUI 界面**：http://\\<ip_or_hostname\\>:8428/vmui\n- **健康检查**：http://\\<ip_or_hostname\\>:8428/-/healthy\n\n> [!NOTE]\n> VictoriaMetrics 服务默认监听 **:8428** 端口接收 HTTP 连接（参见 `-httpListenAddr` flag）。\n\n##### Windows 服务部署\n\n如果需要将 VictoriaMetrics 单机版部署为 Windows 服务，请参考官方文档的 [running as a Windows service](https://docs.victoriametrics.com/#windows-service) 部分。\n\n---\n\n#### 1.2.5 使用二进制文件启动集群版\n\n##### 集群架构说明\n\n```mermaid\ngraph TD\n    A[写入流量] --> B[vminsert:8480]\n    B --> C1[vmstorage-1:8400]\n    B --> C2[vmstorage-2:8400]\n    B --> C3[vmstorage-N:8400]\n  \n    D[查询流量] --> E[vmselect:8481]\n    E --> F1[vmstorage-1:8401]\n    E --> F2[vmstorage-2:8401]\n    E --> F3[vmstorage-N:8401]\n  \n    C1 -.HTTP:8482.-> G[监控/管理]\n    C2 -.HTTP:8482.-> G\n    C3 -.HTTP:8482.-> G\n```\n\nVictoriaMetrics 集群由 **3 个核心组件** 组成：\n\n| 组件                | 角色         | 说明                                    |\n| ------------------- | ------------ | --------------------------------------- |\n| **vmstorage** | 数据存储节点 | 负责数据的持久化存储和检索              |\n| **vminsert**  | 数据写入代理 | 接收写入请求并分发到 vmstorage 节点     |\n| **vmselect**  | 数据查询代理 | 处理查询请求并从 vmstorage 节点聚合数据 |\n\n> [!WARNING]\n> **部署建议**：\n>\n> - 建议在**同一私有网络**中运行这些组件（出于安全考虑）\n> - 应部署在**不同的物理节点**上以获得最佳性能\n> - 确保各组件之间的网络延迟尽可能低\n\n##### 所有节点的通用准备步骤\n\n在所有集群节点上执行以下操作：\n\n**步骤 1：下载集群版二进制文件**\n\n从 [GitHub Releases](https://github.com/VictoriaMetrics/VictoriaMetrics/releases) 下载带有 `-cluster` 后缀的二进制文件。\n\n**步骤 2：解压到系统目录**\n\n```bash\nsudo tar -xvf <victoriametrics-archive> -C /usr/local/bin\n```\n\n**步骤 3：创建系统用户**\n\n```bash\nsudo useradd -s /usr/sbin/nologin victoriametrics\n```\n\n---\n\n##### 安装 vmstorage\n\n**步骤 1：创建数据存储目录**\n\n```bash\nsudo mkdir -p /var/lib/vmstorage && \\\nsudo chown -R victoriametrics:victoriametrics /var/lib/vmstorage\n```\n\n**步骤 2：创建 systemd 服务**\n\n```bash\nsudo bash -c 'cat <<END >/etc/systemd/system/vmstorage.service\n[Unit]\nDescription=VictoriaMetrics vmstorage service\nAfter=network.target\n\n[Service]\nType=simple\nUser=victoriametrics\nGroup=victoriametrics\nRestart=always\nExecStart=/usr/local/bin/vmstorage-prod -retentionPeriod=90d -storageDataPath=/var/lib/vmstorage\n\nPrivateTmp=yes\nNoNewPrivileges=yes\nProtectSystem=full\n\n[Install]\nWantedBy=multi-user.target\nEND'\n```\n\n**vmstorage 重要 Flag 参数：**\n\n| Flag 参数            | 说明                  | 默认端口       | 示例值                  |\n| -------------------- | --------------------- | -------------- | ----------------------- |\n| `-storageDataPath` | 数据存储路径          | -              | `/var/lib/vmstorage`  |\n| `-retentionPeriod` | 数据保留周期          | `1` (1 个月) | `90d`, `12`, `1y` |\n| `-vminsertAddr`    | vminsert 连接监听地址 | `:8400`      | `:8400`               |\n| `-vmselectAddr`    | vmselect 连接监听地址 | `:8401`      | `:8401`               |\n| `-httpListenAddr`  | HTTP API 监听地址     | `:8482`      | `:8482`               |\n\n> [!TIP]\n> 可在 `ExecStart` 行添加其他 flag 参数，例如：\n>\n> - `-dedup.minScrapeInterval=30s` - 启用数据去重\n> - `-snapshotAuthKey=<secret>` - 设置快照 API 认证密钥\n\n**步骤 3：启动并验证服务**\n\n```bash\n# 启动服务\nsudo systemctl daemon-reload && sudo systemctl enable --now vmstorage\n\n# 检查服务状态\nsudo systemctl status vmstorage\n```\n\n**健康检查**：\n访问 http://\\<ip_or_hostname\\>:8482/-/healthy，应显示 **\"VictoriaMetrics is Healthy\"**。\n\n---\n\n##### 安装 vminsert\n\n**步骤 1：创建 systemd 服务**\n\n```bash\nsudo bash -c 'cat <<END >/etc/systemd/system/vminsert.service\n[Unit]\nDescription=VictoriaMetrics vminsert service\nAfter=network.target\n\n[Service]\nType=simple\nUser=victoriametrics\nGroup=victoriametrics\nRestart=always\nExecStart=/usr/local/bin/vminsert-prod -storageNode=<list of vmstorages>\n\nPrivateTmp=yes\nNoNewPrivileges=yes\nProtectSystem=full\n\n[Install]\nWantedBy=multi-user.target\nEND'\n```\n\n**vminsert 重要 Flag 参数：**\n\n| Flag 参数              | 说明                   | 默认端口  | 示例                                    |\n| ---------------------- | ---------------------- | --------- | --------------------------------------- |\n| `-storageNode`       | vmstorage 节点地址列表 | -         | `192.168.1.10:8400,192.168.1.11:8400` |\n| `-httpListenAddr`    | HTTP 监听地址          | `:8480` | `:8480`                               |\n| `-replicationFactor` | 数据副本数             | `1`     | `2` (推荐至少为 2)                    |\n\n> [!IMPORTANT]\n> **配置 `-storageNode` 参数：**\n>\n> - 替换 `<list of vmstorages>` 为实际的 vmstorage 服务地址\n> - 可以多次重复该 flag：`-storageNode=192.168.1.10:8400 -storageNode=192.168.1.11:8400`\n> - 或在一个 flag 中用逗号分隔：`-storageNode=192.168.1.10:8400,192.168.1.11:8400`\n\n**步骤 2：启动并验证服务**\n\n```bash\n# 启动服务\nsudo systemctl daemon-reload && sudo systemctl enable --now vminsert.service\n\n# 检查服务状态\nsudo systemctl status vminsert.service\n```\n\n**健康检查**：\n访问 http://\\<ip_or_hostname\\>:8480/-/healthy，应显示 **\"VictoriaMetrics is Healthy\"**。\n\n---\n\n##### 安装 vmselect\n\n**步骤 1：创建缓存目录**\n\n```bash\nsudo mkdir -p /var/lib/vmselect-cache && \\\nsudo chown -R victoriametrics:victoriametrics /var/lib/vmselect-cache\n```\n\n**步骤 2：创建 systemd 服务**\n\n```bash\nsudo bash -c 'cat <<END >/etc/systemd/system/vmselect.service\n[Unit]\nDescription=VictoriaMetrics vmselect service\nAfter=network.target\n\n[Service]\nType=simple\nUser=victoriametrics\nGroup=victoriametrics\nRestart=always\nExecStart=/usr/local/bin/vmselect-prod -storageNode=<list of vmstorages> -cacheDataPath=/var/lib/vmselect-cache\n\nPrivateTmp=yes\nNoNewPrivileges=yes\nProtectSystem=full\n\n[Install]\nWantedBy=multi-user.target\nEND'\n```\n\n**vmselect 重要 Flag 参数：**\n\n| Flag 参数                    | 说明                   | 默认端口  | 示例值                                  |\n| ---------------------------- | ---------------------- | --------- | --------------------------------------- |\n| `-storageNode`             | vmstorage 节点地址列表 | -         | `192.168.1.10:8401,192.168.1.11:8401` |\n| `-cacheDataPath`           | 查询结果缓存路径       | -         | `/var/lib/vmselect-cache`             |\n| `-httpListenAddr`          | HTTP 监听地址          | `:8481` | `:8481`                               |\n| `-search.maxQueryDuration` | 查询最大执行时间       | `30s`   | `60s`                                 |\n\n> [!IMPORTANT]\n> **配置 `-storageNode` 参数：**\n>\n> - 替换 `<list of vmstorages>` 为实际的 vmstorage 服务地址\n> - **注意端口号**：vmselect 连接 vmstorage 的 **8401** 端口（不是 8400）\n> - 示例：`-storageNode=192.168.1.10:8401,192.168.1.11:8401`\n\n**步骤 3：启动并验证服务**\n\n```bash\n# 启动服务\nsudo systemctl daemon-reload && sudo systemctl enable --now vmselect.service\n\n# 检查服务状态\nsudo systemctl status vmselect.service\n```\n\n**健康检查**：\n访问 http://\\<ip_or_hostname\\>:8481/select/0/vmui，应显示 **vmui 页面**。\n\n---", "subs": ["1.2.1 在 VictoriaMetrics Cloud 上启动", "1.2.2 使用 Docker 启动单机版", "1.2.3 使用 Docker 启动集群版", "1.2.4 使用二进制文件启动单机版", "1.2.5 使用二进制文件启动集群版"]}, {"title": "1.3 集群组件端口汇总", "content": "```mermaid\ngraph LR\n    A[集群端口总览] --> B[vmstorage]\n    A --> C[vminsert]\n    A --> D[vmselect]\n    A --> E[单机版]\n  \n    B --> B1[\":8400<br/>vminsert连接\"]\n    B --> B2[\":8401<br/>vmselect连接\"]\n    B --> B3[\":8482<br/>HTTP API\"]\n  \n    C --> C1[\":8480<br/>HTTP写入API\"]\n  \n    D --> D1[\":8481<br/>HTTP查询API\"]\n  \n    E --> E1[\":8428<br/>HTTP API\"]\n```\n\n#### 端口功能详表\n\n| 组件                | 端口 | 协议     | 用途                | 访问者                      |\n| ------------------- | ---- | -------- | ------------------- | --------------------------- |\n| **vmstorage** | 8400 | 内部协议 | 接收 vminsert 连接  | vminsert                    |\n| **vmstorage** | 8401 | 内部协议 | 接收 vmselect 连接  | vmselect                    |\n| **vmstorage** | 8482 | HTTP     | HTTP API 和管理接口 | 管理员、监控系统            |\n| **vminsert**  | 8480 | HTTP     | 接收写入请求        | 数据源、Prometheus、vmagent |\n| **vmselect**  | 8481 | HTTP     | 接收查询请求        | Grafana、查询客户端         |\n| **单机版 VM** | 8428 | HTTP     | 统一的读写 API      | 数据源、查询客户端          |\n\n> [!NOTE]\n> 所有端口均可通过相应的 `-httpListenAddr`、`-vminsertAddr`、`-vmselectAddr` flag 参数自定义。\n\n---", "subs": ["端口功能详表"]}, {"title": "1.4 快速入门总结", "content": "#### 1.4.1 部署模式选择\n\n```mermaid\ngraph TD\n    A{选择部署模式} --> B{监控规模?}\n    B -->|小规模<br/>百万级指标| C[单机版 VictoriaMetrics]\n    B -->|大规模<br/>千万级指标| D[集群版 VictoriaMetrics]\n    B -->|托管服务| E[VictoriaMetrics Cloud]\n  \n    C --> F{部署方式?}\n    D --> F\n  \n    F -->|快速测试| G[Docker]\n    F -->|生产环境| H[二进制 + Systemd]\n    F -->|K8s环境| I[Helm/Operator]\n```\n\n#### 1.4.2 核心 Flag 参数速查表\n\n**通用参数（单机版和集群版）：**\n\n| Flag                    | 作用             | 推荐值                        | 重要性 |\n| ----------------------- | ---------------- | ----------------------------- | ------ |\n| `-storageDataPath`    | 数据存储路径     | `/var/lib/victoria-metrics` | ⭐⭐⭐ |\n| `-retentionPeriod`    | 数据保留周期     | `90d` 或 `3` (3个月)      | ⭐⭐⭐ |\n| `-httpListenAddr`     | HTTP 监听地址    | `:8428` (单机)              | ⭐⭐   |\n| `-selfScrapeInterval` | 自我监控抓取间隔 | `10s`                       | ⭐     |\n\n**集群专用参数：**\n\n| 组件              | Flag                   | 作用              | 示例                        | 重要性 |\n| ----------------- | ---------------------- | ----------------- | --------------------------- | ------ |\n| vminsert/vmselect | `-storageNode`       | 后端存储节点列表  | `host1:8400,host2:8400`   | ⭐⭐⭐ |\n| vmselect          | `-cacheDataPath`     | 查询缓存路径      | `/var/lib/vmselect-cache` | ⭐⭐   |\n| vminsert          | `-replicationFactor` | 数据副本数        | `2`                       | ⭐⭐⭐ |\n| vmstorage         | `-vminsertAddr`      | vminsert 连接地址 | `:8400`                   | ⭐⭐   |\n| vmstorage         | `-vmselectAddr`      | vmselect 连接地址 | `:8401`                   | ⭐⭐   |\n\n#### 1.4.3 下一步学习路径\n\n完成快速入门后，建议按以下顺序深入学习：\n\n1. **第 2 章**：深入了解单机版 VictoriaMetrics 的高级特性和优化\n2. **第 3 章**：学习集群版的架构设计和运维管理\n3. **第 4 章**：掌握 vmagent 的数据采集和多租户配置\n4. **第 5 章**：学习 vmalert 的告警规则和告警管理\n5. **第 6 章**：了解 vmauth 的认证和多租户管理\n6. **第 7-8 章**：学习数据备份和恢复策略\n7. **第 9 章**：掌握生产环境的最佳实践\n\n---\n\n**🎯 快速入门章节完成！**接下来将继续学习各个组件的详细用法...\n\n---", "subs": ["1.4.1 部署模式选择", "1.4.2 核心 Flag 参数速查表", "1.4.3 下一步学习路径"]}]}, {"title": "第 2 章：单机版 VictoriaMetrics 深入详解", "sections": [{"title": "2.1 概述与核心特性", "content": "单机版 VictoriaMetrics 是一个快速、经济且可扩展的监控解决方案和时序数据库。\n\n#### 2.1.1 产品优势\n\n| 特性类别             | 优势描述             | 性能指标                                                             |\n| -------------------- | -------------------- | -------------------------------------------------------------------- |\n| **性能**       | 高性能数据摄入和查询 | 相比 InfluxDB 和 TimescaleDB 高出 20 倍                              |\n| **内存使用**   | 极低内存占用         | 相比 InfluxDB 少 10 倍，相比 Prometheus/Thanos/Cortex 少 7 倍        |\n| **存储压缩**   | 高效数据压缩         | 相比 TimescaleDB 多存储 70 倍数据点，相比 Prometheus 少 7 倍存储空间 |\n| **垂直扩展**   | 单机可处理大规模数据 | 摄入速率 150 万+ samples/s，活跃时序 5000 万+                        |\n| **高性能 I/O** | 优化的磁盘 I/O       | 适用于高延迟 I/O 和低 IOPS 存储（HDD、网络存储）                     |\n\n> [!NOTE]\n> 单机版 VictoriaMetrics 可以替代中等规模的集群方案（如 Thanos、M3DB、Cortex、InfluxDB）。\n\n---", "subs": ["2.1.1 产品优势"]}, {"title": "2.2 数据摄入协议", "content": "VictoriaMetrics 支持多种数据摄入协议：\n\n#### 2.2.1 Pull 模式\n\n```mermaid\ngraph LR\n    A[VictoriaMetrics] -->|Scrape| B[node_exporter]\n    A -->|Scrape| C[kube-state-metrics]\n    A -->|Scrape| D[其他 Prometheus Exporters]\n```\n\n- **Prometheus Scraping**：兼容 Prometheus `scrape_configs`\n- **配置文件**：通过 `-promscrape.config` 指定 `prometheus.yml`\n\n#### 2.2.2 Push 模式（支持的协议）\n\n| 协议                                   | 端点                                       | 说明                                                |\n| -------------------------------------- | ------------------------------------------ | --------------------------------------------------- |\n| **Prometheus remote_write**      | `/api/v1/write`                          | Prometheus 远程写入 API                             |\n| **Prometheus exposition format** | `/api/v1/import/prometheus`              | Prometheus 文本格式                                 |\n| **InfluxDB line protocol**       | `/write` (HTTP/TCP/UDP)                  | InfluxDB 行协议                                     |\n| **Graphite plaintext**           | `:2003`                                  | Graphite 明文协议（需设置 `-graphiteListenAddr`） |\n| **OpenTSDB telnet put**          | `:4242`                                  | OpenTSDB telnet 协议                                |\n| **OpenTSDB HTTP /api/put**       | `/api/put`                               | OpenTSDB HTTP API                                   |\n| **OpenTelemetry**                | `/opentelemetry/v1/metrics`              | OpenTelemetry metrics                               |\n| **DataDog**                      | `/datadog/api/v2/series`                 | DataDog submit metrics API                          |\n| **NewRelic**                     | `/newrelic/infra/v2/metrics/events/bulk` | NewRelic 基础设施代理                               |\n| **JSON line format**             | `/api/v1/import`                         | VictoriaMetrics JSON 行格式                         |\n| **Native binary format**         | `/api/v1/import/native`                  | VictoriaMetrics 原生二进制格式                      |\n| **CSV**                          | `/api/v1/import/csv`                     | 任意 CSV 数据                                       |\n\n---", "subs": ["2.2.1 Pull 模式", "2.2.2 Push 模式（支持的协议）"]}, {"title": "2.3 核心 Flag 参数详解", "content": "#### 2.3.1 存储相关参数\n\n| Flag 参数                          | 默认值                    | 说明                 | 推荐值                    |\n| ---------------------------------- | ------------------------- | -------------------- | ------------------------- |\n| `-storageDataPath`               | `victoria-metrics-data` | 数据存储路径         | 独立的高性能磁盘路径      |\n| `-retentionPeriod`               | `1` (1个月)             | 数据保留周期         | `90d`, `6`, `1y` 等 |\n| `-retentionTimezoneOffset`       | `0`                     | IndexDB 轮转时区偏移 | 根据时区调整              |\n| `-storage.minFreeDiskSpaceBytes` | `10000000`              | 最小可用磁盘空间     | 至少保留 20% 空间         |\n\n> [!IMPORTANT]\n> **关于 retentionPeriod**：\n>\n> - 支持的时间单位：`h`（小时）、`d`（天）、`w`（周）、`y`（年）\n> - 未指定单位时按月计算\n> - 最小保留期：**24h** 或 **1d**\n> - 数据按月分区存储，过期分区在新月的第一天删除\n\n#### 2.3.2 性能调优参数\n\n```mermaid\ngraph TD\n    A[性能调优参数] --> B[内存控制]\n    A --> C[并发控制]\n    A --> D[缓存控制]\n  \n    B --> B1[\"-memory.allowedPercent\"]\n    B --> B2[\"-memory.allowedBytes\"]\n  \n    C --> C1[\"-maxConcurrentInserts\"]\n    C --> C2[\"-search.maxConcurrentRequests\"]\n  \n    D --> D1[\"-storage.cacheSizeIndexDBDataBlocks\"]\n    D --> D2[\"-storage.cacheSizeStorageTSID\"]\n```\n\n**内存相关：**\n\n| Flag                          | 默认值   | 说明                                 |\n| ----------------------------- | -------- | ------------------------------------ |\n| `-memory.allowedPercent`    | `60`   | 允许缓存使用的系统内存百分比         |\n| `-memory.allowedBytes`      | `0`    | 允许缓存使用的字节数（覆盖 percent） |\n| `-search.maxMemoryPerQuery` | 自动计算 | 单个查询可用的最大内存               |\n\n**并发相关：**\n\n| Flag                              | 默认值          | 说明                 |\n| --------------------------------- | --------------- | -------------------- |\n| `-maxConcurrentInserts`         | `2*CPU核心数` | 最大并发写入请求数   |\n| `-search.maxConcurrentRequests` | 自动计算        | 最大并发查询请求数   |\n| `-search.maxQueueDuration`      | `10s`         | 查询队列最大等待时间 |\n| `-insert.maxQueueDuration`      | `1m`          | 写入队列最大等待时间 |\n\n**工作线程：**\n\n| Flag                           | 默认值   | 说明                            |\n| ------------------------------ | -------- | ------------------------------- |\n| `-search.maxWorkersPerQuery` | 自动计算 | 单个查询可使用的最大 CPU 核心数 |\n\n> [!TIP]\n> **CPU 核心数较多时的优化**：\n>\n> - 如果 VictoriaMetrics 运行在 16+ CPU 核心的主机上，建议调整 `-search.maxWorkersPerQuery`\n> - 大量并发小查询：**降低**该值\n> - 重查询（>10K 时序或 >100M 样本）：**设为可用 CPU 核心数**\n\n#### 2.3.3 资源限制参数\n\n**查询限制：**\n\n| Flag                               | 默认值          | 说明                                     |\n| ---------------------------------- | --------------- | ---------------------------------------- |\n| `-search.maxQueryDuration`       | `30s`         | 查询最大执行时间                         |\n| `-search.maxUniqueTimeseries`    | 自动计算        | 单个查询可处理的最大时序数               |\n| `-search.maxSamplesPerQuery`     | `1000000000`  | 单个查询可处理的最大原始样本数           |\n| `-search.maxSamplesPerSeries`    | `30000000`    | 每个时序可扫描的最大原始样本数           |\n| `-search.maxResponseSeries`      | `0`（无限制） | `/api/v1/query[_range]` 最大返回时序数 |\n| `-search.maxPointsPerTimeseries` | `30000`       | 每个时序最大返回点数                     |\n| `-search.maxSeriesPerAggrFunc`   | `1000000`     | 聚合函数最大生成时序数                   |\n\n**导出限制：**\n\n| Flag                          | 默认值          | 说明                               |\n| ----------------------------- | --------------- | ---------------------------------- |\n| `-search.maxExportSeries`   | `10000000`    | `/api/v1/export*` 最大导出时序数 |\n| `-search.maxExportDuration` | `720h` (30天) | 导出查询最大持续时间               |\n| `-search.maxFederateSeries` | `1000000`     | `/federate` 最大返回时序数       |\n| `-search.maxDeleteSeries`   | `1000000`     | `/delete_series` 最大删除时序数  |\n| `-search.maxDeleteDuration` | `5m`          | 删除操作最大持续时间               |\n\n**API 限制：**\n\n| Flag                             | 默认值      | 说明                                          |\n| -------------------------------- | ----------- | --------------------------------------------- |\n| `-search.maxTagKeys`           | `100000`  | `/api/v1/labels` 最大返回标签名数           |\n| `-search.maxTagValues`         | `100000`  | `/api/v1/label/.../values` 最大返回标签值数 |\n| `-search.maxLabelsAPISeries`   | `1000000` | Labels API 可扫描的最大时序数                 |\n| `-search.maxLabelsAPIDuration` | `5s`      | Labels API 最大持续时间                       |\n| `-search.maxSeries`            | `30000`   | `/api/v1/series` 最大返回时序数             |\n\n#### 2.3.4 摄入限制参数\n\n| Flag                        | 默认值          | 说明                                      |\n| --------------------------- | --------------- | ----------------------------------------- |\n| `-maxIngestionRate`       | `0`（无限制） | 每秒最大样本摄入数                        |\n| `-maxInsertRequestSize`   | `32MB`        | 单个 Prometheus remote_write 请求最大大小 |\n| `-maxLabelNameLen`        | `256`         | 标签名最大长度                            |\n| `-maxLabelValueLen`       | `4096`        | 标签值最大长度                            |\n| `-maxLabelsPerTimeseries` | `40`          | 每个时序最大标签数                        |\n\n#### 2.3.5 HTTP 服务器参数\n\n| Flag                                  | 默认值    | 说明                               |\n| ------------------------------------- | --------- | ---------------------------------- |\n| `-httpListenAddr`                   | `:8428` | HTTP 监听地址                      |\n| `-http.maxGracefulShutdownDuration` | `7s`    | 优雅关闭最大持续时间               |\n| `-http.shutdownDelay`               | `0`     | 关闭前延迟（用于从负载均衡器摘除） |\n| `-http.connTimeout`                 | `2m`    | 传入连接超时时间                   |\n| `-http.idleConnTimeout`             | `1m`    | 空闲连接超时时间                   |\n| `-http.pathPrefix`                  | `\"\"`    | HTTP 路径前缀                      |\n\n---", "subs": ["2.3.1 存储相关参数", "2.3.2 性能调优参数", "2.3.3 资源限制参数", "2.3.4 摄入限制参数", "2.3.5 HTTP 服务器参数"]}, {"title": "2.4 存储架构深度解析", "content": "#### 2.4.1 存储结构\n\n```mermaid\ngraph TD\n    A[样本数据] --> B[内存缓冲 最多1秒]\n    B --> C[In-Memory Parts]\n    C --> D[持久化到磁盘 StorageDataPath/data]\n  \n    D --> E[small/ - 小分区]\n    D --> F[big/ - 大分区]\n  \n    E --> G[2025_03/ - 月分区]\n    G --> H[part目录]\n    H --> I[metadata.json]\n    H --> J[timestamps.bin]\n    H --> K[values.bin]\n    H --> L[index.bin]\n    H --> M[metaindex.bin]\n```\n\n**目录结构：**\n\n```\n<storageDataPath>/\n├── data/\n│   ├── small/\n│   │   └── YYYY_MM/      # 月分区，如 2025_03\n│   │       ├── parts.json  # parts 列表\n│   │       ├── part1/\n│   │       ├── part2/\n│   │       └── partN/\n│   └── big/\n│       └── YYYY_MM/\n├── indexdb/\n│   └── ...               # 索引数据\n├── snapshots/            # 快照目录\n└── cache/                # 缓存目录\n```\n\n**Part 目录结构：**\n\n每个 part 目录包含以下文件：\n\n| 文件               | 说明                                            |\n| ------------------ | ----------------------------------------------- |\n| `metadata.json`  | Part 元数据（行数、块数、时间范围、去重间隔等） |\n| `timestamps.bin` | 压缩的时间戳数据                                |\n| `values.bin`     | 压缩的值数据                                    |\n| `index.bin`      | 快速查找块的索引                                |\n| `metaindex.bin`  | 索引的索引                                      |\n\n**metadata.json 字段：**\n\n- `RowsCount`：原始样本数\n- `BlocksCount`：块数\n- `MinTimestamp`、`MaxTimestamp`：时间范围\n- `MinDedupInterval`：应用的去重间隔\n\n#### 2.4.2 数据分区与合并\n\n```mermaid\ngraph LR\n    A[新数据写入] --> B[小 Part]\n    B --> C[后台合并]\n    C --> D[中等 Part]\n    D --> C\n    C --> E[大 Part]\n  \n    style C fill:#f9f,stroke:#333,stroke-width:2px\n```\n\n**后台合并的好处：**\n\n1. 控制数据文件数量（避免超出打开文件限制）\n2. 提升数据压缩率（更大的 part 通常压缩效果更好）\n3. 提升查询速度（查询更少的 part）\n4. 执行维护任务（去重、降采样、删除时序）\n\n**合并限制：**\n\n> [!WARNING]\n> 当可用磁盘空间不足时，VictoriaMetrics 不会合并 parts。建议至少保留 **20%** 的可用磁盘空间。\n\n可通过以下指标监控合并状态：\n\n- 控制面板：[single-node VictoriaMetrics dashboard](https://grafana.com/grafana/dashboards/10229)\n- 监控文档：[Monitoring docs](https://docs.victoriametrics.com/#monitoring)\n\n#### 2.4.3 数据持久化机制\n\nVictoriaMetrics 的数据持久化设计确保数据安全：\n\n1. **内存缓冲**：数据在内存中缓冲最多 1 秒\n2. **In-Memory Parts**：定期写入内存 parts（可查询）\n3. **持久化**：周期性将内存 parts 写入磁盘\n4. **原子注册**：Part 完全写入并 fsync 后，原子性地注册到 `parts.json`\n5. **故障恢复**：硬件掉电时，不完整的 part 会在启动时自动删除\n\n> [!NOTE]\n> **数据丢失风险**：\n>\n> - 不干净的关闭（OOM、kill -9、硬件重置）可能导致最后几秒的数据丢失\n> - 可通过 `-inmemoryDataFlushInterval` 调整刷新频率（默认 `5s`）\n> - 更短的间隔会增加磁盘 I/O\n\n---", "subs": ["2.4.1 存储结构", "2.4.2 数据分区与合并", "2.4.3 数据持久化机制"]}, {"title": "2.5 IndexDB 索引机制", "content": "#### 2.5.1 索引类型\n\nVictoriaMetrics 维护两种倒排索引：\n\n```mermaid\ngraph TD\n    A[查询请求] --> B{时间范围判断}\n    B -->|<= 40天| C[Per-day Index 每日索引]\n    B -->|> 40天| D[Global Index 全局索引]\n  \n    C --> E[快速检索短期数据]\n    D --> F[检索长期数据]\n```\n\n| 索引类型                | 存储内容             | 使用场景          | 优势             |\n| ----------------------- | -------------------- | ----------------- | ---------------- |\n| **Global Index**  | 整个保留期的映射     | 时间范围 > 40 天  | 减少索引重复写入 |\n| **Per-day Index** | 每日的映射（含日期） | 时间范围 ≤ 40 天 | 加速短期数据查询 |\n\n**索引映射的内容：**\n\n- `metric_name` → `TSID`\n- `label_name` → `TSID`\n- `label_value` → `TSID`\n- `label_name=label_value` → `TSID`\n\n**索引创建时机：**\n\n- **Global Index**：每个保留期内每个映射只创建一次\n- **Per-day Index**：每个唯一日期创建一次映射\n\n#### 2.5.2 低流失率优化：禁用每日索引\n\n**适用场景：**\n\n- 时序集合固定不变（如历史气象数据）\n- 时序流失率低（如 IoT 传感器，极少添加/移除）\n\n**优势：**\n\n- 提升摄入速度\n- 减少磁盘空间使用\n\n**配置方法：**\n\n```bash\nvictoria-metrics -disablePerDayIndex\n```\n\n> [!IMPORTANT]\n> **注意事项：**\n>\n> - 推荐在新安装上设置此 flag\n> - 在有历史数据的安装上禁用每日索引是可以的\n> - 重新启用每日索引会导致历史数据无法搜索\n\n---", "subs": ["2.5.1 索引类型", "2.5.2 低流失率优化：禁用每日索引"]}, {"title": "2.6 去重（Deduplication）", "content": "VictoriaMetrics 支持数据去重，适用于高可用部署场景。\n\n#### 2.6.1 去重工作原理\n\n```mermaid\ngraph LR\n    A[vmagent-1] -->|写入| C[VictoriaMetrics]\n    B[vmagent-2] -->|写入| C\n  \n    C --> D[去重处理]\n    D --> E[保留时间戳最大的样本]\n```\n\n**配置去重：**\n\n```bash\nvictoria-metrics -dedup.minScrapeInterval=30s\n```\n\n**去重规则：**\n\n- 在每个 **离散间隔**（由 `-dedup.minScrapeInterval` 指定）内\n- 保留 **时间戳最大** 的原始样本\n- 如果多个样本时间戳相同，保留 **值最大** 的样本\n- **Staleness markers（失效标记）** 优先于任何其他值\n\n#### 2.6.2 重要 Flag 参数\n\n| Flag                          | 说明           | 示例                                                |\n| ----------------------------- | -------------- | --------------------------------------------------- |\n| `-dedup.minScrapeInterval`  | 去重间隔       | `30s`（应等于 Prometheus 的 `scrape_interval`） |\n| `-streamAggr.dedupInterval` | 摄入时去重间隔 | 数据写入磁盘前去重                                  |\n\n> [!TIP]\n> **最佳实践：**\n>\n> 1. `-dedup.minScrapeInterval` 应等于 Prometheus 配置中的 `scrape_interval`\n> 2. 所有抓取目标推荐使用单一的 `scrape_interval`\n> 3. 不同 HA 对的 vmagent 实例应设置不同的 `-promscrape.cluster.name`\n\n**去重与降采样：**\n\n- `-dedup.minScrapeInterval=D` 等价于 `-downsampling.period=0s:D`\n- 可同时使用去重和降采样\n\n---", "subs": ["2.6.1 去重工作原理", "2.6.2 重要 Flag 参数"]}, {"title": "2.7 降采样（Downsampling）", "content": "> [!NOTE]\n> 降采样是 **VictoriaMetrics Enterprise** 特性。\n\n#### 2.7.1 单级降采样\n\n```mermaid\ngraph LR\n    A[全部数据] --> B{数据年龄}\n    B -->|< 30天| C[保留全部样本]\n    B -->|>= 30天| D[每5分钟保留最后一个样本]\n```\n\n**配置示例：**\n\n```bash\nvictoria-metrics-prod \\\n  -downsampling.period=30d:5m\n```\n\n#### 2.7.2 多级降采样\n\n```bash\nvictoria-metrics-prod \\\n  -downsampling.period=30d:5m,180d:1h\n```\n\n**效果：**\n\n- **30天以上的数据**：每 5 分钟保留最后一个样本\n- **180天以上的数据**：每 1 小时保留最后一个样本\n\n#### 2.7.3 基于过滤器的降采样\n\n```bash\nvictoria-metrics-prod \\\n  -downsampling.period='{__name__=~\"(node|process)_.*\"}:1d:1m'\n```\n\n**说明：**\n\n- 仅对名称以 `node_` 或 `process_` 开头的时序进行降采样\n- 超过 1 天的数据，以 1 分钟间隔降采样\n\n#### 2.7.4 禁用特定时序的降采样\n\n```bash\nvictoria-metrics-prod \\\n  -downsampling.period='{env=\"prod\"}:0s:0s' \\\n  -downsampling.period='{__name__=~\"node_.*\"}:1d:5m'\n```\n\n**说明：**\n\n- `env=\"prod\"` 的时序**不进行降采样**\n- 其他 `node_*` 时序超过 1 天后以 5 分钟间隔降采样\n\n**降采样调试：**\n\n- Enterprise 版本的 VMUI：**Tools → Downsampling filters debug**\n\n> [!IMPORTANT]\n> **降采样限制：**\n>\n> 1. 同一过滤器的多个间隔必须是**倍数关系**\n> 2. 如果启用去重，`-dedup.minScrapeInterval` 也必须是降采样间隔的倍数\n> 3. 降采样在**后台合并**期间执行\n> 4. 需要足够的可用磁盘空间\n\n---", "subs": ["2.7.1 单级降采样", "2.7.2 多级降采样", "2.7.3 基于过滤器的降采样", "2.7.4 禁用特定时序的降采样"]}, {"title": "2.8 保留期过滤器（Retention Filters）", "content": "> [!NOTE]\n> 这是 **VictoriaMetrics Enterprise** 特性。\n\n#### 2.8.1 基本配置\n\n```bash\nvictoria-metrics-prod \\\n  -retentionFilter='{team=\"juniors\"}:3d' \\\n  -retentionFilter='{env=~\"dev|staging\"}:30d' \\\n  -retentionPeriod=1y\n```\n\n**效果：**\n\n| 时序匹配条件                       | 保留期 |\n| ---------------------------------- | ------ |\n| `team=\"juniors\"`                 | 3 天   |\n| `env=\"dev\"` 或 `env=\"staging\"` | 30 天  |\n| 其他时序                           | 1 年   |\n\n**规则：**\n\n- 如果时序匹配多个过滤器，应用**最小**保留期\n- `-retentionFilter` 的 duration 必须 ≤ `-retentionPeriod`\n\n#### 2.8.2 监控指标\n\n| 指标                                                     | 说明                       |\n| -------------------------------------------------------- | -------------------------- |\n| `vm_retention_filters_partitions_scheduled`            | 计划进行保留过滤的分区总数 |\n| `vm_retention_filters_partitions_scheduled_size_bytes` | 计划分区的总大小           |\n\n#### 2.8.3 注意事项\n\n> [!WARNING]\n>\n> 1. 旧数据不会立即删除，在**后台合并**期间逐步删除\n> 2. `-retentionFilter` **不会**从 IndexDB 删除旧数据（到 `-retentionPeriod` 才删除）\n> 3. 高流失率下，即使设置了较小的保留期，IndexDB 大小也可能很大\n> 4. 应用保留过滤器时，资源使用会暂时增加\n\n**调试工具：**\n\n- VMUI Enterprise 版：**Tools → Retention filters debug**\n\n---", "subs": ["2.8.1 基本配置", "2.8.2 监控指标", "2.8.3 注意事项"]}, {"title": "2.9 基数限制器（Cardinality Limiter）", "content": "VictoriaMetrics 支持限制新增时序的速率，防止基数爆炸。\n\n#### 2.9.1 配置参数\n\n| Flag                         | 说明                               |\n| ---------------------------- | ---------------------------------- |\n| `-storage.maxHourlySeries` | 最近 1 小时可添加的最大唯一时序数  |\n| `-storage.maxDailySeries`  | 最近 24 小时可添加的最大唯一时序数 |\n\n**示例：**\n\n```bash\nvictoria-metrics \\\n  -storage.maxHourlySeries=100000 \\\n  -storage.maxDailySeries=1000000\n```\n\n#### 2.9.2 监控指标\n\n| 指标                                          | 说明                                         |\n| --------------------------------------------- | -------------------------------------------- |\n| `vm_hourly_series_limit_rows_dropped_total` | 因超出小时限制而丢弃的指标数                 |\n| `vm_hourly_series_limit_max_series`         | 小时时序限制（`-storage.maxHourlySeries`） |\n| `vm_hourly_series_limit_current_series`     | 当前小时的唯一时序数                         |\n| `vm_daily_series_limit_rows_dropped_total`  | 因超出每日限制而丢弃的指标数                 |\n| `vm_daily_series_limit_max_series`          | 每日时序限制（`-storage.maxDailySeries`）  |\n| `vm_daily_series_limit_current_series`      | 最近一天的唯一时序数                         |\n\n**告警示例：**\n\n```promql\n# 小时时序使用率超过 90%\nvm_hourly_series_limit_current_series / vm_hourly_series_limit_max_series > 0.9\n\n# 每日时序使用率超过 90%\nvm_daily_series_limit_current_series / vm_daily_series_limit_max_series > 0.9\n```\n\n---", "subs": ["2.9.1 配置参数", "2.9.2 监控指标"]}, {"title": "2.10 查询追踪（Query Tracing）", "content": "VictoriaMetrics 支持查询追踪，用于分析查询性能瓶颈。\n\n#### 2.10.1 启用查询追踪\n\n**方法：** 在查询时添加 `trace=1` 参数。\n\n**示例：**\n\n```bash\ncurl \"http://localhost:8428/api/v1/query_range?query=2*rand()&start=-1h&step=1m&trace=1\" | jq '.trace'\n```\n\n**输出示例：**\n\n```json\n{\n  \"duration_msec\": 0.099,\n  \"message\": \"/api/v1/query_range: series=1\",\n  \"children\": [\n    {\n      \"duration_msec\": 0.034,\n      \"message\": \"eval: series=1, points=60\",\n      \"children\": [...]\n    }\n  ]\n}\n```\n\n#### 2.10.2 VMUI 中的查询追踪\n\n1. **启用追踪**：勾选 **Trace query** 复选框并重新执行查询\n2. **查看追踪**：追踪信息会显示在查询结果下方\n3. **导出追踪**：点击调试图标导出 JSON，可在 **Tools → Query Analyzer** 页面加载\n\n#### 2.10.3 禁用查询追踪\n\n```bash\nvictoria-metrics -denyQueryTracing\n```\n\n---", "subs": ["2.10.1 启用查询追踪", "2.10.2 VMUI 中的查询追踪", "2.10.3 禁用查询追踪"]}, {"title": "2.11 安全配置", "content": "#### 2.11.1 认证相关 Flag\n\n| Flag                          | 说明                   | 端点                                 |\n| ----------------------------- | ---------------------- | ------------------------------------ |\n| `-httpAuth.username`        | HTTP Basic Auth 用户名 | 所有端点                             |\n| `-httpAuth.password`        | HTTP Basic Auth 密码   | 所有端点                             |\n| `-deleteAuthKey`            | 删除时序的认证密钥     | `/api/v1/admin/tsdb/delete_series` |\n| `-snapshotAuthKey`          | 快照操作的认证密钥     | `/snapshot/*`                      |\n| `-forceFlushAuthKey`        | 强制刷新认证密钥       | `/internal/force_flush`            |\n| `-forceMergeAuthKey`        | 强制合并认证密钥       | `/internal/force_merge`            |\n| `-search.resetCacheAuthKey` | 重置缓存认证密钥       | `/internal/resetRollupResultCache` |\n| `-reloadAuthKey`            | 重载配置认证密钥       | `/-/reload`                        |\n| `-configAuthKey`            | 配置页面认证密钥       | `/config`                          |\n| `-flagsAuthKey`             | Flags 页面认证密钥     | `/flags`                           |\n| `-pprofAuthKey`             | Profiling 认证密钥     | `/debug/pprof/*`                   |\n| `-metricsAuthKey`           | Metrics 页面认证密钥   | `/metrics`                         |\n\n#### 2.11.2 TLS/mTLS 配置\n\n**启用 HTTPS：**\n\n```bash\nvictoria-metrics \\\n  -tls \\\n  -tlsCertFile=/path/to/cert.pem \\\n  -tlsKeyFile=/path/to/key.pem\n```\n\n**启用 mTLS（Enterprise）：**\n\n```bash\nvictoria-metrics-prod \\\n  -tls \\\n  -mtls \\\n  -mtlsCAFile=/path/to/ca.pem\n```\n\n**自动签发 TLS 证书（Enterprise）：**\n\n```bash\nvictoria-metrics-prod \\\n  -httpListenAddr=:443 \\\n  -tls \\\n  -tlsAutocertHosts=vm.example.com,vm2.example.com \\\n  -tlsAutocertEmail=admin@example.com \\\n  -tlsAutocertCacheDir=/var/lib/vm-certs\n```\n\n#### 2.11.3 安全 HTTP 响应头\n\n| Flag                          | 说明                         | 推荐值                                  |\n| ----------------------------- | ---------------------------- | --------------------------------------- |\n| `-http.header.hsts`         | Strict-Transport-Security 头 | `max-age=31536000; includeSubDomains` |\n| `-http.header.csp`          | Content-Security-Policy 头   | `default-src 'self'`                  |\n| `-http.header.frameOptions` | X-Frame-Options 头           | `DENY`                                |\n\n---", "subs": ["2.11.1 认证相关 Flag", "2.11.2 TLS/mTLS 配置", "2.11.3 安全 HTTP 响应头"]}, {"title": "2.12 VMUI Web 界面", "content": "VictoriaMetrics 提供强大的 Web UI（VMUI）。\n\n#### 2.12.1 访问地址\n\n- **单机版**：[http://victoriametrics:8428/vmui](http://victoriametrics:8428/vmui)\n- **集群版**：http://`<vmselect>`:8481/select/`<accountID>`/vmui/\n\n#### 2.12.2 主要功能\n\n| 功能标签                             | 说明                                       |\n| ------------------------------------ | ------------------------------------------ |\n| **Query**                      | MetricsQL 查询，支持时间序列、表格、直方图 |\n| **Raw Query**                  | 查看原始样本，调试查询结果                 |\n| **Explore Metrics**            | 按 job/instance 浏览指标                   |\n| **Cardinality Explorer**       | 分析时序基数                               |\n| **Top Queries**                | 查看最常执行的查询                         |\n| **Active Queries**             | 查看当前执行的查询                         |\n| **Trace Analyzer**             | 分析查询追踪 JSON                          |\n| **Query Analyzer**             | 分析导出的查询结果                         |\n| **Metric Relabel Debugger**    | 调试 relabeling 规则                       |\n| **Downsampling Debugger**      | 调试降采样配置（Enterprise）               |\n| **Retention Filters Debugger** | 调试保留过滤器（Enterprise）               |\n\n#### 2.12.3 快捷键\n\n| 操作               | 快捷键                  |\n| ------------------ | ----------------------- |\n| 执行查询           | `Enter`               |\n| 多行查询           | `Shift + Enter`       |\n| 自动完成           | `Ctrl + Space`        |\n| 查询历史（上一条） | `Ctrl/Cmd + ↑`       |\n| 查询历史（下一条） | `Ctrl/Cmd + ↓`       |\n| 放大               | `Ctrl/Cmd + 滚轮向上` |\n| 缩小               | `Ctrl/Cmd + 滚轮向下` |\n| 移动时间范围       | `Ctrl/Cmd + 拖动`     |\n\n---", "subs": ["2.12.1 访问地址", "2.12.2 主要功能", "2.12.3 快捷键"]}, {"title": "2.13 监控与可观测性", "content": "#### 2.13.1 自我监控\n\nVictoriaMetrics 可以自我抓取指标：\n\n```bash\nvictoria-metrics -selfScrapeInterval=10s\n```\n\n**相关 Flag：**\n\n| Flag                    | 默认值               | 说明                           |\n| ----------------------- | -------------------- | ------------------------------ |\n| `-selfScrapeInterval` | `0`（禁用）        | 自我抓取间隔                   |\n| `-selfScrapeJob`      | `victoria-metrics` | 自我抓取的 `job` 标签值      |\n| `-selfScrapeInstance` | `self`             | 自我抓取的 `instance` 标签值 |\n\n#### 2.13.2 推送指标（Push Metrics）\n\nVictoriaMetrics 支持将 `/metrics` 页面的指标推送到远程存储。\n\n```bash\nvictoria-metrics \\\n  -pushmetrics.url=http://vm-central:8428/api/v1/import/prometheus \\\n  -pushmetrics.interval=10s \\\n  -pushmetrics.extraLabel='instance=\"vm-node1\"' \\\n  -pushmetrics.extraLabel='job=\"victoriametrics\"'\n```\n\n**相关 Flag：**\n\n| Flag                                | 说明                         |\n| ----------------------------------- | ---------------------------- |\n| `-pushmetrics.url`                | 推送指标的 URL（可指定多次） |\n| `-pushmetrics.interval`           | 推送间隔（默认 `10s`）     |\n| `-pushmetrics.extraLabel`         | 添加额外标签                 |\n| `-pushmetrics.header`             | 添加 HTTP 请求头             |\n| `-pushmetrics.disableCompression` | 禁用压缩                     |\n\n#### 2.13.3 Grafana 仪表板\n\n官方 Grafana 仪表板：\n\n- **单机版**：[https://grafana.com/grafana/dashboards/10229](https://grafana.com/grafana/dashboards/10229)\n- **集群版**：[https://grafana.com/grafana/dashboards/11176](https://grafana.com/grafana/dashboards/11176)\n\n---", "subs": ["2.13.1 自我监控", "2.13.2 推送指标（Push Metrics）", "2.13.3 Grafana 仪表板"]}, {"title": "2.14 备份与恢复", "content": "#### 2.14.1 创建快照\n\n```bash\ncurl http://localhost:8428/snapshot/create\n```\n\n**响应：**\n\n```json\n{\"status\":\"ok\",\"snapshot\":\"20231115-120000-ABC123\"}\n```\n\n**快照存储位置：**\n\n```\n<storageDataPath>/snapshots/<snapshot-name>/\n```\n\n#### 2.14.2 列出快照\n\n```bash\ncurl http://localhost:8428/snapshot/list\n```\n\n#### 2.14.3 删除快照\n\n```bash\n# 删除指定快照\ncurl \"http://localhost:8428/snapshot/delete?snapshot=<snapshot-name>\"\n\n# 删除所有快照\ncurl http://localhost:8428/snapshot/delete_all\n```\n\n#### 2.14.4 从快照恢复\n\n```bash\n# 1. 停止 VictoriaMetrics\nkill -INT <vm-pid>\n\n# 2. 使用 vmrestore 恢复快照\nvmrestore \\\n  -src=<backup-location> \\\n  -storageDataPath=<vm-storageDataPath>\n\n# 3. 启动 VictoriaMetrics\n./victoria-metrics -storageDataPath=<vm-storageDataPath>\n```\n\n> [!Important]\n> **快照注意事项：**\n>\n> 1. 快照使用硬链接和软链接，**不要**用 `rm` 删除快照子目录\n> 2. **不要**用 `cp`/`rsync` 复制快照，使用 `vmbackup`\n> 3. 旧快照可能占用额外磁盘空间，建议定期删除\n\n#### 2.14.5 自动快照管理\n\n```bash\nvictoria-metrics \\\n  -snapshotsMaxAge=7d \\\n  -snapshotAuthKey=<secret-key>\n```\n\n**相关 Flag：**\n\n| Flag                 | 说明                          |\n| -------------------- | ----------------------------- |\n| `-snapshotsMaxAge` | 快照最大保留时间（如 `7d`） |\n| `-snapshotAuthKey` | 快照 API 认证密钥             |\n\n---", "subs": ["2.14.1 创建快照", "2.14.2 列出快照", "2.14.3 删除快照", "2.14.4 从快照恢复", "2.14.5 自动快照管理"]}, {"title": "2.15 数据导入导出", "content": "#### 2.15.1 导出数据\n\n**JSON Line 格式：**\n\n```bash\ncurl \"http://localhost:8428/api/v1/export?start=2023-01-01T00:00:00Z&end=2023-12-31T23:59:59Z&match[]={__name__!=\\\"\\\"}\" > data.jsonl\n```\n\n**CSV 格式：**\n\n```bash\ncurl \"http://localhost:8428/api/v1/export/csv?format=__timestamp__:unix_s,__name__,__value__&match[]={__name__=\\\"up\\\"}\" > data.csv\n```\n\n**Native 格式（最高效）：**\n\n```bash\ncurl \"http://localhost:8428/api/v1/export/native?match[]={__name__!=\\\"\\\"}\" > data.bin\n```\n\n#### 2.15.2 导入数据\n\n**JSON Line 格式：**\n\n```bash\ncurl -X POST \"http://localhost:8428/api/v1/import\" -T data.jsonl\n```\n\n**Native 格式：**\n\n```bash\ncurl -X POST \"http://localhost:8428/api/v1/import/native\" -T data.bin\n```\n\n**CSV 格式：**\n\n```bash\ncurl -X POST \"http://localhost:8428/api/v1/import/csv?format=1:metric:temperature,2:label:location,3:time:unix_s\" -T data.csv\n```\n\n**Prometheus 格式：**\n\n```bash\ncurl -d 'metric{label=\"value\"} 123' -X POST \"http://localhost:8428/api/v1/import/prometheus\"\n```\n\n---", "subs": ["2.15.1 导出数据", "2.15.2 导入数据"]}, {"title": "2.16 故障排查", "content": "#### 2.16.1 常见问题\n\n| 问题       | 可能原因               | 解决方法                               |\n| ---------- | ---------------------- | -------------------------------------- |\n| 数据摄入慢 | 活跃时序过多，内存不足 | 增加内存，监控 `vm_slow_*` 指标      |\n| 查询慢     | 并发查询过多           | 调整 `-search.maxConcurrentRequests` |\n| 磁盘使用高 | 合并停滞               | 检查可用磁盘空间（至少 20%）           |\n| 图表有间隙 | 时间同步问题           | 调整 `-search.cacheTimestampOffset`  |\n| 启动失败   | 损坏的 parts           | 删除损坏的 part 目录                   |\n\n#### 2.16.2 关键监控指标\n\n| 指标                                                                                           | 说明                     | 告警阈值 |\n| ---------------------------------------------------------------------------------------------- | ------------------------ | -------- |\n| `vm_free_disk_space_bytes`                                                                   | 可用磁盘空间             | < 20%    |\n| `vm_slow_row_inserts_total`                                                                  | 慢写入计数               | 持续增长 |\n| `vm_slow_metric_name_loads_total`                                                            | 慢元数据加载             | 持续增长 |\n| `vm_rows_ignored_total`                                                                      | 被忽略的行数             | > 0      |\n| `vm_hourly_series_limit_current_series / vm_hourly_series_limit_max_series`                  | 小时基数使用率           | > 0.9    |\n| `vm_cache_size_bytes{type=\"storage/metricNamesStatsTracker\"} / vm_cache_size_max_bytes{...}` | 指标名称追踪器缓存使用率 | > 0.9    |\n\n#### 2.16.3 日志记录\n\n**配置日志：**\n\n```bash\nvictoria-metrics \\\n  -loggerLevel=INFO \\\n  -loggerFormat=json \\\n  -loggerOutput=stdout \\\n  -loggerTimezone=Asia/Shanghai \\\n  -loggerMaxArgLen=10000\n```\n\n**日志相关 Flag：**\n\n| Flag                         | 默认值      | 说明                                        |\n| ---------------------------- | ----------- | ------------------------------------------- |\n| `-loggerLevel`             | `INFO`    | 日志级别（INFO, WARN, ERROR, FATAL, PANIC） |\n| `-loggerFormat`            | `default` | 日志格式（default, json）                   |\n| `-loggerOutput`            | `stderr`  | 日志输出（stderr, stdout）                  |\n| `-loggerTimezone`          | `UTC`     | 日志时区                                    |\n| `-loggerMaxArgLen`         | `5000`    | 单个日志参数最大长度                        |\n| `-loggerDisableTimestamps` | `false`   | 禁用时间戳                                  |\n\n---", "subs": ["2.16.1 常见问题", "2.16.2 关键监控指标", "2.16.3 日志记录"]}, {"title": "2.17 环境变量支持", "content": "VictoriaMetrics 支持通过环境变量设置 flag 值。\n\n#### 2.17.1 配置文件中引用环境变量\n\n```yaml\n# prometheus.yml\nglobal:\n  external_labels:\n    cluster: %{CLUSTER_NAME}\n    region: %{REGION}\n\nscrape_configs:\n  - job_name: 'node'\n    static_configs:\n      - targets: ['%{NODE_IP}:9100']\n```\n\n#### 2.17.2 通过环境变量设置 Flag\n\n**启用环境变量支持：**\n\n```bash\nvictoria-metrics -envflag.enable\n```\n\n**示例：**\n\n```bash\nexport retention_period=90d\nexport http_listen_addr=:8428\nexport storage_data_path=/data/vm\n\nvictoria-metrics -envflag.enable\n```\n\n**重复 Flag：**\n\n```bash\nexport storage_node=\"node1:8400,node2:8400,node3:8400\"\n```\n\n**设置前缀：**\n\n```bash\nexport VM_retention_period=90d\nexport VM_http_listen_addr=:8428\n\nvictoria-metrics -envflag.enable -envflag.prefix=VM_\n```\n\n---", "subs": ["2.17.1 配置文件中引用环境变量", "2.17.2 通过环境变量设置 Flag"]}, {"title": "2.18 容量规划", "content": "#### 2.18.1 生产工作负载参考\n\n根据案例研究，单机版 VictoriaMetrics 可完美处理以下工作负载：\n\n| 指标                      | 数值              |\n| ------------------------- | ----------------- |\n| **摄入速率**        | 150 万+ samples/s |\n| **活跃时序**        | 5000 万+          |\n| **总时序数**        | 50 亿+            |\n| **时序流失率**      | 1.5 亿+ 新时序/天 |\n| **总样本数**        | 10 万亿+          |\n| **查询 QPS**        | 200+              |\n| **查询延迟（P99）** | 1 秒              |\n\n#### 2.18.2 资源建议\n\n| 资源类型               | 建议     |\n| ---------------------- | -------- |\n| **空闲内存**     | 至少 50% |\n| **空闲 CPU**     | 至少 50% |\n| **可用磁盘空间** | 至少 20% |\n\n#### 2.18.3 存储空间估算\n\n**公式：**\n\n```\n所需存储空间 = 测试期间磁盘使用量 × (保留期天数 / 测试天数)\n```\n\n**示例：**\n\n- 测试 1 天后，`-storageDataPath` 目录大小为 10GB\n- 保留期设为 100 天（`-retentionPeriod=100d`）\n- 所需存储空间：`10GB × 100 = 1TB`\n\n**预留空间：** 实际需要 **1TB + 20%** = **1.2TB**\n\n---", "subs": ["2.18.1 生产工作负载参考", "2.18.2 资源建议", "2.18.3 存储空间估算"]}, {"title": "2.19 Flag 参数速查表", "content": "#### 2.19.1 核心参数\n\n| Flag                    | 默认值                    | 说明          |\n| ----------------------- | ------------------------- | ------------- |\n| `-storageDataPath`    | `victoria-metrics-data` | 数据存储路径  |\n| `-retentionPeriod`    | `1` (月)                | 数据保留周期  |\n| `-httpListenAddr`     | `:8428`                 | HTTP 监听地址 |\n| `-selfScrapeInterval` | `0`                     | 自我抓取间隔  |\n\n#### 2.19.2 性能调优\n\n| Flag                              | 默认值 | 说明                     |\n| --------------------------------- | ------ | ------------------------ |\n| `-memory.allowedPercent`        | `60` | 允许缓存使用的内存百分比 |\n| `-search.maxConcurrentRequests` | 自动   | 最大并发查询数           |\n| `-search.maxMemoryPerQuery`     | 自动   | 单查询最大内存           |\n| `-search.maxWorkersPerQuery`    | 自动   | 单查询最大工作线程数     |\n\n#### 2.19.3 限制参数\n\n| Flag                            | 默认值  | 说明               |\n| ------------------------------- | ------- | ------------------ |\n| `-maxIngestionRate`           | `0`   | 每秒最大摄入样本数 |\n| `-search.maxQueryDuration`    | `30s` | 查询最大执行时间   |\n| `-search.maxUniqueTimeseries` | 自动    | 单查询最大时序数   |\n\n#### 2.19.4 企业特性\n\n| Flag                     | 说明                   | 类型       |\n| ------------------------ | ---------------------- | ---------- |\n| `-downsampling.period` | 降采样配置             | Enterprise |\n| `-retentionFilter`     | 保留期过滤器           | Enterprise |\n| `-mtls`                | 启用 mTLS              | Enterprise |\n| `-tlsAutocertHosts`    | Let's Encrypt 自动证书 | Enterprise |\n\n---\n\n**🎯 第 2 章完成！** 下一步将继续学习集群版 VictoriaMetrics...\n\n---", "subs": ["2.19.1 核心参数", "2.19.2 性能调优", "2.19.3 限制参数", "2.19.4 企业特性"]}]}, {"title": "第 3 章：集群版 VictoriaMetrics 深入详解", "sections": [{"title": "3.1 概述与架构", "content": "#### 3.1.1 何时使用集群版\n\n> [!IMPORTANT]\n> **推荐使用场景判断**：\n>\n> - **单机版适用**：摄入速率 < 100 万 data points/s\n> - **集群版适用**：摄入速率 >= 100 万 data points/s，或需要多租户隔离\n\n单机版优势：\n\n- 完美的垂直扩展能力（CPU、RAM、存储）\n- 支持高可用部署\n- 配置和运维更简单\n\n#### 3.1.2 架构组件\n\n```mermaid\ngraph LR\n    A[HTTP Load Balancer vmauth/nginx] --> B[vminsert 数据写入]\n    A --> C[vmselect 数据查询]\n  \n    B --> D[vmstorage-1]\n    B --> E[vmstorage-2]\n    B --> F[vmstorage-N]\n  \n    C --> D\n    C --> E\n    C --> F\n  \n    style A fill:#f9f,stroke:#333,stroke-width:2px\n    style B fill:#9f9,stroke:#333,stroke-width:2px\n    style C fill:#99f,stroke:#333,stroke-width:2px\n    style D fill:#ff9,stroke:#333,stroke-width:2px\n```\n\n| 组件                | 端口                                                      | 职责                                   | 是否有状态                       |\n| ------------------- | --------------------------------------------------------- | -------------------------------------- | -------------------------------- |\n| **vminsert**  | `8480`                                                  | 接收数据，按一致性哈希分发到 vmstorage | 无状态                           |\n| **vmselect**  | `8481`                                                  | 处理查询请求，从 vmstorage 聚合数据    | 无状态（但需要少量磁盘用于缓存） |\n| **vmstorage** | `8482` (HTTP), `8400` (vminsert), `8401` (vmselect) | 存储和检索数据                         | 有状态                           |\n\n**Shared Nothing 架构**：\n\n- vmstorage 节点之间不通信\n- 不共享任何数据\n- 提高集群可用性\n- 简化集群维护和扩展\n\n> [!NOTE]\n> vmselect 虽然是无状态的，但仍需要一些磁盘空间（几 GB）用于临时缓存。通过 `-cacheDataPath` 参数配置。\n\n---", "subs": ["3.1.1 何时使用集群版", "3.1.2 架构组件"]}, {"title": "3.2 多租户（Multi-tenancy）", "content": "#### 3.2.1 租户标识符\n\n租户由 `accountID` 或 `accountID:projectID` 标识：\n\n- 都是 **32位整数**，范围：`[0 .. 2^32)`\n- `projectID` 缺失时自动设为 `0`\n\n**URL 格式：**\n\n```\n# 写入\nhttp://vminsert:8480/insert/<accountID>/prometheus/api/v1/write\nhttp://vminsert:8480/insert/<accountID>:<projectID>/prometheus/api/v1/write\n\n# 查询\nhttp://vmselect:8481/select/<accountID>/prometheus/api/v1/query\nhttp://vmselect:8481/select/<accountID>:<projectID>/prometheus/api/v1/query_range\n```\n\n#### 3.2.2 租户管理\n\n| 特性                 | 说明                                                          |\n| -------------------- | ------------------------------------------------------------- |\n| **自动创建**   | 首次写入数据时自动创建租户                                    |\n| **均匀分布**   | 所有租户的数据均匀分布在所有 vmstorage 节点                   |\n| **性能无关**   | 性能与租户数量无关，仅与活跃时序总数相关                      |\n| **元信息存储** | 建议在关系数据库中管理租户元信息（auth tokens、限制、计费等） |\n\n**列出已注册租户：**\n\n```bash\ncurl http://vmselect:8481/admin/tenants?start=2024-01-01T00:00:00Z&end=2024-12-31T23:59:59Z\n```\n\n#### 3.2.3 基于标签的多租户\n\n**写入数据：**\n\n通过特殊端点 `/insert/multitenant/<suffix>` 写入，租户 ID 从标签中提取：\n\n```\n# 样本\nhttp_requests_total{path=\"/foo\",vm_account_id=\"42\"} 12\nhttp_requests_total{path=\"/bar\",vm_account_id=\"7\",vm_project_id=\"9\"} 34\n\n# 写入端点\nPOST http://vminsert:8480/insert/multitenant/prometheus/api/v1/write\n```\n\n**效果：**\n\n- `http_requests_total{path=\"/foo\"} 12` → `accountID=42, projectID=0`\n- `http_requests_total{path=\"/bar\"} 34` → `accountID=7, projectID=9`\n- `vm_account_id` 和 `vm_project_id` 标签会被自动删除\n\n**读取数据：**\n\n```promql\n# 跨多租户查询\nup{vm_account_id=\"7\", vm_project_id=\"9\" or vm_account_id=\"42\"}\n\n# 使用 extra_filters\ncurl 'http://vmselect:8481/select/multitenant/prometheus/api/v1/query' \\\n  -d 'query=up' \\\n  -d 'extra_filters[]={vm_account_id=\"7\",vm_project_id=\"9\"}' \\\n  -d 'extra_filters[]={vm_account_id=\"42\"}'\n```\n\n> [!WARNING]\n> **安全考虑**：\n> 多租户端点应仅对可信源开放，防止未授权访问或跨租户数据污染。\n\n---", "subs": ["3.2.1 租户标识符", "3.2.2 租户管理", "3.2.3 基于标签的多租户"]}, {"title": "3.3 集群搭建指南", "content": "#### 3.3.1 最小集群配置\n\n```bash\n# 1. 启动 vmstorage（至少1个）\n./vmstorage \\\n  -retentionPeriod=3 \\\n  -storageDataPath=/var/lib/vmstorage\n\n# 2. 启动 vminsert（至少1个）\n./vminsert \\\n  -storageNode=vmstorage-host:8400\n\n# 3. 启动 vmselect（至少1个）\n./vmselect \\\n  -storageNode=vmstorage-host:8401\n\n# 4. 配置负载均衡器（vmauth或nginx）\n# /insert/* → vminsert:8480\n# /select/* → vmselect:8481\n```\n\n#### 3.3.2 高可用配置\n\n```mermaid\ngraph TD\n    A[Load Balancer vmauth] --> B[vminsert-1]\n    A --> C[vminsert-2]\n    A --> D[vmselect-1]\n    A --> E[vmselect-2]\n  \n    B --> F[vmstorage-1]\n    B --> G[vmstorage-2]\n    B --> H[vmstorage-3]\n  \n    C --> F\n    C --> G\n    C --> H\n  \n    D --> F\n    D --> G\n    D --> H\n  \n    E --> F\n    E --> G\n    E --> H\n```\n\n**推荐配置：**\n\n- 每种服务至少 **2个节点**\n- 宁可多个小 vmstorage 节点，而不是少数大节点\n- 所有组件运行在同一子网（高带宽、低延迟、低错误率）\n\n#### 3.3.3 自动发现 vmstorage（Enterprise）\n\n**基于 DNS SRV：**\n\n```bash\n./vminsert -storageNode=srv+vmstorage-service\n\n./vmselect -storageNode=srv+vmstorage-service\n```\n\n**基于文件：**\n\n```bash\n# vmstorage-list.txt\nvmstorage-1:8400\nvmstorage-2:8400\nvmstorage-3:8400\n\n./vminsert -storageNode=file:///path/to/vmstorage-list.txt\n\n# 支持 HTTP URL\n./vminsert -storageNode=file://http://config-server/vmstorage-list\n```\n\n**相关 Flag：**\n\n| Flag                               | 说明               | 默认值 |\n| ---------------------------------- | ------------------ | ------ |\n| `-storageNode.discoveryInterval` | 刷新间隔           | `2s` |\n| `-storageNode.filter`            | 地址过滤正则表达式 | `\"\"` |\n\n**监控指标：**\n\n- `vm_rpc_vmstorage_is_reachable`：vmstorage 是否可达\n- `vm_rpc_vmstorage_is_read_only`：vmstorage 是否只读\n\n---", "subs": ["3.3.1 最小集群配置", "3.3.2 高可用配置", "3.3.3 自动发现 vmstorage（Enterprise）"]}, {"title": "3.4 集群可用性", "content": "#### 3.4.1 可用性定义\n\nVictoriaMetrics 集群在部分组件不可用时仍能继续接受数据和处理查询，优先**可用性**而非**一致性**。\n\n#### 3.4.2 可用性条件\n\n| 组件                 | 可用性要求           | 说明                                             |\n| -------------------- | -------------------- | ------------------------------------------------ |\n| **负载均衡器** | 停止路由到不可用节点 | vmauth 自动实现                                  |\n| **vminsert**   | 至少 1 个节点可用    | 有足够 CPU、RAM、网络带宽处理写入负载            |\n| **vmselect**   | 至少 1 个节点可用    | 有足够 CPU、RAM、网络带宽、磁盘 I/O 处理查询负载 |\n| **vmstorage**  | 至少 1 个节点可用    | 有足够 CPU、RAM、网络带宽、磁盘 I/O、磁盘空间    |\n\n#### 3.4.3 vmstorage 不可用时的行为\n\n```mermaid\ngraph TD\n    A[部分 vmstorage 不可用] --> B[vminsert 行为]\n    A --> C[vmselect 行为]\n  \n    B --> D[重新路由新数据到健康节点]\n    B --> E[均匀分布增加的负载]\n  \n    C --> F[继续处理查询]\n    C --> G[标记响应为 partial]\n    C --> H[\"isPartial: true\"]\n```\n\n**vminsert 的重新路由：**\n\n- 自动将数据从不可用节点重新路由到健康节点\n- 健康节点将承受更高的资源使用和活跃时序数\n\n**vmselect 的部分响应：**\n\n- 至少一个 vmstorage 可用时继续服务查询\n- 响应包含 `\"isPartial\": true` 字段\n- 可能缺少存储在不可用节点上的历史数据\n\n**禁用部分响应：**\n\n```bash\n# 启动时禁用\n./vmselect -search.denyPartialResponse\n\n# 查询时禁用\ncurl 'http://vmselect:8481/.../query?deny_partial_response=1'\n```\n\n> [!NOTE]\n> 以下端点不返回部分响应（用户期望完整数据）：\n>\n> - `/api/v1/export*` 端点\n> - `/api/v1/query?query=up[1h]` (返回原始样本)\n\n---", "subs": ["3.4.1 可用性定义", "3.4.2 可用性条件", "3.4.3 vmstorage 不可用时的行为"]}, {"title": "3.5 数据复制（Replication）", "content": "#### 3.5.1 配置复制\n\n**vminsert 端：**\n\n```bash\n./vminsert \\\n  -storageNode=vmstorage-1:8400,vmstorage-2:8400,vmstorage-3:8400 \\\n  -replicationFactor=2\n```\n\n**效果：**\n\n- 每个样本存储 **2份副本** 到不同的 vmstorage 节点\n- 最多可容忍 `N-1` 个 vmstorage 节点不可用\n\n**vmselect 端：**\n\n```bash\n./vmselect \\\n  -storageNode=vmstorage-1:8401,vmstorage-2:8401,vmstorage-3:8401 \\\n  -replicationFactor=2 \\\n  -dedup.minScrapeInterval=1ms\n```\n\n**说明：**\n\n- `-replicationFactor=2`：少于 2 个 vmstorage 不可用时不标记为 partial\n- `-dedup.minScrapeInterval=1ms`：去重副本数据\n\n#### 3.5.2 最小节点数\n\n对于复制因子 `N`，集群至少需要 **`2*N-1`** 个 vmstorage 节点。\n\n| 复制因子 | 最小 vmstorage 节点数 | 容错能力     |\n| -------- | --------------------- | ------------ |\n| 1        | 1                     | 0 个节点故障 |\n| 2        | 3                     | 1 个节点故障 |\n| 3        | 5                     | 2 个节点故障 |\n\n#### 3.5.3 复制的成本\n\n> [!WARNING]\n> 复制会将资源使用增加 **最多 N 倍**：\n>\n> - CPU\n> - RAM\n> - 磁盘空间\n> - 网络带宽\n\n**替代方案（推荐）：**\n使用复制持久盘，如 Google Compute Engine persistent disk，提供：\n\n- 数据持久性保护\n- 数据损坏保护\n- 一致的高性能\n- 无需停机即可调整大小\n- 通常基于 HDD 即可满足大多数场景\n\n---", "subs": ["3.5.1 配置复制", "3.5.2 最小节点数", "3.5.3 复制的成本"]}, {"title": "3.6 去重（Deduplication）", "content": "集群版与单机版的去重机制相同，但有以下例外：\n\n**去重无法保证的场景：**\n\n1. 添加/移除 vmstorage 节点（时序重新路由到其他节点）\n2. vmstorage 节点临时不可用（数据重新路由）\n3. vmstorage 节点容量不足（数据重新路由）\n\n**配置建议：**\n\n```bash\n# vmstorage\n./vmstorage -dedup.minScrapeInterval=30s\n\n# vmselect\n./vmselect -dedup.minScrapeInterval=30s\n```\n\n推荐在 vmselect 和 vmstorage 设置相同的值以确保查询结果一致性。\n\n---", "subs": []}, {"title": "3.7 多级集群（Multi-level Cluster）", "content": "#### 3.7.1 vmselect 多级链接\n\n```mermaid\ngraph TD\n    A[Top vmselect] --> B[AZ1 vmselect]\n    A --> C[AZ2 vmselect]\n    A --> D[AZ3 vmselect]\n  \n    B --> E[AZ1 vmstorage-1]\n    B --> F[AZ1 vmstorage-2]\n  \n    C --> G[AZ2 vmstorage-1]\n    C --> H[AZ2 vmstorage-2]\n  \n    D --> I[AZ3 vmstorage-1]\n    D --> J[AZ3 vmstorage-2]\n```\n\n**配置二级 vmselect：**\n\n```bash\n# 一级 vmselect（每个 AZ）\n./vmselect \\\n  -storageNode=az1-vmstorage-1:8401,az1-vmstorage-2:8401 \\\n  -clusternativeListenAddr=:8401\n\n# 顶级 vmselect\n./vmselect \\\n  -storageNode=az1-vmselect:8401,az2-vmselect:8401,az3-vmselect:8401\n```\n\n#### 3.7.2 vminsert 多级链接\n\n```mermaid\ngraph TD\n    A[Top vminsert] --> B[AZ1 vminsert]\n    A --> C[AZ2 vminsert]\n  \n    B --> D[AZ1 vmstorage-1]\n    B --> E[AZ1 vmstorage-2]\n  \n    C --> F[AZ2 vmstorage-1]\n    C --> G[AZ2 vmstorage-2]\n```\n\n**配置：**\n\n```bash\n# 二级 vminsert（每个 AZ）\n./vminsert \\\n  -storageNode=az1-vmstorage-1:8400,az1-vmstorage-2:8400 \\\n  -clusternativeListenAddr=:8400\n\n# 顶级 vminsert\n./vminsert \\\n  -storageNode=az1-vminsert:8400,az2-vminsert:8400\n```\n\n**缺点：**\n\n1. 数据摄入速度受限于最慢的 AZ 链路\n2. AZ 临时不可用时，数据会重新路由到其他 AZ，导致数据缺口\n\n**推荐方案：**\n使用 **vmagent** 在 AZ 前复制/分片数据流：\n\n- AZ 临时不可用时，vmagent 缓冲数据到磁盘（`--remoteWrite.maxDiskUsagePerURL`）\n- 无需影响其他 AZ\n- AZ 恢复后自动发送缓冲数据\n\n---", "subs": ["3.7.1 vmselect 多级链接", "3.7.2 vminsert 多级链接"]}, {"title": "3.8 vmstorage 分组", "content": "#### 3.8.1 独立复制因子\n\n```bash\n./vmselect \\\n  -replicationFactor=2 \\\n  -storageNode=g1/host1,g1/host2,g1/host3 \\\n  -storageNode=g2/host4,g2/host5,g2/host6 \\\n  -storageNode=g3/host7,g3/host8,g3/host9\n```\n\n**效果：**\n\n- 每个组独立应用 `-replicationFactor=2`\n- 最多容忍每组 1 个节点不可用\n\n#### 3.8.2 每组不同复制因子\n\n```bash\n./vmselect \\\n  -replicationFactor=g1:3 \\\n  -storageNode=g1/host1,g1/host2,g1/host3 \\\n  -replicationFactor=g2:2 \\\n  -storageNode=g2/host4,g2/host5,g2/host6 \\\n  -replicationFactor=g3:1 \\\n  -storageNode=g3/host7,g3/host8,g3/host9\n```\n\n#### 3.8.3 全局复制因子\n\n```bash\n./vmselect \\\n  -globalReplicationFactor=2 \\\n  -storageNode=g1/host1,g1/host2,g1/host3 \\\n  -storageNode=g2/host4,g2/host5,g2/host6 \\\n  -storageNode=g3/host7,g3/host8,g3/host9\n```\n\n**效果：**\n\n- 最多容忍 1 个完整的 vmstorage 组不可用\n\n#### 3.8.4 混合使用\n\n```bash\n./vmselect \\\n  -globalReplicationFactor=2 \\\n  -replicationFactor=3 \\\n  -storageNode=g1/host1,g1/host2,g1/host3 \\\n  -storageNode=g2/host4,g2/host5,g2/host6 \\\n  -storageNode=g3/host7,g3/host8,g3/host9\n```\n\n**效果：**\n\n- 容忍 1 个完整组不可用\n- 剩余组中每组最多容忍 2 个节点不可用\n\n---", "subs": ["3.8.1 独立复制因子", "3.8.2 每组不同复制因子", "3.8.3 全局复制因子", "3.8.4 混合使用"]}, {"title": "3.9 集群扩容与重新平衡", "content": "#### 3.9.1 垂直扩展 vs 水平扩展\n\n| 扩展类型           | 方法                             | 优势                                               |\n| ------------------ | -------------------------------- | -------------------------------------------------- |\n| **垂直扩展** | 增加单节点资源（CPU、RAM、磁盘） | 提升单个查询性能、增加活跃时序容量                 |\n| **水平扩展** | 增加节点数量                     | 提升集群稳定性、改善高流失率查询性能、提高并发能力 |\n\n#### 3.9.2 扩容建议\n\n**添加 vmstorage 节点：**\n\n1. 提高活跃时序容量\n2. 改善高流失率时序查询性能\n3. 提升集群稳定性（节点故障时负载增加更小）\n\n**添加 vminsert 节点：**\n\n- 提高数据摄入速度\n\n**添加 vmselect 节点：**\n\n- 提高查询并发处理能力\n\n#### 3.9.3 添加 vmstorage 节点步骤\n\n```bash\n# 1. 启动新 vmstorage 节点\n./vmstorage \\\n  -retentionPeriod=90d \\\n  -storageDataPath=/var/lib/vmstorage-new\n\n# 2. 逐步重启所有 vmselect 节点\n./vmselect \\\n  -storageNode=old1:8401,old2:8401,new1:8401\n\n# 3. 逐步重启所有 vminsert 节点\n./vminsert \\\n  -storageNode=old1:8400,old2:8400,new1:8400\n```\n\n#### 3.9.4 重新平衡策略\n\n**默认行为：**\n\n- 新数据均匀分布到所有节点（包括新节点）\n- 历史数据保留在旧节点\n\n**优势：**\n\n- 无需网络带宽、磁盘 I/O、CPU 用于数据重新平衡\n- 避免重新平衡期间的故障问题\n- 支持灵活的集群方案（不同 vminsert 节点写入不同 vmstorage 子集）\n\n**手动重新平衡方法：**\n\n1. **等待历史数据自动删除**（根据 retention）\n2. **临时只写新节点**：\n\n   ```bash\n   # vminsert（只写新节点）\n   ./vminsert -storageNode=new1:8400,new2:8400\n\n   # vmselect（读所有节点）\n   ./vmselect -storageNode=old1:8401,old2:8401,new1:8401,new2:8401\n   ```\n\n   等待新旧节点数据量相等后，重新配置 vminsert 包含所有节点。\n\n---", "subs": ["3.9.1 垂直扩展 vs 水平扩展", "3.9.2 扩容建议", "3.9.3 添加 vmstorage 节点步骤", "3.9.4 重新平衡策略"]}, {"title": "3.10 集群更新与配置变更", "content": "#### 3.10.1 零停机滚动更新\n\n```bash\n# 推荐顺序\n# 1. 逐个重启 vmstorage 节点\nkill -INT <vmstorage-pid>\n# 等待进程优雅退出\n./vmstorage <new-flags>\n\n# 2. 逐个重启 vminsert 节点\nkill -INT <vminsert-pid>\n./vminsert <new-flags>\n\n# 3. 逐个重启 vmselect 节点\nkill -INT <vmselect-pid>\n./vmselect <new-flags>\n```\n\n**前提条件：**\n\n1. 每种组件至少有 2 对节点（高可用）\n2. 有足够的计算资源处理单节点临时不可用的负载\n3. 新配置/版本与现有组件兼容\n\n#### 3.10.2 最小停机时间更新\n\n```bash\n# 1. 并行停止所有 vminsert 和 vmselect\nkill -INT <all-vminsert-pids>\nkill -INT <all-vmselect-pids>\n\n# 2. 并行重启所有 vmstorage\nkill -INT <all-vmstorage-pids>\n# 等待所有进程退出\n./vmstorage <new-flags> &  # 所有节点并行启动\n\n# 3. 并行启动所有 vminsert 和 vmselect\n./vminsert <new-flags> &\n./vmselect <new-flags> &\n```\n\n**适用场景：**\n\n- 版本不兼容\n- 资源不足以滚动更新\n- 大规模集群需要快速更新\n\n#### 3.10.3 优化滚动重启性能\n\n**减少重新路由负载：**\n\n```bash\n# vminsert：暂停摄入而不是重新路由\n./vminsert -disableReroutingOnUnavailable\n\n# vmstorage：增加连接优雅关闭时间（v1.95.0+）\n./vmstorage -storage.vminsertConnsShutdown Duration=120s\n```\n\n> [!WARNING]\n> 确保 `-storage.vminsertConnsShutdownDuration` **小于**系统的优雅关闭超时（Docker、Kubernetes、systemd）。\n\n---", "subs": ["3.10.1 零停机滚动更新", "3.10.2 最小停机时间更新", "3.10.3 优化滚动重启性能"]}, {"title": "3.11 资源使用限制", "content": "#### 3.11.1 全局限制\n\n| Flag                       | 说明                                  | 适用组件 |\n| -------------------------- | ------------------------------------- | -------- |\n| `-memory.allowedPercent` | 缓存可使用的系统内存百分比（默认 60） | 所有组件 |\n| `-memory.allowedBytes`   | 缓存可使用的字节数（覆盖 percent）    | 所有组件 |\n\n#### 3.11.2 vmselect 查询限制\n\n| Flag                              | 默认值   | 说明                       |\n| --------------------------------- | -------- | -------------------------- |\n| `-search.maxMemoryPerQuery`     | 自动计算 | 单个查询最大内存           |\n| `-search.maxQueryDuration`      | `30s`  | 查询最大执行时间           |\n| `-search.maxConcurrentRequests` | 自动计算 | 最大并发查询数             |\n| `-search.maxQueueDuration`      | `10s`  | 查询队列最大等待时间       |\n| `-search.maxUniqueTimeseries`   | 自动计算 | 限制单个查询可处理的时序数 |\n| `-search.maxWorkersPerQuery`    | 自动计算 | 单个查询可用的 CPU 核数    |\n\n#### 3.11.3 vmstorage 限制\n\n| Flag                              | 说明                                    | 适用组件            |\n| --------------------------------- | --------------------------------------- | ------------------- |\n| `-search.maxUniqueTimeseries`   | 单个查询可处理的时序数                  | vmstorage           |\n| `-search.maxConcurrentRequests` | 最大并发请求数                          | vmstorage           |\n| `-search.maxQueueDuration`      | 查询队列最大等待时间                    | vmstorage           |\n| `-search.maxTagKeys`            | `/api/v1/labels` 最大返回数           | vmstorage、vmselect |\n| `-search.maxTagValues`          | `/api/v1/label/.../values` 最大返回数 | vmstorage、vmselect |\n\n#### 3.11.4 基数限制\n\n```bash\n# vmstorage\n./vmstorage \\\n  -storage.maxHourlySeries=1000000 \\\n  -storage.maxDailySeries=10000000\n```\n\n> [!NOTE]\n> 集群级别的限制 = 单节点限制 × vmstorage 节点数\n\n---", "subs": ["3.11.1 全局限制", "3.11.2 vmselect 查询限制", "3.11.3 vmstorage 限制", "3.11.4 基数限制"]}, {"title": "3.12 企业特性", "content": "#### 3.12.1 保留期过滤器（Retention Filters）\n\n```bash\n# vmstorage\n./vmstorage \\\n  -retentionFilter='{vm_account_id=~\"42.*\"}:1d' \\\n  -retentionFilter='{env=~\"dev|staging\"}:3d' \\\n  -retentionPeriod=4w\n```\n\n**效果：**\n\n- `vm_account_id` 以 `42` 开头的租户：1 天保留期\n- `env=\"dev\"` 或 `env=\"staging\"` 的时序：3 天保留期\n- 其他：4 周保留期\n\n**混合真实标签与伪标签：**\n\n```bash\n-retentionFilter='{vm_account_id=\"5\",env=\"dev\"}:5d'\n```\n\n#### 3.12.2 降采样（Downsampling）\n\n```bash\n# vmstorage 和 vmselect 都需要设置\n./vmstorage \\\n  -downsampling.period='{vm_account_id=~\"12|42\"}:1h:1m'\n\n./vmselect \\\n  -downsampling.period='{vm_account_id=~\"12|42\"}:1h:1m'\n```\n\n**效果：**\n\n- `accountID=12` 或 `42` 的租户：1 小时后每分钟保留最后一个样本\n- 其他租户：数据被丢弃\n\n**混合标签：**\n\n```bash\n-downsampling.period='{vm_account_id=\"5\",env=\"dev\"}:30d:1h'\n```\n\n> [!IMPORTANT]\n> vmselect 和 vmstorage 必须设置相同的 `-downsampling.period` 值以确保查询结果一致。\n\n---", "subs": ["3.12.1 保留期过滤器（Retention Filters）", "3.12.2 降采样（Downsampling）"]}, {"title": "3.13 安全配置", "content": "#### 3.13.1 通用安全建议\n\n1. **网络隔离**：所有集群组件运行在受保护的私有网络\n2. **认证代理**：外部客户端通过 vmauth 或 vmgateway 访问\n3. **HTTPS**：仅通过 HTTPS 接受 auth token\n4. **租户隔离**：不同租户使用不同的 auth token\n5. **API 白名单**：配置允许的 API 端点列表\n\n#### 3.13.2 mTLS 保护（Enterprise）\n\n**HTTP 端点 mTLS：**\n\n```bash\n# vminsert\n./vminsert -tls -mtls\n\n# vmselect\n./vmselect -tls -mtls\n```\n\n**集群内部通信 mTLS：**\n\n```bash\n# vminsert\n./vminsert \\\n  -cluster.tls \\\n  -cluster.tlsCertFile=/path/to/cert.pem \\\n  -cluster.tlsKeyFile=/path/to/key.pem\n\n# vmselect\n./vmselect \\\n  -cluster.tls \\\n  -cluster.tlsCertFile=/path/to/cert.pem \\\n  -cluster.tlsKeyFile=/path/to/key.pem\n\n# vmstorage\n./vmstorage \\\n  -cluster.tls \\\n  -cluster.tlsCertFile=/path/to/cert.pem \\\n  -cluster.tlsKeyFile=/path/to/key.pem\n```\n\n**多级集群 mTLS：**\n\n```bash\n# 二级 vmselect\n./vmselect \\\n  -clusternativeListenAddr=:8401 \\\n  -clusternative.tls \\\n  -clusternative.tlsCertFile=/path/to/cert.pem \\\n  -clusternative.tlsKeyFile=/path/to/key.pem\n```\n\n---", "subs": ["3.13.1 通用安全建议", "3.13.2 mTLS 保护（Enterprise）"]}, {"title": "3.14 URL 格式总览", "content": "#### 3.14.1 数据摄入端点\n\n**基础格式：** `http://vminsert:8480/insert/<accountID>/<suffix>`\n\n| Suffix                                  | 协议                    | 说明                       |\n| --------------------------------------- | ----------------------- | -------------------------- |\n| `prometheus/api/v1/write`             | Prometheus remote write | 推荐                       |\n| `prometheus/api/v1/import`            | JSON line               | 从 vmselect 导出的数据     |\n| `prometheus/api/v1/import/native`     | Native binary           | VictoriaMetrics 原生格式   |\n| `prometheus/api/v1/import/csv`        | CSV                     | 任意 CSV 数据              |\n| `prometheus/api/v1/import/prometheus` | Prometheus exposition   | Text/OpenMetrics 格式      |\n| `opentelemetry/v1/metrics`            | OpenTelemetry           | OTLP metrics               |\n| `datadog/api/v2/series`               | DataDog                 | DataDog submit metrics API |\n| `influx/write`                        | InfluxDB line protocol  | HTTP                       |\n| `opentsdb/api/put`                    | OpenTSDB HTTP           | `/api/put`               |\n\n#### 3.14.2 查询端点\n\n**基础格式：** `http://vmselect:8481/select/<accountID>/prometheus/<suffix>`\n\n| Suffix                           | 说明                      |\n| -------------------------------- | ------------------------- |\n| `api/v1/query`                 | 即时查询（Instant query） |\n| `api/v1/query_range`           | 范围查询（Range query）   |\n| `api/v1/series`                | 时序查询                  |\n| `api/v1/labels`                | 标签名列表                |\n| `api/v1/label/<name>/values`   | 标签值列表                |\n| `api/v1/export`                | 导出为 JSON line          |\n| `api/v1/export/native`         | 导出为 native binary      |\n| `api/v1/export/csv`            | 导出为 CSV                |\n| `api/v1/status/tsdb`           | 时序统计信息              |\n| `api/v1/status/active_queries` | 当前执行的查询            |\n| `api/v1/status/top_queries`    | 最频繁/最慢的查询         |\n\n#### 3.14.3 其他端点\n\n| 端点                                                                                   | 说明          |\n| -------------------------------------------------------------------------------------- | ------------- |\n| `http://vmselect:8481/select/<accountID>/vmui/`                                      | VMUI Web 界面 |\n| `http://vmselect:8481/admin/tenants`                                                 | 列出所有租户  |\n| `http://vmselect:8481/delete/<accountID>/prometheus/api/v1/admin/tsdb/delete_series` | 删除时序      |\n| `http://vmstorage:8482/snapshot/create`                                              | 创建快照      |\n| `http://vmstorage:8482/snapshot/list`                                                | 列出快照      |\n| `http://vmstorage:8482/snapshot/delete?snapshot=<id>`                                | 删除快照      |\n\n---", "subs": ["3.14.1 数据摄入端点", "3.14.2 查询端点", "3.14.3 其他端点"]}, {"title": "3.15 容量规划", "content": "#### 3.15.1 资源建议\n\n| 资源类型           | 推荐空闲量 | 原因                             |\n| ------------------ | ---------- | -------------------------------- |\n| **RAM**      | 50%        | 应对临时负载峰值、避免 OOM       |\n| **CPU**      | 50%        | 应对临时负载峰值、避免查询超时   |\n| **磁盘空间** | ≥ 20%     | vmstorage 后台合并和月度去重需要 |\n\n#### 3.15.2 存储空间估算\n\n**公式：**\n\n```\n所需空间 = 测试期间磁盘使用量 × (保留期天数 / 测试天数) × vmstorage节点数 × (1 + 0.2)\n```\n\n**示例：**\n\n- 单个 vmstorage 测试 1 天后使用 10GB\n- 保留期 = 90 天\n- vmstorage 节点数 = 3\n- 所需存储：`10GB × 90 × 3 × 1.2 = 3.24TB`\n\n#### 3.15.3 特殊考虑\n\n**月度最终去重：**\n\n- 每月月初，vmstorage 会进行最终去重\n- 临时需要上个月数据量大小的磁盘空间\n- 如 3 个月保留期，建议预留 **35%** 空间\n\n**只读模式触发：**\n\n- 当 vmstorage 磁盘空间 < `-storage.minFreeDiskSpaceBytes`\n- vminsert 停止写入该节点，重新路由到其他节点\n- 监控指标：`vm_storage_is_read_only`\n\n---", "subs": ["3.15.1 资源建议", "3.15.2 存储空间估算", "3.15.3 特殊考虑"]}, {"title": "3.16 监控指标", "content": "#### 3.16.1 组件端口\n\n| 组件      | 监控端口 | 端点         |\n| --------- | -------- | ------------ |\n| vminsert  | `8480` | `/metrics` |\n| vmselect  | `8481` | `/metrics` |\n| vmstorage | `8482` | `/metrics` |\n\n#### 3.16.2 Grafana 仪表板\n\n官方仪表板：[https://grafana.com/grafana/dashboards/11176](https://grafana.com/grafana/dashboards/11176)\n\n#### 3.16.3 关键监控指标\n\n| 指标                                      | 说明                             |\n| ----------------------------------------- | -------------------------------- |\n| `vm_rpc_vmstorage_is_reachable`         | vmstorage 节点是否可达           |\n| `vm_rpc_vmstorage_is_read_only`         | vmstorage 是否只读模式           |\n| `vm_storage_is_read_only`               | vmstorage 是否进入只读模式       |\n| `vm_free_disk_space_bytes`              | vmstorage 可用磁盘空间           |\n| `vm_rows_ignored_total`                 | 被忽略的行数（标签超长、超限等） |\n| `vm_hourly_series_limit_current_series` | 当前小时唯一时序数               |\n| `vm_daily_series_limit_current_series`  | 当前day唯一时序数                |\n\n---", "subs": ["3.16.1 组件端口", "3.16.2 Grafana 仪表板", "3.16.3 关键监控指标"]}, {"title": "3.17 集群 vs 单机对比", "content": "| 特性                 | 单机版                | 集群版                                        |\n| -------------------- | --------------------- | --------------------------------------------- |\n| **多租户**     | 不支持                | 支持，通过 accountID/projectID                |\n| **水平扩展**   | 不支持                | 支持，可添加 vminsert/vmselect/vmstorage 节点 |\n| **垂直扩展**   | 支持                  | 支持                                          |\n| **复制**       | 依赖存储层            | 应用层复制（`-replicationFactor`）          |\n| **高可用**     | 通过vmagent多副本写入 | 内置高可用                                    |\n| **配置复杂度** | 低                    | 中等                                          |\n| **适用场景**   | < 100万 samples/s     | >= 100万 samples/s，多租户需求                |\n\n---", "subs": []}, {"title": "3.18 常见问题与故障排查", "content": "#### 3.18.1 为什么不自动重新平衡数据？\n\n**原因：**\n\n1. 避免网络、磁盘 I/O、CPU 浪费\n2. 避免重新平衡期间的潜在故障风险\n3. 支持灵活的集群拓扑\n\n**解决方案：**\n见 [3.9.4 重新平衡策略](#394-重新平衡策略)\n\n#### 3.18.2 集群不稳定\n\n**诊断步骤：**\n\n1. 检查网络延迟：`-rpc.handshakeTimeout` 是否足够\n2. 检查 vmstorage 磁盘空间：是否 < 20%\n3. 检查 vmstorage 是否只读：`vm_storage_is_read_only`\n4. 检查 CPU/RAM 使用率\n\n**解决方案：**\n\n- 增加 `-rpc.handshakeTimeout`（默认 5s）\n- 增加磁盘空间\n- 增加 CPU/RAM\n- 增加 vmstorage 节点数\n\n#### 3.18.3 查询性能慢\n\n**可能原因与解决方案：**\n\n| 原因                   | 解决方案                                        |\n| ---------------------- | ----------------------------------------------- |\n| vmselect 资源不足      | 增加 vmselect 节点或 CPU/RAM                    |\n| vmstorage 压缩占用 CPU | 禁用压缩：`vmstorage -rpc.disableCompression` |\n| 并发查询过多           | 调整 `-search.maxConcurrentRequests`          |\n| 重查询                 | 增加 `-search.maxWorkersPerQuery`             |\n\n---", "subs": ["3.18.1 为什么不自动重新平衡数据？", "3.18.2 集群不稳定", "3.18.3 查询性能慢"]}, {"title": "3.19 Flag 参数速查", "content": "#### 3.19.1 vminsert 核心 Flag\n\n| Flag                               | 默认值        | 说明                                     |\n| ---------------------------------- | ------------- | ---------------------------------------- |\n| `-storageNode`                   | 无            | vmstorage 节点地址列表                   |\n| `-replicationFactor`             | `1`         | 复制因子                                 |\n| `-disableRerouting`              | `true`      | 禁用重新路由（降低滚动重启时的活跃时序） |\n| `-disableReroutingOnUnavailable` | `false`     | 节点不可用时禁用重新路由                 |\n| `-dropSamplesOnOverload`         | `false`     | 节点过载时丢弃样本而非重新路由           |\n| `-maxConcurrentInserts`          | `2*CPU核数` | 最大并发写入请求数                       |\n\n#### 3.19.2 vmselect 核心 Flag\n\n| Flag                            | 默认值    | 说明                                          |\n| ------------------------------- | --------- | --------------------------------------------- |\n| `-storageNode`                | 无        | vmstorage 节点地址列表                        |\n| `-replicationFactor`          | `1`     | 复制因子（部分响应判断）                      |\n| `-globalReplicationFactor`    | `1`     | 全局复制因子                                  |\n| `-search.denyPartialResponse` | `false` | 禁止部分响应                                  |\n| `-search.skipSlowReplicas`    | `false` | 跳过慢副本（需要 `-replicationFactor > 1`） |\n| `-dedup.minScrapeInterval`    | `0`     | 去重间隔                                      |\n| `-cacheDataPath`              | `\"\"`    | 缓存和临时查询结果路径                        |\n\n#### 3.19.3 vmstorage 核心 Flag\n\n| Flag                                       | 默认值                    | 说明                              |\n| ------------------------------------------ | ------------------------- | --------------------------------- |\n| `-retentionPeriod`                       | `1` (月)                | 数据保留期                        |\n| `-storageDataPath`                       | `victoria-metrics-data` | 数据存储路径                      |\n| `-vminsertAddr`                          | `:8400`                 | vminsert 连接地址                 |\n| `-vmselectAddr`                          | `:8401`                 | vmselect 连接地址                 |\n| `-httpListenAddr`                        | `:8482`                 | HTTP 监听地址                     |\n| `-storage.minFreeDiskSpaceBytes`         | `10MB`                  | 最小可用磁盘空间                  |\n| `-rpc.disableCompression`                | `false`                 | 禁用 vmstorage→vmselect 数据压缩 |\n| `-storage.vminsertConnsShutdownDuration` | `25s`                   | vminsert 连接优雅关闭时间         |\n\n---\n\n**🎯 第 3 章完成！** 下一步将继续学习 vmagent 组件...\n\n---", "subs": ["3.19.1 vminsert 核心 Flag", "3.19.2 vmselect 核心 Flag", "3.19.3 vmstorage 核心 Flag"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 学习笔记 · 第四册：Istio、多集群与安全 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 学习笔记 · 第四册：Istio、多集群与安全</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 学习笔记 · 第四册：Istio、多集群与安全", "intro": "", "parts": [{"title": "第 9 章 · Istio 高级流量管理", "sections": [{"title": "微服务架构如何从单体演进到服务治理", "content": "单体架构把多个业务模块放在同一个应用和同一套发布链路里。早期系统常见的形态是一个应用服务器承载销售、仓储、结算、折扣等模块，运维人员在少量机器上完成部署和配置。它的好处是链路短、依赖少、排查边界集中；问题是所有模块共享生命周期，一个模块变更、扩容或故障都可能影响整个系统。\n\n先从一个最小的单体结构看“模块还在一个发布单元内”这件事。进销存系统是这种形态的典型例子：业务模块很多，但部署、扩容和故障边界仍然绑在同一个应用服务器上。\n\n```mermaid\nflowchart LR\n    subgraph MonoA[\"App Server\"]\n        MA1[\"Module\"]\n        MA2[\"Module\"]\n        MA3[\"Module\"]\n        MA4[\"Module\"]\n    end\n    Admin[\"Admin Server<br/>Deployment & Configuration\"]\n    subgraph MonoB[\"App Server\"]\n        MB1[\"Module\"]\n        MB2[\"Module\"]\n        MB3[\"Module\"]\n        MB4[\"Module\"]\n    end\n    MA1 <--> Admin\n    Admin <--> MB1\n```\n\n这个阶段的治理动作主要发生在应用服务器和管理服务器上。它容易理解，但只要销售模块、仓储模块或折扣模块需要独立扩容，就会暴露出边界过粗的问题。\n\n微服务架构的变化不是“把系统拆小”这么简单，而是让服务边界、团队边界、发布边界和资源边界都显式化。每个服务可以独立部署、独立扩缩容、独立维护 SLA，也可以按业务压力决定副本数量和高可用等级。但拆分以后，原来进程内的方法调用变成了跨网络调用，系统必须面对服务发现、负载均衡、认证授权、超时、重试、熔断、链路追踪和灰度发布等治理问题。\n\n```mermaid\nflowchart LR\n    Mono[\"Monolith\"]\n    Modules[\"Business Modules\"]\n    Services[\"Microservices\"]\n    Registry[\"Service Registry\"]\n    Gateway[\"API Gateway\"]\n    Governance[\"Traffic Governance\"]\n\n    Mono --> Modules\n    Modules --> Services\n    Services --> Registry\n    Gateway --> Services\n    Services --> Governance\n```\n\n单体到微服务的收益和代价可以这样理解：\n\n| 维度 | 单体架构 | 微服务架构 | 治理需求 |\n|---|---|---|---|\n| 发布 | 一个整体发布 | 服务独立发布 | 灰度发布 回滚 金丝雀 |\n| 扩容 | 整体扩容 | 按服务扩容 | 服务级容量和负载均衡 |\n| 故障 | 故障边界粗 | 故障边界细但依赖多 | 超时 重试 熔断 降级 |\n| 依赖 | 进程内依赖 | 网络依赖 | 服务发现 TLS 认证授权 |\n| 观测 | 日志集中在应用内 | 链路跨多个服务 | 指标 日志 Trace |\n\nKubernetes 已经提供了微服务运行的基础能力。Deployment 负责副本管理，Service 负责稳定访问入口，CoreDNS 负责服务名解析，kube-proxy 通过 iptables 或 IPVS 完成四层转发。服务 A 调用服务 B 时，可以直接访问 `service.namespace.svc.cluster.local`，再由 Service 转到后端 Pod。\n\n拆成微服务以后，业务边界变成多个独立服务，入口通常由 API Gateway 汇聚，服务发现则成为每个服务都要依赖的基础设施。这里需要注意，复杂性并没有消失：只是从单体内部的模块依赖，转成了跨服务、跨网络、跨版本的治理问题。\n\n```mermaid\nflowchart LR\n    Client[\"Client\"] --> Gateway[\"API Gateway\"]\n    Gateway --> Sales[\"Sales\"]\n    Gateway --> Warehouse[\"Warehouse\"]\n    Gateway --> Accounting[\"Accounting\"]\n    Gateway --> Discount[\"Discount\"]\n    Sales -.-> Registry[\"Service Registry\"]\n    Warehouse -.-> Registry\n    Accounting -.-> Registry\n    Discount -.-> Registry\n```\n\n这张图的重点是“业务服务之间开始需要共同设施”。如果没有统一治理层，每个服务都要自己接注册中心、自己处理认证、自己处理重试和熔断，语言栈和框架差异会让平台升级非常困难。\n\n这条路径能解决基础连通性，但不能解决高级治理。Service 的核心能力偏四层，它不理解 HTTP Header、URI、gRPC 方法、用户身份、请求耗时和响应状态，也不能为每个服务定制复杂的负载均衡策略。Ingress 支持七层规则，但它主要面向集群外到集群内的入口流量，不适合统一管理集群内部所有东西向流量。\n\n| Kubernetes 原生能力 | 可以解决 | 难以解决 |\n|---|---|---|\n| Service | 稳定虚拟 IP 服务发现 基础负载均衡 | 按 Header 路由 按版本分流 请求级治理 |\n| CoreDNS | 服务名到地址解析 | 服务版本 用户身份 流量策略 |\n| kube-proxy | 四层转发 | 应用层协议感知和高级负载均衡 |\n| Ingress | 北南向 HTTP 入口 | 全网格东西向流量和统一出站策略 |\n\n在微服务系统里，经常出现的故障不是“服务完全死掉”，而是“半死不活”：后端实例仍能建立连接，但响应很慢、偶发 5xx、只在某些 URI 上失败。调用方如果没有超时和重试策略，线程可能一直等待；如果负载均衡策略只看最少连接，异常实例反而可能因为连接很快失败而持续被选中，导致局部故障放大为全局故障。\n\n因此，服务治理不是附属功能，而是微服务架构能否稳定运行的关键能力：\n\n| 治理能力 | 解决的问题 | 示例 |\n|---|---|---|\n| 服务发现 | 服务实例动态变化后仍能定位目标 | Pod 扩缩容后自动更新端点 |\n| 负载均衡 | 请求按合适策略分配到后端 | 随机 轮询 最少请求 本地优先 |\n| 超时 | 防止调用方无限等待 | ratings 超过 10s 直接失败 |\n| 重试 | 对可恢复错误做有限补偿 | 5xx 或超时后重试 3 次 |\n| 熔断 | 隔离异常实例或限制并发 | 连接池满后快速失败 |\n| 降级 | 非关键依赖异常时保护主链路 | 广告或推荐服务异常时隐藏模块 |\n| 认证授权 | 确认调用方身份和权限 | 服务间 mTLS 和授权策略 |\n| 可观测性 | 看到请求从哪里来 到哪里去 慢在哪里 | Metrics Logs Tracing |\n\n因此，服务治理要从“每个服务自己带一套能力”转成“平台统一提供横切能力”。系统边界图把业务服务、治理层和基础设施服务放在一起：TLS、认证授权、服务发现、熔断和负载均衡都不应该散落在每个业务代码库里。\n\n```mermaid\nflowchart LR\n    subgraph Biz[\"业务服务\"]\n        Sales[\"Sales\"]\n        Warehouse[\"Warehouse\"]\n        Accounting[\"Accounting\"]\n        Discount[\"Discount\"]\n    end\n\n    subgraph MeshCap[\"网格能力\"]\n        MeshLayer[\"统一治理层\"]\n        TLS[\"TLS\"]\n        AU[\"AU\"]\n        SD[\"SD\"]\n        CB[\"CB\"]\n        LB[\"LB\"]\n    end\n\n    subgraph Infra[\"基础设施服务\"]\n        Registry[\"Service Registry\"]\n        Auth[\"Auth Server\"]\n        Gateway[\"API Gateway\"]\n    end\n\n    TLS --> MeshLayer\n    AU --> MeshLayer\n    SD --> MeshLayer\n    CB --> MeshLayer\n    LB --> MeshLayer\n    MeshLayer -.-> Sales\n    MeshLayer -.-> Warehouse\n    MeshLayer -.-> Accounting\n    MeshLayer -.-> Discount\n    Sales -.-> Registry\n    Warehouse -.-> Registry\n    Accounting -.-> Registry\n    Discount -.-> Registry\n    Auth -.-> MeshLayer\n    Gateway --> Sales\n    Gateway --> Warehouse\n    Gateway --> Accounting\n    Gateway --> Discount\n```\n\n这里的口头解释可以概括为一句话：微服务开发仍然是微服务开发，Istio 关注的是服务发布以后如何被管起来。把治理层抽出来以后，业务团队少写网络控制逻辑，平台团队则要承担更严格的模板、校验和排障责任。\n\n传统微服务框架常把这些能力通过 SDK 嵌入业务代码，例如服务注册、客户端负载均衡、熔断库、认证库和追踪库。这样能工作，但会带来语言绑定和业务耦合。Java 服务可以复用一套框架，Go、Node.js、Python 服务又要重做适配；平台组件升级也可能迫使业务重新发布。\n\n服务网格的目标是把这些横切能力从业务进程中抽离，让业务代码继续处理业务逻辑，让平台侧统一处理流量治理。也就是说，业务仍然定义“我要访问哪个服务”，但如何发现目标、如何加密、如何重试、如何熔断、如何采集指标，由网格的数据平面和控制平面完成。\n\nIstio 的设计目标可以概括为“最大化透明度”和“支持增量治理”。最大化透明度是指应用仍然创建普通 Pod、访问普通 Service 名，平台通过 Sidecar 注入和 iptables 捕获把流量接入代理，业务代码不需要为每一种语言重复接入治理 SDK。增量治理是指服务可以按命名空间、工作负载或调用链路逐步纳入网格，规则变化也应尽量只影响相关代理，避免一次配置调整引发全网格抖动。\n\n这两个目标还带来统一模型的价值：入口流量、服务间东西向流量和出口流量都能用相同的 Gateway、VirtualService、DestinationRule、ServiceEntry 等对象表达；VM 或集群外工作负载也可以逐步接入，而不是要求所有系统一次性迁移完成。", "subs": []}, {"title": "服务网格和 Sidecar 为什么成为流量治理基础", "content": "服务网格把服务间通信改造成经过代理的通信。每个业务 Pod 旁边注入一个 Sidecar 代理，业务容器发出的请求先进入本地代理，再由代理根据控制面下发的配置决定真实目标；目标 Pod 收到流量时，也先经过本地代理，再转交给业务容器。\n\n```mermaid\nflowchart LR\n    AppA[\"Service A\"]\n    ProxyA[\"Sidecar A\"]\n    ProxyB[\"Sidecar B\"]\n    AppB[\"Service B\"]\n    Control[\"Control Plane\"]\n\n    AppA --> ProxyA\n    ProxyA --> ProxyB\n    ProxyB --> AppB\n    Control -.-> ProxyA\n    Control -.-> ProxyB\n```\n\n这条链路看起来比直连多了两跳，但它换来了统一治理入口。因为所有请求都经过代理，平台就能在代理中完成服务发现、负载均衡、TLS、认证授权、超时、重试、故障注入、指标采集和链路追踪。业务进程仍然可以暴露普通 HTTP 服务，真正跨机器传输时由代理升级成 mTLS。\n\nSidecar 模式的关键是边界清晰：\n\n| 角色 | 关注内容 |\n|---|---|\n| 业务容器 | 业务 API 数据处理 依赖调用 |\n| Sidecar 代理 | 流量拦截 路由 转发 加密 遥测 |\n| 控制平面 | 监听配置变化 生成代理配置 下发证书和发现数据 |\n| 平台团队 | 治理模板 安全基线 可观测性 运维排查 |\n\n在 Kubernetes 中，Istio 通过 Sidecar 注入实现这件事。常见方式是在命名空间上开启自动注入：\n\n```bash\nkubectl label namespace bookinfo istio-injection=enabled\n```\n\n开启后，Pod 创建请求会经过 Istio 的 Mutating Webhook。Webhook 会改写 Pod Spec，加入一个 init container 和一个 Sidecar 容器：\n\n| 注入内容 | 作用 |\n|---|---|\n| `istio-init` 或等价初始化逻辑 | 写入 Pod 网络命名空间内的 iptables 重定向规则 |\n| `istio-proxy` | 运行 Envoy 代理 接收控制面配置 承载数据面转发 |\n| 管理端口和环境变量 | 连接 istiod 获取配置 证书和遥测参数 |\n\n从 Kubernetes admission 视角看，给 namespace 打上 `istio-injection=enabled` 后，新建 Pod 会命中 `istio-sidecar-injector` 这个 MutatingWebhook。原本只有一个业务容器的 Pod，创建后会多出 `istio-proxy` Sidecar 和 `init container`，`kubectl get pod` 中常见状态会从单容器变成 `2/2` ready。这个现象能把“透明注入”与 Kubernetes 在创建阶段改写 Pod Spec 的机制对应起来。\n\n也可以用手动注入查看变更后的资源：\n\n```bash\nistioctl kube-inject -f bookinfo.yaml\n```\n\nSidecar 的透明性来自 iptables 劫持。Pod 内所有容器共享同一个网络命名空间，init container 写入的 iptables 规则会影响业务容器和 Sidecar 容器。出站 TCP 流量通常被重定向到 Envoy 的 `15001`，入站 TCP 流量通常被重定向到 Envoy 的 `15006`。Envoy 自身一般以 UID `1337` 运行，iptables 规则会放行来自该 UID 的流量，避免代理发出的请求再次被自己劫持造成循环。\n\n```bash\n# 出站流量进入 Envoy outbound\n-A OUTPUT -p tcp -j ISTIO_OUTPUT\n-A ISTIO_OUTPUT -m owner --uid-owner 1337 -j RETURN\n-A ISTIO_OUTPUT -p tcp -j ISTIO_REDIRECT\n-A ISTIO_REDIRECT -p tcp -j REDIRECT --to-ports 15001\n\n# 入站流量进入 Envoy inbound\n-A PREROUTING -p tcp -j ISTIO_INBOUND\n-A ISTIO_INBOUND -p tcp --dport 15090 -j RETURN\n-A ISTIO_INBOUND -p tcp -j ISTIO_IN_REDIRECT\n-A ISTIO_IN_REDIRECT -p tcp -j REDIRECT --to-ports 15006\n```\n\n出站链路可以拆成下面几步：\n\n1. 业务容器访问 `reviews:9080`。\n2. DNS 仍由 CoreDNS 解析，得到 Service ClusterIP。\n3. Pod 内 iptables 把出站 TCP 请求劫持到 `15001`。\n4. Envoy 的 outbound listener 根据原始目标端口找到对应虚拟监听器。\n5. Envoy 匹配 route，找到目标 cluster。\n6. cluster 通过 EDS 获取真实 endpoint，即目标 Pod IP。\n7. Envoy 发出请求，因为请求来自 UID `1337`，iptables 放行。\n\n入站链路则是：\n\n1. 远端 Envoy 把请求发到目标 Pod IP 和业务端口。\n2. 目标 Pod 内 PREROUTING 规则把请求劫持到 `15006`。\n3. Envoy 的 inbound listener 判断这是本地服务流量。\n4. Envoy 根据 route 和 cluster 把请求转发给本地业务容器端口。\n5. 业务响应原路返回，代理负责记录指标和 trace 信息。\n\n```mermaid\nflowchart LR\n    ClientApp[\"Client App\"]\n    OutRule[\"Outbound Rule\"]\n    OutProxy[\"Envoy 15001\"]\n    Network[\"Network\"]\n    InRule[\"Inbound Rule\"]\n    InProxy[\"Envoy 15006\"]\n    ServerApp[\"Server App\"]\n\n    ClientApp --> OutRule\n    OutRule --> OutProxy\n    OutProxy --> Network\n    Network --> InRule\n    InRule --> InProxy\n    InProxy --> ServerApp\n```\n\n这种设计带来了明显收益，也带来了成本。\n\n| 收益 | 说明 |\n|---|---|\n| 语言无关 | Java Go Node.js Python 服务都通过代理治理 |\n| 业务低侵入 | 大量网络治理能力不需要写进业务 SDK |\n| 策略集中 | 平台可以用统一 CRD 管理入口 东西向 出口流量 |\n| 可观测性直接 | 请求经过代理即可采集指标 日志和 Trace |\n| 安全升级自然 | 服务间明文调用可由 Sidecar 升级为 mTLS |\n\n| 成本 | 说明 |\n|---|---|\n| 链路变长 | 请求多经过本地和远端代理 |\n| 资源开销 | 每个 Pod 多一个代理容器 消耗 CPU 和内存 |\n| 排查复杂 | 要同时理解 Kubernetes Service iptables Envoy 配置和 Istio 对象 |\n| 配置规模 | 默认可见服务过多时 Sidecar 配置会膨胀 |\n| 规则风险 | VirtualService DestinationRule 等对象通过 host subset 等字段松耦合 需要模板化和校验 |\n\n配置规模是大规模网格最容易被低估的成本。Istio 默认会发现可见的 Service、Pod、Endpoint 以及相关 Istio 配置，并把代理需要的 listener、route、cluster、endpoint 信息下发到 Sidecar。如果所有命名空间的服务都互相可见，每个 Sidecar 都会加载大量本不访问的目标，导致 Envoy 内存开销上升、`istiod` 生成配置变慢，xDS 推送也更容易成为控制面瓶颈。\n\n治理思路是从服务可见性入手。可以用 Istio 配置对象的 `exportTo` 明确配置只导出给指定命名空间，用 `Sidecar` 资源的 `egress.hosts` 限制某类工作负载能看到哪些服务；在多租户或超大规模集群中，还可以把默认策略调整为不全量导出，再按业务依赖显式开放。这样能从源头减少 Sidecar 配置体积和控制面推送压力。\n\nIstio 的架构也经历过演进。早期控制平面由 Pilot、Mixer、Citadel、Galley 等多个组件组成：\n\n| 早期组件 | 职责 |\n|---|---|\n| Pilot | 服务发现和流量配置下发 |\n| Mixer | 策略检查和遥测适配 |\n| Citadel | 证书签发和安全能力 |\n| Galley | 配置校验和适配 |\n\n这种拆法职责清晰，但运维复杂。控制面组件多，升级顺序、故障定位和依赖关系都变难。后来 Istio 把核心控制面合并到 `istiod`，同时移除或收敛 Mixer 相关路径，把大量遥测工作下沉到 Envoy 和 Telemetry V2。\n\n```mermaid\nflowchart LR\n    subgraph Old[\"早期架构\"]\n        A[\"Service A\"] <--> PA[\"Proxy\"]\n        PA --> PB[\"Proxy\"]\n        PB <--> B[\"Service B\"]\n        Pilot[\"Pilot\"] -.->|\"Config data\"| PA\n        Pilot -.->|\"Config data\"| PB\n        Mixer[\"Mixer\"] -.->|\"Policy checks<br/>Telemetry\"| PA\n        Mixer -.->|\"Policy checks<br/>Telemetry\"| PB\n        Citadel[\"Citadel\"] -.->|\"TLS certs\"| PA\n        Citadel -.->|\"TLS certs\"| PB\n    end\n\n    subgraph New[\"收敛后架构\"]\n        In[\"Ingress traffic\"] --> ProxyA[\"Proxy\"]\n        ProxyA <--> ServiceA[\"Service A\"]\n        ProxyA --> ProxyB[\"Proxy\"]\n        ProxyB <--> ServiceB[\"Service B\"]\n        ProxyB --> Out[\"Egress traffic\"]\n        Istd[\"istiod<br/>Pilot / Citadel / Galley\"]\n        Istd -.->|\"Discovery / Configuration / Certificates\"| ProxyA\n        Istd -.->|\"Discovery / Configuration / Certificates\"| ProxyB\n    end\n```\n\n这张图的重点是演进动机：早期组件拆得很细，策略检查、遥测、证书和配置下发都在不同组件里，真实运维会变重。收敛到 `istiod` 后，数据面仍然是 Envoy，控制面的核心职责变成统一生成发现数据、网络配置和证书材料。\n\n```mermaid\nflowchart TB\n    CRD[\"Istio CRD\"]\n    K8s[\"Kubernetes Objects\"]\n    Istiod[\"istiod\"]\n    Cert[\"Certificates\"]\n    Proxy[\"Envoy Proxies\"]\n    Traffic[\"Service Traffic\"]\n\n    CRD --> Istiod\n    K8s --> Istiod\n    Cert --> Istiod\n    Istiod --> Proxy\n    Proxy --> Traffic\n```\n\n控制面和数据面可以这样区分：\n\n| 平面 | Istio 中的对象 | 主要职责 |\n|---|---|---|\n| 控制平面 | `istiod` Istio CRD Kubernetes Service Endpoint Secret | 监听状态和配置 生成 Envoy 配置 下发证书 |\n| 数据平面 | Envoy Sidecar Ingress Gateway Egress Gateway | 执行真实转发 路由 负载均衡 TLS 遥测 |\n\n`istiod` 本质上也是控制器。它 watch Kubernetes API Server 中的 Service、Pod、Endpoint、Secret 以及 Istio 自己的 CRD，把“平台状态”和“治理配置”合并成 Envoy 可理解的 xDS 配置，再通过 gRPC 长连接推送给每个代理。代理启动时会先拉取一份配置，后续再接收控制面合并后的增量或推送。", "subs": []}, {"title": "Envoy 数据平面如何处理线程 xDS 和过滤器", "content": "Envoy 是 Istio 数据平面的核心。它原本是一个高性能 L4/L7 代理，被 Istio 选中并不是因为它只会反向代理，而是因为它适合云原生动态环境：支持 HTTP/2 和 gRPC，支持丰富过滤器，支持热重启，更重要的是支持通过 API 动态配置。\n\n和传统反向代理相比，Envoy 的关键优势是“控制面友好”。在 Kubernetes 中，Service、Endpoint、Pod、Secret 和路由规则不断变化，如果每次变化都要生成本地配置文件并重启代理，连接会被频繁中断。Envoy 可以通过 xDS API 从管理服务器获取配置并更新内存中的监听器、路由、集群和端点，不必依赖频繁重启。\n\n这也是 Istio 选择 Envoy 作为数据面的重要原因。Nginx 和 HAProxy 都是成熟代理，但常见传统用法更偏“配置文件 + reload”；在 Endpoint 高频变化的云原生场景中，频繁重载会让连接排空、状态迁移和配置一致性变复杂。Envoy 从设计上更适合被控制面驱动，动态 API、热重启和 connection draining 能减少配置变化时的连接中断。\n\n| 对比点 | Nginx / HAProxy 常见传统模式 | Envoy 在服务网格中的价值 |\n|---|---|---|\n| 配置更新 | 以配置文件和 reload 为主 | 通过 xDS API 动态更新内存配置 |\n| 连接处理 | reload 时要额外处理连接排空 | 支持热重启和 connection draining |\n| 协议支持 | 常用于 HTTP/TCP 代理 | 原生适配 HTTP/2 gRPC 和多层 filter |\n| 控制面集成 | 需要额外胶水层生成配置 | 天然面向管理服务器和发现 API |\n| 高频 Endpoint 变化 | 配置生成和 reload 成本较高 | EDS 可单独更新 endpoint 集合 |\n\n| 能力 | Envoy 的价值 |\n|---|---|\n| HTTP/2 和 gRPC | 同时支持下游和上游的现代协议 |\n| 动态配置 | xDS 推送配置 不需要每次重启 |\n| 过滤器 | L4 L7 都能扩展处理逻辑 |\n| 热重启 | 配置或版本变更时尽量保留连接 |\n| 可观测性 | 原生生成指标 访问日志 Trace Header |\n\nEnvoy 采用单进程多线程模型。主线程负责协调、监听配置、管理控制面连接和分发更新；工作线程负责真正的网络连接处理。一个连接一旦被某个 worker 接收，就会绑定到该 worker 的生命周期中，减少跨线程协调和锁竞争。底层事件模型通常基于非阻塞 I/O，例如 epoll，worker 数量一般建议接近所在节点可用硬件线程数。\n\n```mermaid\nflowchart TB\n    Main[\"Main Thread\"]\n    XDS[\"xDS Stream\"]\n    TLS[\"Thread Local Slot\"]\n    WorkerA[\"Worker Thread A\"]\n    WorkerB[\"Worker Thread B\"]\n    Listener[\"Listener\"]\n    Route[\"Route\"]\n    Cluster[\"Cluster\"]\n    Endpoint[\"Endpoint\"]\n\n    XDS --> Main\n    Main --> TLS\n    TLS --> WorkerA\n    TLS --> WorkerB\n    WorkerA --> Listener\n    WorkerB --> Listener\n    Listener --> Route\n    Route --> Cluster\n    Cluster --> Endpoint\n```\n\n理解 Envoy 配置，核心是理解四个层级：\n\n| 层级 | Envoy 概念 | Kubernetes 或 Istio 中的近似来源 |\n|---|---|---|\n| 入口 | Listener | Gateway Sidecar 端口 捕获端口 |\n| 路由 | Route VirtualHost RouteMatch | VirtualService |\n| 目标集合 | Cluster | Service DestinationRule ServiceEntry |\n| 实例 | Endpoint Host | Pod IP WorkloadEntry |\n\n一个请求进入 Envoy 后，大致流程是：先命中 listener，再进入 filter chain，然后由 HTTP Connection Manager 找到 virtual host 和 route，最后选择 cluster 中的 endpoint 发出请求。这个过程也解释了为什么 `istioctl proxy-config` 排障时通常按 Listener、Route、Cluster、Endpoint 的顺序看。\n\n```bash\nistioctl proxy-config listeners productpage-v1-xxx -n bookinfo\nistioctl proxy-config routes productpage-v1-xxx -n bookinfo\nistioctl proxy-config clusters productpage-v1-xxx -n bookinfo\nistioctl proxy-config endpoints productpage-v1-xxx -n bookinfo\n```\n\n用一份最小静态配置也能把这条链路串起来。`admin` 暴露本地管理端口，便于查看 `/config_dump`；`static_resources.listeners` 定义 Envoy 对外监听的端口；HTTP Connection Manager 里的 `route_config.virtual_hosts` 定义域名和路径匹配；`clusters` 定义被路由选中的后端集合。排查时，`static_resources.listeners` 对应 listener，`route_config.virtual_hosts` 和 routes 对应 route，`clusters` 对应 cluster，`load_assignment.endpoints` 对应 endpoint。请求访问 `10000` 端口后，先命中 listener，再按 `prefix` 匹配 route，随后转到 `local_service` cluster，最后由 cluster 中的 endpoint 指向真实后端。\n\n```yaml\nadmin:\n  address:\n    socket_address:\n      address: 127.0.0.1\n      port_value: 9901\nstatic_resources:\n  listeners:\n  - name: listener_0\n    address:\n      socket_address:\n        address: 0.0.0.0\n        port_value: 10000\n    filter_chains:\n    - filters:\n      - name: envoy.filters.network.http_connection_manager\n        typed_config:\n          route_config:\n            virtual_hosts:\n            - name: backend\n              domains: [\"*\"]\n              routes:\n              - match:\n                  prefix: \"/api\"\n                route:\n                  cluster: local_service\n  clusters:\n  - name: local_service\n    type: LOGICAL_DNS\n    load_assignment:\n      cluster_name: local_service\n      endpoints:\n      - lb_endpoints:\n        - endpoint:\n            address:\n              socket_address:\n                address: httpserver.default.svc.cluster.local\n                port_value: 8080\n```\n\n这些命令背后看的仍然是 Envoy 配置。Envoy 自身在本地管理端口提供 `config_dump`，可以一次性导出完整配置，但生产环境里的 dump 往往很大，listener、route、cluster、endpoint 之间又是弱关联，直接肉眼查很容易迷路。`istioctl proxy-config` 相当于按 Envoy 层级帮你过滤和整理 `config_dump`，因此适合定位“VirtualService 写了但 route 没生成”“cluster 存在但 endpoint 为空”“listener 没有挂到预期端口”等问题。\n\nxDS 是一组发现 API 的统称。早期 Envoy v1 API 偏 JSON/REST 和轮询，强类型能力弱，配置传播延迟也大。v2 以后使用 proto3，并通过 gRPC 流式 API 传递，控制面可以更快、更确定地把配置推给代理。\n\n| xDS | 全称 | 作用 |\n|---|---|---|\n| LDS | Listener Discovery Service | 下发监听器和过滤链 |\n| RDS | Route Discovery Service | 下发路由和虚拟主机 |\n| CDS | Cluster Discovery Service | 下发目标服务集合 |\n| EDS | Endpoint Discovery Service | 下发目标实例地址和健康状态 |\n| SDS | Secret Discovery Service | 下发证书和密钥材料 |\n| HDS | Health Discovery Service | 支持分布式健康检查信息 |\n| ADS | Aggregated Discovery Service | 在单条双向 gRPC 流中组织多个发现服务 |\n\nHDS 表达的是主动健康检查结果的分发思路：在多网关或多 Envoy 场景下，如果每个代理都主动探测同一组后端，健康检查流量本身就可能变成压力源，因此可以让部分成员执行检查，再把结果共享给其他代理。它和 DestinationRule 里的 `outlierDetection` 不是同一类机制；主动检查可以访问 `/healthz` 这类专用端点判断实例是否整体健康，被动异常剔除则根据真实业务请求的超时、连接失败或 5xx 计数把 endpoint 暂时移出负载均衡池。\n\n```mermaid\nflowchart LR\n    Istiod[\"istiod\"]\n    ADS[\"ADS Stream\"]\n    LDS[\"LDS\"]\n    RDS[\"RDS\"]\n    CDS[\"CDS\"]\n    EDS[\"EDS\"]\n    SDS[\"SDS\"]\n    Envoy[\"Envoy\"]\n\n    Istiod --> ADS\n    ADS --> LDS\n    ADS --> RDS\n    ADS --> CDS\n    ADS --> EDS\n    ADS --> SDS\n    LDS --> Envoy\n    RDS --> Envoy\n    CDS --> Envoy\n    EDS --> Envoy\n    SDS --> Envoy\n```\n\n配置之间存在依赖关系。通常 cluster 信息要先存在，route 才能引用目标 cluster；listener 要存在，route 才有挂载位置；endpoint 变化又最频繁，需要相对轻量地更新。ADS 的价值就是把多个发现接口放在同一个有序流里，让控制面对配置顺序有更强控制。\n\n`istiod` 处理配置更新时，通常不是每个事件立即全量推送。它会为 Kubernetes Service、Endpoint、Pod、Secret 以及 Istio CRD 注册 handler 和 watch，资源变化先进入全局 push channel。worker 会用一个很短的 debounce 窗口合并一批 push request，常见默认量级约为 100ms，然后再为每条 Envoy ADS 连接写入该连接自己的 push channel。\n\nEnvoy 启动后会先在双向 gRPC 流上发送 DiscoveryRequest，向 `istiod` 拉取一份可用的全量配置；后续资源变化则由 `istiod` 根据代理身份、命名空间、Sidecar 可见范围和相关规则生成 LDS、RDS、CDS、EDS、SDS 等 xDS 更新，再通过对应连接下发。这个流水线解释了三个生产现象：配置不会严格逐事件立即生效；`istiod` 多副本可以按代理连接分摊压力；当 Service 和 Endpoint 数量很大时，配置生成、队列积压和连接级发送都会成为排障重点。\n\n```mermaid\nflowchart TB\n    API[\"API Server\"]\n    Watch[\"Watch Resources\"]\n    Queue[\"Push Queue\"]\n    Debounce[\"Debounce Merge\"]\n    Generate[\"Generate xDS\"]\n    Conn[\"Proxy Connection\"]\n    Send[\"gRPC Send\"]\n    Envoy[\"Envoy\"]\n\n    API --> Watch\n    Watch --> Queue\n    Queue --> Debounce\n    Debounce --> Generate\n    Generate --> Conn\n    Conn --> Send\n    Send --> Envoy\n```\n\nEnvoy 的过滤器模型是另一个重点。它不是把所有逻辑写成一个固定转发函数，而是在不同层级挂载 filter。Listener filter 可以在 TLS 握手早期读取 SNI，Network filter 可以处理 TCP 连接和 HTTP Connection Manager，HTTP filter 可以做鉴权、限流、遥测、路由等处理。\n\n| 过滤器层级 | 示例 | 作用 |\n|---|---|---|\n| Listener Filter | TLS Inspector | 从连接早期信息识别 SNI 和协议 |\n| Network Filter | HTTP Connection Manager | 把连接解析成 HTTP 请求 |\n| HTTP Filter | Auth Rate Limit Router Telemetry | 执行七层逻辑和最终路由 |\n| Router Filter | Router | 把请求交给目标 cluster |\n\n```mermaid\nflowchart LR\n    Listener[\"Listener\"] --> FilterChain[\"FilterChain<br/>FilterChainMatch\"]\n    FilterChain --> ListenerFilter[\"Listener Filter<br/>TLS Inspector\"]\n    ListenerFilter --> NetworkFilter[\"Network Filter<br/>HTTP Conn Manager\"]\n    NetworkFilter --> HTTPFilter[\"HTTP Filter<br/>Mixer / Router\"]\n    HTTPFilter --> VirtualHost[\"VirtualHost<br/>Domain\"]\n    VirtualHost --> Route[\"Route<br/>RouteMatch / Route / Cluster\"]\n    Route --> Cluster[\"ClusterManager<br/>Cluster\"]\n    Cluster --> Endpoint1[\"Endpoint\"]\n    Cluster --> Endpoint2[\"Endpoint\"]\n    Cluster --> Endpoint3[\"Endpoint\"]\n\n    Up1[\"Upstream\"] --> Endpoint1\n    Up2[\"Upstream\"] --> Endpoint2\n    Up3[\"Upstream\"] --> Endpoint3\n```\n\n排查时要顺着这张图看，而不是只盯着一个 VirtualService。listener 没有生成，入口端口就不存在；route 没有挂上，host 或 path 匹配就不会生效；cluster 或 endpoint 不正确，请求即使命中路由也转不到真实 Pod。`istioctl proxy-config` 的 listener、route、cluster、endpoint 顺序，本质上就是沿着这条处理链路做定位。\n\nSNI 是网关 HTTPS 场景中的典型例子。一个 Ingress Gateway 可能只监听一个 443 端口，但服务多个域名，每个域名证书不同。客户端 TLS 握手时会带上要访问的域名，Envoy 通过 TLS Inspector 读出 SNI，再选择对应证书完成握手。\n\nEnvoy 也支持通过 WASM 等方式扩展过滤器，但这类扩展要谨慎。它能让平台在现有配置基础上插入自定义逻辑，也可能引入性能开销和维护复杂度。生产里更常见的做法是优先使用 Istio 和 Envoy 已有能力，只有在标准 CRD 无法表达业务规则时才考虑 EnvoyFilter 或 WASM 插件。", "subs": []}, {"title": "Istio 流量管理对象如何组合请求路由能力", "content": "Istio 流量治理围绕一组 CRD 展开。它们不是彼此替代，而是负责不同层级：Gateway 管入口监听，VirtualService 管路由匹配和转发，DestinationRule 管目标服务策略，ServiceEntry 和 WorkloadEntry 扩展服务注册表，Sidecar 控制代理可见配置范围。\n\n| 对象 | 主要用途 | 对应 Envoy 概念 |\n|---|---|---|\n| Gateway | 为入口或出口网关定义端口 协议 TLS | Listener |\n| VirtualService | 定义 host uri header sourceLabels 等路由规则 | Route VirtualHost |\n| DestinationRule | 定义 subset 负载均衡 TLS 连接池 断路器 | Cluster Policy |\n| ServiceEntry | 把网格外服务加入服务注册表 | Cluster |\n| WorkloadEntry | 把 VM 或外部实例建模成工作负载 | Endpoint |\n| Sidecar | 控制工作负载可见服务和出入站配置 | Proxy Scope |\n\n```mermaid\nflowchart TB\n    Gateway[\"Gateway\"]\n    VS[\"VirtualService\"]\n    DR[\"DestinationRule\"]\n    SE[\"ServiceEntry\"]\n    WE[\"WorkloadEntry\"]\n    Envoy[\"Envoy\"]\n    Backend[\"Workload\"]\n\n    Gateway --> VS\n    VS --> DR\n    SE --> VS\n    WE --> SE\n    DR --> Envoy\n    Envoy --> Backend\n```\n\n一次请求真正执行时，Gateway 只决定入口监听，VirtualService 决定“按 host、URI、header 或来源匹配到哪里”，DestinationRule 决定“目标 subset 怎么连接、怎么负载均衡、是否启用 TLS 和断路器”。灰度发布中常见的“按百分比或 header 把请求导到哪个 subset”，执行时走的就是这条链路。\n\n```mermaid\nsequenceDiagram\n    participant C as Client\n    participant G as Gateway\n    participant VS as VirtualService\n    participant DR as DestinationRule\n    participant E as Envoy\n    participant V1 as Service v1\n    participant V2 as Service v2\n\n    C->>G: HTTP/TCP request\n    G->>VS: host / uri / header match\n    VS->>DR: destination + subset\n    DR->>E: policy: lb / tls / circuit breaker\n    alt subset v1\n        E->>V1: forward\n    else subset v2\n        E->>V2: forward\n    end\n```\n\n这也解释了两个常见排查点：第一，VirtualService 中引用的 subset 必须能在 DestinationRule 中找到；第二，DestinationRule 里的 subset label 必须能选中真实 Pod，否则 Envoy 会生成空 endpoint 或请求落到非预期后端。\n\nVirtualService 是使用最频繁的对象。它描述“什么请求应该转发到哪里”。请求可以按 host、URI、Header、端口、方法、sourceLabels 等条件匹配；目标可以是某个服务，也可以是某个 subset。下面是按权重切分 `reviews` 流量的例子：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: reviews\nspec:\n  hosts:\n  - reviews\n  http:\n  - route:\n    - destination:\n        host: reviews\n        subset: v1\n      weight: 75\n    - destination:\n        host: reviews\n        subset: v2\n      weight: 25\n```\n\n权重之和应为 100。这个规则适合金丝雀发布：先把少量流量导向新版本，观察错误率、延迟、业务指标和用户反馈，再逐步放大。如果新版本异常，可以快速把权重调回旧版本。\n\nDestinationRule 定义“到目标服务以后如何连接”。它常用来把同一个 Service 下的 Pod 按 label 拆成 subset，并为服务或 subset 配置负载均衡、连接池、TLS 和熔断策略。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: reviews\nspec:\n  host: reviews\n  trafficPolicy:\n    loadBalancer:\n      simple: RANDOM\n  subsets:\n  - name: v1\n    labels:\n      version: v1\n  - name: v2\n    labels:\n      version: v2\n    trafficPolicy:\n      loadBalancer:\n        simple: ROUND_ROBIN\n```\n\nVirtualService 和 DestinationRule 的关系要特别注意。VirtualService 中引用的 `subset: v2` 必须在 DestinationRule 中存在，并且 subset label 必须能选中真实 Pod。这里是松耦合关系，字段写错不一定立刻报错，但规则可能不生效。生产中通常要用 Helm 或其他模板固定模式，并用 `istioctl analyze` 和代理配置检查做验证。\n\n这种松耦合不只发生在 subset 上。Istio 规则常由 Gateway、VirtualService、DestinationRule、ServiceEntry、WorkloadEntry 和 Kubernetes Service 一起完成，`hosts`、`gateways`、`destination.host`、`subset`、selector、Pod label 以及请求 Host Header 都依赖字符串或标签关联。字段拼错、命名空间写错、短域名和 FQDN 混用不当，通常不会让 YAML 创建失败，而是导致 Envoy 没有生成预期 route/cluster，或者请求根本匹配不到对应 virtual host。\n\n生产校验不能只停留在 `kubectl apply` 成功。更稳妥的做法是把常见规则固化成 Helm/Kustomize 模板，提交前跑 `istioctl analyze`，上线后按 listener、route、cluster、endpoint 顺序检查代理配置，并配合端到端探测确认真实请求路径。这样才能发现“对象存在但规则静默不生效”的问题。\n\n```bash\nistioctl analyze -n bookinfo\nistioctl proxy-config routes productpage-v1-xxx -n bookinfo\nistioctl proxy-config clusters productpage-v1-xxx -n bookinfo\n```\n\n按 Header 做灰度是另一种常见能力。例如只让带有 `end-user: jason` 的请求进入 v2，其余请求仍走 v1：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: reviews\nspec:\n  hosts:\n  - reviews\n  http:\n  - match:\n    - headers:\n        end-user:\n          exact: jason\n    route:\n    - destination:\n        host: reviews\n        subset: v2\n  - route:\n    - destination:\n        host: reviews\n        subset: v1\n```\n\n这种规则适合内部用户、特定客户、测试账号或 Beta 用户组。业务系统可以在 API Gateway 或认证层为用户打上稳定 Header，Istio 根据 Header 把请求导到不同版本。\n\nURI 匹配和重写常用于入口网关。例如同一个域名下，`/simple/hello` 转到 HTTP 服务并重写为 `/hello`，`/nginx` 转到 Nginx 并重写为 `/`：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: simple\nspec:\n  hosts:\n  - simple.example.com\n  gateways:\n  - simple-gateway\n  http:\n  - match:\n    - uri:\n        prefix: /simple/hello\n    rewrite:\n      uri: /hello\n    route:\n    - destination:\n        host: httpserver\n        port:\n          number: 80\n  - match:\n    - uri:\n        prefix: /nginx\n    rewrite:\n      uri: /\n    route:\n    - destination:\n        host: nginx\n        port:\n          number: 80\n```\n\n规则顺序很重要。Istio 会按 VirtualService 中的顺序匹配 HTTP 路由。越精确的规则应放在前面，兜底规则应放在后面。如果第一条就是 `prefix: /`，后面的具体路径规则就可能永远匹配不到。\n\n这类问题在生产里经常表现为“配置看起来正确，但流量总是走默认后端”。例如先写了一个 `prefix: /` 的兜底规则，再写 `/api/v1/orders` 或带 Header 的精细规则，Envoy 按顺序命中第一条后就不会继续向下匹配。经验原则是 URI 越长、Header 条件越精确、用户或来源范围越窄的规则越靠前，兜底规则始终放到最后；上线前应使用 `istioctl proxy-config routes` 检查 Envoy 最终生成的 route 顺序。\n\n```yaml\nhttp:\n- match:\n  - uri:\n      prefix: /api/v1/orders\n  route:\n  - destination:\n      host: orders-v1\n- match:\n  - uri:\n      prefix: /\n  route:\n  - destination:\n      host: frontend\n```\n\nsourceLabels 可以根据调用方工作负载标签做路由。例如只有来自 `app: reviews` 的请求才导向特定目标。这类规则适合流量泳道、调用方隔离和按来源服务定制后端版本。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: ratings\nspec:\n  hosts:\n  - ratings\n  http:\n  - match:\n    - sourceLabels:\n        app: reviews\n    route:\n    - destination:\n        host: ratings\n        subset: reviews-lane\n  - route:\n    - destination:\n        host: ratings\n        subset: stable\n```\n\n入口流量一般由 Gateway 和 VirtualService 组合。Gateway 只定义端口、协议、TLS 和适用的网关工作负载；VirtualService 绑定这个 Gateway 后，才定义七层路由。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: Gateway\nmetadata:\n  name: bookinfo-gateway\nspec:\n  selector:\n    istio: ingressgateway\n  servers:\n  - port:\n      number: 80\n      name: http\n      protocol: HTTP\n    hosts:\n    - bookinfo.example.com\n```\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: bookinfo\nspec:\n  hosts:\n  - bookinfo.example.com\n  gateways:\n  - bookinfo-gateway\n  http:\n  - match:\n    - uri:\n        prefix: /productpage\n    route:\n    - destination:\n        host: productpage\n        port:\n          number: 9080\n```\n\n从 Envoy 角度看，Gateway 让 ingress gateway Pod 里的 Envoy 起对应 listener，VirtualService 让 listener 下挂 route，DestinationRule 影响 route 选中 cluster 后的连接策略。这样 Istio 用少数对象统一表达了入口流量、东西向流量和出口流量。", "subs": []}, {"title": "超时 重试 故障注入 镜像和断路器如何治理流量", "content": "高级流量管理的目标不是让规则“看起来复杂”，而是在真实故障和发布变化中保护系统。微服务链路越长，越需要把超时、重试、故障注入、流量镜像和断路器这类机制平台化，否则每个业务团队都要重复实现并承担不一致风险。\n\n#### 超时和重试\n\n超时用来给一次请求设置最大等待时间。调用方忘记设置超时时，代理可以在中间层补上保护，避免连接和线程无限等待。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: ratings\nspec:\n  hosts:\n  - ratings\n  http:\n  - route:\n    - destination:\n        host: ratings\n        subset: v1\n    timeout: 10s\n```\n\n重试用于处理临时错误。重试必须有上限，否则会在故障时放大流量。生产策略通常要同时限制 `attempts`、`perTryTimeout` 和可重试错误类型。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: ratings\nspec:\n  hosts:\n  - ratings\n  http:\n  - route:\n    - destination:\n        host: ratings\n        subset: v1\n    retries:\n      attempts: 3\n      perTryTimeout: 2s\n      retryOn: 5xx,connect-failure,refused-stream\n```\n\n超时和重试要配套设计。每次重试的超时不能大于整体调用预算，上游服务也要知道下游服务的最大处理时间。否则一层层重试叠加，会形成重试风暴。\n\n| 配置 | 建议 |\n|---|---|\n| `timeout` | 按业务端到端预算设置 不是越长越好 |\n| `attempts` | 通常少量重试即可 过多会放大故障 |\n| `perTryTimeout` | 应小于整体 timeout |\n| `retryOn` | 只对可恢复错误重试 不要盲目重试所有失败 |\n\n#### 故障注入\n\n故障注入用于模拟异常，而不是等待生产环境自然出错。Istio 可以在代理层注入延迟或错误响应，不需要停 Pod、拔网线或临时写 iptables 规则。它适合做混沌测试、降级链路验证和超时重试策略验证。\n\n延迟注入示例：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: ratings\nspec:\n  hosts:\n  - ratings\n  http:\n  - fault:\n      delay:\n        percentage:\n          value: 10\n        fixedDelay: 5s\n    route:\n    - destination:\n        host: ratings\n        subset: v1\n```\n\n错误注入示例：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: ratings\nspec:\n  hosts:\n  - ratings\n  http:\n  - fault:\n      abort:\n        percentage:\n          value: 10\n        httpStatus: 500\n    route:\n    - destination:\n        host: ratings\n        subset: v1\n```\n\n故障注入最适合验证这些问题：\n\n| 场景 | 要观察 |\n|---|---|\n| 下游延迟变高 | 上游是否及时超时 是否触发降级 |\n| 下游偶发 5xx | 重试次数是否合理 错误率是否可控 |\n| 非关键服务异常 | 主链路是否仍可返回 |\n| 局部实例异常 | 断路器是否把异常 endpoint 剔除 |\n\n#### 流量镜像\n\n流量镜像把真实请求复制一份发给影子版本。主请求仍然走稳定版本，影子请求的响应会被丢弃，不影响用户看到的结果。Envoy 通常会为镜像请求增加 shadow 语义，表示它只是旁路请求。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: httpbin\nspec:\n  hosts:\n  - httpbin\n  http:\n  - route:\n    - destination:\n        host: httpbin\n        subset: v1\n      weight: 100\n    mirror:\n      host: httpbin\n      subset: v2\n    mirrorPercentage:\n      value: 100\n```\n\n流量镜像适合在不切真实流量的情况下观察新版本行为，例如日志、性能、资源消耗和兼容性。要注意影子版本会收到真实请求内容，因此仍要考虑隐私、幂等性和副作用。对写请求做镜像时，影子后端必须隔离写入目标，避免重复扣费、重复下单或污染生产数据。\n\n#### 规则委托\n\n当一个域名下面有大量服务和路径时，把所有规则写进一个 VirtualService 会很难维护。规则委托允许顶层 VirtualService 把某些路径交给其他命名空间或团队维护。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: bookinfo\nspec:\n  hosts:\n  - bookinfo.example.com\n  gateways:\n  - bookinfo-gateway\n  http:\n  - match:\n    - uri:\n        prefix: /productpage\n    delegate:\n      name: productpage\n      namespace: team-product\n  - match:\n    - uri:\n        prefix: /reviews\n    delegate:\n      name: reviews\n      namespace: team-review\n```\n\n被委托的 VirtualService 再定义本团队内部的细分规则：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: productpage\n  namespace: team-product\nspec:\n  http:\n  - match:\n    - uri:\n        prefix: /productpage/v1\n    route:\n    - destination:\n        host: productpage-v1.team-product.svc.cluster.local\n  - route:\n    - destination:\n        host: productpage.team-product.svc.cluster.local\n```\n\n规则委托的价值是权限下放和配置拆分。平台团队维护域名和顶层路径，业务团队维护自己命名空间内的细分规则。控制面最终会把这些规则合并成 Envoy 配置再下发。\n\n#### 断路器和异常实例剔除\n\n断路器通常配置在 DestinationRule 中。它包含两类常见能力：连接池限制和异常实例检测。连接池限制用于保护后端不被过多连接或请求打满；异常实例检测用于被动发现不健康 endpoint，并把它暂时踢出负载均衡池。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: httpbin\nspec:\n  host: httpbin\n  trafficPolicy:\n    connectionPool:\n      tcp:\n        maxConnections: 100\n      http:\n        http1MaxPendingRequests: 100\n        maxRequestsPerConnection: 10\n    outlierDetection:\n      consecutive5xxErrors: 3\n      interval: 5s\n      baseEjectionTime: 30s\n      maxEjectionPercent: 50\n```\n\n| 字段 | 含义 |\n|---|---|\n| `maxConnections` | 到目标服务的最大 TCP 连接数 |\n| `http1MaxPendingRequests` | HTTP 等待队列上限 |\n| `maxRequestsPerConnection` | 单连接最大请求数 |\n| `consecutive5xxErrors` | 连续 5xx 达到阈值后认为异常 |\n| `interval` | 异常检测周期 |\n| `baseEjectionTime` | endpoint 被踢出的基础时长 |\n| `maxEjectionPercent` | 最多剔除后端实例比例 |\n\n断路器要避免两种极端。太保守会让异常实例继续承接请求，太激进会把大量实例踢出导致容量骤降。生产中通常先用观测数据评估后端错误模式，再逐步收紧阈值。\n\n还要区分主动健康检查和被动异常剔除。主动检查会按固定周期访问后端的健康端点，例如 `/healthz`，它判断的是实例是否整体可服务；真实业务 URI 的 5xx 未必表示实例整体不可用，可能只是某个接口或依赖异常。`outlierDetection` 则完全基于真实请求结果，把连续 5xx、超时或连接失败达到阈值的 endpoint 临时剔除。两者可以互补，但不能互相替代：主动检查更适合发现实例级不可用，被动剔除更适合隔离真实流量中表现异常的后端。", "subs": ["超时和重试", "故障注入", "流量镜像", "规则委托", "断路器和异常实例剔除"]}, {"title": "ServiceEntry WorkloadEntry Gateway 和多集群扩展如何使用", "content": "Istio 的服务注册表不只来自 Kubernetes Service。ServiceEntry 可以把网格外服务加入 Istio 的服务发现模型，让网格内服务像访问内部服务一样访问外部服务，并继续套用 VirtualService 和 DestinationRule。\n\n#### ServiceEntry 管理外部服务\n\n最常见场景是允许网格内服务访问外部域名：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: ServiceEntry\nmetadata:\n  name: external-api\nspec:\n  hosts:\n  - api.external.example.com\n  location: MESH_EXTERNAL\n  ports:\n  - number: 443\n    name: https\n    protocol: HTTPS\n  resolution: DNS\n```\n\n如果启用了严格出站控制，ServiceEntry 可以明确声明哪些外部服务可访问。之后还可以为这个 host 配置 VirtualService 做路由，为 DestinationRule 配置 TLS、负载均衡或连接策略。\n\nServiceEntry 也能描述网格内部但不由 Kubernetes 管理的服务，例如传统 VM 上的服务。此时通常把 `location` 设为 `MESH_INTERNAL`，再配合 WorkloadEntry 表示具体实例。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: ServiceEntry\nmetadata:\n  name: details-svc\nspec:\n  hosts:\n  - details.bookinfo.com\n  location: MESH_INTERNAL\n  ports:\n  - number: 80\n    name: http\n    protocol: HTTP\n  resolution: STATIC\n  workloadSelector:\n    labels:\n      app: details-legacy\n```\n\n#### WorkloadEntry 纳入 VM 工作负载\n\nWorkloadEntry 把一个非 Kubernetes 工作负载建模成 Istio endpoint。它可以带地址、标签和 serviceAccount，使 VM 或裸机服务进入网格治理范围。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: WorkloadEntry\nmetadata:\n  name: details-vm-1\nspec:\n  serviceAccount: details-legacy\n  address: 2.2.2.2\n  labels:\n    app: details-legacy\n    instance-id: vm1\n```\n\n这类对象适合迁移阶段。应用还没有完全迁入 Kubernetes，但希望 Kubernetes 内服务可以通过统一服务名访问传统实例，并逐步把流量切到新 Pod。它也适合跨环境服务发现，但要注意网络可达性、证书身份和健康检查。\n\n#### Gateway 管理入口流量\n\nGateway 负责在网格边缘打开监听器。它和 Kubernetes Ingress 的定位相似，但模型更灵活：Gateway 定义端口、协议、TLS 和选择哪个网关工作负载；VirtualService 定义具体七层路由。\n\nHTTP Gateway：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: Gateway\nmetadata:\n  name: simple-gateway\nspec:\n  selector:\n    istio: ingressgateway\n  servers:\n  - port:\n      number: 80\n      name: http\n      protocol: HTTP\n    hosts:\n    - simple.example.com\n```\n\nHTTPS Gateway：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: Gateway\nmetadata:\n  name: secure-gateway\nspec:\n  selector:\n    istio: ingressgateway\n  servers:\n  - port:\n      number: 443\n      name: https\n      protocol: HTTPS\n    hosts:\n    - secure.example.com\n    tls:\n      mode: SIMPLE\n      credentialName: secure-example-credential\n```\n\n证书建议用 Kubernetes Secret 通过 `credentialName` 引用，而不是直接把证书文件路径写进 Gateway。这样证书管理、轮换和权限控制更符合 Kubernetes 的声明式模型。\n\n```bash\nkubectl create secret tls secure-example-credential \\\n  --cert=server.crt \\\n  --key=server.key \\\n  -n istio-system\n```\n\n本地没有配置 DNS 时，可以用 `curl --resolve` 同时验证解析和 HTTPS SNI：\n\n```bash\ncurl --resolve secure.example.com:443:${GATEWAY_IP} \\\n  https://secure.example.com/simple/hello -v\n```\n\n这条命令只在本次 curl 中把 `secure.example.com:443` 解析到 ingress gateway IP，但 URL 里仍保留域名，因此 TLS 握手会携带 `secure.example.com` 作为 SNI。这样既能验证流量是否到达网关，也能验证 Envoy 是否按域名选择到正确证书；直接访问 `https://${GATEWAY_IP}` 则无法覆盖同样的 SNI 场景。\n\nGateway 安全加固至少要关注：\n\n| 加固项 | 建议 |\n|---|---|\n| TLS | 对公网入口启用 HTTPS 并统一证书轮换 |\n| Host 限制 | Gateway 和 VirtualService 都限制明确域名 |\n| 最小暴露 | 只开放业务需要的端口 |\n| mTLS | 服务间通信启用网格身份和加密 |\n| 授权 | 在后续安全策略中按身份 方法 路径限制访问 |\n| 高可用 | Ingress Gateway 多副本部署并受 PDB 保护 |\n\n入口 Gateway 是集中式关键路径，它和普通 Sidecar 的风险不同。Sidecar 通常只影响所在工作负载，而 ingress gateway 承接外部进入网格的北南向流量；如果 ingress gateway Pod 全部异常，集群入口流量会直接中断。因此生产中要做多副本、反亲和、PDB、容量评估、滚动升级和变更验证，发布时不能一次性重启全部入口网关。\n\n还要把 Gateway 的可用性和控制面的可用性分开看。控制平面 `istiod` 短暂重启通常不会让已下发的数据面配置立即失效，但证书轮换、配置下发和新代理连接会受影响；入口 Gateway 全部不可用则会立刻打断外部流量。生产准入时应至少验证网关副本滚动、证书 Secret 轮换、配置变更、横向扩容和故障恢复路径。\n\n把入口网关、服务间 Sidecar 和出口网关串成一次完整请求，可以看清三类流量在网格中的位置：\n\n```mermaid\nflowchart LR\n    Client[\"外部客户端\"]\n    Ingress[\"Ingress Gateway\\n北南向入口\"]\n    SvcA[\"Service A Pod\"]\n    SidecarA[\"Sidecar A\"]\n    SvcB[\"Service B Pod\"]\n    SidecarB[\"Sidecar B\"]\n    Egress[\"Egress Gateway\\n受控出口\"]\n    External[\"外部服务\"]\n    Istiod[\"istiod\\n配置与证书\"]\n\n    Client --> Ingress\n    Ingress --> SidecarA\n    SidecarA --> SvcA\n    SvcA --> SidecarA\n    SidecarA --> SidecarB\n    SidecarB --> SvcB\n    SvcB --> SidecarB\n    SidecarB --> Egress\n    Egress --> External\n    Istiod -.xDS / SDS.-> Ingress\n    Istiod -.xDS / SDS.-> SidecarA\n    Istiod -.xDS / SDS.-> SidecarB\n    Istiod -.xDS / SDS.-> Egress\n```\n\n图中入口段对应 Gateway 和 VirtualService，服务间东西向流量主要由 Sidecar、VirtualService、DestinationRule 和 mTLS 策略执行，出口段可以通过 ServiceEntry、VirtualService 和 Egress Gateway 显式控制。Egress Gateway 默认不是自动启用的出口必经点，出口策略要在安装和流量规则中明确声明。\n\n#### 多集群扩展\n\nIstio 多集群有多种模式，核心差异在于控制面数量、服务网络是否互通、跨集群流量是否经 Gateway。\n\n| 模式 | 适用场景 | 特点 |\n|---|---|---|\n| 多控制面加 Gateway | 集群网络不互通 或跨地域隔离 | 每个集群有控制面 跨集群经东西向网关 |\n| Primary Remote | 多个集群可由一个主控制面管理 | Remote 集群轻量控制面 主要做注入和证书 |\n| 互通网络 | Pod 网络或服务网络可达 | 代理可直接访问远端 endpoint |\n| 网关互联 | 网络不可直达或需边界控制 | 远端服务通过 Gateway 暴露 |\n\n```mermaid\nflowchart LR\n    C1[\"Cluster One\"]\n    C2[\"Cluster Two\"]\n    CP1[\"Control Plane One\"]\n    CP2[\"Control Plane Two\"]\n    GW1[\"East West Gateway One\"]\n    GW2[\"East West Gateway Two\"]\n    S1[\"Service A\"]\n    S2[\"Service B\"]\n\n    CP1 --> C1\n    CP2 --> C2\n    S1 --> GW1\n    GW1 --> GW2\n    GW2 --> S2\n```\n\n当 Pod 网络已经互通时，代理可以直接寻址远端 endpoint，不必再经东西向网关；如果网络隔离或需要边界控制，则通常让跨集群流量经过 Gateway。\n\n```mermaid\nflowchart TB\n    subgraph Direct[\"互通网络模式\"]\n        DA[\"Cluster A\\nSidecar\"]\n        DB[\"Cluster B\\nRemote Endpoint\"]\n        DA -->|Pod IP / endpoint 直达| DB\n    end\n\n    subgraph GatewayMode[\"网关互联模式\"]\n        GA[\"Cluster A\\nSidecar\"]\n        GWA[\"East West Gateway A\"]\n        GWB[\"East West Gateway B\"]\n        GB[\"Cluster B\\nService\"]\n        GA --> GWA\n        GWA -->|跨集群边界| GWB\n        GWB --> GB\n    end\n```\n\n网关互联适合网络隔离、跨地域边界控制和统一入口审计，代价是多一跳并需要给 Gateway 做容量和高可用设计。互通网络省掉网关转发路径，但要求底层网络可达、服务身份和信任域一致，且要明确故障隔离边界。\n\n在 Primary Remote 模式中，主集群控制面可以读取远端集群的 kubeconfig，watch 远端集群中的 Service、Endpoint 和 Istio 配置，把多个集群的服务发现结果合并起来。Remote 集群本地仍需要基本组件处理 Sidecar 注入和证书。\n\n多集群带来的挑战主要有四类：\n\n| 挑战 | 说明 |\n|---|---|\n| 网络连通性 | Pod 网段是否互通 跨集群是否走网关 |\n| 身份一致性 | 服务身份和证书信任域如何统一 |\n| 配置规模 | 多集群 Service Endpoint 汇总后配置更大 |\n| 故障边界 | 一个集群故障时是否影响其他集群路由 |\n\n因此，多集群不是简单地“把更多集群接进来”。它需要配合 locality、服务可见性、export 策略、网关容量、证书信任域和故障切换策略一起设计。大规模环境尤其要关注 Sidecar 配置膨胀，可用 `exportTo` 或 Sidecar 资源限制可见服务范围，避免每个代理都加载全网格所有服务。", "subs": ["ServiceEntry 管理外部服务", "WorkloadEntry 纳入 VM 工作负载", "Gateway 管理入口流量", "多集群扩展"]}, {"title": "跟踪采样和应用埋点如何补全可观测性", "content": "服务网格让指标、日志和链路追踪更容易统一，但它不能完全替代应用埋点。代理能看到网络请求，却不一定知道业务语义；代理能创建或转发 span，却需要应用把追踪上下文继续传给下游服务，完整调用链才能串起来。\n\nIstio 的遥测能力覆盖基础 HTTP、HTTP/2、gRPC 和 TCP 指标。Telemetry V2 以后，大量指标由 Envoy 直接生成并暴露给 Prometheus，减少了早期 Mixer 适配路径带来的性能和稳定性问题。\n\n| 指标 | 含义 |\n|---|---|\n| `istio_requests_total` | 请求总数 |\n| `istio_request_duration_milliseconds` | 请求处理时延 |\n| `istio_request_bytes` | 请求大小 |\n| `istio_response_bytes` | 响应大小 |\n| `istio_tcp_sent_bytes_total` | TCP 发送字节数 |\n| `istio_tcp_received_bytes_total` | TCP 接收字节数 |\n| `istio_tcp_connections_opened_total` | TCP 打开连接数 |\n| `istio_tcp_connections_closed_total` | TCP 关闭连接数 |\n\n指标适合回答“整体是否异常”：错误率是否升高、延迟是否升高、某个服务 QPS 是否异常、TCP 连接是否暴涨。链路追踪适合回答“单个请求慢在哪里”：请求经过哪些服务，每一段耗时多少，哪个下游服务拖慢了整条链路。\n\n```mermaid\nsequenceDiagram\n    participant Client\n    participant Gateway\n    participant ServiceA\n    participant ServiceB\n    participant ServiceC\n    participant Jaeger\n\n    Client->>Gateway: request\n    Gateway->>ServiceA: trace context\n    ServiceA->>ServiceB: trace context\n    ServiceB->>ServiceC: trace context\n    Gateway-->>Jaeger: span\n    ServiceA-->>Jaeger: span\n    ServiceB-->>Jaeger: span\n    ServiceC-->>Jaeger: span\n```\n\nTrace 的两个核心概念是：\n\n| 概念 | 含义 |\n|---|---|\n| Trace ID | 一次完整业务请求的全局标识 |\n| Span ID | 请求在某个服务或某段调用中的局部标识 |\n\nIstio 可以和 Jaeger、Zipkin 等系统集成。示例配置中可以指定 Zipkin 或 Jaeger collector 地址：\n\n```bash\nistioctl upgrade \\\n  --set values.global.tracer.zipkin.address=jaeger-collector:9411\n```\n\n采样率决定多少请求会被记录为 trace。小流量验证时可以临时设成 100%，这样每个请求都能在 Jaeger 中看到，便于确认链路是否完整；生产环境通常不会设置为 100%，因为 trace 采集会增加代理和后端存储压力。默认较低采样率更常见，关键业务可以根据排障需要临时提高。\n\n| 采样策略 | 适用场景 | 风险 |\n|---|---|---|\n| 低采样率 | 常态生产运行 | 少量请求可能没有 trace |\n| 临时高采样 | 故障排查 灰度验证 | 存储和代理开销增加 |\n| 全量采样 | 小流量演示或短时压测 | 不适合大流量长期运行 |\n\n应用必须转发追踪 Header。Istio 能在代理层生成并发送 span，但如果服务 A 调服务 B 时没有把上下文 Header 传下去，Jaeger 里就可能出现多条断开的 trace，而不是一条完整链路。\n\n常见需要传播的 Header 包括：\n\n| Header | 作用 |\n|---|---|\n| `x-request-id` | 请求标识 |\n| `x-b3-traceid` | B3 Trace ID |\n| `x-b3-spanid` | B3 Span ID |\n| `x-b3-parentspanid` | 父 Span ID |\n| `x-b3-sampled` | 采样标识 |\n| `x-b3-flags` | 调试标识 |\n| `x-ot-span-context` | OpenTracing 上下文 |\n\nGo 服务中可以用类似方式把上游 Header 传给下游请求：\n\n```go\nfunc copyTracingHeaders(in http.Header, out http.Header) {\n    keys := []string{\n        \"x-request-id\",\n        \"x-b3-traceid\",\n        \"x-b3-spanid\",\n        \"x-b3-parentspanid\",\n        \"x-b3-sampled\",\n        \"x-b3-flags\",\n        \"x-ot-span-context\",\n    }\n\n    for _, key := range keys {\n        if value := in.Get(key); value != \"\" {\n            out.Set(key, value)\n        }\n    }\n}\n\nfunc callNext(r *http.Request, url string) (*http.Response, error) {\n    req, err := http.NewRequest(\"GET\", url, nil)\n    if err != nil {\n        return nil, err\n    }\n    copyTracingHeaders(r.Header, req.Header)\n    return http.DefaultClient.Do(req)\n}\n```\n\n在某些语言或框架中，Header key 的大小写处理会变化。Go 的 `http.Header` 读取和写入时可能把 key 规范化成 `X-B3-Traceid` 这类 CamelCase 形式；如果下游代理、网关或追踪组件要求 B3 headers 使用小写名称，应用在透传时就要按要求保留或转换成 `x-b3-traceid`、`x-b3-spanid` 等小写形式。否则值虽然存在，链路上下文也可能因为 Header 名不符合预期而断开。\n\n可观测性还要和流量治理结合使用。灰度发布时看 v1 和 v2 的请求量、错误率、P99 延迟和业务指标；故障注入时看重试次数、超时比例和上游错误是否被放大；断路器生效时看 endpoint 剔除、连接池饱和和调用方失败率。只有把规则、指标和 Trace 放在一起看，才能判断 Istio 规则是否真的保护了业务。\n\nService Mesh 也会带来额外网络路径。传统 Sidecar 模式下，请求在 Pod 内需要经过 socket、TCP/IP、iptables、Envoy，再进入网络；目标端也要经过类似路径。流量会被反复捕获到 Sidecar，所有这些劫持都发生在 Pod 内部，所以要做 tracing、安全保证和复杂流量管理，就必须理解这条网络栈。\n\n```mermaid\nflowchart LR\n    subgraph PodA[\"Kubernetes Pod A\"]\n        ServiceA[\"Service\"]\n        SocketA[\"Socket\"]\n        TCPA[\"TCP/IP\"]\n        IPTA[\"iptables\"]\n        EthA[\"Ethernet / Loopback\"]\n        ProxyA[\"Sidecar Proxy\"]\n        ServiceA --> SocketA --> TCPA --> IPTA --> ProxyA --> EthA\n    end\n\n    Net[\"Network\"]\n\n    subgraph PodB[\"Kubernetes Pod B\"]\n        EthB[\"Ethernet / Loopback\"]\n        ProxyB[\"Sidecar Proxy\"]\n        IPTB[\"iptables\"]\n        TCPB[\"TCP/IP\"]\n        SocketB[\"Socket\"]\n        ServiceB[\"Service\"]\n        EthB --> ProxyB --> IPTB --> TCPB --> SocketB --> ServiceB\n    end\n\n    EthA --> Net --> EthB\n```\n\nCilium 等基于 eBPF 的数据平面尝试减少这类开销，例如在更早的内核 hook 点处理数据包，或用 socket 级优化减少不必要的数据拷贝。它的目标不是取消服务治理，而是在保留策略表达的同时减少不必要的内核栈绕行。\n\n```mermaid\nflowchart LR\n    subgraph PodA[\"Kubernetes Pod A\"]\n        ServiceA[\"Service\"]\n        SocketA[\"Socket\"]\n        CiliumA[\"Cilium / eBPF\"]\n        EthA[\"Ethernet\"]\n        ServiceA --> SocketA --> CiliumA --> EthA\n    end\n\n    Net[\"Network\"]\n\n    subgraph PodB[\"Kubernetes Pod B\"]\n        EthB[\"Ethernet\"]\n        CiliumB[\"Cilium / eBPF\"]\n        SocketB[\"Socket\"]\n        ServiceB[\"Service\"]\n        EthB --> CiliumB --> SocketB --> ServiceB\n    end\n\n    EthA --> Net --> EthB\n```\n\n不过，性能优化不能替代治理设计。Sidecar 带来的开销要通过压测、真实流量和容量模型评估；采样率、代理资源、网关副本、Sidecar 可见范围和规则数量都要纳入生产设计。Istio 的价值是提供一套统一的治理模型，但越灵活的系统越需要模板、校验、观测和渐进式发布来控制复杂度。", "subs": []}]}, {"title": "第 10 章 · Kubernetes 集群联邦和 Istio 多集群管理", "sections": [{"title": "多集群治理为什么成为分布式云的关键能力", "content": "多集群治理的背景不是“集群数量变多”这么简单，而是业务运行位置发生了变化：应用可能同时运行在自建数据中心、公有云、边缘云、测试环境、生产环境和不同安全区中。Kubernetes 统一了单个资源池内的抽象，多集群治理则进一步回答：这些资源池如何统一接入、统一分发应用、统一发现服务、统一处理流量和故障。\n\n分布式云可以理解为多云、混合云和边缘云的进一步扩展。它强调云能力不只存在于某一个公有云地域，而是分布在企业自有机房、公有云资源池、边缘节点和存量硬件中，并通过统一平台服务同一组业务目标。\n\n```mermaid\nflowchart TB\n    Cloud[\"分布式云\"]\n    Public[\"公有云\"]\n    Private[\"私有云\"]\n    Edge[\"边缘云\"]\n    Legacy[\"存量资源\"]\n    Platform[\"统一管控平台\"]\n    Apps[\"业务应用\"]\n\n    Public --> Platform\n    Private --> Platform\n    Edge --> Platform\n    Legacy --> Platform\n    Platform --> Apps\n    Cloud --> Public\n    Cloud --> Private\n    Cloud --> Edge\n    Cloud --> Legacy\n```\n\n多集群治理常见驱动力如下：\n\n| 驱动力 | 典型场景 | 对平台的要求 |\n|---|---|---|\n| 成本优化 | 平时保留基础容量，突发流量弹到公有云 | 能按需分发应用并回收资源 |\n| 弹性和灵活性 | 节点利用率低时压缩本地容量，峰值时扩展到其他资源池 | 能把工作负载放到不同集群 |\n| 避免厂商锁定 | 同一个企业同时使用多个云厂商 | 应用模型不能强绑定单一厂商 API |\n| 获取云上新能力 | 某些云厂商先提供新特性 | 平台要允许局部接入新能力 |\n| 容灾和多活 | 两地三中心或多数据中心部署 | 应用和流量要能跨故障域切换 |\n| 数据保护 | 敏感数据留在私有云，非敏感计算放到公有云 | 需要按业务和数据等级选择运行位置 |\n| 响应速度 | 深圳机房服务北京用户延迟较高 | 服务应尽量部署到离用户更近的地域 |\n| 存量利旧 | 淘汰机器仍可跑 CI 或低优先级任务 | 需要把异构资源纳入统一调度视角 |\n\n同样的入口治理思路也适用于平台依赖。例如容器镜像仓库在多个 region 各部署一份时，可以在 registry 入口上叠加 Smart DNS；不同地域的节点或 `kubelet` 拉取同一个镜像域名时，解析到本地镜像仓库的 LB VIP，从而减少跨地域拉取延迟和出网成本。镜像仓库入口本质上也是一个 federated 应用入口，只是消费方从业务客户端变成了集群节点。\n\n这里要区分三个概念：\n\n| 概念 | 含义 | 重点 |\n|---|---|---|\n| 多集群 | 同一个或多个基础设施上存在多个 Kubernetes 集群 | 集群之间如何管理和协同 |\n| 多云 | 业务同时使用多个云厂商 | 避免厂商锁定和利用不同云能力 |\n| 分布式云 | 公有云、私有云、边缘和存量资源被统一纳管 | 云能力无处不在且服务同一业务目标 |\n\n单集群也可以做一部分跨地域高可用。例如把北京、上海、深圳的节点加入同一个 Kubernetes 集群，再给节点打上 `topology.kubernetes.io/region` 和 `topology.kubernetes.io/zone` 标签。调度时通过亲和性把 Pod 分散到不同地域，服务访问时通过拓扑感知优先访问本地实例。\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: api-with-affinity\nspec:\n  affinity:\n    podAffinity:\n      requiredDuringSchedulingIgnoredDuringExecution:\n      - labelSelector:\n          matchLabels:\n            app: api\n        topologyKey: topology.kubernetes.io/zone\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: api\nspec:\n  selector:\n    app: api\n  ports:\n  - port: 80\n    targetPort: 8080\n  topologyKeys:\n  - topology.kubernetes.io/zone\n  - topology.kubernetes.io/region\n```\n\n这种方式的前提是所有节点网络互通，因为单集群 CNI 通常要求节点之间能够直接连通，容器网络才能正常工作。它适合规模不大、网络延迟可接受、地域之间互联质量较好的场景。\n\n当规模继续扩大时，单集群方案会遇到边界：\n\n1. etcd 存储对象数量和对象大小有限，数据越多，存储和内存压力越大。\n2. API Server、Controller、Informer、Lister 都会缓存对象，集群越大，控制面内存和重启恢复时间越长。\n3. 控制器处理队列会随着对象数量膨胀，某些控制器重启后可能长时间追不上状态。\n4. NodePort、进程数、端口范围、路由规模等底层资源会限制服务数量。\n5. 单个控制面故障会扩大影响范围，即使正在运行的 Pod 不一定立刻停止，调度、扩缩容和故障转移也会受影响。\n6. 不同环境和安全区往往天然隔离，不能简单用一个集群横跨所有区域。\n\n这些边界有很具体的工程表现。大规模 Kubernetes 集群通常会把单集群控制在约 5000 个节点、150000 个 Pod、300000 个容器这一量级内；超过这个范围后，继续把节点塞进同一个控制面，收益往往小于风险。etcd 数据量也不只是磁盘容量问题，实践中通常按 8Gi 级别控制，因为对象越多，etcd 内存中的 KV index、API Server 的 watch cache、各控制器的 informer 和 lister 本地缓存都会同步放大。某个控制器如果因为 OOM 重启，需要重新 list 对象、重建缓存并处理积压队列，可能几十分钟追不上状态，严重时会反复 OOM，表现为扩缩容、滚动发布或故障恢复长期不可用。\n\nNodePort 也有硬边界。默认范围是 `30000-32767`，Service 数量很大时有些平台会扩展这个范围，但如果扩到类似 `30000-50000`，就可能和节点的 source port range 重叠，带来连接复用、端口冲突和排障困难等网络问题。判断是否要拆集群时，不能只看节点数，还要同时看 etcd 数据量、API Server cache、控制器队列恢复时间、Service/NodePort 数量和网络端口规划。\n\n控制面节点数量也不是按 worker 节点比例线性计算。Master 节点通常在 1、3、5 之间做取舍：单节点只适合实验或低风险环境；中小生产集群通常使用 3 个控制面节点；非常大的生产集群可以使用 5 个控制面节点来提升容错能力。5 个节点比 3 个节点能承受更多节点故障，但 etcd 写入需要更多成员达成多数派，写路径和网络同步成本也更高。因此 Master 数量的核心依据是 etcd quorum、API Server 并发压力、数据安全和运维容错，而不是 worker 数量翻倍就把 Master 数量也翻倍。\n\n生产环境还应隔离控制面和数据面。控制面节点通常打上 `node-role.kubernetes.io/control-plane` 相关 taint，只运行 API Server、Controller Manager、Scheduler、etcd 和平台关键组件，业务 Pod 运行在 worker 节点。这样可以避免业务负载抢占控制面 CPU、内存和磁盘，也能减少控制面异常时对业务数据面资源的连带影响。\n\n还要注意，应用高可用不等于数据层高可用。把 Deployment、Service 和入口网关分发到多个集群，只解决计算层和流量入口的可用性；数据库、缓存和消息系统仍要单独设计。跨地域 MySQL 可以选择单点主库、异步或半同步复制、双向复制，或者基于 Paxos、Galera 等协议的多地写入，但没有一种方案能同时做到不牺牲性能、不牺牲数据安全、不牺牲一致性。跨地域数据层必然受 CAP 约束，需要明确可用性、延迟、冲突处理和数据丢失窗口，不能只完成计算和入口多活就宣称业务已经多活。\n\n因此多集群治理的本质是控制故障域并降低复杂度。平台不应该要求用户分别拿到几十个 kubeconfig，再一个集群一个集群地部署对象；更合理的方式是提供一个统一入口，让用户声明应用、资源和流量意图，再由控制面决定分发到哪些集群、如何覆盖差异、如何汇总状态。\n\n```mermaid\nflowchart TB\n    User[\"用户\"]\n    Entry[\"统一入口\"]\n    Policy[\"策略\"]\n    ClusterA[\"集群 A\"]\n    ClusterB[\"集群 B\"]\n    ClusterC[\"集群 C\"]\n    Status[\"状态汇聚\"]\n\n    User --> Entry\n    Entry --> Policy\n    Policy --> ClusterA\n    Policy --> ClusterB\n    Policy --> ClusterC\n    ClusterA --> Status\n    ClusterB --> Status\n    ClusterC --> Status\n    Status --> Entry\n```\n\n从架构取舍看，多集群不是为了追求更复杂，而是把不可避免的复杂性收敛到平台层。应用高可用、资源弹性、跨地域访问、跨安全区发布、智能 DNS 和服务网格治理都需要这个平台层来承接。", "subs": []}, {"title": "集群联邦模型和控制面架构如何设计", "content": "集群联邦的核心定义是：把多个 Kubernetes 集群注册到一个统一控制平面，为用户提供统一 API 入口，并由联邦控制器把联邦层的声明同步到成员集群。它本身不提供算力，真正运行 Pod 的仍然是成员集群。\n\n集群联邦通常承担四类职责：\n\n| 职责 | 说明 |\n|---|---|\n| 集群管理 | 注册成员集群，保存 API Endpoint、认证信息、健康状态和地域信息 |\n| 应用分发 | 把 Namespace、Deployment、Service、ConfigMap、CRD 等对象分发到目标集群 |\n| 服务发现 | 汇总各集群入口地址，配合 DNS 或网关生成全局访问入口 |\n| 高可用和迁移 | 根据策略调整副本分布，在故障或迁移时隐藏具体集群差异 |\n\n典型联邦控制面包含 Federation API Server、联邦 etcd、Federation Controller Manager，以及若干成员集群。用户请求先进入联邦 API Server，联邦控制器再根据对象声明访问成员集群 API Server，并创建或更新本地 Kubernetes 对象。\n\n```mermaid\nflowchart TB\n    Kubectl[\"kubectl\"]\n    FedApi[\"Federation API Server\"]\n    FedEtcd[\"Federation etcd\"]\n    FedCtrl[\"Federation Controller Manager\"]\n    ClusterA[\"成员集群 A\"]\n    ClusterB[\"成员集群 B\"]\n    ClusterC[\"成员集群 C\"]\n    ApiA[\"API Server A\"]\n    ApiB[\"API Server B\"]\n    ApiC[\"API Server C\"]\n    WorkloadA[\"工作负载 A\"]\n    WorkloadB[\"工作负载 B\"]\n    WorkloadC[\"工作负载 C\"]\n\n    Kubectl --> FedApi\n    FedApi --> FedEtcd\n    FedCtrl --> FedApi\n    FedCtrl --> ApiA\n    FedCtrl --> ApiB\n    FedCtrl --> ApiC\n    ClusterA --> ApiA\n    ClusterB --> ApiB\n    ClusterC --> ApiC\n    ApiA --> WorkloadA\n    ApiB --> WorkloadB\n    ApiC --> WorkloadC\n```\n\n联邦控制面本身也要高可用。一种做法是把联邦 etcd 的实例放到多个地域中，使某个地域故障时仍能保留联邦层入口。但这里要注意：联邦层主要管理对象声明，控制面跨地域延迟通常不等于业务请求延迟。真正敏感的是数据面访问路径，业务流量仍要通过本地优先、故障转移和流量治理来处理。\n\n基于联邦的应用高可用访问链路通常是：全局 DNS 或 Smart DNS 选择一个健康集群入口，流量到达该集群自己的 LoadBalancer VIP、F5 或自研 IPVS LB，再进入 Ingress 或 API Gateway，最后由 Service 转发到 Pod。每个成员集群都有独立入口地址，全局 DNS 把这些入口组合成一个服务名；某个私有云或数据中心不可用时，可以把解析结果或上层权重切到另一个私有云、公有云或边缘集群。\n\n```mermaid\nflowchart LR\n    Client[\"客户端\"]\n    DNS[\"全局 DNS / Smart DNS\"]\n    LBA[\"集群 A LB VIP\"]\n    LBB[\"集群 B LB VIP\"]\n    GatewayA[\"Ingress / API Gateway A\"]\n    GatewayB[\"Ingress / API Gateway B\"]\n    ServiceA[\"Service A\"]\n    ServiceB[\"Service B\"]\n    PodA[\"Pod A\"]\n    PodB[\"Pod B\"]\n\n    Client --> DNS\n    DNS --> LBA\n    DNS --> LBB\n    LBA --> GatewayA\n    LBB --> GatewayB\n    GatewayA --> ServiceA\n    GatewayB --> ServiceB\n    ServiceA --> PodA\n    ServiceB --> PodB\n```\n\nKubeFed 中有两个重要角色：\n\n| 角色 | 含义 |\n|---|---|\n| Host Cluster | 运行 KubeFed API 和控制器的集群，也就是联邦控制面所在集群 |\n| Member Cluster | 被联邦控制面纳管的成员集群，提供 API Endpoint 和访问凭证 |\n\nHost Cluster 也可以同时作为 Member Cluster 加入联邦。加入集群时，`kubefedctl join` 会在 Host Cluster 中创建 `KubeFedCluster` 对象，保存成员集群的访问地址、CA Bundle、Secret 引用和状态。\n\n```yaml\napiVersion: core.kubefed.io/v1beta1\nkind: KubeFedCluster\nmetadata:\n  name: cluster-shanghai\nspec:\n  apiEndpoint: https://api.cluster-shanghai.example.com\n  caBundle: LSOtLS0tLS1...\n  secretRef:\n    name: cluster-shanghai-token\nstatus:\n  conditions:\n  - type: Ready\n    status: \"True\"\n    reason: ClusterReady\n  region: cn-east\n  zones:\n  - shanghai-a\n```\n\n`KubeFedCluster` 是联邦控制器访问成员集群的基础。如果 Endpoint 写错、Token 无效、CA 不匹配或网络不通，成员集群会进入 NotReady 状态，联邦对象自然无法被正确分发。\n\n在 Kind 或 Docker 本地环境中，`kubefedctl join` 生成的 `spec.apiEndpoint` 可能来自宿主机 kubeconfig，例如 `https://127.0.0.1:65150`。这个地址对宿主机可用，但 KubeFed 控制器运行在集群 Pod 内，访问 Pod 自己的 loopback 无法打到宿主机转发端口，成员集群会保持 NotReady。应改成控制器网络可达的 API Server 地址，例如 Kind control-plane 容器 IP、集群网络内 Service 地址或可从 Pod 访问的宿主机地址；连通性、CA 和 token 都正确后，status condition 才会出现 `reason: ClusterReady`。\n\nKubeFed 的 API 被拆成多个 API Group：\n\n| API Group | 作用 |\n|---|---|\n| `core.kubefed.k8s.io` | 集群配置、联邦资源配置、控制器配置 |\n| `types.kubefed.k8s.io` | 被联邦化后的 Kubernetes 资源 |\n| `scheduling.kubefed.k8s.io` | 副本调度和分配策略 |\n| `multiclusterdns.kubefed.k8s.io` | 跨集群 DNS 相关配置 |\n\nKubeFed v1 和 v2 的主要差异在对象模型。早期方式更像是在联邦层创建普通对象，再用标签决定下发到哪些集群；问题是 Kubernetes API 变化很快，上层对象需要不断跟随下层 API 演进，而且不同集群的局部差异不容易表达。v2 以后改用 CRD，把每一种被联邦化的资源包装成 Federated 对象，并把通用模板、目标集群和本地化覆盖拆开表达。\n\n`FederatedTypeConfig` 用来定义“哪个原生资源可以被联邦化，以及它对应哪个 Federated 资源”。例如让 ConfigMap 支持联邦分发，需要声明原生 `ConfigMap` 与 `FederatedConfigMap` 的映射关系。\n\n```yaml\napiVersion: core.kubefed.io/v1beta1\nkind: FederatedTypeConfig\nmetadata:\n  name: configmaps\nspec:\n  federatedType:\n    group: types.kubefed.io\n    kind: FederatedConfigMap\n    pluralName: federatedconfigmaps\n    scope: Namespaced\n    version: v1beta1\n  propagation: Enabled\n  targetType:\n    kind: ConfigMap\n    pluralName: configmaps\n    scope: Namespaced\n    version: v1\n```\n\n这套模型的好处是通用：Deployment、Namespace、Secret、ConfigMap、Service，甚至自定义 CRD，都可以通过类似方式变成 Federated 类型。控制器只需要根据 TypeConfig 理解目标类型、联邦类型和是否启用分发。\n\n`kubefedctl` 是把标准 Kubernetes 对象纳入这套模型的关键工具。`kubefedctl enable <resource>` 用来为某类资源启用 Federated CRD 和 `FederatedTypeConfig`，例如启用 Deployment、ConfigMap、Secret 或 Namespace；`kubefedctl federate` 用来把已经存在的原生对象转换成联邦对象。转换后，原始对象的主体进入 `spec.template`，目标集群选择进入 `spec.placement`，不同集群差异再通过 `spec.overrides` 表达。\n\n```bash\nkubefedctl enable deployments\nkubefedctl enable configmaps\nkubefedctl enable namespaces\n\nkubefedctl federate namespace demo\nkubefedctl federate deployment nginx -n demo\nkubefedctl federate configmap app-config -n demo\n```\n\n这意味着 KubeFed 并不是直接把一个普通 Deployment 写到所有成员集群，而是先通过 CRD 生成 `FederatedDeployment` 这一类联邦资源，再由同步控制器把模板渲染成各成员集群中的原生 Deployment。Namespace、Secret、ConfigMap 甚至平台自定义 CRD 也遵循同样的联邦化流程。\n\n从平台实现角度看，联邦控制面至少要有这些能力：\n\n1. 管理成员集群清单和凭证。\n2. 把原生资源映射成联邦资源。\n3. 根据 Placement 选择目标集群。\n4. 根据 Override 生成每个集群的最终对象。\n5. 把对象分发到成员集群。\n6. 汇总分发结果和成员集群状态。\n7. 对调度、DNS、流量入口等高阶能力提供可插拔控制器。\n\n```mermaid\nflowchart LR\n    TypeConfig[\"类型配置\"]\n    FedObject[\"联邦对象\"]\n    Placement[\"目标集群\"]\n    Override[\"本地覆盖\"]\n    Propagation[\"对象分发\"]\n    Status[\"状态汇聚\"]\n    ClusterA[\"集群 A\"]\n    ClusterB[\"集群 B\"]\n\n    TypeConfig --> FedObject\n    FedObject --> Placement\n    FedObject --> Override\n    Placement --> Propagation\n    Override --> Propagation\n    Propagation --> ClusterA\n    Propagation --> ClusterB\n    ClusterA --> Status\n    ClusterB --> Status\n```\n\n需要特别注意，联邦不是把所有集群变成一个巨型集群。成员集群仍然可以独立使用，也仍然有自己的 API Server、etcd、控制器和网络边界。联邦层的价值是统一声明和统一编排，而不是消除成员集群的独立性。", "subs": []}, {"title": "联邦对象 调度和 DNS 如何跨集群生效", "content": "KubeFed 联邦对象通常由三段组成：`template`、`placement`、`overrides`。这三个字段对应多集群分发最基本的三个问题：分发什么，发到哪里，每个地方有什么差异。\n\n| 字段 | 解决的问题 | 示例 |\n|---|---|---|\n| Template | 要下发的原生 Kubernetes 对象长什么样 | Deployment 模板 副本数 镜像 标签 |\n| Placement | 要下发到哪些成员集群 | cluster1 cluster2 或按 label 选择 |\n| Override | 目标集群中的局部差异 | 某集群副本数不同 某集群镜像版本不同 |\n\n```mermaid\nflowchart LR\n    FedDeploy[\"FederatedDeployment\"]\n    Template[\"Template\"]\n    Placement[\"Placement\"]\n    Override[\"Override\"]\n    ClusterA[\"集群 A 对象\"]\n    ClusterB[\"集群 B 对象\"]\n\n    FedDeploy --> Template\n    FedDeploy --> Placement\n    FedDeploy --> Override\n    Template --> ClusterA\n    Template --> ClusterB\n    Placement --> ClusterA\n    Placement --> ClusterB\n    Override --> ClusterB\n```\n\n一个典型的 `FederatedDeployment` 可以这样表达：\n\n在创建 namespaced 联邦对象前，要先把对应 Namespace 联邦化并下发到成员集群。例如下面示例使用 `metadata.namespace: demo`，那么 `demo` 这个 Namespace 本身也应先通过 `kubefedctl federate namespace demo` 或 `FederatedNamespace` 分发到目标集群。否则同步控制器在成员集群中创建 Deployment 时，可能遇到 namespace not federated 或 namespace 不存在，导致 `FederatedDeployment` 下发失败。多集群分发同样存在依赖顺序，Namespace 往往是第一批要处理的基础对象。\n\n```yaml\napiVersion: types.kubefed.io/v1beta1\nkind: FederatedDeployment\nmetadata:\n  name: nginx\n  namespace: demo\nspec:\n  template:\n    metadata:\n      labels:\n        app: nginx\n    spec:\n      replicas: 3\n      selector:\n        matchLabels:\n          app: nginx\n      template:\n        metadata:\n          labels:\n            app: nginx\n        spec:\n          containers:\n          - name: nginx\n            image: nginx:1.25\n  placement:\n    clusters:\n    - name: cluster-a\n    - name: cluster-b\n  overrides:\n  - clusterName: cluster-b\n    clusterOverrides:\n    - path: /spec/replicas\n      value: 1\n```\n\n这段配置表示：联邦层维护一个通用 Deployment 模板，默认副本数为 3；对象会下发到 `cluster-a` 和 `cluster-b`；但在 `cluster-b` 中，副本数被覆盖为 1。\n\nPlacement 可以直接列出集群，也可以用 `clusterSelector` 按标签选择集群：\n\n```yaml\nplacement:\n  clusterSelector:\n    matchLabels:\n      region: cn-east\n      environment: prod\n```\n\n如果同时声明具体集群列表和 selector，一般以明确集群列表为准。设计上要避免语义模糊，因为多集群分发一旦选错目标，就可能把应用发布到错误环境。\n\nOverride 的能力很强，也很危险。它通常基于路径修改模板字段，例如改副本数、镜像版本或某些开关。数组字段不适合开放式覆盖，因为数组元素依赖下标；模板中数组顺序一变，覆盖路径就可能指向错误元素。生产平台通常会把 Override 做成白名单，只允许覆盖少数经过验证的字段，避免用户通过 Patch 删除关键 spec 或制造全局故障。\n\n联邦调度主要解决全局副本数如何分配到多个集群。KubeFed 的 `ReplicaSchedulingPreference` 可以指定总副本数、默认权重，以及每个集群的最小和最大副本数。调度控制器会把计算结果写回联邦对象的 overrides，再由同步控制器下发到成员集群。\n\n```yaml\napiVersion: scheduling.kubefed.io/v1alpha1\nkind: ReplicaSchedulingPreference\nmetadata:\n  name: nginx\n  namespace: demo\nspec:\n  targetKind: FederatedDeployment\n  totalReplicas: 15\n  clusters:\n    \"*\":\n      weight: 2\n      maxReplicas: 12\n    cluster-a:\n      minReplicas: 1\n      maxReplicas: 3\n      weight: 1\n```\n\n```mermaid\nflowchart LR\n    RSP[\"副本调度策略\"]\n    Scheduler[\"调度控制器\"]\n    FedDeploy[\"联邦 Deployment\"]\n    Override[\"副本数覆盖\"]\n    ClusterA[\"集群 A 副本\"]\n    ClusterB[\"集群 B 副本\"]\n    ClusterC[\"集群 C 副本\"]\n\n    RSP --> Scheduler\n    Scheduler --> Override\n    Override --> FedDeploy\n    FedDeploy --> ClusterA\n    FedDeploy --> ClusterB\n    FedDeploy --> ClusterC\n```\n\n观察 `ReplicaSchedulingPreference` 生效时，要看 `FederatedDeployment` 本身，而不是只看成员集群里的 Deployment。`targetKind: FederatedDeployment` 让策略找到要调度的联邦对象，`totalReplicas` 计算出的结果会先写入该对象的 `spec.overrides`，例如为某个集群生成 `/spec/replicas` 的覆盖值，再由同步控制器把最终副本数下发到成员集群。这个写回路径也可用于单集群灰度：先只把某个目标集群副本数调低或调高，验证后再扩大到其他集群。\n\n多集群 DNS 的目标是把多个集群中的服务入口汇聚成一个全局可访问的服务名。最简单做法是：每个集群暴露一个 LoadBalancer Service 或 Ingress，拿到各自的 VIP 或域名后，把它们注册到全局 DNS。客户端解析全局域名后，可以访问任一健康集群。\n\n更智能的 DNS 会按来源地址、地域、健康状态和权重返回不同地址。内部客户端请求 DNS 时，DNS 可以根据客户端源 IP 判断来自哪个集群或哪个网段；如果本地 Endpoint 健康，就返回本地地址；如果本地不可用，则逐级 CNAME 到可用区、地域或全局域名。\n\n```mermaid\nflowchart TB\n    Client[\"客户端\"]\n    LocalDns[\"本地 DNS\"]\n    AzDns[\"可用区 DNS\"]\n    RegionDns[\"地域 DNS\"]\n    GlobalDns[\"全局 DNS\"]\n    LocalSvc[\"本地服务\"]\n    RemoteSvc[\"远端服务\"]\n\n    Client --> LocalDns\n    LocalDns -->|本地健康| LocalSvc\n    LocalDns -->|本地故障| AzDns\n    AzDns -->|可用区故障| RegionDns\n    RegionDns -->|地域故障| GlobalDns\n    GlobalDns --> RemoteSvc\n```\n\nKubeFed 曾经提供过 `ServiceDNSRecord`、`IngressDNSRecord`、`DNSEndpoint` 等能力，并通过 ExternalDNS 同步到 DNS Provider。这个方向的核心逻辑是：\n\n1. 联邦 DNS 控制器监听 Federated Service 或 Federated Ingress。\n2. 控制器获取各成员集群中的 LoadBalancer VIP 或 Ingress 地址。\n3. 控制器生成 DNSEndpoint。\n4. ExternalDNS 把 DNSEndpoint 写入真实 DNS Provider。\n5. DNS Provider 根据自身能力实现 RoundRobin、地域优先、健康检查或权重。\n\n这类能力后来从 KubeFed 中移出，原因是 DNS 与厂商设备、网络规划和业务策略强相关。做一个落地方案不难，做一个所有企业都能直接使用的通用产品很难。\n\n在生产设计中，DNS 适合做入口选择和灰度，但不能把所有故障切换都寄托在 DNS 上。DNS 有 TTL，客户端也可能缓存解析结果。如果业务要求秒级切换，通常还需要在 DNS 之后叠加负载均衡、网关和服务网格策略。\n\nSmart DNS 或 GTM 背后通常不是单个配置进程，而是一组设备或服务阵列。用户写入一个域名策略后，配置还要同步到多台设备或多个节点，因此写入路径通常不会很快。即使自建 CoreDNS 插件实现 locality、weight 或 health check，客户端缓存和 TTL 仍然存在，DNS 适合做入口选择和常态灰度，不适合作为唯一的紧急切流手段。", "subs": []}, {"title": "Clusternet 如何管理多集群应用分发", "content": "Clusternet 是一个面向混合云、分布式云和边缘场景的多集群管理与应用分发项目。它的定位和 KubeFed 接近，但设计上更轻量，也更强调原生 Kubernetes 访问体验。\n\nClusternet 试图解决的核心问题包括：\n\n| 问题 | KubeFed 传统方式的限制 | Clusternet 的思路 |\n|---|---|---|\n| 子集群访问 | 联邦层主要看到联邦对象，不方便直接查看子集群 Pod 和 Node | 通过聚合 API 和 agent 转发访问子集群资源 |\n| 网络隔离 | Push 模式要求上层控制面能访问下层 API Server | 支持 Push 和 Pull 两种模式 |\n| 应用分发 | 每类对象联邦化后都要处理模板和同步 | 用户操作原生对象，平台转换成 Manifest |\n| RBAC | 子集群凭证放在联邦层会有安全顾虑 | 可使用子集群自己的身份访问 |\n| 资源类型 | KubeFed 对 Helm Chart 支持不直接 | 支持原生对象 CRD Helm Chart |\n\nClusternet 的架构由 Parent Cluster、`clusternet-hub`、Child Cluster 中的 `clusternet-agent` 和子集群 API Server 组成。`clusternet-hub` 可以理解为聚合 API Server，agent 和 hub 之间通过长连接打通路径。用户在 Parent Cluster 上发起请求，请求可以转到 agent，再由 agent 访问子集群 API Server。\n\n在访问模型上，Clusternet 的关键差异是尽量不把所有子集群长期访问凭证集中保存在父集群控制器里。子集群加入和访问可以使用 Bootstrap Token、Service Token 或 TLS 证书等方式建立连接；用户从 Parent Cluster 查看或操作子集群资源时，可以沿用自己在子集群中的身份和 RBAC 约束。这样既能通过统一入口执行 `get`、`list`、`watch`、`patch`、`exec`、`logs` 等原生操作，又能减少“父集群持有所有子集群高权限 token”的集中风险。\n\n```mermaid\nflowchart TB\n    User[\"用户\"]\n    ParentApi[\"父集群 API\"]\n    Hub[\"clusternet hub\"]\n    AgentA[\"agent A\"]\n    AgentB[\"agent B\"]\n    ApiA[\"子集群 API A\"]\n    ApiB[\"子集群 API B\"]\n    WorkloadA[\"子集群资源 A\"]\n    WorkloadB[\"子集群资源 B\"]\n\n    User --> ParentApi\n    ParentApi --> Hub\n    Hub --> AgentA\n    Hub --> AgentB\n    AgentA --> ApiA\n    AgentB --> ApiB\n    ApiA --> WorkloadA\n    ApiB --> WorkloadB\n```\n\nPush 和 Pull 是 Clusternet 的一个重要差异化能力：\n\n| 模式 | 工作方式 | 适合场景 |\n|---|---|---|\n| Push | 父集群控制器读取上层对象并主动写入子集群 | 网络允许父集群访问子集群 API Server |\n| Pull | 子集群 agent 或控制器 watch 父集群对象，再拉取到本地 | 安全区隔离 子集群 API Server 不方便对上层开放 |\n\n这种差异很实用。很多生产系统会分成安全区和非安全区，安全区内 API Server 地址和端口不允许被外部控制面直接访问。如果只支持 Push，应用分发会卡在防火墙和访问路径上；Pull 模式只需要让子集群访问上层控制面，网络开口更少。\n\n在进入对象模型之前，先看多集群应用分发要解决的差异化问题：\n\n1. 给同一批资源统一打标签，便于跨集群检索、计费和治理。\n2. 按业务、环境、地域或安全区标记目标集群。\n3. 在不同集群中调整副本数、镜像地址、资源配额或开关。\n4. 注入环境配置、证书、Sidecar 或平台代理。\n5. 支持灰度升级、变更暂停、继续发布和回滚。\n6. 处理重复定义、覆盖顺序和多团队同时修改带来的冲突。\n\n`Manifest`、`Subscription`、`Base`、`Globalization`、`Localization` 和 `Description` 这些对象，正是为了把上述问题拆成可声明、可审计、可回滚的控制器流程，而不是让用户手工在每个集群里拼 YAML。\n\nClusternet 的应用分发对象链路可以概括为：\n\n1. 用户通过 `kubectl clusternet apply` 提交原生 Kubernetes 对象。\n2. 插件把对象转换为 `Manifest`，保存在父集群。\n3. 用户创建 `Subscription`，声明哪些资源要分发到哪些集群。\n4. 控制器生成 `Base`，作为面向目标集群的基础描述。\n5. `Globalization` 和 `Localization` 对分发对象做全局或局部覆盖。\n6. 渲染后的 `Description` 下发到目标集群。\n\n```mermaid\nflowchart LR\n    Native[\"原生对象\"]\n    Manifest[\"Manifest\"]\n    Subscription[\"Subscription\"]\n    Base[\"Base\"]\n    Globalization[\"Globalization\"]\n    Localization[\"Localization\"]\n    Description[\"Description\"]\n    Child[\"子集群\"]\n\n    Native --> Manifest\n    Manifest --> Subscription\n    Subscription --> Base\n    Base --> Globalization\n    Base --> Localization\n    Globalization --> Description\n    Localization --> Description\n    Description --> Child\n```\n\n命令观察上也要区分父集群原生视角和 Clusternet 聚合视角。通过 `kubectl clusternet apply` 提交 Namespace 或 Deployment 时，插件会把对象包装成 `Manifest`，通常保存在系统保留 namespace 中；这和直接在父集群创建一个 namespace 不是一回事。因此普通 `kubectl get ns demo` 看到的是父集群原生 namespace 视角，可能看不到这个待分发对象。排查时应使用 `kubectl clusternet get ns demo` 查看聚合视角，再用 `kubectl get manifests -A`、`kubectl get descriptions -A` 观察分发前保存的对象和渲染后准备下发的 `Description`。\n\n一个 `Subscription` 会指定订阅者和要分发的资源：\n\n```yaml\napiVersion: apps.clusternet.io/v1alpha1\nkind: Subscription\nmetadata:\n  name: app-demo\n  namespace: default\nspec:\n  subscribers:\n  - clusterAffinity:\n      matchLabels:\n        clusters.clusternet.io/cluster-id: dc91021d-2361-4f6d-a404-7c33b9e01118\n  feeds:\n  - apiVersion: apps/v1\n    kind: Deployment\n    name: nginx\n    namespace: demo\n  - apiVersion: v1\n    kind: Service\n    name: nginx\n    namespace: demo\n  - apiVersion: v1\n    kind: Namespace\n    name: demo\n```\n\n`Localization` 用于某个集群的本地化覆盖，例如给分发后的 Deployment 增加标签或调整副本数：\n\n```yaml\napiVersion: apps.clusternet.io/v1alpha1\nkind: Localization\nmetadata:\n  name: nginx-localization\n  namespace: clusternet-51821\npriority: 300\nfeed:\n  apiVersion: apps/v1\n  kind: Deployment\n  name: nginx\n  namespace: demo\noverrides:\n- name: add-cluster-label\n  type: MergePatch\n  value: |\n    {\"metadata\":{\"labels\":{\"running-in\":\"cluster-a\"}}}\n- name: scale-replicas\n  type: JSONPatch\n  value: |-\n    - op: replace\n      path: /spec/replicas\n      value: 1\n```\n\nClusternet 的优势不是完全替代所有联邦方案，而是把多集群管理中的几个痛点变轻：用户尽量操作原生 Kubernetes 对象；平台通过插件和聚合 API 做转换；子集群访问可以通过 agent 代理；应用分发可以覆盖原生对象、CRD 和 Helm Chart。\n\n在学习 Clusternet 时要抓住三个层次：\n\n| 层次 | 关键对象或组件 | 要理解的问题 |\n|---|---|---|\n| 集群连接 | clusternet hub clusternet agent ManagedCluster | 父集群如何纳管子集群 |\n| 资源存储 | Manifest | 用户提交的原生对象如何在父集群保存 |\n| 应用分发 | Subscription Base Description Globalization Localization | 资源如何选择目标集群并渲染差异 |\n\n应用分发的价值在大规模场景中非常明显。如果一个应用需要部署到 10 个可用区，每次发布都要操作 Deployment、Service、Ingress、ConfigMap、Secret 和 CRD，手工逐集群执行会变成高风险工作。多集群分发把这些操作收敛到声明式对象和控制器，让用户只表达“这些资源发到这些集群，并在这些集群做这些覆盖”。", "subs": []}, {"title": "Istio 多集群部署如何处理跨地域流量", "content": "多集群应用分发解决“对象如何到达多个集群”，但生产系统还要解决“请求如何到达正确的实例”。跨地域流量治理比单集群服务发现更复杂，因为它要同时处理性能、可用性、DNS TTL、负载均衡层次、证书、安全和规模。\n\n主备数据中心是早期常见模式：主数据中心承接全部流量，备用数据中心平时几乎不接流量。这种模式有两个明显问题。第一，备用资源长期闲置，成本不经济。第二，备用环境长期不被真实流量验证，真正切换时容易发现版本不一致、配置缺失、防火墙未开等问题，导致故障恢复时间变长。\n\n多活数据中心更符合现代高可用目标。生产应用在多个数据中心同时部署，每个数据中心都有本地负载均衡和跨数据中心负载均衡。大部分请求留在本地，少量请求跨地域，用于验证远端链路和提供故障转移能力。\n\n```mermaid\nflowchart TB\n    DNS[\"Smart DNS\"]\n    CrossA[\"跨地域 LB A\"]\n    CrossB[\"跨地域 LB B\"]\n    LocalA[\"本地 LB A\"]\n    LocalB[\"本地 LB B\"]\n    PodA[\"本地实例 A\"]\n    PodB[\"本地实例 B\"]\n\n    DNS --> CrossA\n    DNS --> CrossB\n    CrossA -->|本地优先| LocalA\n    CrossB -->|本地优先| LocalB\n    CrossA -->|少量远端| LocalB\n    CrossB -->|少量远端| LocalA\n    LocalA --> PodA\n    LocalB --> PodB\n```\n\n为什么不直接把 DNS 指到每个数据中心的本地 LB？因为 DNS 有 TTL，客户端和中间服务都可能缓存解析结果。当某个数据中心故障时，DNS 记录即使已经更新，客户端仍可能继续访问旧地址。把关键切换放到负载均衡层，可以把分钟级 DNS 生效问题压缩到秒级流量切换。\n\neBay 这类大型电商多活入口常见一加二部署思路：生产应用至少跨 3 个数据中心，每个数据中心至少保持多个副本，例如不少于 3 个 Pod。入口权重可以让 99% 流量留在本地，1% 流量走远端；这 1% 不只是灰度流量，也是在持续验证远端链路，避免真正故障时才发现防火墙、版本或配置问题。\n\n一种典型的生产规模背景如下：\n\n| 维度 | 示例规模 |\n|---|---|\n| 主数据中心 | 3 个 |\n| 边缘数据中心 | 20 个以上 |\n| Kubernetes 集群 | 100 个以上 |\n| 物理节点 | 100000 级别 |\n| 单集群节点 | 最高约 5000 |\n| 单集群 Pod | 100000 级别 |\n| 单集群服务 | 5000 到 10000 |\n\n在这种规模下，不能让每个应用自己维护跨地域入口和故障切换。平台需要统一流量模型，并把 Kubernetes Service、Istio Gateway、VirtualService、DestinationRule、证书和 DNS 状态打通。\n\nIstio 多集群部署模型可以按可用区组织：\n\n1. 所有 Kubernetes 集群注册到集群联邦。\n2. 数据中心内部按供电、制冷和网络故障域划分可用区。\n3. 每个可用区里有多个 Kubernetes 集群。\n4. 每个可用区选择一个网关集群部署 Istio Primary。\n5. 同一可用区内其他业务集群部署 Istio Remote。\n6. Remote 集群把 kubeconfig 交给 Primary，使 Primary 能发现本可用区内服务。\n7. 所有集群使用同一 Root CA，并在同一环境中使用相同 Trust Domain。\n8. 同可用区内服务调用走 Sidecar，跨可用区调用走 Gateway。\n\nPrimary 和 Remote 的职责不同。Primary 是完整 Istio 控制面，负责本可用区内的服务发现、配置分发、证书信任和跨集群管理；Remote 并不是另一套完整控制面，它的 `istiod` 权限更有限，主要处理本地权限管理、sidecar injector、证书签发等本地动作。Remote 通过交出 kubeconfig，让 Primary 能 watch Remote 集群中的 Service、Endpoint、Pod 和 Istio 配置，因此 Primary 才能统一发现同可用区内多个业务集群的服务。\n\n| 模型 | 部署位置 | 主要职责 | 不负责或弱化的职责 |\n|---|---|---|---|\n| Primary | 网关集群或可用区核心集群 | 完整控制面 服务发现 xDS 配置 证书信任 多集群 watch | 不承接所有业务 Pod |\n| Remote | 同可用区业务集群 | 本地注入 本地证书 本地权限配合 | 不独立完成完整服务发现 |\n\n```mermaid\nflowchart TB\n    Federation[\"集群联邦\"]\n    PrimaryA[\"Istio Primary A\"]\n    RemoteA1[\"Remote 集群 A1\"]\n    RemoteA2[\"Remote 集群 A2\"]\n    PrimaryB[\"Istio Primary B\"]\n    RemoteB1[\"Remote 集群 B1\"]\n    RemoteB2[\"Remote 集群 B2\"]\n    GatewayA[\"网关 A\"]\n    GatewayB[\"网关 B\"]\n\n    Federation --> PrimaryA\n    Federation --> PrimaryB\n    PrimaryA --> RemoteA1\n    PrimaryA --> RemoteA2\n    PrimaryB --> RemoteB1\n    PrimaryB --> RemoteB2\n    RemoteA1 -->|本区 Sidecar| RemoteA2\n    RemoteB1 -->|本区 Sidecar| RemoteB2\n    GatewayA -->|跨区 Gateway| GatewayB\n    PrimaryA --> GatewayA\n    PrimaryB --> GatewayB\n```\n\n入站流量架构一般拆成四层和七层：\n\n| 层次 | 组件 | 职责 |\n|---|---|---|\n| L4 | Service Controller IPVS XDP BGP IPIP | 分配 VIP 配置转发 宣告路由 承接入口流量 |\n| L7 | Istio Ingress Gateway Envoy | 处理 HTTP TLS 路由 证书 访问日志 tracing |\n| Mesh | Sidecar | 处理服务间 mTLS 路由 熔断 可观测性 |\n\n四层入口中，Service Controller 会监听 LoadBalancer Service，为它分配 VIP，并通过 IPVS 或 XDP 配置转发规则。路由侧通过 BGP 宣告 VIP 或 VIP 网段。对于 IPIP 转发，Ingress Gateway Pod 内需要绑定 Tunnel 设备和 VIP，内核识别并解包后把请求交给 Envoy。回包可以走 DSR，直接从七层网关回到客户端，不再绕回四层负载均衡。\n\nBGP 宣告粒度通常会随规模演进。早期 VIP 数量少时，可以为每个 VIP 宣告一条 `/32` 路由，路由器精确知道某个单 IP 应该到哪个四层入口。规模变大后，VIP 数量持续增加会撑大路由表，平台通常会把一组 VIP 所在子网做汇聚，按网段一次宣告，再由四层网关内部完成更细粒度的转发。XDP 是 eBPF 在网卡或内核较早路径上的挂载点，可用于更早地处理和转发数据包，减少进入后续网络栈后的开销。\n\n```mermaid\nflowchart TB\n    Client[\"客户端\"]\n    Router[\"路由器\"]\n    Bgp[\"BGP 宣告\"]\n    L4[\"四层网关\"]\n    Tunnel[\"IPIP Tunnel\"]\n    Envoy[\"Ingress Envoy\"]\n    Sidecar[\"Sidecar\"]\n    App[\"应用\"]\n\n    Client --> Router\n    Router --> L4\n    L4 --> Tunnel\n    Tunnel --> Envoy\n    Envoy --> Sidecar\n    Sidecar --> App\n    L4 --> Bgp\n    Envoy -->|DSR 回包| Router\n```\n\n应用高可用接入链路可以概括为：Smart DNS 先把客户端导向某地域入口；IPVS 或其他四层入口把请求交给 Istio Ingress Gateway；Ingress Gateway 到 Sidecar 之间使用 Istio mTLS；Sidecar 再把请求交给应用容器。\n\n这条链路里的 TLS 要分层理解。外部客户端到 Ingress Gateway 的 HTTPS 通常在 Gateway 上终止，Gateway `tls.mode: SIMPLE` 使用业务域名证书处理南北向 TLS；进入网格后，Gateway 到 Sidecar、Sidecar 到 Sidecar 使用 Istio mTLS，`DestinationRule` 中通常配置 `ISTIO_MUTUAL`，它关注的是服务身份、双向认证和网格内部传输安全。不要把外部证书终止和网格内部 mTLS 混成一个配置点。\n\n| 链路 | 典型配置 | 安全语义 |\n|---|---|---|\n| Client -> Smart DNS -> L4 LB | DNS / VIP / 监听端口 | 入口选择和四层转发 |\n| L4 LB -> Istio Ingress Gateway | Gateway `tls.mode: SIMPLE` | 对外 HTTPS 证书终止 |\n| Ingress Gateway -> Sidecar | DestinationRule `ISTIO_MUTUAL` | 网格内部双向认证 |\n| Sidecar -> Sidecar | PeerAuthentication / DestinationRule | 服务身份和东西向加密 |\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: Gateway\nmetadata:\n  name: app-gateway\nspec:\n  selector:\n    istio: ingressgateway\n  servers:\n  - hosts:\n    - app.example.com\n    port:\n      name: https\n      number: 443\n      protocol: HTTPS\n    tls:\n      mode: SIMPLE\n      credentialName: app-cert\n```\n\n多环境共享同一集群时，还要控制 Istio 对象可见性。测试环境可能同时包含研发、集成测试、压力测试等 namespace。如果所有环境共用一个 Istio 控制面，规模和隔离都会出问题。较新的 Istio 支持 `discoverySelector`，可以让每套 Istio 只发现带特定 label 的 namespace，从而在同一 Kubernetes 集群中运行多套互相隔离的 Istio 控制面。这里的多套 Istio 指的是互相隔离的控制面，而不是简单把一个 `istiod` 多起几个副本。\n\n```yaml\nmeshConfig:\n  discoverySelectors:\n  - matchLabels:\n      environment: staging\n```\n\n课件给了一个真实落地的例子：在同一个网关集群里划分 `istio-dev`、`istio-stg` 和 `istio-lnp` 三套环境。Istio 有 root namespace 的概念，默认是 `istio-system`，但安装时可以指定装到任何 namespace——课程里的做法就是装了三套完全独立的 Istio，分别落在这三个 namespace 里。每套环境拥有自己的 istiod、Istio Ingress Gateway 和配置对象，并通过 `exportTo` 限制对象只在本环境可见。\n\n```mermaid\nflowchart TB\n    API[\"Kube-APIServer\"]\n\n    subgraph Dev[\"istio-dev / development\"]\n        DevIstiod[\"istiod\"]\n        DevGW[\"Istio Ingress GW\"]\n        DevObj[\"Gateway<br/>VirtualService<br/>Service<br/>exportTo: istio-dev\"]\n        DevIstiod <-->|\"xDS\"| DevGW\n        DevObj --> DevIstiod\n    end\n\n    subgraph Stg[\"istio-stg / integration\"]\n        StgIstiod[\"istiod\"]\n        StgGW[\"Istio Ingress GW\"]\n        StgObj[\"Gateway<br/>VirtualService<br/>Service<br/>exportTo: istio-stg\"]\n        StgIstiod <-->|\"xDS\"| StgGW\n        StgObj --> StgIstiod\n    end\n\n    subgraph Lnp[\"istio-lnp / lnp\"]\n        LnpIstiod[\"istiod\"]\n        LnpGW[\"Istio Ingress GW\"]\n        LnpObj[\"Gateway<br/>VirtualService<br/>Service<br/>exportTo: istio-lnp\"]\n        LnpIstiod <-->|\"xDS\"| LnpGW\n        LnpObj --> LnpIstiod\n    end\n\n    API <-->|\"Watch Config & Status\"| DevIstiod\n    API <-->|\"Watch Config & Status\"| StgIstiod\n    API <-->|\"Watch Config & Status\"| LnpIstiod\n```\n\n隔离规则可以拆成四条：\n\n- `Gateway` 和 `VirtualService` 用 `exportTo` 指向本环境 namespace。\n- Kubernetes `Service` 通过 `networking.istio.io/exportTo` 标注限定可见性。\n- 各环境 istiod 只把本环境可见的配置通过 xDS 下发给对应的 Ingress Gateway。\n- API Server 仍是统一的配置和状态来源，但数据平面配置在逻辑上按环境完全隔离。\n\n注意这里的“三套 Istio”不是 istiod 或 Gateway 的副本数——副本数是同一环境内的横向扩展；这里是三套彼此无关的控制面，目的就是在共享网关集群中避免开发、集成和生产类环境互相看到或引用对方的服务与路由。\n\n网关集群的设计还有一个工程原因：入口网关承担大量 HTTPS 握手和解密。如果把所有网关打散到业务集群，SSL 加速卡等硬件资源难以集中使用；把某个集群专门作为网关集群，可以把硬件加速、证书、Ingress Gateway 和 L4 入口集中管理。", "subs": ["Gateway 和 VirtualService 用 exportTo 指向本环境", "Kubernetes Service 通过 networking", "各环境 istiod 只把本环境可见的配置通过 xDS 下发给对应的 Ingress", "API Server 仍是统一的配置和状态来源"]}, {"title": "ServiceEntry Locality 和规模控制如何降低多集群复杂度", "content": "跨地域流量治理不能把所有远端 Pod 都塞进本地 Istio。大规模集群中 Pod 数量可能达到百万级，Pod Ready 状态和 IP 又频繁变化。如果把每个远端 Pod 都作为本地 Envoy 的 Endpoint，Istiod 和 Envoy 都会被压垮，跨地域负载均衡也很难做批量切换。\n\n更可控的方案是把远端服务先收敛成稳定的四层入口，例如每个应用在远端集群暴露一个 LoadBalancer Service。然后本地集群通过 `WorkloadEntry` 指向这个远端 VIP 或域名，把远端一组 Pod 抽象成一个稳定端点。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: WorkloadEntry\nmetadata:\n  name: app-remote\n  namespace: demo\nspec:\n  address: app.demo.svc.cluster-b.example.com\n  labels:\n    app: demo-api\n  locality: region-b/zone-b/subzone-1\n```\n\n`ServiceEntry` 可以通过 `workloadSelector` 同时选中本地 Pod 和远端 `WorkloadEntry`。只要它们有相同 label，Envoy 最终会把它们看成同一个服务的可选上游。\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: ServiceEntry\nmetadata:\n  name: demo-api\n  namespace: demo\nspec:\n  hosts:\n  - demo-api.example.com\n  ports:\n  - name: http\n    number: 80\n    protocol: HTTP\n    targetPort: 8080\n  resolution: STATIC\n  workloadSelector:\n    labels:\n      app: demo-api\n```\n\n入口 Gateway 和 VirtualService 再把外部请求路由到这个 ServiceEntry 的 host：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: Gateway\nmetadata:\n  name: demo-api\n  namespace: demo\nspec:\n  selector:\n    istio: ingressgateway\n  servers:\n  - hosts:\n    - demo-api.example.com\n    port:\n      name: http\n      number: 80\n      protocol: HTTP\n---\napiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: demo-api\n  namespace: demo\nspec:\n  gateways:\n  - demo-api\n  hosts:\n  - demo-api.example.com\n  http:\n  - route:\n    - destination:\n        host: demo-api.example.com\n        port:\n          number: 80\n```\n\n这个模型把本地 Pod 和远端 LB VIP 放进同一个 Envoy Cluster。好处是：本地流量可以直接进入本地 Pod，避免多绕一层本地 LB；远端流量则只看到稳定 VIP，不需要承接远端 Pod 的高频变化。\n\n```mermaid\nflowchart LR\n    Envoy[\"Envoy Cluster\"]\n    LocalPod1[\"本地 Pod A\"]\n    LocalPod2[\"本地 Pod B\"]\n    RemoteWE[\"远端 WorkloadEntry\"]\n    RemoteLB[\"远端 LB VIP\"]\n    RemotePods[\"远端 Pod 组\"]\n\n    Envoy --> LocalPod1\n    Envoy --> LocalPod2\n    Envoy --> RemoteWE\n    RemoteWE --> RemoteLB\n    RemoteLB --> RemotePods\n```\n\nLocality 是这套方案能做地域优先和故障转移的关键。Istio 可以从多个来源获得 locality：\n\n| 来源 | 示例 | 说明 |\n|---|---|---|\n| Node label | `topology.kubernetes.io/region` `topology.kubernetes.io/zone` | Pod 会继承所在节点的地域信息 |\n| Pod label | `istio-locality: region/zone/subzone` | 可覆盖节点 locality |\n| WorkloadEntry | `locality: region/zone/subzone` | 用于 VM 或远端入口等非 Pod 工作负载 |\n\n`DestinationRule` 的 `localityLbSetting` 可以定义两类策略：按比例分发和故障转移。\n\n按比例分发适合需要持续验证远端链路或做灰度的场景，例如 99% 流量留在本地，1% 流量发到远端：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: demo-api\n  namespace: demo\nspec:\n  host: demo-api.example.com\n  trafficPolicy:\n    loadBalancer:\n      localityLbSetting:\n        enabled: true\n        distribute:\n        - from: region-a/zone-a/*\n          to:\n            region-a/zone-a/*: 99\n            region-b/zone-b/*: 1\n    outlierDetection:\n      consecutive5xxErrors: 100\n      interval: 10s\n      baseEjectionTime: 10s\n    tls:\n      mode: ISTIO_MUTUAL\n```\n\n故障转移策略适合正常情况下永远访问本地，只在本地健康度下降时转移到远端：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: demo-api-failover\n  namespace: demo\nspec:\n  host: demo-api.example.com\n  trafficPolicy:\n    loadBalancer:\n      localityLbSetting:\n        enabled: true\n        failover:\n        - from: region-a/zone-a\n          to: region-b/zone-b\n    outlierDetection:\n      consecutive5xxErrors: 1\n      interval: 2s\n      baseEjectionTime: 10m\n    tls:\n      mode: ISTIO_MUTUAL\n```\n\n`outlierDetection` 是 locality failover 能工作的关键健康信号之一。主动健康检查是 Envoy 或负载均衡组件持续对后端端口、HTTP 路径或 TCP 连接发探测，失败后主动把目标摘除；被动健康检查不单独发心跳，而是在真实请求出现超时、连接失败、503 或连续 5xx 时，按规则把异常 endpoint ejection 一段时间。Istio 的 `outlierDetection` 属于被动健康检查和熔断能力，它让 Envoy 根据真实流量判断某些 endpoint、locality 或远端入口不健康，并配合 `localityLbSetting.failover` 把流量切到备用地域。没有足够的错误信号或真实流量时，failover 不会凭空知道远端链路是否可用，这也是少量 `distribute` 流量有价值的原因。\n\n二者的取舍很明确：\n\n| 策略 | 优点 | 代价 |\n|---|---|---|\n| distribute | 能持续验证远端链路 能按比例灰度 | 永远有少量跨地域流量 |\n| failover | 正常时性能最好 本地优先彻底 | 远端链路平时缺少真实流量验证 |\n\n规模控制是 Istio 多集群部署的另一个关键点。默认情况下，Istiod 会发现集群中所有 Service、Endpoint、Pod 和 Istio 配置，并把大量 xDS 配置推给 Envoy。如果集群有 10000 个 Service，每个 Service 暴露 80 和 443 两个端口，单 CDS 就可能产生 20000 个 Envoy Cluster；多集群和 SNI 路由还会进一步放大数量。\n\n降低规模压力可以从几个方向入手：\n\n1. 用 namespace 隔离项目，避免所有应用堆在一个 namespace。\n2. 在 `meshConfig` 中把默认可见性限制在当前 namespace。\n3. 对确实需要跨 namespace 调用的服务，用 `exportTo` 显式开放。\n4. 用 `discoverySelector` 让 Istiod 只管理目标 namespace。\n5. 远端服务用 LB VIP 或网关聚合，不把所有远端 Pod 注入本地网格。\n\nnamespace 不是随便放的标签容器，而是 Istio 规模控制的关键边界。把所有应用塞进一个 namespace，可能让一个 namespace 中同时存在上万个 Deployment 和上万个 Service；Istio 在服务发现和配置生成时要遍历 Service、端口、Endpoint 和 Pod label 关系，规模一大就容易接近 `Service x Workload` 的笛卡尔积放大。社区通常会把这类问题视为部署模型反模式，而不是单靠给 Istio 控制面加缓存或提性能补丁就能解决。生产上应按项目、环境和治理边界拆 namespace，并用独立控制面、`discoverySelector`、`exportTo` 和默认可见性收敛每套 Istio 需要管理的对象集合。\n\n```yaml\nmeshConfig:\n  defaultServiceExportTo:\n  - \".\"\n  defaultVirtualServiceExportTo:\n  - \".\"\n  defaultDestinationRuleExportTo:\n  - \".\"\n```\n\n`exportTo: \".\"` 表示默认只对当前 namespace 可见。这样可以避免每个 Sidecar 都拿到全集群所有服务配置。需要跨 namespace 暴露时，再在 Service、VirtualService 或 DestinationRule 中按需配置 `exportTo`。\n\n不过，`discoverySelector` 也不是万能的。它能减少 Istiod 对对象的后续处理和推送范围，但受 Kubernetes watch 机制限制，Istiod 仍可能先接收大量事件再在本地过滤。超大规模场景真正理想的方向，是让 Kubernetes Server 端就能按 namespace label 或其他条件过滤 watch 数据。", "subs": []}, {"title": "基于联邦的统一流量模型未来如何演进", "content": "KubeFed 和 Clusternet 主要解决对象分发，Istio 解决网格流量治理。真正的生产平台还需要把两者结合起来：用户在联邦层声明一个全局流量入口，平台自动生成各集群中的 Kubernetes Service、Istio Gateway、VirtualService、DestinationRule、WorkloadEntry、证书和 DNS 配置，并汇总状态。\n\n统一流量模型可以理解为一个联邦化的 AccessPoint。它把入站流量相关对象组织成一个更高层 CRD。\n\nSpec 侧通常包含：\n\n| 字段 | 作用 |\n|---|---|\n| Scope | 声明目标可用区或目标集群 |\n| TrafficTemplate | 包含 Istio networking 对象和 Kubernetes Service 模板 |\n| Override | 对不同目标集群做局部修改 |\n| PlacementPolicy | 决定入口配置跟随哪些后端部署位置 |\n| RolloutPolicy | 控制多集群灰度发布 暂停 继续 |\n| RuntimePolicy | 定义运行期策略和约束 |\n\nStatus 侧通常包含：\n\n| 状态 | 说明 |\n|---|---|\n| Conditions | 每个阶段的就绪和错误信息 |\n| L4 状态 | VIP 是否分配 BGP 是否宣告 |\n| L7 状态 | Gateway 和路由是否配置完成 |\n| 证书状态 | 证书是否安装 版本是否正确 |\n| 访问地址 | 网关 VIP FQDN 和关联 DNS 结果 |\n\n```mermaid\nflowchart TB\n    AccessPoint[\"AccessPoint\"]\n    Placement[\"PlacementPolicy<br/>选择目标集群\"]\n    Rollout[\"RolloutPolicy<br/>单集群灰度 / 暂停 / 继续\"]\n    Runtime[\"RuntimePolicy\"]\n    FedDeploy[\"FederatedDeployment\"]\n    Clusters[\"目标集群\"]\n    Gateway[\"四层 / 七层网关配置\"]\n    WorkloadEntry[\"WorkloadEntry<br/>Locality\"]\n    Status[\"状态汇聚<br/>VIP / FQDN / 证书 / 路由完成度\"]\n\n    AccessPoint --> Placement\n    AccessPoint --> Rollout\n    AccessPoint --> Runtime\n    Placement --> FedDeploy\n    FedDeploy --> Clusters\n    Placement --> Clusters\n    AccessPoint --> Gateway\n    AccessPoint --> WorkloadEntry\n    Gateway --> Status\n    WorkloadEntry --> Status\n    Status --> AccessPoint\n```\n\nPlacementPolicy 可以是固定目标，也可以是 follow 模式。固定目标表示用户明确选择 cluster-a、cluster-b；follow 模式表示流量入口跟随后端工作负载，例如 `FederatedDeployment` 分发到哪里，AccessPoint 就自动把入口配置发到哪里。这样可以避免应用部署位置和流量入口位置需要维护两份配置。\n\nRolloutPolicy 是生产治理中非常重要但社区方案常常缺失的能力。多集群配置不能一改就全局生效，否则一个错误路由、错误端口或错误证书会同时影响所有数据中心。更稳妥的方式是按可用区或集群逐步发布：先推一个集群，暂停等待验证，再继续推下一个集群。\n\n```mermaid\nstateDiagram-v2\n    [*] --> Validate\n    Validate --> ClusterA\n    ClusterA --> Pause\n    Pause --> ClusterB\n    ClusterB --> ClusterC\n    ClusterC --> Done\n    Pause --> Rollback\n    Rollback --> Done\n```\n\nNameService 则负责全局服务名和 DNS 策略。它不是替代 AccessPoint，而是把 AccessPoint 暴露出来的 VIP 或 FQDN 注册成全局域名。\n\nNameService 的 Spec 可以包含：\n\n| 字段 | 说明 |\n|---|---|\n| Global Name FQDN | 对外或对内访问的全局域名 |\n| TTL | DNS 记录缓存时间 |\n| DNSPolicy | RoundRobin Locality Ratio 等策略 |\n| HealthCheck Port | DNS 设备或控制器执行健康检查的端口 |\n| Target | 指向 AccessPoint 或目标 Service FQDN |\n| Ratio | 多目标权重 |\n\n```mermaid\nflowchart LR\n    NameService[\"NameService\"]\n    Spec[\"Spec<br/>Global Name FQDN / TTL / DNSPolicy / Target\"]\n    Status[\"Status<br/>Conditions / DNS 结果 / 错误信息\"]\n    DNS[\"DNS Provider\"]\n    Targets[\"目标 Service<br/>FQDN + Ratio\"]\n\n    NameService --> Spec\n    NameService --> Status\n    Spec --> DNS\n    Spec --> Targets\n    DNS --> Status\n    Targets --> Status\n```\n\n这张图对应 DNS 层的一个重要边界：DNS 可以做权重和本地优先，但它不是最可靠的紧急切流手段。NameService 必须把 AccessPoint、网关 VIP、证书和后端健康状态汇总进 status，再决定哪些目标可以进入 DNS Provider。\n\n```yaml\napiVersion: traffic.platform.example.com/v1alpha1\nkind: NameService\nmetadata:\n  name: demo-api\nspec:\n  globalName: demo-api.global.example.com\n  ttl: 30\n  dnsPolicy:\n    type: Locality\n  healthCheck:\n    port: 8080\n  targets:\n  - fqdn: demo-api.ap-cn-east.example.com\n    ratio: 99\n  - fqdn: demo-api.ap-cn-south.example.com\n    ratio: 1\n```\n\nNameService Controller 会读取 AccessPoint status 中的入口地址。如果某个目标集群的 VIP 尚未分配、证书未就绪或网关配置未完成，就不应提前把它写入全局 DNS。这个状态联动能减少“DNS 已指向但服务未就绪”的风险。\n\nHealthCheck Port 的设计也要尽量利用 DNS 或 GTM 设备自身能力。很多 Smart DNS、GTM 或负载均衡设备已经支持按端口、HTTP 路径或 TCP 连接做健康检查，NameService 把端口和目标地址交给设备后，设备可以直接探测并从解析结果中摘除失败目标。如果由控制面频繁 watch 每个 endpoint 状态，再通过 Provider API 高频改 DNS，路径更长、写入更慢，也会给 DNS Provider 带来额外压力。NameService Controller 更适合做目标收敛和状态门禁：从 AccessPoint status 中读取 ready 的 VIP、FQDN 和证书状态，只有目标就绪后才写入 DNS；紧急切流仍应主要依赖 L4/L7 负载均衡和网格策略，因为 DNS TTL 和客户端缓存不可控。\n\n```mermaid\nflowchart LR\n    AccessPoint[\"AccessPoint 状态\"]\n    NameService[\"NameService\"]\n    Controller[\"DNS 控制器\"]\n    DNS[\"Smart DNS\"]\n    Client[\"客户端\"]\n\n    AccessPoint --> NameService\n    NameService --> Controller\n    Controller --> DNS\n    Client --> DNS\n```\n\nAccessPoint Controller 的职责可以概括为：\n\n1. 解析 TrafficTemplate，拆出 Kubernetes Service 和 Istio 对象。\n2. 根据 Scope 或 PlacementPolicy 选择目标集群。\n3. 根据 Override 渲染每个集群的最终配置。\n4. 创建或更新 L4 Service、Gateway、VirtualService、DestinationRule 和 WorkloadEntry。\n5. 读取证书、VIP、FQDN、网关路由等状态。\n6. 把目标集群状态汇总回联邦层。\n7. 把聚合后的状态再传播回成员集群，让每个集群能看到自身和兄弟集群的入口状态。\n8. 按 RolloutPolicy 控制灰度、暂停、继续和回滚。\n\n状态回灌很重要。每个成员集群不仅要知道自己的 VIP、证书和路由是否就绪，也要能看到其他成员集群的入口健康、DNS 目标和证书状态。这样本地控制器、网关和流量策略才能基于兄弟集群状态做跨集群故障判断、远端链路验证和 NameService target 生成，而不是只有联邦层知道全局状态。\n\n这种统一模型的意义是让用户不用分别理解每个集群中的所有底层对象。用户声明“我要一个入口，后端跟随这个 FederatedDeployment，本地优先，远端 1% 验证，证书用这个引用，DNS 用 Locality 策略”，平台负责把它翻译成各集群的 Service、Istio 和 DNS 配置。\n\n未来演进主要有三个方向。\n\n第一，全面构建基于 Mesh 的流量管理。传统跨地域流量大量依赖 DNS 和南北向网关，服务间调用即使发生在同一集群，也可能先解析全局域名，再绕到外部入口，最后再回到目标服务。服务网格可以把这类调用下沉到 Sidecar 层，根据 VirtualService 中的 `mesh` gateway 把原本绕外部入口的流量转成本地东西向流量。\n\n```mermaid\nflowchart LR\n    ServiceA[\"服务 A\"]\n    DNS[\"Smart DNS\"]\n    Ingress[\"入口网关\"]\n    ServiceB[\"服务 B\"]\n    Sidecar[\"Sidecar 路由\"]\n\n    ServiceA --> DNS\n    DNS --> Ingress\n    Ingress --> ServiceB\n    ServiceA --> Sidecar\n    Sidecar --> ServiceB\n```\n\n第二，在用户无感知的前提下逐步把南北流量转换成东西流量。这个过程需要基于访问日志、tracing 和拓扑分析判断“某个经由外部入口的调用，其实目标服务在本地可达”。确认后，再把 Gateway 侧配置同步到 Sidecar 侧，使调用直接在网格内部完成。这个方向需要谨慎灰度，因为它可能影响成千上万个服务和海量 Pod。\n\n第三，对数据平面做加速和按需发现。Cilium、eBPF、XDP、Lazy Load、按需服务发现等能力都可能减少控制面和数据面的压力。大规模场景下，未来平台不应默认把所有服务状态推给所有 Sidecar，而应让 Envoy 只拿到自己真正需要的服务、路由和证书。\n\n多集群治理的最终目标不是让用户记住更多 CRD，而是把“应用在哪里运行、入口在哪里暴露、流量如何本地优先、故障如何切换、配置如何灰度、状态如何汇聚”收敛成统一声明。Kubernetes 联邦负责对象和集群层面的统一，Istio 负责流量和安全层面的统一，NameService 与 AccessPoint 则把两者连接成面向业务的多集群流量模型。", "subs": []}]}, {"title": "第 11 章 · Kubernetes 和 Istio 安全保证", "sections": [{"title": "云原生语境下的安全保证覆盖哪些生命周期", "content": "云原生安全不是上线前补一个扫描步骤，而是贯穿开发、分发、部署和运行的完整生命周期。安全与效率经常存在张力：如果把安全全部放在最后验收，团队会在发布前被漏洞、权限、合规问题反复打断；如果把安全前移到开发和流水线，单次检查会增加成本，但整体修复成本更低。\n\n#### 从 CIA 到云原生安全\n\n传统安全的三个基础目标仍然适用：\n\n| 目标 | 含义 | 云原生落点 |\n|---|---|---|\n| 机密性 | 只有被授权的主体能访问数据 | 身份认证、RBAC、Secret 管理、传输加密 |\n| 完整性 | 数据和工件未被非法篡改 | 镜像签名、摘要校验、TLS、审计日志 |\n| 可用性 | 合法用户和系统能持续使用资源 | 配额、限流、节点隔离、运行时监控 |\n\n云原生场景下还要把计算、存储、访问和运行环境一起纳入治理。一个服务可能由镜像、Kubernetes 对象、ServiceAccount、Secret、Ingress、Sidecar 和多个网络策略共同组成，任何一环权限过大或缺少验证，都可能放大攻击面。\n\n```mermaid\nflowchart LR\n    Dev[\"开发\"]\n    Dist[\"分发\"]\n    Deploy[\"部署\"]\n    Run[\"运行\"]\n    Access[\"访问安全\"]\n    Storage[\"存储安全\"]\n    Compute[\"计算安全\"]\n    Env[\"环境安全\"]\n\n    Dev --> Dist --> Deploy --> Run\n    Access --> Dev\n    Access --> Dist\n    Access --> Deploy\n    Access --> Run\n    Storage --> Deploy\n    Storage --> Run\n    Compute --> Deploy\n    Compute --> Run\n    Env --> Deploy\n    Env --> Run\n```\n\n#### 开发阶段\n\n开发阶段的目标是把明显问题挡在提交前。开发者不仅写业务代码，也会写 Dockerfile、Kubernetes Manifest、IaC 模板和配置文件，这些都可能引入安全风险。\n\n```mermaid\nflowchart LR\n    IDE[\"Developer IDE\"]\n    IaC[\"Infrastructure as Code\"]\n    Dockerfile[\"Dockerfile\"]\n    Manifest[\"K8s Manifest\"]\n    Code[\"Custom Code\"]\n    PreCommit[\"Pre-commit Hook\"]\n    Scan[\"Security Scan<br/>Static Analysis / Vulnerability Scan / IaC Scan / K8s Manifest Scan\"]\n    SCM[\"Commit to SCM\"]\n\n    IDE --> IaC\n    IDE --> Dockerfile\n    IDE --> Manifest\n    IDE --> Code\n    IaC --> PreCommit\n    Dockerfile --> PreCommit\n    Manifest --> PreCommit\n    Code --> PreCommit\n    PreCommit --> Scan\n    Scan -->|Passed| SCM\n    Scan -->|Fail| IDE\n```\n\n这张图对应“安全前移”的工程思路。开发者不用成为密码学专家，但不能把 FTP、不安全端口、明文 token、root 镜像和危险 Manifest 留到上线前才处理。扫描失败回到 IDE 虽然会影响当次效率，却能避免上线前被 P0 漏洞打断整个发布计划。\n\n常见检查包括：\n\n| 检查类型 | 检查对象 | 典型问题 |\n|---|---|---|\n| 静态代码扫描 | 应用源码 | 不安全协议、敏感信息硬编码、已知危险 API |\n| 依赖漏洞扫描 | 第三方库和基础镜像 | CVE、过期组件、恶意依赖 |\n| IaC 扫描 | Terraform、Ansible 等 | 过宽安全组、未加密存储、默认密码 |\n| Dockerfile 扫描 | 镜像构建文件 | root 用户运行、过大基础镜像、泄露 token |\n| Manifest 扫描 | Pod、Deployment、Service 等 | 特权容器、hostPath、未设置资源限制 |\n\n静态扫描只能发现代码和配置中的已知模式，动态扫描还要把应用或虚机实际跑起来检查运行面暴露。例如扫描器可以发现进程监听了不该开放的端口、启用了 FTP 这类不安全服务，或把调试接口暴露到外部网络；这类问题应在开发或集成环境直接阻断，而不是等到部署阶段再靠防火墙兜底。\n\n敏感凭据也要纳入开发阶段检查。企业账号密码、API token、云访问密钥一旦被提交到公共 GitHub 仓库，即使随后删除提交，也可能已经被索引、克隆或自动化程序抓取。代码扫描、提交钩子和仓库侧 secret scanning 应同时启用，并把泄露后的 token 轮换作为标准处置流程。\n\n示例：把简单检查放到提交前。\n\n```bash\n# 示例命令仅表示检查思路\ndocker build -t app:dev .\ntrivy image app:dev\nkubectl apply --dry-run=server -f k8s/\n```\n\n#### 分发阶段\n\n分发阶段关注工件本身是否可信。容器镜像、Helm Chart、Manifest 包和二进制文件进入仓库前，需要经过测试、扫描、签名和摘要校验。\n\n```mermaid\nflowchart LR\n    Build[\"构建工件\"]\n    Test[\"测试\"]\n    Scan[\"漏洞扫描\"]\n    Sign[\"签名\"]\n    Registry[\"镜像仓库\"]\n    Verify[\"完整性校验\"]\n    Release[\"发布\"]\n\n    Build --> Test --> Scan --> Sign --> Registry --> Verify --> Release\n```\n\n镜像安全的核心不是只扫一次，而是持续扫描。即使镜像构建时没有漏洞，基础镜像和依赖库之后也可能被披露新漏洞，所以生产镜像仓库应支持漏洞更新、重新评估和阻断策略。\n\n#### 部署阶段\n\n部署阶段要在工作负载进入集群前做准入控制。典型策略包括：\n\n- 镜像必须来自可信仓库。\n- 镜像摘要或签名必须通过校验。\n- 禁止特权容器和危险 capability。\n- 限制 hostNetwork、hostPID、hostIPC、hostPath。\n- 要求显式设置 ServiceAccount，而不是复用默认账号。\n- 要求 Secret、ConfigMap、Volume 和网络策略符合租户边界。\n\n```mermaid\nflowchart TB\n    Preflight[\"Pre Flight Checks\"]\n    ImageIntegrity[\"Validate Image<br/>Integrity and Signature\"]\n    ImageRuntime[\"Apply Image Runtime Policies<br/>Vulnerabilities\"]\n    HostSecurity[\"Host Security<br/>Compliance Controls\"]\n    ContainerPolicy[\"Apply Runtime Container Policies\"]\n    RuntimePolicies[\"Runtime Policies\"]\n    Deploy[\"Deploy\"]\n\n    Preflight --> ImageIntegrity\n    Preflight --> ImageRuntime\n    Preflight --> HostSecurity\n    RuntimePolicies --> ContainerPolicy\n    ImageIntegrity --> Deploy\n    ImageRuntime --> Deploy\n    HostSecurity --> Deploy\n    ContainerPolicy --> Deploy\n```\n\n部署前检查的关键是“没过就不让进集群”。镜像签名、漏洞策略、主机合规和运行时策略都属于准入前后的一组门禁，不能只靠人工约定。启用集群级限制前，要先确认系统组件和基础设施组件有对应授权，否则 kubelet、CNI、网关等关键 Pod 可能先被自己挡住。\n\nKubernetes 的准入控制、策略引擎、Pod Security、镜像准入和 RBAC 都属于这个阶段的重要能力。\n\n#### 运行阶段\n\n运行时安全关注服务已经跑起来之后是否继续保持可信状态。重点包括：\n\n- 容器内只允许运行预期进程。\n- 运行用户最小权限，根文件系统尽量只读。\n- 监控异常网络连接、端口暴露和横向移动。\n- 通过 NetworkPolicy 和服务网格限制东西向访问。\n- 通过 mTLS、认证、授权和审计记录服务访问。\n- 通过日志、审计和告警回溯谁在什么时间做了什么。\n\n```mermaid\nflowchart TB\n    subgraph App[\"Application\"]\n        MeshCP[\"Service Mesh Control Plane\"]\n        AppProc[\"App / Process\"]\n        AppAccess[\"Access<br/>Service Mesh / Ingress\"]\n        Transit[\"In-transit Data / Mem\"]\n        OSControl[\"OS Process Control\"]\n        NetEnc[\"Network Encryption\"]\n        ServiceAccess[\"Service Access Control\"]\n        QoS[\"QoS\"]\n        MemProtect[\"Memory Protection\"]\n        MeshAudit[\"Audit<br/>Service Access Log / Mesh Audit Log\"]\n    end\n\n    subgraph Orchestration[\"Workload Orchestration\"]\n        ControlPlane[\"Control Plane\"]\n        Workload[\"Container / Pod / Function\"]\n        NetAccess[\"Access<br/>CNI / Ingress\"]\n        Volumes[\"Data Volumes\"]\n        RBAC[\"RBAC\"]\n        Admission[\"Admission Control\"]\n        NetPolicy[\"Network Policy\"]\n        PodSecurity[\"Pod Security\"]\n        ContainerSec[\"Container Security\"]\n        ImageAuth[\"Image Authorization\"]\n        OrchAudit[\"Audit<br/>Orchestration Audit Log\"]\n    end\n\n    subgraph Cloud[\"Cloud / Environment\"]\n        CloudOrch[\"Cloud Orchestration\"]\n        Compute[\"Compute<br/>VM / Bare-Metal\"]\n        CloudAccess[\"Access<br/>VPC / ELB\"]\n        Storage[\"Storage\"]\n        IAM[\"IAM / RBAC\"]\n        SecGroup[\"Security Groups\"]\n        SecureBoot[\"Secure Boot\"]\n        ImmutableOS[\"Immutable OS\"]\n        StorageEnc[\"Storage Encryption\"]\n        CloudAudit[\"Audit<br/>Cloud Access Log / OS Audit Log / Flow Logs\"]\n    end\n\n    subgraph Foundations[\"Security Foundations\"]\n        Registry[\"Artifact Registry\"]\n        Identity[\"Identity & Access Control\"]\n        Secrets[\"Secrets Management\"]\n        Threat[\"Vulnerability & Threat Intelligence Feeds\"]\n        Compliance[\"Compliance\"]\n        Policies[\"Policies\"]\n    end\n\n    App --> Orchestration --> Cloud\n    Foundations -.->|支撑| App\n    Foundations -.->|支撑| Orchestration\n    Foundations -.->|支撑| Cloud\n```\n\n运行时安全不能只看 Pod 本身。应用层要关注服务访问、传输加密和审计；编排层要关注 RBAC、准入、NetworkPolicy、Pod Security 和镜像授权；云和环境层还要关注 VPC、安全组、加密存储、不可变 OS 和云审计。任何一层松动，都会给横向移动或权限提升留下入口。\n\n运行时的关键思路是持续验证，而不是部署时验证一次就永久信任。", "subs": ["从 CIA 到云原生安全", "开发阶段", "分发阶段", "部署阶段", "运行阶段"]}, {"title": "容器运行时和 Kubernetes 集群安全如何落地", "content": "容器运行时安全从镜像、用户、Linux namespace、capability 和文件系统权限开始；Kubernetes 集群安全则在控制面通信、认证授权、准入控制、Secret 加密、Pod Security 和审计层面继续收敛权限。\n\n#### 以非 root 身份运行容器\n\n容器内 root 不应被视为安全默认值。某些运行时、挂载方式或错误配置会让容器内 root 获得对主机目录、网络或内核能力的危险访问。常见做法是在构建镜像时创建普通用户，并在 Dockerfile 中切换用户。\n\n```dockerfile\nFROM ubuntu:22.04\nRUN useradd --uid 10001 --create-home appuser\nUSER 10001\nWORKDIR /app\n```\n\n在 Kubernetes 中还应通过 `securityContext` 强制声明运行身份：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: app\nspec:\n  securityContext:\n    runAsNonRoot: true\n    runAsUser: 10001\n    runAsGroup: 10001\n    fsGroup: 10001\n  containers:\n  - name: app\n    image: registry.example.com/app:v1\n    securityContext:\n      allowPrivilegeEscalation: false\n      readOnlyRootFilesystem: true\n      capabilities:\n        drop:\n        - ALL\n```\n\n这里的关键点不是 YAML 本身，而是最小权限原则：\n\n- 不需要 root 就不要 root。\n- 不需要 capability 就全部 drop。\n- 不需要写根文件系统就设为只读。\n- 必须写文件时，只开放明确的目录和权限。\n\n非 root 容器落地时，日志优先写到 `stdout` 和 `stderr`，再由容器运行时、节点日志采集器或平台日志系统接走。这样应用不需要为了写日志获得根目录或系统日志目录的写权限。如果确实必须写本地文件，应只为该用户授权特定挂载目录，例如 `/var/lib/app` 或 `/tmp/app`，并避免把整个根文件系统、宿主机目录或共享卷开放为可写。\n\n#### User Namespace 和 rootless container\n\nUser Namespace 可以把容器内用户映射为主机上的非 root 用户。即使容器内看到的是 root，映射到主机后也不是主机 root，从而降低容器逃逸后的破坏能力。\n\nRootless container 则让容器运行时本身以非 root 身份启动。Podman 这类运行时更适合这种模型；Docker 传统 daemon 常以 root 运行，因此要额外关注 daemon 权限边界。\n\n这两类能力都能降低风险，但也会带来文件挂载、用户映射、目录权限和运行时兼容性的复杂度。生产落地时通常与安全基线、镜像规范和节点运行时统一规划。\n\n#### Kubernetes 控制面通信安全\n\nKubernetes 控制面默认应通过 TLS 通信：\n\n- etcd 成员之间使用 peer 证书。\n- API Server 访问 etcd 使用客户端证书。\n- kubelet、controller-manager、scheduler、kubectl 等访问 API Server 时通过 kubeconfig 或证书认证。\n- 不应开启 API Server 的 insecure 端口。\n\n```mermaid\nflowchart TB\n    subgraph EtcdCA[\"etcd CA 颁发和验证的证书\"]\n        Etcd1[\"etcd 成员 1\"]\n        Etcd2[\"etcd 成员 2\"]\n        Etcd3[\"etcd 成员 3\"]\n        Etcd1 <-->|etcd peering| Etcd2\n        Etcd2 <-->|etcd peering| Etcd3\n    end\n\n    subgraph APIServers[\"API Server 高可用层\"]\n        API1[\"API Server 1\"]\n        API2[\"API Server 2\"]\n        API3[\"API Server 3\"]\n    end\n\n    LB[\"负载均衡器 / DNS\"]\n\n    subgraph K8sCA[\"Kubernetes CA 颁发和验证的证书\"]\n        KubeletA[\"kubelet<br/>Node A\"]\n        KubeletB[\"kubelet<br/>Node B\"]\n        KubeletC[\"kubelet<br/>Node C\"]\n        Kubectl[\"kubectl / API 客户端\"]\n    end\n\n    API1 <-->|etcd 客户端证书| Etcd1\n    API2 <-->|etcd 客户端证书| Etcd2\n    API3 <-->|etcd 客户端证书| Etcd3\n    Kubectl -->|TLS| LB\n    LB --> API1\n    LB --> API2\n    LB --> API3\n    API1 <-->|TLS| KubeletA\n    API2 <-->|TLS| KubeletB\n    API3 <-->|TLS| KubeletC\n```\n\n控制面安全不只靠 TLS。认证、授权、准入、审计和配额共同组成访问控制链路：\n\n| 环节 | 作用 | 例子 |\n|---|---|---|\n| 认证 | 确认请求者是谁 | X.509、ServiceAccount、OIDC |\n| 授权 | 判断能否执行操作 | RBAC、ABAC |\n| 准入 | 创建或修改前做策略校验 | NodeRestriction、Pod Security、Webhook |\n| 审计 | 记录谁做了什么 | API Server audit log |\n| 配额 | 限制资源消耗 | ResourceQuota、LimitRange |\n\n所有访问 API Server 的客户端都要进入这条链路，不只是 `kubectl`。节点上的 kubelet、kube-proxy，控制面的 scheduler、controller-manager，卷插件、聚合 API、准入 Webhook 以及自动化运维程序，本质上都是 API 客户端。小规模集群可以使用静态 token、bootstrap token 或 X.509 客户端证书；企业集群通常会接入 OIDC、LDAP 或统一身份系统，再用 RBAC 把用户、组和 ServiceAccount 绑定到明确权限上。\n\nResourceQuota 也不只是一个抽象的“限额”开关。namespace 级配额通常会约束 CPU request/limit、内存 request/limit、持久化存储容量、PVC 数量、Pod 数量、Service 数量、LoadBalancer Service 数量以及对象总数。配额和 LimitRange 配合使用时，前者限制团队能消耗多少总量，后者限制单个工作负载的默认值和上下限。\n\n审计日志需要在 API Server 上显式配置。集群即使具备审计能力，如果没有设置 `--audit-policy-file` 和审计后端，例如 `--audit-log-path` 或 webhook 后端，就不会留下足够的 API 调用证据。生产集群应把 audit log 作为安全基线，至少记录对象写操作、权限变更、Secret 访问和准入拒绝事件，便于在事故后还原“谁在什么时间对哪个对象做了什么”。\n\n```yaml\napiVersion: audit.k8s.io/v1\nkind: Policy\nrules:\n- level: RequestResponse\n  verbs:\n  - create\n  - update\n  - patch\n  - delete\n  resources:\n  - group: \"\"\n    resources:\n    - secrets\n- level: Metadata\n  resources:\n  - group: \"*\"\n    resources:\n    - \"*\"\n```\n\n#### RBAC 和最小授权\n\nRBAC 的设计重点是按团队、namespace、服务账号和职责拆分权限。生产集群里不要把 `cluster-admin` 当作默认权限，也不要让大量应用共享同一个高权限 ServiceAccount。\n\n生产环境通常还会禁止业务 Pod 直接使用 namespace 自动创建的 `default` ServiceAccount。默认账号长期存在，容易被多个应用为了省事复用；一旦它被绑定了过宽权限，或其 token 通过日志、镜像、调试入口泄露，影响面会覆盖整个 namespace 甚至更大范围。更稳妥的做法是为每个工作负载显式创建 ServiceAccount，并只绑定它需要的 Role 或 ClusterRole。\n\n一个只允许读取 Pod 的 Role 示例：\n\n```yaml\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: pod-reader\n  namespace: team-a\nrules:\n- apiGroups:\n  - \"\"\n  resources:\n  - pods\n  verbs:\n  - get\n  - list\n  - watch\n```\n\n绑定到明确的 ServiceAccount：\n\n```yaml\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: read-pods\n  namespace: team-a\nsubjects:\n- kind: ServiceAccount\n  name: app-reader\n  namespace: team-a\nroleRef:\n  kind: Role\n  name: pod-reader\n  apiGroup: rbac.authorization.k8s.io\n```\n\nPodSecurityPolicy 的 `use` 权限说明了策略对象本身也应该纳入 RBAC 权限边界。PSP 作为一种资源，需要通过 Role 或 ClusterRole 授权给用户、组或 ServiceAccount 后才能使用。新版本集群通常会使用 Pod Security Admission 或策略引擎替代 PSP，但角色规划思路相同：系统组件、管理员、普通用户应有不同安全等级。\n\n验证 PSP 授权链路时，可以先在目标 namespace 中创建一个低权限 ServiceAccount，再用 `kubectl auth can-i` 按该身份检查它是否能 `use` 指定策略：\n\n```bash\nkubectl create namespace psp-demo\nkubectl create serviceaccount fake -n psp-demo\n\nkubectl auth can-i use podsecuritypolicy/restricted \\\n  --as system:serviceaccount:psp-demo:fake \\\n  -n psp-demo\n```\n\n未授权时，上面的检查应返回 `no`，使用该 ServiceAccount 创建需要 PSP 放行的 Pod 也会被准入控制拒绝。授权通常由一个限定 `resourceNames` 的 ClusterRole 加上 namespace 内 RoleBinding 完成：\n\n```yaml\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: use-restricted-psp\nrules:\n- apiGroups:\n  - policy\n  resources:\n  - podsecuritypolicies\n  resourceNames:\n  - restricted\n  verbs:\n  - use\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: fake-use-restricted-psp\n  namespace: psp-demo\nsubjects:\n- kind: ServiceAccount\n  name: fake\n  namespace: psp-demo\nroleRef:\n  kind: ClusterRole\n  name: use-restricted-psp\n  apiGroup: rbac.authorization.k8s.io\n```\n\n绑定后再次执行 `kubectl auth can-i use podsecuritypolicy/restricted --as system:serviceaccount:psp-demo:fake -n psp-demo`，应返回 `yes`。这条链路能帮助区分“策略本身存在”和“某个主体被授权使用该策略”两个问题。\n\n#### Secret 和存储加密\n\nSecret 常存放 token、密码、证书和私钥，因此不能只依赖对象名叫 Secret。需要同时关注三个层面：\n\n| 层面 | 风险 | 防护 |\n|---|---|---|\n| API 访问 | 用户或工作负载读取不该读的 Secret | RBAC 最小授权 |\n| etcd 落盘 | etcd 数据泄露后明文暴露 | EncryptionConfiguration |\n| 使用方式 | key 和 cert 或 token 被集中泄露 | 分离存储、动态注入、短周期轮换 |\n\nKubernetes 可以配置资源落盘加密：\n\n```yaml\napiVersion: apiserver.config.k8s.io/v1\nkind: EncryptionConfiguration\nresources:\n- resources:\n  - secrets\n  providers:\n  - aescbc:\n      keys:\n      - name: key1\n        secret: c2VjcmV0IGlzIHNlY3VyZQ==\n  - kms:\n      name: production-kms\n      endpoint: unix:///var/run/kms/socket\n      cachesize: 100\n  - identity: {}\n```\n\nProvider 顺序很重要：写入时使用第一个 provider，读取时按顺序尝试解密。`identity` 表示不加密，通常只作为兼容旧数据的兜底项。\n\n证书和私钥也不应该因为 Kubernetes Secret 支持键值存储就随意放在一起。标准 TLS Secret 常把 `tls.crt` 和 `tls.key` 放在同一个对象里，便于 Ingress 或 Istio Gateway 通过 `credentialName` 引用；但在更严格的密钥管理要求下，私钥和证书只有在最终使用的工作负载内才允许同时出现。此时应把私钥放在 KMS、HSM 或专门的 Secret provider 中，通过 CSI driver、External Secrets 或自定义 SDS/provider 动态注入，而不是长期把 key 和 cert 打包进一个可被大量主体读取的 Secret。\n\n#### NodeRestriction\n\n`NodeRestriction` 是 Kubernetes 准入控制器，用于限制 kubelet 的权限边界。它解决的是 RBAC 难以表达的节点维度问题：一个节点上的 Pod 可能来自多个 namespace，但 kubelet 只能管理调度到自己节点上的 Pod。\n\n开启后，kubelet 受到这些限制：\n\n- 只能修改自己的 Node 对象。\n- 只能修改绑定到自己节点的 Pod 对象。\n- 不能删除 Node 对象。\n- 不能修改带有 `node-restriction.kubernetes.io/` 前缀的受保护标签。\n\n这能降低 kubelet kubeconfig 泄露后的影响范围，避免攻击者借节点身份修改其他节点或其他 Pod。\n\n#### Pod Security 和安全上下文\n\nPod Security 的核心是限制 Pod 和容器能向主机申请什么权限。实际理解时可以把它拆成三层：\n\n| 层次 | 作用域 | 控制内容 | 例子 |\n|---|---|---|\n| Container-level SecurityContext | 只影响指定容器 | 容器进程权限和文件系统行为 | `privileged`、`capabilities`、`allowPrivilegeEscalation`、`readOnlyRootFilesystem` |\n| Pod-level SecurityContext | 影响 Pod 内全部容器和 Volume | 默认用户、组、SELinux、seccomp 和卷属主 | `runAsUser`、`runAsGroup`、`fsGroup`、`supplementalGroups`、`seccompProfile` |\n| 集群级 Pod 安全策略 | 准入时限制哪些声明可以被接受 | 对工作负载权限做统一约束 | 禁止特权容器、禁止 hostPath、限制 hostNetwork、限制 hostPorts |\n\n容器级安全上下文只约束对应容器，不会改变共享 Volume 的属主和权限；Pod 级安全上下文会影响 Pod 内所有容器，并可通过 `fsGroup`、`supplementalGroups` 等字段影响 Volume 挂载后的权限。集群级策略则在对象创建或更新时拦截不符合基线的 Pod。\n\n常见高风险字段：\n\n| 字段 | 风险 |\n|---|---|\n| `privileged: true` | 容器获得接近主机级别的权限 |\n| `allowPrivilegeEscalation: true` | 进程可能提升权限 |\n| `hostNetwork: true` | Pod 共享主机网络命名空间 |\n| `hostPID: true` | Pod 可看到主机进程 |\n| `hostIPC: true` | Pod 可访问主机 IPC namespace |\n| `hostPath` | Pod 可挂载主机文件路径 |\n| 未 drop capabilities | 进程保留不必要的 Linux 能力 |\n\n这些字段不能只按“出现即错误”机械判断，系统级 DaemonSet 往往确实需要更高权限，但要能解释权限来源并限制到必要组件。Calico Node 就是典型例子：init container 需要把 CNI 插件复制到主机目录，因此会挂载 CNI 相关 `hostPath`，并需要足够权限写入主机文件系统；主容器负责创建网络设备、配置路由和维护 iptables 规则，通常需要 `privileged`，并经常使用 `hostNetwork` 直接操作节点网络命名空间。这个权限模型适合 CNI 组件，不应被普通业务容器照搬。\n\nIstio sidecar 也体现了最小权限和必要权限的组合。负责流量重定向的 init container 可以先 `drop: ALL`，再只添加 `NET_ADMIN` 和 `NET_RAW`，用于写入 iptables 规则和处理网络包；主 `istio-proxy` 容器则以固定的非 root 身份运行，常见 UID/GID 为 `1337`。iptables 规则会识别这个用户，让代理自己发出的流量直接返回，避免 Envoy 出站连接再次被重定向到自己形成重复劫持。\n\nPSP 已在新版本中被 Pod Security Admission 和策略引擎取代，但它覆盖的控制项仍然是设计安全基线时的检查清单：\n\n- `privileged`、`allowPrivilegeEscalation`、capabilities 的默认添加、允许添加和强制删除。\n- 可使用的 `volumes` 类型，例如是否允许 `hostPath`。\n- `hostNetwork`、`hostPID`、`hostIPC` 以及 `hostPorts` 范围。\n- SELinux 上下文、`runAsUser`、`runAsGroup`。\n- `supplementalGroups`、`fsGroup`。\n- `readOnlyRootFilesystem`、seccomp、AppArmor 等运行时限制。\n\n生产落地时应先为系统组件准备高权限策略并完成绑定，再开启集群级限制，否则 API Server、kubelet 创建 mirror pod 或基础设施组件可能被准入控制挡住。普通用户则使用受限策略，例如禁止特权、禁止 host namespace、强制非 root、限制 volume 类型。\n\n#### 镜像安全和准入\n\n镜像安全贯穿分发和部署两个阶段。一个可落地的基线可以写成：\n\n| 要求 | 目的 |\n|---|---|\n| 使用可信基础镜像 | 降低未知依赖和恶意镜像风险 |\n| 固定镜像摘要 | 避免 tag 漂移 |\n| 构建后扫描漏洞 | 阻断已知高危问题 |\n| 镜像签名 | 证明工件来源和完整性 |\n| 准入阶段校验来源和签名 | 防止绕过流水线直接部署 |\n| 禁止镜像内写入密码和 token | 防止分发后泄露 |\n\n示例：部署时使用摘要而不是可漂移 tag。\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: api\n  template:\n    metadata:\n      labels:\n        app: api\n    spec:\n      containers:\n      - name: api\n        image: registry.example.com/api@sha256:1111111111111111111111111111111111111111111111111111111111111111\n```", "subs": ["以非 root 身份运行容器", "User Namespace 和 rootless container", "Kubernetes 控制面通信安全", "RBAC 和最小授权", "Secret 和存储加密", "NodeRestriction", "Pod Security 和安全上下文", "镜像安全和准入"]}, {"title": "Taint 和节点隔离如何控制工作负载落点", "content": "Taint 和 Toleration 用于控制 Pod 能不能调度到某些节点。它不是网络隔离，也不是运行时隔离，而是调度层面的准入机制。\n\n#### Taint 的基本用法\n\n给节点增加 taint：\n\n```bash\nkubectl taint nodes node-a tenant=team-a:NoSchedule\n```\n\n删除 taint：\n\n```bash\nkubectl taint nodes node-a tenant:NoSchedule-\n```\n\nPod 通过 toleration 表示可以容忍该 taint：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: team-a-app\nspec:\n  tolerations:\n  - key: tenant\n    operator: Equal\n    value: team-a\n    effect: NoSchedule\n  containers:\n  - name: app\n    image: registry.example.com/app:v1\n```\n\n`operator` 有两种常见写法。`Equal` 要求 `key`、`value` 和 `effect` 都匹配，适合精确容忍某个租户或某类节点；`Exists` 只要求 taint key 存在，不关心 value，适合表达“只要是这类 taint 都能容忍”。\n\n```yaml\ntolerations:\n- key: dedicated\n  operator: Exists\n  effect: NoSchedule\n```\n\n常见 effect：\n\n| effect | 含义 |\n|---|---|\n| `NoSchedule` | 不容忍该 taint 的新 Pod 不能调度上来 |\n| `PreferNoSchedule` | 尽量不调度上来，但不是强制 |\n| `NoExecute` | 不容忍的 Pod 会被驱逐，新 Pod 也不能调度 |\n\n#### 多租户节点隔离\n\n在多租户集群中，某些租户希望关键业务不与其他租户共享节点。可以将节点打上租户 taint，再让该租户 Pod 带上 toleration。\n\n```mermaid\nflowchart TB\n    NodeA[\"节点 A 具备 tenant a taint\"]\n    NodeB[\"节点 B 具备 tenant b taint\"]\n    PodA[\"租户 A Pod\"]\n    PodB[\"租户 B Pod\"]\n    PodX[\"普通 Pod\"]\n    RejectA[\"不能调度到节点 A\"]\n    RejectB[\"不能调度到节点 B\"]\n\n    PodA --> NodeA\n    PodB --> NodeB\n    PodX --> RejectA\n    PodX --> RejectB\n```\n\n这种方案适合强隔离或合规场景，但不应滥用。把一个大集群切成许多小资源池，会降低资源利用率，也会降低故障腾挪空间。更常见的做法是：\n\n- 用 namespace、RBAC、ResourceQuota 做租户边界。\n- 用 NetworkPolicy 做网络边界。\n- 用 Pod Security 限制危险权限。\n- 用亲和性、反亲和性和拓扑约束表达调度偏好。\n- 只在确实需要独占硬件或强隔离时使用 taint 分池。\n\n对于 CPU 或延迟敏感工作负载，盲目拆节点池不一定是最好的隔离方式。可以让 kubelet 启用 `static` CPU Manager policy，并把关键 Pod 做成 Guaranteed QoS：CPU request 和 limit 相等，且申请整数个 CPU。满足条件后，kubelet 可以把独占 CPU 分配给该 Pod，使敏感工作负载和普通工作负载在 CPU 调度层面隔离，通常比把节点切成许多小池子更能兼顾性能稳定性和集群利用率。\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: latency-sensitive\nspec:\n  containers:\n  - name: app\n    image: registry.example.com/app:v1\n    resources:\n      requests:\n        cpu: \"2\"\n        memory: 2Gi\n      limits:\n        cpu: \"2\"\n        memory: 2Gi\n```", "subs": ["Taint 的基本用法", "多租户节点隔离"]}, {"title": "Kubernetes NetworkPolicy 如何定义网络访问边界", "content": "Kubernetes `NetworkPolicy` 用于在三层和四层控制 Pod 的入站和出站流量。它的本质是白名单策略：当 Pod 被策略选中后，未被允许的方向会被拒绝。\n\n#### Pod 的隔离状态\n\n默认情况下，Pod 是非隔离的，可以接受任何来源流量，也可以发出任意出站流量。只有当某个 NetworkPolicy 选择了它，它才在对应方向进入隔离状态。\n\n重要规则：\n\n- 策略必须由支持 NetworkPolicy 的 CNI 插件实现。\n- 多个策略不会互相覆盖，而是并集生效。\n- 入站访问需要目标 Pod 的 ingress 允许。\n- 出站访问需要源 Pod 的 egress 允许。\n- 两边任意一边不允许，连接就不成立。\n\n```mermaid\nflowchart LR\n    Src[\"源 Pod\"]\n    Egress[\"源端出站允许\"]\n    Ingress[\"目标入站允许\"]\n    Dst[\"目标 Pod\"]\n    Deny[\"拒绝\"]\n\n    Src --> Egress\n    Egress --> Ingress\n    Ingress --> Dst\n    Egress --> Deny\n    Ingress --> Deny\n```\n\n#### 关键字段\n\n| 字段 | 作用 |\n|---|---|\n| `podSelector` | 选择策略作用的目标 Pod |\n| `policyTypes` | 指定 Ingress、Egress 或两者 |\n| `ingress.from` | 定义允许访问目标 Pod 的来源 |\n| `egress.to` | 定义目标 Pod 允许访问的目的地 |\n| `ports` | 限制协议和端口 |\n| `namespaceSelector` | 选择 namespace |\n| `ipBlock` | 选择 CIDR 网段 |\n\n空的 `podSelector: {}` 表示选择当前 namespace 下所有 Pod。\n\n`policyTypes` 未显式填写时会按规则推导：默认至少包含 `Ingress`；如果策略里写了 `egress` 规则，则同时包含 `Egress`。为了避免读者误判策略方向，生产配置通常显式写出 `Ingress`、`Egress` 或两者。需要注意，选择了 Pod 之后，隔离只发生在对应方向：只有 Ingress 策略不会限制出站，只有 Egress 策略不会限制入站。\n\n#### 默认拒绝和精确放行\n\n默认拒绝所有入站：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-ingress\n  namespace: prod\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\n```\n\n常见默认策略可以按四种基线理解：\n\n| 策略 | 语义 | 典型用途 |\n|---|---|---|\n| default deny ingress | 拒绝当前 namespace 所有 Pod 的入站流量 | 建立最小入站基线 |\n| allow all ingress | 允许当前 namespace 所有 Pod 接收入站流量 | 作为显式放行或迁移过渡 |\n| allow all egress | 允许当前 namespace 所有 Pod 发起出站流量 | 避免只启用入站隔离时误伤出站 |\n| default deny all | 入站和出站都默认拒绝 | 高安全 namespace 的起点 |\n\n允许所有入站：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-all-ingress\n  namespace: prod\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\n  ingress:\n  - {}\n```\n\n允许所有出站：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-all-egress\n  namespace: prod\nspec:\n  podSelector: {}\n  policyTypes:\n  - Egress\n  egress:\n  - {}\n```\n\n同时默认拒绝入站和出站：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-all\n  namespace: prod\nspec:\n  podSelector: {}\n  policyTypes:\n  - Ingress\n  - Egress\n```\n\n隔离数据库 Pod，只允许指定前端访问 Redis 端口：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: db-allow-frontend\n  namespace: prod\nspec:\n  podSelector:\n    matchLabels:\n      role: db\n  policyTypes:\n  - Ingress\n  - Egress\n  ingress:\n  - from:\n    - podSelector:\n        matchLabels:\n          role: frontend\n    ports:\n    - protocol: TCP\n      port: 6379\n  egress:\n  - to:\n    - ipBlock:\n        cidr: 10.0.0.0/24\n    ports:\n    - protocol: TCP\n      port: 5978\n```\n\n来源和目的可以组合 Pod、namespace 与 CIDR。下面的示例把数据库入站限制为三类来源：同 namespace 的 frontend Pod、带 `purpose: app` 标签的 namespace 中的 client Pod、以及办公网段中排除一段子网后的地址。\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: db-allow-combined-sources\n  namespace: prod\nspec:\n  podSelector:\n    matchLabels:\n      role: db\n  policyTypes:\n  - Ingress\n  ingress:\n  - from:\n    - podSelector:\n        matchLabels:\n          role: frontend\n    - namespaceSelector:\n        matchLabels:\n          purpose: app\n      podSelector:\n        matchLabels:\n          role: client\n    - ipBlock:\n        cidr: 172.17.0.0/16\n        except:\n        - 172.17.1.0/24\n    ports:\n    - protocol: TCP\n      port: 6379\n```\n\n同一个 `from` 列表中的多个条目是“或”的关系；同一个条目里同时写 `namespaceSelector` 和 `podSelector` 时表示二者同时满足。`ipBlock.except` 用来从大网段中排除更小的子网，常用于允许办公网或出口网段时排除不可信地址段。\n\nNetworkPolicy 很适合做 namespace 内部或 namespace 之间的基础隔离，但它通常只处理 L3/L4 条件。若要按 HTTP path、JWT claim 或 service identity 授权，需要服务网格或应用层策略。", "subs": ["Pod 的隔离状态", "关键字段", "默认拒绝和精确放行"]}, {"title": "Calico NetworkPolicy 如何扩展网络安全策略", "content": "Calico 在 Kubernetes NetworkPolicy 的基础上提供更丰富的策略能力。它既支持 Kubernetes 原生策略，也支持 `projectcalico.org/v3` 下的 Calico NetworkPolicy 和 GlobalNetworkPolicy。\n\n#### Calico 策略能力\n\nCalico NetworkPolicy 是 namespace 级资源，使用 selector 匹配 endpoint。它比原生 NetworkPolicy 更灵活，常见增强包括：\n\n| 能力 | 说明 |\n|---|---|\n| 更丰富的 selector | 支持表达式式标签选择 |\n| action | 可以显式 Allow、Deny、Log、Pass |\n| GlobalNetworkPolicy | 集群级策略，可跨 namespace 生效 |\n| HostEndpoint | 可把节点网卡纳入策略控制 |\n| 更细的顺序控制 | 通过策略层级和顺序表达优先级 |\n\n示例：允许特定来源访问 envoy 工作负载。\n\n```yaml\napiVersion: projectcalico.org/v3\nkind: NetworkPolicy\nmetadata:\n  name: allow-tcp-90\n  namespace: prod\nspec:\n  selector: app == \"envoy\"\n  types:\n  - Ingress\n  - Egress\n  ingress:\n  - action: Allow\n    protocol: TCP\n    source:\n      nets:\n      - 192.168.0.0/16\n      selector: role == \"frontend\"\n      namespaceSelector: project == \"platform\"\n    destination:\n      ports:\n      - 80\n      - 6040:6050\n  egress:\n  - action: Allow\n    destination:\n      ports:\n      - 443\n```\n\n#### Calico 的底层执行\n\n可以通过 toolbox 容器、ping 测试和 iptables 规则观察 Calico 策略效果。Calico 会把策略转换为节点上的规则链，例如 `cali-INPUT`、`cali-FORWARD` 和 workload 相关链。典型处理逻辑包括：\n\n- 已建立连接放行。\n- 无效连接丢弃。\n- 命中允许策略后打 mark 并返回。\n- 没有策略通过时丢弃。\n- 对 VXLAN 和 workload 流量做专门链路处理。\n\n```mermaid\nflowchart TB\n    Packet[\"数据包\"]\n    Input[\"Calico 输入链\"]\n    Dispatch[\"工作负载分发链\"]\n    Policy[\"策略链\"]\n    Profile[\"配置链\"]\n    Accept[\"接受\"]\n    Drop[\"丢弃\"]\n\n    Packet --> Input --> Dispatch --> Policy\n    Policy --> Accept\n    Policy --> Profile\n    Profile --> Accept\n    Profile --> Drop\n    Policy --> Drop\n```\n\nCalico 策略适合在需要更强网络隔离、全局默认拒绝、主机端点防护或策略审计时使用。它与 Kubernetes 原生 NetworkPolicy 的关系不是替代一切，而是补充更细的表达能力。", "subs": ["Calico 策略能力", "Calico 的底层执行"]}, {"title": "零信任架构如何改变服务访问模型", "content": "传统网络安全常以边界为中心：外网不可信，内网相对可信，DMZ、WAF、防火墙和入侵检测部署在边界上。这种模型在云原生环境中会遇到问题，因为服务、节点、Pod、用户、设备和办公网络都在动态变化，边界很难固定。\n\n#### 从边界信任到持续验证\n\n零信任的核心原则是：从不默认信任，始终验证。\n\n传统边界模型先把外网、DMZ 和内网切开，再把防火墙、IDS、WAF 放在入口处。它在固定机房时代有效，但到了 Pod、节点、用户设备和服务实例都频繁变化的云原生环境里，内网默认可信会变成横向移动的温床。\n\n```mermaid\nflowchart LR\n    Internet[\"Internet / Outside Zone\"]\n    Firewall[\"边界防护<br/>Firewall / IDS / WAF\"]\n    DMZ[\"DMZ Zone\"]\n    Inside[\"Inside Zone\"]\n    App[\"Application Server\"]\n    DB[\"Database Server\"]\n\n    Internet --> Firewall --> DMZ --> Inside\n    Inside --> App\n    Inside --> DB\n```\n\n因此，零信任不是不要边界，而是不把网络位置当成充分信任条件。每次访问都要重新看主体身份、设备和服务状态、请求上下文、策略条件和审计信号。\n\n| 传统边界模型 | 零信任模型 |\n|---|---|\n| 按网络位置判断可信度 | 按身份、上下文和策略判断可信度 |\n| 内网通常被默认信任 | 内外网都视为不可信 |\n| 静态访问控制 | 动态访问控制 |\n| 重点保护入口边界 | 每次访问都要认证和授权 |\n| 横向移动风险高 | 通过微隔离缩小影响范围 |\n\n```mermaid\nflowchart LR\n    Subject[\"访问主体\"]\n    Identity[\"身份验证\"]\n    Context[\"上下文评估\"]\n    Policy[\"动态策略\"]\n    Access[\"最小授权访问\"]\n    Audit[\"审计和监测\"]\n\n    Subject --> Identity --> Context --> Policy --> Access --> Audit\n    Audit --> Context\n```\n\n零信任网络建立在几个假设上：\n\n- 网络中始终存在威胁。\n- 内部和外部流量都可能不可信。\n- 不能只依靠网络位置建立信任。\n- 用户、设备、服务和流量都应被认证和授权。\n- 访问决策应基于尽可能多的数据源动态评估。\n\n#### 零信任三类关键技术\n\n零信任架构可以用 SIM 三类技术理解：\n\n| 技术 | 全称 | 作用 |\n|---|---|---|\n| SDP | Software Defined Perimeter | 软件定义边界，隐藏和保护服务入口 |\n| IAM | Identity and Access Management | 身份管理，提供唯一身份和生命周期管理 |\n| MSG | Micro Segmentation | 微隔离，将访问边界切到工作负载级别 |\n\nSDP 把控制流和数据流分开：访问主体先向控制面证明身份、设备状态和上下文，控制面通过后才暴露服务入口或下发连接信息；未通过验证的主体连目标服务的网络位置都不应该看到。IAM 负责给人、设备、服务和自动化程序建立唯一身份，并管理入职、离职、过期、异常登录、权限回收等生命周期事件。微隔离则把传统数据中心的大网段拆成工作负载级安全段，让东西向访问必须显式放行，即使攻击者进入某个 Pod 或节点，也不能天然访问同网段里的其他服务。\n\n```mermaid\nflowchart TB\n    ZT[\"Zero Trust\"]\n    Data[\"Data\"]\n    People[\"People\"]\n    Networks[\"Networks\"]\n    Workloads[\"Workloads\"]\n    Devices[\"Devices\"]\n    Visibility[\"Visibility & Analytics\"]\n    Automation[\"Automation & Orchestration\"]\n\n    ZT --> Data\n    ZT --> People\n    ZT --> Networks\n    ZT --> Workloads\n    ZT --> Devices\n    ZT --> Visibility\n    ZT --> Automation\n```\n\n把零信任落到 Kubernetes 和 Istio 时，Data 对应 Secret、存储加密和敏感接口；People 和 Devices 对应企业 IAM、OIDC 和访问上下文；Workloads 对应 ServiceAccount、SPIFFE、mTLS 和 AuthorizationPolicy；Visibility 与 Automation 则对应审计、遥测、告警和自动化策略下发。\n\n在 Kubernetes 和 Istio 中，这些理念分别落到：\n\n- ServiceAccount 和 SPIFFE 身份。\n- RBAC 和 AuthorizationPolicy。\n- NetworkPolicy 和 Calico 网络隔离。\n- mTLS 和证书轮换。\n- 请求级 JWT 认证。\n- Envoy 代理侧审计和遥测。", "subs": ["从边界信任到持续验证", "零信任三类关键技术"]}, {"title": "Istio 安全模型和身份如何建立服务信任", "content": "微服务架构让服务数量增加、调用链变长、东西向流量增多，也让安全边界从入口网关延伸到每一次服务调用。Istio 的安全目标是把服务间认证、加密、授权和审计从业务代码中剥离出来，由数据平面代理和控制平面统一管理。\n\n#### Istio 安全目标\n\n| 目标 | 含义 |\n|---|---|\n| 默认安全 | 应用不用改代码，也能获得身份、证书和加密能力 |\n| 深度防御 | 与已有身份、证书、审计和策略系统集成 |\n| 零信任网络 | 在不可信网络上建立服务到服务的安全通信 |\n\nIstio 安全架构包含：\n\n- CA 负责密钥和证书管理。\n- istiod 分发认证、授权和网络配置。\n- Envoy Sidecar 和边缘代理作为策略执行点。\n- 扩展和遥测能力用于审计、指标和访问日志。\n\n```mermaid\nflowchart TB\n    Istiod[\"istiod\"]\n    CA[\"证书机构\"]\n    Policy[\"安全策略\"]\n    ProxyA[\"服务 A 代理\"]\n    ServiceA[\"服务 A\"]\n    ProxyB[\"服务 B 代理\"]\n    ServiceB[\"服务 B\"]\n    Gateway[\"入口代理\"]\n\n    Istiod --> CA\n    Policy --> Istiod\n    Istiod --> ProxyA\n    Istiod --> ProxyB\n    Istiod --> Gateway\n    Gateway --> ProxyA\n    ProxyA --> ServiceA\n    ServiceA --> ProxyA\n    ProxyA --> ProxyB\n    ProxyB --> ServiceB\n```\n\n#### Istio 身份模型\n\nIstio 使用服务身份判断请求来源。不同平台的身份来源不同，在 Kubernetes 中通常来自 ServiceAccount。\n\n| 平台 | 身份来源 |\n|---|---|\n| Kubernetes | Kubernetes ServiceAccount |\n| GKE 或 GCE | GCP ServiceAccount |\n| AWS | IAM 用户或角色 |\n| 本地环境 | 用户账号、自定义服务账号或服务名称 |\n\nIstio 与 SPIFFE 身份模型兼容。Kubernetes 中常见身份格式如下：\n\n```text\nspiffe://cluster.local/ns/default/sa/sleep\n```\n\n这个身份表达三件事：信任域、namespace 和 ServiceAccount。服务端可以根据调用方身份做授权，客户端也可以验证服务端证书中的身份是否被授权运行目标服务。\n\n安全命名解决的是“服务名称”和“证书身份”之间的绑定问题。客户端访问 `reviews.default.svc.cluster.local` 时，真正参与 mTLS 握手的是服务端代理证书中的 SPIFFE 身份，例如 `spiffe://cluster.local/ns/default/sa/reviews`。Istio 控制面会监视 Kubernetes Service、Endpoint、Pod 和 ServiceAccount，把服务发现名称映射到被允许承载该服务的身份，再把这份映射安全分发给代理。客户端代理在校验证书时不只检查证书是否由可信 CA 签发，还会检查该身份是否被授权运行目标服务名。\n\n#### SDS 和证书供应\n\nIstio 通过 Secret Discovery Service 为 Envoy 提供证书和私钥。流程如下：\n\n```mermaid\nsequenceDiagram\n    participant Envoy as Envoy\n    participant Agent as istio agent\n    participant Istiod as istiod\n    participant CA as CA\n\n    Envoy->>Agent: 请求证书和密钥\n    Agent->>Agent: 生成私钥和 CSR\n    Agent->>Istiod: 提交 CSR 和凭据\n    Istiod->>CA: 验证并签名 CSR\n    CA-->>Istiod: 返回证书\n    Istiod-->>Agent: 下发证书\n    Agent-->>Envoy: 提供证书和私钥\n```\n\n工作负载启动后，Envoy 向同 Pod 内的 `istio-agent` 请求身份材料；agent 生成私钥和 CSR，发送给 istiod CA；CA 验证凭据并签发证书；agent 再把证书和私钥通过 SDS 提供给 Envoy。证书临近过期时，agent 会重复流程完成轮换。\n\n对于 Istio Gateway，标准做法可以通过 `credentialName` 引用 Kubernetes TLS Secret，再由 SDS 把证书材料送给网关代理。但如果安全规范要求私钥和证书不能长期存放在同一个 Secret 中，就需要定制 SDS 或 Secret provider：例如证书从证书管理系统读取，私钥从 KMS/HSM 或专用 provider 读取，只在 Gateway Pod 内存中短暂组合后交给 Envoy 使用。\n\n证书轮换依赖 istiod 和 CA 持续可用。Istio 证书通常有效期较短，短时控制面故障不会立刻切断已有数据面连接；但如果 istiod 长时间不可用，工作负载和 Gateway 无法续签证书，证书超过有效期后 mTLS 握手会失败，局部控制面故障就可能演变成全网格通信故障。生产设计需要监控 istiod 健康、CSR 签发失败、证书剩余有效期和 Gateway SDS 状态，并准备升级回滚和临时证书恢复路径。\n\n#### Gateway 升级和流量导入风险\n\nIstio Gateway 升级可以采用滚动升级或 A/B 方式，但入口网关直接承接用户流量，readiness 不能只表示进程存活。新网关 Pod 可能已经拿到 LDS/RDS 并被判定为 ready，但 EDS、AuthorizationPolicy、PeerAuthentication 或其他策略还没有全量推送到 Envoy；此时外部负载均衡器开始导流，就可能出现短暂 503 或策略不一致。\n\n生产中应把网关 ready 条件设计得更保守：简单场景可以增加 `initialDelaySeconds`，给 xDS 和策略收敛留出缓冲；高要求场景应使用自定义探针，确认关键 listener、route、cluster endpoint 和安全策略已经进入预期状态后再接流量。升级窗口还要观察 Envoy 配置同步状态、SDS 状态和 5xx 指标，而不是只看 Kubernetes Pod Ready。\n\n后端工作负载终止时也有类似风险。某个 Pod 已进入 `terminating`，但四层负载均衡或网关的 endpoint 权重尚未归零时，连接仍可能被导向正在退出的实例。滚动升级和缩容流程应先把目标实例权重调为 0 或从上游 endpoint 中摘除，等待连接排空后再终止容器。", "subs": ["Istio 安全目标", "Istio 身份模型", "SDS 和证书供应", "Gateway 升级和流量导入风险"]}, {"title": "Istio 认证如何实现 mTLS 和策略控制", "content": "Istio 认证分为两类：PeerAuthentication 处理服务到服务身份认证，RequestAuthentication 处理最终用户或请求级凭据认证。\n\n#### PeerAuthentication 和 RequestAuthentication\n\n| 类型 | 认证对象 | 典型机制 | 作用 |\n|---|---|---|---|\n| PeerAuthentication | 服务工作负载 | mTLS | 验证对端服务身份 |\n| RequestAuthentication | 最终用户请求 | JWT | 验证请求携带的用户凭据 |\n\nPeerAuthentication 由 Envoy 在服务间通信时自动执行，应用代码无需修改。RequestAuthentication 要求应用或上游网关把 token 放入请求中，Istio 根据 issuer、JWKS 和 token 位置验证请求。\n\n```mermaid\nflowchart LR\n    User[\"最终用户\"]\n    Token[\"JWT\"]\n    Client[\"客户端服务\"]\n    ProxyA[\"客户端代理\"]\n    ProxyB[\"服务端代理\"]\n    Server[\"服务端服务\"]\n\n    User --> Token --> Client --> ProxyA\n    ProxyA --> ProxyB\n    ProxyB --> Server\n```\n\n认证策略有作用域。namespace 级策略可以覆盖一组工作负载，selector 级策略只覆盖命中的工作负载；未命中的工作负载仍按更外层或默认策略处理。生产排查时不能只看 YAML 是否存在，还要看它是否真的选中了目标代理。\n\n```mermaid\nflowchart TB\n    Admin[\"Administrators\"] --> Istiod[\"istiod\"]\n    Istiod --> PolicyFoo[\"Authentication policy<br/>namespace: Foo<br/>targets: all\"]\n    Istiod --> PolicyBar[\"Authentication policy<br/>namespace: Bar<br/>target: Workload X\"]\n\n    subgraph Foo[\"namespace Foo\"]\n        WorkloadA[\"Workload A\"]\n        ProxyA[\"Proxy\"]\n        WorkloadB[\"Workload B\"]\n        ProxyB[\"Proxy\"]\n        WorkloadA <--> ProxyA\n        WorkloadB <--> ProxyB\n        ProxyA <-->|mTLS| ProxyB\n    end\n\n    subgraph Bar[\"namespace Bar\"]\n        WorkloadX[\"Workload X\"]\n        ProxyX[\"Proxy\"]\n        WorkloadY[\"Workload Y\"]\n        ProxyY[\"Proxy\"]\n        WorkloadX <--> ProxyX\n        WorkloadY <--> ProxyY\n    end\n\n    PolicyFoo -.-> ProxyA\n    PolicyFoo -.-> ProxyB\n    PolicyBar -.-> ProxyX\n```\n\n#### mTLS 认证流程\n\n当客户端工作负载访问服务端工作负载时：\n\n1. 客户端出站流量被重定向到本地 Envoy。\n2. 客户端 Envoy 与服务端 Envoy 发起 mTLS 握手。\n3. 客户端 Envoy 校验服务端证书和安全命名映射。\n4. 服务端 Envoy 校验客户端证书和身份。\n5. 双方建立加密连接。\n6. 服务端 Envoy 在授权通过后把请求转发给本地服务。\n\n```mermaid\nsequenceDiagram\n    participant Client as Client\n    participant CProxy as Client Proxy\n    participant SProxy as Server Proxy\n    participant Server as Server\n\n    Client->>CProxy: 发起请求\n    CProxy->>SProxy: mTLS 握手\n    CProxy->>CProxy: 校验服务端身份\n    SProxy->>SProxy: 校验客户端身份\n    CProxy->>SProxy: 加密请求\n    SProxy->>Server: 本地转发\n```\n\n#### mTLS 模式\n\nPeerAuthentication 常见模式：\n\n| 模式 | 含义 | 使用场景 |\n|---|---|---|\n| `PERMISSIVE` | 同时接受明文和 mTLS | 迁移期 |\n| `STRICT` | 只接受 mTLS | 网格内强制加密 |\n| `DISABLE` | 禁用 mTLS | 特殊端口或兼容场景 |\n\n未设置网格级 PeerAuthentication 时，Istio 通常采用 `PERMISSIVE`，这样能让未注入 sidecar 的客户端和已启用 mTLS 的客户端同时访问同一服务，便于迁移。但 `PERMISSIVE` 不是强制加密：它允许明文请求继续进入服务端代理。`DISABLE` 或端口级禁用 mTLS 后，代理之间会按明文通信，除非客户端侧 DestinationRule 另有 TLS 配置。因此生产中要把 `STRICT` 作为最终目标，并用指标和访问日志确认是否仍有 plaintext 流量。\n\n服务端配置严格 mTLS：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: PeerAuthentication\nmetadata:\n  name: reviews-strict\n  namespace: foo\nspec:\n  selector:\n    matchLabels:\n      app: reviews\n  mtls:\n    mode: STRICT\n```\n\n端口级别禁用 mTLS：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: PeerAuthentication\nmetadata:\n  name: example-port-policy\n  namespace: foo\nspec:\n  selector:\n    matchLabels:\n      app: example-app\n  portLevelMtls:\n    8080:\n      mode: DISABLE\n```\n\n客户端侧的 TLS 行为通过 DestinationRule 描述：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: ratings-istio-mtls\n  namespace: prod\nspec:\n  host: ratings.prod.svc.cluster.local\n  trafficPolicy:\n    tls:\n      mode: ISTIO_MUTUAL\n```\n\n`ISTIO_MUTUAL` 表示使用 Istio 自动管理的证书。`SIMPLE` 表示普通 TLS，`MUTUAL` 表示手工指定客户端证书、私钥和 CA。\n\n普通 TLS 只校验服务端证书，常用于访问网格外 HTTPS 服务：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: external-simple-tls\n  namespace: prod\nspec:\n  host: api.external.example.com\n  trafficPolicy:\n    tls:\n      mode: SIMPLE\n      sni: api.external.example.com\n```\n\n手工 mTLS 需要显式提供客户端证书、私钥和 CA，适合接入非 Istio 管理证书体系：\n\n```yaml\napiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: external-mutual-tls\n  namespace: prod\nspec:\n  host: payments.external.example.com\n  trafficPolicy:\n    tls:\n      mode: MUTUAL\n      clientCertificate: /etc/certs/client-cert.pem\n      privateKey: /etc/certs/client-key.pem\n      caCertificates: /etc/certs/ca-cert.pem\n      sni: payments.external.example.com\n```\n\n#### RequestAuthentication 和 JWT\n\nRequestAuthentication 用来验证请求中的 JWT。它会检查 issuer、签名和 token 位置。需要注意：只配置 RequestAuthentication 时，不带 token 的请求默认仍可能被接受；如果要强制要求认证，必须配合 AuthorizationPolicy。\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: RequestAuthentication\nmetadata:\n  name: ingress-jwt\n  namespace: istio-system\nspec:\n  selector:\n    matchLabels:\n      istio: ingressgateway\n  jwtRules:\n  - issuer: testing@secure.istio.io\n    jwksUri: https://issuer.example.com/.well-known/jwks\n```\n\n这也体现了认证和授权的边界：认证回答“你是谁”，授权回答“你能访问什么”。JWT 验证通过只说明请求者身份可信，不代表它可以访问所有服务。", "subs": ["PeerAuthentication 和 RequestAuthentication", "mTLS 认证流程", "mTLS 模式", "RequestAuthentication 和 JWT"]}, {"title": "Istio 授权如何精细化控制服务访问", "content": "Istio 授权由 Envoy 中的授权引擎执行。请求到达代理时，Envoy 根据当前 AuthorizationPolicy 评估来源、目标、操作和条件，然后返回允许或拒绝。\n\n#### 授权策略的基本规则\n\n| 规则 | 含义 |\n|---|---|\n| 支持 `ALLOW` 和 `DENY` | 允许策略和拒绝策略都可表达 |\n| `DENY` 优先 | 拒绝策略命中时优先拒绝 |\n| 有允许策略时默认拒绝未匹配请求 | 工作负载被 ALLOW 策略覆盖后，没匹配的请求不会被放行 |\n| 未设置 selector 时作用于同 namespace 所有工作负载 | 根 namespace 可作用于全网格 |\n\n策略目标由 `metadata.namespace` 和可选的 `selector` 共同决定。普通 namespace 中的策略只影响该 namespace：设置 `selector` 时只作用于匹配标签的工作负载；不设置 `selector` 时作用于同 namespace 的全部工作负载。root namespace 中的策略可以作用于整个网格，默认 root namespace 通常是 `istio-system`，也可以通过网格配置调整。全局策略要格外谨慎，因为一个空 `selector` 的 `DENY` 策略可能把全网格流量一起拒绝。\n\n```mermaid\nflowchart TB\n    Admin[\"Administrators\"]\n    ApiServer[\"API Server configuration\"]\n    Istiod[\"istiod\"]\n    Authz[\"Authorization policies\"]\n\n    subgraph Mesh[\"Istio Mesh\"]\n        WorkloadA[\"Workload A\"]\n        ProxyA[\"Proxy A<br/>authorization engine\"]\n        WorkloadB[\"Workload B\"]\n        ProxyB[\"Proxy B<br/>authorization engine\"]\n        WorkloadA <--> ProxyA\n        ProxyA <-->|mTLS| ProxyB\n        ProxyB <--> WorkloadB\n    end\n\n    Admin --> Authz --> ApiServer --> Istiod\n    Istiod -.->|policy| ProxyA\n    Istiod -.->|policy| ProxyB\n    ProxyA -->|ALLOW / DENY| WorkloadA\n    ProxyB -->|ALLOW / DENY| WorkloadB\n```\n\n授权策略由管理员提交到 API Server，经 istiod 分发到各个 Envoy，再由每个代理本地执行。它和认证的边界很清楚：mTLS 或 JWT 让代理知道请求者是谁，AuthorizationPolicy 再根据 principal、namespace、method、path、port 和 claim 判断这次访问是否被允许。\n\n#### AuthorizationPolicy 结构\n\n核心字段：\n\n| 字段 | 作用 |\n|---|---|\n| `metadata.namespace` | 策略所在 namespace |\n| `selector` | 选择目标工作负载 |\n| `action` | ALLOW 或 DENY |\n| `rules.from` | 请求来源，如 principal、namespace |\n| `rules.to` | 请求操作，如 method、path、port |\n| `rules.when` | 附加条件，如 JWT claim、请求头 |\n\n允许来自指定 ServiceAccount 或 dev namespace 的 GET 请求，并要求 issuer 匹配：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: httpbin\n  namespace: foo\nspec:\n  selector:\n    matchLabels:\n      app: httpbin\n      version: v1\n  action: ALLOW\n  rules:\n  - from:\n    - source:\n        principals:\n        - cluster.local/ns/default/sa/sleep\n    - source:\n        namespaces:\n        - dev\n    to:\n    - operation:\n        methods:\n        - GET\n    when:\n    - key: request.auth.claims[iss]\n      values:\n      - https://accounts.google.com\n```\n\nAuthorizationPolicy 的字符串值支持多种匹配模式：\n\n| 模式 | 示例 | 含义 |\n|---|---|---|\n| 完全匹配 | `GET` | 必须完全相等 |\n| 前缀匹配 | `/api/*` | 匹配指定前缀 |\n| 后缀匹配 | `*/admin` | 匹配指定后缀 |\n| 存在匹配 | `*` | 字段存在即可 |\n\n`when` 不只适合 JWT claim，也可以引用请求头、来源属性和连接上下文。下面的策略只允许带 `version: v1` 请求头的 GET 请求访问 `/api/` 前缀路径：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: httpbin-header-version\n  namespace: foo\nspec:\n  selector:\n    matchLabels:\n      app: httpbin\n  action: ALLOW\n  rules:\n  - to:\n    - operation:\n        methods:\n        - GET\n        paths:\n        - /api/*\n    when:\n    - key: request.headers[version]\n      values:\n      - v1\n```\n\n拒绝非 `foo` namespace 来源：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: httpbin-deny\n  namespace: foo\nspec:\n  selector:\n    matchLabels:\n      app: httpbin\n      version: v1\n  action: DENY\n  rules:\n  - from:\n    - source:\n        notNamespaces:\n        - foo\n```\n\n#### 默认允许、默认拒绝和公开访问\n\n允许 default namespace 中所有工作负载的全部访问：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: allow-all\n  namespace: default\nspec:\n  action: ALLOW\n  rules:\n  - {}\n```\n\n拒绝 admin namespace 中所有工作负载访问：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: deny-all\n  namespace: admin\nspec: {}\n```\n\n如果只允许经过认证的主体，可以使用 principal 通配：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: authenticated-only\n  namespace: foo\nspec:\n  selector:\n    matchLabels:\n      app: httpbin\n  action: ALLOW\n  rules:\n  - from:\n    - source:\n        principals:\n        - \"*\"\n```\n\n如果工作负载需要公开访问，则不要限制 source，只限制操作：\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: public-read\n  namespace: foo\nspec:\n  selector:\n    matchLabels:\n      app: httpbin\n  action: ALLOW\n  rules:\n  - to:\n    - operation:\n        methods:\n        - GET\n        - POST\n```\n\n#### TCP 工作负载的授权边界\n\nIstio 授权也可以用于 TCP 工作负载，但不能依赖 HTTP 专属字段。对 MongoDB 这类 TCP 服务，应使用 principal、namespace、port 等协议无关字段。\n\n```yaml\napiVersion: security.istio.io/v1beta1\nkind: AuthorizationPolicy\nmetadata:\n  name: mongodb-policy\n  namespace: default\nspec:\n  selector:\n    matchLabels:\n      app: mongodb\n  action: ALLOW\n  rules:\n  - from:\n    - source:\n        principals:\n        - cluster.local/ns/default/sa/bookinfo-ratings-v2\n    to:\n    - operation:\n        ports:\n        - \"27017\"\n```\n\n最终可以把 Istio 安全控制理解成三层：\n\n| 层次 | 对象 | 回答的问题 |\n|---|---|---|\n| 身份 | ServiceAccount、SPIFFE、证书 | 调用方和服务端是谁 |\n| 认证 | PeerAuthentication、RequestAuthentication | 身份或请求凭据是否可信 |\n| 授权 | AuthorizationPolicy | 可信身份能访问哪些服务和操作 |\n\n这三层配合 mTLS、NetworkPolicy、RBAC 和审计，才能形成从集群控制面到服务调用面的完整安全保证。", "subs": ["授权策略的基本规则", "AuthorizationPolicy 结构", "默认允许、默认拒绝和公开访问", "TCP 工作负载的授权边界"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

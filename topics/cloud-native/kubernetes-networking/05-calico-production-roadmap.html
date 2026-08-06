@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 容器网络学习笔记 · 第五册：Calico 路由与生产实践 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 容器网络学习笔记 · 第五册：Calico 路由与生产实践</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 容器网络学习笔记 · 第五册：Calico 路由与生产实践", "intro": "", "parts": [{"title": "Calico 路由与生产实践", "sections": [{"title": "第三十七章 Calico-VxLAN-CrossSubnet 模式", "content": "本章介绍 Calico VxLAN 的 CrossSubnet 模式，这是生产环境中最推荐的混合部署方案——同网段走高性能路由，跨网段走 overlay 封装。\n\n#### 37.1 背景与概述\n\n##### 37.1.1 为什么需要 CrossSubnet\n\n在大型数据中心中，节点通常分布在不同的网段：\n\n```mermaid\ngraph TB\n    subgraph \"机架 A (10.1.5.0/24)\"\n        Node1[\"Node1<br/>10.1.5.10\"]\n        Node2[\"Node2<br/>10.1.5.11\"]\n    end\n    \n    subgraph \"机架 B (10.1.8.0/24)\"\n        Node3[\"Node3<br/>10.1.8.10\"]\n        Node4[\"Node4<br/>10.1.8.11\"]\n    end\n    \n    Router[\"路由器/三层交换机\"]\n    \n    Node1 & Node2 --> Router\n    Router --> Node3 & Node4\n```\n\n- **同机架**：节点在同一二层，可直接路由\n- **跨机架**：节点在不同网段，需要三层转发\n\n##### 37.1.2 CrossSubnet 模式原理\n\n```mermaid\nflowchart LR\n    subgraph \"同网段通信\"\n        Pod1A[\"Pod1\"] -->|\"直接路由\"| Pod2A[\"Pod2\"]\n        Note1[\"无封装<br/>高性能\"]\n    end\n    \n    subgraph \"跨网段通信\"\n        Pod1B[\"Pod1\"] -->|\"VxLAN 封装\"| Pod2B[\"Pod2\"]\n        Note2[\"overlay<br/>兼容性好\"]\n    end\n```\n\n| 场景 | 封装方式 | 性能 | 依赖 |\n|:---|:---|:---|:---|\n| **同网段** | 无（纯路由） | 高 | - |\n| **跨网段** | VxLAN | 较低 | FDB 表 |\n\n##### 37.1.3 Always vs CrossSubnet\n\n| 模式 | 同网段 | 跨网段 | 适用场景 |\n|:---|:---|:---|:---|\n| `Always` | VxLAN | VxLAN | 统一封装，简单 |\n| `CrossSubnet` | 路由 | VxLAN | 混合环境，性能优先 |\n| `Never` | 路由 | 路由 | 需要 BGP + 外部路由 |\n\n#### 37.2 配置详解\n\n##### 37.2.1 IPPool 配置\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: IPPool\nmetadata:\n  name: default-pool\nspec:\n  cidr: 10.244.0.0/16\n  ipipMode: Never              # 禁用 IPIP\n  vxlanMode: CrossSubnet       # 跨网段 VxLAN\n  natOutgoing: true\n```\n\n> [!IMPORTANT]\n> **关键配置项**：\n>\n> - `vxlanMode: CrossSubnet` — 只在跨网段时封装\n> - `ipipMode: Never` — 必须禁用 IPIP（二者互斥）\n> - 仍需禁用 bird 相关组件\n\n##### 37.2.2 Calico 如何判断\"同网段\"\n\nCalico 根据节点 IP 和网络掩码判断：\n\n```bash\n# 假设节点 IP\nNode1: 10.1.5.10/24\nNode2: 10.1.5.11/24  # 同网段\nNode3: 10.1.8.10/24  # 不同网段\n\n# Calico 判断逻辑\n10.1.5.10/24 & 10.1.5.11/24 → 同网段 (10.1.5.0) → 路由\n10.1.5.10/24 & 10.1.8.10/24 → 不同网段 → VxLAN\n```\n\n#### 37.3 实验拓扑\n\n##### 37.3.1 ContainerLab 跨网段环境\n\n```mermaid\ngraph TB\n    subgraph \"Kind 集群\"\n        Control[\"control-plane<br/>10.1.5.10\"]\n        Worker1[\"worker1<br/>10.1.5.11\"]\n        Worker2[\"worker2<br/>10.1.8.10\"]\n        Worker3[\"worker3<br/>10.1.8.11\"]\n    end\n    \n    subgraph \"ContainerLab\"\n        BR1[\"bridge1<br/>10.1.5.0/24\"]\n        BR2[\"bridge2<br/>10.1.8.0/24\"]\n        Router[\"clab-gw0<br/>路由器\"]\n    end\n    \n    Control & Worker1 --> BR1\n    Worker2 & Worker3 --> BR2\n    BR1 --> Router\n    Router --> BR2\n```\n\n##### 37.3.2 路由器配置\n\n```bash\n# ContainerLab 路由器配置\ninterface net0\n  ip address 10.1.5.1/24\n\ninterface net1  \n  ip address 10.1.8.1/24\n\n# SNAT for internet access\niptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE\n```\n\n#### 37.4 同网段通信验证\n\n##### 37.4.1 测试场景\n\n```bash\n# 从 control-plane (10.1.5.10) 上的 Pod\n# ping worker1 (10.1.5.11) 上的 Pod\nkubectl exec -it pod-on-control -- ping <pod-on-worker1-ip>\n```\n\n##### 37.4.2 抓包分析\n\n```bash\n# 在 control-plane 节点的 net0 接口抓包\ntcpdump -i net0 -nn icmp\n\n# 输出示例\n# 10.244.1.69 > 10.244.175.1: ICMP echo request\n# 10.244.175.1 > 10.244.1.69: ICMP echo reply\n```\n\n**特点**：\n\n- **无 VxLAN 封装**\n- **裸 ICMP 包**\n- **MAC 地址逐跳变化**（标准路由行为）\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1 (10.244.1.69)\n    participant Node1 as Node1 (10.1.5.10)\n    participant Node2 as Node2 (10.1.5.11)\n    participant Pod2 as Pod2 (10.244.175.1)\n    \n    Pod1->>Node1: SRC MAC: Pod1<br/>DST MAC: 网关(ee:ee...)\n    Node1->>Node2: SRC MAC: Node1 net0<br/>DST MAC: Node2 net0\n    Node2->>Pod2: DST MAC: Pod2 veth\n```\n\n#### 37.5 跨网段通信验证\n\n##### 37.5.1 测试场景\n\n```bash\n# 从 control-plane (10.1.5.10) 上的 Pod\n# ping worker2 (10.1.8.10) 上的 Pod\nkubectl exec -it pod-on-control -- ping <pod-on-worker2-ip>\n```\n\n##### 37.5.2 抓包分析\n\n```bash\n# 抓 VxLAN 包\ntcpdump -i net0 -nn udp port 4789 -w vxlan-cross.pcap\n```\n\n**Wireshark 分析**：\n\n```\nFrame: 外层 Ethernet\n├── SRC MAC: control-plane net0\n├── DST MAC: router interface\n├── Outer IP Header\n│   ├── SRC: 10.1.5.10 (control-plane)\n│   └── DST: 10.1.8.10 (worker2)\n├── UDP Header\n│   ├── SRC Port: random\n│   └── DST Port: 4789\n├── VxLAN Header\n│   └── VNI: 4096\n└── Inner Frame\n    ├── Inner Ethernet\n    │   ├── SRC MAC: vxlan.calico (local)\n    │   └── DST MAC: vxlan.calico (remote)\n    └── Inner IP\n        ├── SRC: 10.244.1.69 (Pod1)\n        └── DST: 10.244.73.x (Pod2)\n```\n\n#### 37.6 与 IPIP CrossSubnet 对比\n\n| 对比项 | IPIP CrossSubnet | VxLAN CrossSubnet |\n|:---|:---|:---|\n| **同网段** | 路由 | 路由 |\n| **跨网段** | IP-in-IP 封装 | VxLAN 封装 |\n| **封装开销** | 20 字节 | 50 字节 |\n| **协议** | IP Protocol 4 | UDP 4789 |\n| **BGP 依赖** | 需要 bird | 不需要 |\n| **FDB 表** | 不需要 | 需要 |\n| **防火墙** | 可能受阻 | UDP 易穿透 |\n\n#### 37.7 Overlay 的安全性优势\n\n```mermaid\ngraph LR\n    subgraph \"路由模式\"\n        Pod1R[\"Pod<br/>10.244.1.69\"] -->|\"IP 暴露\"| Net1[\"外部网络\"]\n    end\n    \n    subgraph \"Overlay 模式\"\n        Pod1O[\"Pod<br/>10.244.1.69\"] -->|\"封装在节点 IP 内\"| Net2[\"外部网络\"]\n        Note[\"外部只看到<br/>节点 IP\"]\n    end\n```\n\n**Overlay 安全优势**：\n\n1. **Pod IP 隐藏**：外部设备只看到节点 IP，不知道内部 Pod IP\n2. **网络隔离**：中间网络设备无法直接访问 Pod\n3. **零改造成本**：无需在外部网络配置 Pod 网段路由\n\n#### 37.8 故障排查\n\n##### 37.8.1 确认模式生效\n\n```bash\n# 查看 IPPool 配置\ncalicoctl get ippool -o yaml\n\n# 确认 vxlanMode\nspec:\n  vxlanMode: CrossSubnet\n```\n\n##### 37.8.2 验证路由表\n\n```bash\n# 同网段节点 - 直接路由\nip route | grep <same-subnet-node-pod-cidr>\n# 10.244.175.0/26 via 10.1.5.11 dev net0\n\n# 跨网段节点 - VxLAN 路由\nip route | grep <cross-subnet-node-pod-cidr>  \n# 10.244.73.0/26 via 10.244.73.0 dev vxlan.calico onlink\n```\n\n##### 37.8.3 常见问题\n\n| 问题 | 原因 | 解决方案 |\n|:---|:---|:---|\n| 跨网段不通 | 路由器未配置 | 确保三层设备能转发 |\n| FDB 表为空 | CNI 未正常启动 | 重启 calico-node |\n| 同网段走 VxLAN | 掩码配置错误 | 检查节点 IP/掩码 |\n\n#### 37.9 章节小结\n\n```mermaid\nmindmap\n  root((VxLAN CrossSubnet))\n    原理\n      同网段 直接路由\n      跨网段 VxLAN\n      自动判断\n    配置\n      vxlanMode CrossSubnet\n      ipipMode Never\n      禁用 bird\n    验证\n      同网段 普通 ICMP\n      跨网段 UDP 4789\n      Wireshark 分析\n    优势\n      性能与兼容平衡\n      overlay 安全\n      零改造成本\n    对比\n      vs Always\n      vs IPIP CrossSubnet\n```\n\n> [!TIP]\n> **VxLAN CrossSubnet 要点总结**：\n>\n> 1. **核心原理**：\n>    - 同网段走路由（高性能）\n>    - 跨网段走 VxLAN（兼容性好）\n>    - Calico 根据节点 IP/掩码自动判断\n>\n> 2. **配置**：`vxlanMode: CrossSubnet`\n>\n> 3. **验证方法**：\n>    - 同网段：`tcpdump -i net0 icmp`（普通包）\n>    - 跨网段：`tcpdump -i net0 udp port 4789`（VxLAN 包）\n>\n> 4. **适用场景**：\n>    - 多机架/多网段的生产环境\n>    - 追求性能与兼容性平衡\n>    - 不想改造外部网络\n>\n> 5. **生产建议**：节点数 <200 时推荐使用\n\n---", "subs": ["37.1 背景与概述", "37.2 配置详解", "37.3 实验拓扑", "37.4 同网段通信验证", "37.5 跨网段通信验证", "37.6 与 IPIP CrossSubnet 对比", "37.7 Overlay 的安全性优势", "37.8 故障排查", "37.9 章节小结"]}, {"title": "第三十八章 Calico-BGP-Fullmesh 模式", "content": "本章介绍 Calico 的 BGP Fullmesh 模式，这是 Calico 最\"原生\"的网络方案——不使用任何 overlay 封装，完全依赖 BGP 协议进行路由通告。\n\n#### 38.1 背景与概述\n\n##### 38.1.1 BGP 基础回顾\n\n```mermaid\ngraph LR\n    subgraph \"AS 64512\"\n        Node1[\"Node1\"]\n        Node2[\"Node2\"]\n        Node3[\"Node3\"]\n    end\n    \n    Node1 <-->|\"iBGP\"| Node2\n    Node2 <-->|\"iBGP\"| Node3\n    Node1 <-->|\"iBGP\"| Node3\n```\n\n**BGP 核心概念**：\n\n| 概念 | 说明 |\n|:---|:---|\n| **AS (自治系统)** | 统一管理的网络域 |\n| **iBGP** | 同一 AS 内的 BGP |\n| **eBGP** | 不同 AS 间的 BGP |\n| **水平分割** | iBGP 学到的路由不再通告给其他 iBGP peer |\n| **TCP 179** | BGP 使用 TCP 179 端口建立会话 |\n\n##### 38.1.2 为什么需要 Fullmesh\n\n由于 **BGP 水平分割规则**：\n\n- iBGP peer 学到的路由不会通告给其他 iBGP peer\n- 要让所有节点学到完整路由，必须**两两建立 BGP 邻居关系**\n- 这就是 **Fullmesh（全网状连接）**\n\n```mermaid\ngraph TB\n    subgraph \"3 节点 Fullmesh\"\n        A[\"Node A\"] <-->|\"BGP\"| B[\"Node B\"]\n        B <-->|\"BGP\"| C[\"Node C\"]\n        A <-->|\"BGP\"| C\n    end\n    \n    subgraph \"连接数计算\"\n        Formula[\"N*(N-1)/2<br/>3 节点 = 3 条连接\"]\n    end\n```\n\n##### 38.1.3 Fullmesh 的适用场景\n\n| 节点数 | 连接数 | 推荐方案 |\n|:---|:---|:---|\n| 10 | 45 | Fullmesh ✅ |\n| 50 | 1,225 | Fullmesh ✅ |\n| 100 | 4,950 | Fullmesh ✅ |\n| **200** | 19,900 | **边界** |\n| 500 | 124,750 | Route Reflector ✅ |\n\n> [!IMPORTANT]\n> **官方建议**：\n>\n> - 节点数 **< 200**：使用 Fullmesh\n> - 节点数 **≥ 200**：使用 Route Reflector (RR)\n\n#### 38.2 Fullmesh vs Overlay\n\n| 对比项 | BGP Fullmesh | IPIP/VxLAN |\n|:---|:---|:---|\n| **封装** | 无 | 有 |\n| **性能** | 最高 | 有开销 |\n| **MTU** | 无损失 | 有损失 |\n| **外部路由** | 需要配合 | 无需 |\n| **复杂度** | 高 | 低 |\n| **调试** | 需了解 BGP | 相对简单 |\n\n#### 38.3 配置详解\n\n##### 38.3.1 IPPool 配置\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: IPPool\nmetadata:\n  name: default-pool\nspec:\n  cidr: 10.244.0.0/16\n  ipipMode: Never              # 禁用 IPIP\n  vxlanMode: Never             # 禁用 VxLAN\n  natOutgoing: true\n```\n\n> [!IMPORTANT]\n> **关键配置**：\n>\n> - `ipipMode: Never` — 禁用 IPIP 封装\n> - `vxlanMode: Never` — 禁用 VxLAN 封装\n> - 禁用 overlay 后，Calico 自动使用 BGP 路由\n\n##### 38.3.2 BGP 配置（默认）\n\nCalico 默认启用 BGP Fullmesh：\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: BGPConfiguration\nmetadata:\n  name: default\nspec:\n  nodeToNodeMeshEnabled: true   # 启用 Fullmesh\n  asNumber: 64512               # 默认 AS 号\n```\n\n#### 38.4 路由分析\n\n##### 38.4.1 路由表特征\n\n```bash\n# 查看路由表\nip route show\n\n# 输出示例\n10.244.73.128/26 via 172.18.0.2 dev eth0 proto bird\n10.244.83.128/26 via 172.18.0.3 dev eth0 proto bird\n```\n\n**关键特征**：\n\n- **proto bird**：路由由 bird 进程（BGP daemon）维护\n- **下一跳是 peer 节点 IP**：直接路由到对端节点\n- **无 tunl0/vxlan.calico**：不使用隧道设备\n\n##### 38.4.2 与 Overlay 路由对比\n\n| 模式 | 路由示例 | 设备 |\n|:---|:---|:---|\n| BGP | `via 172.18.0.2 dev eth0 proto bird` | eth0 |\n| IPIP | `via 172.18.0.2 dev tunl0 proto bird onlink` | tunl0 |\n| VxLAN | `via 10.244.73.0 dev vxlan.calico onlink` | vxlan.calico |\n\n#### 38.5 BGP 状态查看\n\n##### 38.5.1 calicoctl node status\n\n```bash\n# 查看 BGP peer 状态\ncalicoctl node status\n\n# 输出示例\nCalico process is running.\n\nIPv4 BGP status\n+----------------+-------------------+-------+----------+-------------+\n| PEER ADDRESS   | PEER TYPE         | STATE | SINCE    | INFO        |\n+----------------+-------------------+-------+----------+-------------+\n| 172.18.0.2     | node-to-node mesh | up    | 10:30:00 | Established |\n| 172.18.0.3     | node-to-node mesh | up    | 10:30:00 | Established |\n+----------------+-------------------+-------+----------+-------------+\n```\n\n**字段说明**：\n\n| 字段 | 说明 |\n|:---|:---|\n| PEER ADDRESS | BGP 邻居 IP |\n| PEER TYPE | `node-to-node mesh` = Fullmesh |\n| STATE | `up` = 正常 |\n| INFO | `Established` = TCP 179 连接已建立 |\n\n##### 38.5.2 验证 TCP 179 连接\n\n```bash\n# 查看 BGP 端口连接\nnetstat -an | grep 179\n\n# 输出\ntcp   0   0 172.18.0.4:179   172.18.0.2:xxxxx   ESTABLISHED\ntcp   0   0 172.18.0.4:179   172.18.0.3:xxxxx   ESTABLISHED\n```\n\n#### 38.6 bird 命令详解\n\n##### 38.6.1 进入 bird 控制台\n\n```bash\n# 进入 calico-node Pod\nkubectl exec -it calico-node-xxxxx -n kube-system -- /bin/sh\n\n# 进入 bird 控制台\nbirdcl\n# 或\nbirdc\n```\n\n##### 38.6.2 常用 bird 命令\n\n```bash\n# 查看接口\nbirdc> show interfaces\n\n# 查看路由表\nbirdc> show route\n\n# 查看 BGP 协议路由\nbirdc> show route protocol Mesh_172_18_0_2\n\n# 查看协议状态\nbirdc> show protocols\n```\n\n**show route 输出示例**：\n\n```\n10.244.73.128/26   via 172.18.0.2 on eth0 [Mesh_172_18_0_2 10:30:00] * (100/0) [i]\n10.244.83.128/26   via 172.18.0.3 on eth0 [Mesh_172_18_0_3 10:30:00] * (100/0) [i]\n```\n\n#### 38.7 AS Number 与配置文件\n\n##### 38.7.1 查看 AS Number\n\n```bash\n# 通过 calicoctl\ncalicoctl get nodes -o yaml | grep asNumber\n\n# 或查看 BGPConfiguration\ncalicoctl get bgpconfig default -o yaml\n```\n\n##### 38.7.2 bird 配置文件\n\n```bash\n# 配置文件位置\ncat /etc/calico/confd/config/bird.cfg\n```\n\n```conf\n# bird.cfg 示例\nrouter id 172.18.0.4;\n\nprotocol bgp Mesh_172_18_0_2 {\n  local as 64512;\n  neighbor 172.18.0.2 as 64512;\n  # ... \n}\n\nprotocol bgp Mesh_172_18_0_3 {\n  local as 64512;\n  neighbor 172.18.0.3 as 64512;\n  # ...\n}\n```\n\n#### 38.8 抓包验证\n\n##### 38.8.1 跨节点 Pod 通信\n\n```bash\n# 抓包\ntcpdump -i eth0 -nn icmp\n\n# 输出示例\n172.18.0.4 > 172.18.0.2: ICMP echo request\n# 注意：这是节点 IP，不是 Pod IP！\n```\n\n**实际抓包**：\n\n```bash\n# Pod 间 ping\n10.244.140.132 > 10.244.88.128: ICMP echo request\n```\n\n**特点**：\n\n- **无封装**：直接看到 Pod IP\n- **MAC 地址变化**：每跳变化\n- **纯三层转发**\n\n#### 38.9 Route Reflector 简介\n\n当节点数超过 200 时，应使用 Route Reflector：\n\n```mermaid\ngraph TB\n    subgraph \"Route Reflector 模式\"\n        RR1[\"RR1\"]\n        RR2[\"RR2\"]\n        RR1 <-->|\"Mesh\"| RR2\n        \n        Client1[\"Node1\"] --> RR1\n        Client2[\"Node2\"] --> RR1\n        Client3[\"Node3\"] --> RR2\n        Client4[\"Node4\"] --> RR2\n    end\n```\n\n**RR 优势**：\n\n- RR 之间 Fullmesh（少量连接）\n- 普通节点只连接 RR（减少连接数）\n- 多 RR 保证高可用\n\n#### 38.10 章节小结\n\n```mermaid\nmindmap\n  root((BGP Fullmesh))\n    原理\n      水平分割\n      两两建立 peer\n      N*(N-1)/2\n    配置\n      ipipMode Never\n      vxlanMode Never\n      nodeToNodeMesh true\n    验证\n      calicoctl node status\n      ip route proto bird\n      birdc show route\n    特点\n      无封装\n      最高性能\n      无 MTU 损失\n    限制\n      小于 200 节点\n      超过用 RR\n```\n\n> [!TIP]\n> **BGP Fullmesh 要点总结**：\n>\n> 1. **核心原理**：\n>    - BGP 水平分割 → 需要 Fullmesh\n>    - 连接数：N*(N-1)/2\n>    - 官方建议：<200 节点\n>\n> 2. **配置**：禁用 IPIP/VxLAN，默认启用 BGP\n>\n> 3. **关键命令**：\n>    - `calicoctl node status` — 查看 BGP peer\n>    - `ip route` — 看到 `proto bird`\n>    - `birdc show route` — BGP 路由详情\n>\n> 4. **抓包特点**：无封装，直接看到 Pod IP\n>\n> 5. **生产建议**：\n>    - 小集群：Fullmesh\n>    - 大集群：Route Reflector\n\n---", "subs": ["38.1 背景与概述", "38.2 Fullmesh vs Overlay", "38.3 配置详解", "38.4 路由分析", "38.5 BGP 状态查看", "38.6 bird 命令详解", "38.7 AS Number 与配置文件", "38.8 抓包验证", "38.9 Route Reflector 简介", "38.10 章节小结"]}, {"title": "第三十九章 Calico-BGP-RR 模式", "content": "本章介绍 Calico 的 BGP Route Reflector (RR) 模式，这是大规模集群（>200 节点）的推荐 BGP 方案，采用 AS per Rack 拓扑设计。\n\n#### 39.1 背景与概述\n\n##### 39.1.1 为什么需要 Route Reflector\n\n回顾 Fullmesh 的问题：\n\n| 节点数 | Fullmesh 连接数 |\n|:---|:---|\n| 100 | 4,950 |\n| 200 | 19,900 |\n| 500 | 124,750 |\n| 1000 | 499,500 |\n\n**Route Reflector 解决方案**：\n\n- **RR 节点**：接收所有路由，反射给所有客户端\n- **客户端**：只与 RR 建立连接\n- **连接数**：从 N*(N-1)/2 降低到 N\n\n```mermaid\ngraph TB\n    subgraph \"Route Reflector 模式\"\n        RR[\"Route Reflector<br/>Leaf Switch\"]\n        \n        Client1[\"Node1<br/>RR Client\"] --> RR\n        Client2[\"Node2<br/>RR Client\"] --> RR\n        Client3[\"Node3<br/>RR Client\"] --> RR\n        Client4[\"Node4<br/>RR Client\"] --> RR\n    end\n```\n\n##### 39.1.2 AS per Rack 拓扑\n\n生产环境推荐的 Leaf-Spine 架构：\n\n```mermaid\ngraph TB\n    subgraph \"Spine Layer\"\n        Spine0[\"Spine0<br/>AS 500\"]\n        Spine1[\"Spine1<br/>AS 800\"]\n    end\n    \n    subgraph \"Leaf Layer\"\n        Leaf0[\"Leaf0<br/>AS 65005\"]\n        Leaf1[\"Leaf1<br/>AS 65008\"]\n    end\n    \n    subgraph \"Rack0 - 10.1.5.0/24\"\n        Node1[\"Node1<br/>10.1.5.10\"]\n        Node2[\"Node2<br/>10.1.5.11\"]\n    end\n    \n    subgraph \"Rack1 - 10.1.8.0/24\"\n        Node3[\"Node3<br/>10.1.8.10\"]\n        Node4[\"Node4<br/>10.1.8.11\"]\n    end\n    \n    Spine0 <-->|\"eBGP\"| Leaf0\n    Spine0 <-->|\"eBGP\"| Leaf1\n    Spine1 <-->|\"eBGP\"| Leaf0\n    Spine1 <-->|\"eBGP\"| Leaf1\n    \n    Node1 -->|\"iBGP\"| Leaf0\n    Node2 -->|\"iBGP\"| Leaf0\n    Node3 -->|\"iBGP\"| Leaf1\n    Node4 -->|\"iBGP\"| Leaf1\n```\n\n**架构说明**：\n\n| 层级 | 说明 |\n|:---|:---|\n| **Spine** | 核心交换机，eBGP 互联 |\n| **Leaf** | 接入交换机，作为 RR |\n| **Node** | K8s 节点，RR Client |\n| **iBGP** | 同 AS 内部（Node ↔ Leaf） |\n| **eBGP** | 不同 AS 之间（Leaf ↔ Spine） |\n\n#### 39.2 配置详解\n\n##### 39.2.1 禁用 Node-to-Node Mesh\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: BGPConfiguration\nmetadata:\n  name: default\nspec:\n  nodeToNodeMeshEnabled: false    # 关闭 Fullmesh！\n  asNumber: 65005\n```\n\n或通过命令：\n\n```bash\ncalicoctl patch bgpconfig default -p \\\n  '{\"spec\": {\"nodeToNodeMeshEnabled\": false}}'\n```\n\n##### 39.2.2 配置节点 BGP 属性\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: Node\nmetadata:\n  name: node1\n  labels:\n    rack: rack0    # 机架标签\nspec:\n  bgp:\n    ipv4Address: 10.1.5.10/24\n    asNumber: 65005\n```\n\n##### 39.2.3 创建 BGP Peer\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: BGPPeer\nmetadata:\n  name: rack0-to-leaf0\nspec:\n  peerIP: 10.1.5.1              # Leaf 交换机 IP\n  asNumber: 65005               # 同 AS = iBGP\n  nodeSelector: rack == 'rack0' # 只匹配 rack0 的节点\n```\n\n**nodeSelector 机制**：\n\n```bash\n# 查看节点标签\nkubectl get nodes --show-labels | grep rack\n\n# 输出\nnode1  rack=rack0\nnode2  rack=rack0\nnode3  rack=rack1\nnode4  rack=rack1\n```\n\n#### 39.3 Leaf 交换机配置\n\n##### 39.3.1 VyOS 配置示例\n\n```bash\n# Leaf0 配置\nset interfaces ethernet eth0 address 10.1.5.1/24\nset interfaces ethernet eth1 address 10.1.10.2/24  # to Spine0\nset interfaces ethernet eth2 address 10.1.12.2/24  # to Spine1\n\n# BGP 配置\nset protocols bgp 65005 router-id 10.1.5.1\n\n# 宣告本地网段\nset protocols bgp 65005 network 10.1.5.0/24\n\n# 配置 RR Client (iBGP)\nset protocols bgp 65005 neighbor 10.1.5.10 remote-as 65005\nset protocols bgp 65005 neighbor 10.1.5.10 route-reflector-client\nset protocols bgp 65005 neighbor 10.1.5.11 remote-as 65005\nset protocols bgp 65005 neighbor 10.1.5.11 route-reflector-client\n\n# 配置 eBGP (to Spine)\nset protocols bgp 65005 neighbor 10.1.10.1 remote-as 500\nset protocols bgp 65005 neighbor 10.1.12.1 remote-as 800\n\n# SNAT for Internet\nset nat source rule 10 outbound-interface eth0\nset nat source rule 10 source address 10.1.5.0/24\nset nat source rule 10 translation address masquerade\n```\n\n> [!IMPORTANT]\n> **关键配置**：\n>\n> - `route-reflector-client`：指定节点为 RR 客户端\n> - 同 AS（65005）= iBGP\n> - 不同 AS（500, 800）= eBGP\n\n#### 39.4 ECMP 等价多路径\n\n##### 39.4.1 什么是 ECMP\n\n```mermaid\ngraph LR\n    subgraph \"Rack0\"\n        Pod1[\"Pod\"]\n    end\n    \n    subgraph \"Spine\"\n        Spine0[\"Spine0\"]\n        Spine1[\"Spine1\"]\n    end\n    \n    subgraph \"Rack1\"\n        Pod2[\"Pod\"]\n    end\n    \n    Pod1 -->|\"Path1\"| Spine0 --> Pod2\n    Pod1 -->|\"Path2\"| Spine1 --> Pod2\n```\n\n**ECMP (Equal Cost Multi-Path)**：\n\n- 等价开销多路径\n- 多条路径同时使用\n- 负载分担 + 故障备份\n\n##### 39.4.2 VyOS ECMP 配置\n\n```bash\n# 启用 ECMP\nset protocols bgp 65005 maximum-paths ebgp 2\nset protocols bgp 65005 maximum-paths ibgp 2\n```\n\n##### 39.4.3 验证 ECMP\n\n```bash\n# 查看路由表\nshow ip bgp\n\n# 输出示例\n   Network          Next Hop       Metric  Path\n*> 10.1.8.0/24      10.1.10.1      0       500 65008 i\n*=                  10.1.12.1      0       800 65008 i\n```\n\n- `*>` = 有效且最佳\n- `*=` = 有效且等价（ECMP）\n\n#### 39.5 验证步骤\n\n##### 39.5.1 calicoctl node status\n\n```bash\ncalicoctl node status\n\n# 输出\nIPv4 BGP status\n+----------------+---------------+-------+----------+-------------+\n| PEER ADDRESS   | PEER TYPE     | STATE | SINCE    | INFO        |\n+----------------+---------------+-------+----------+-------------+\n| 10.1.5.1       | node specific | up    | 10:30:00 | Established |\n+----------------+---------------+-------+----------+-------------+\n```\n\n**关键变化**：\n\n| Fullmesh | Route Reflector |\n|:---|:---|\n| `node-to-node mesh` | `node specific` |\n| 多个 peer（所有节点） | 单个 peer（仅 RR） |\n\n##### 39.5.2 验证 TCP 179\n\n```bash\nnetstat -an | grep 179\n\n# 输出\ntcp  0  0 10.1.5.10:xxxxx  10.1.5.1:179  ESTABLISHED\n```\n\n##### 39.5.3 查看 Leaf 上的 BGP 状态\n\n```bash\n# VyOS\nshow ip bgp summary\n\n# 输出\nNeighbor        AS   MsgRcvd  MsgSent  State/PfxRcd\n10.1.5.10    65005       100      100  Established\n10.1.5.11    65005        98       98  Established\n10.1.10.1      500       200      200  Established\n10.1.12.1      800       195      195  Established\n```\n\n#### 39.6 Service IP Advertisement\n\n##### 39.6.1 宣告 ClusterIP\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: BGPConfiguration\nmetadata:\n  name: default\nspec:\n  nodeToNodeMeshEnabled: false\n  asNumber: 65005\n  serviceClusterIPs:\n    - cidr: 10.96.0.0/16    # ClusterIP 范围\n```\n\n或通过命令：\n\n```bash\ncalicoctl patch bgpconfig default -p \\\n  '{\"spec\": {\"serviceClusterIPs\": [{\"cidr\": \"10.96.0.0/16\"}]}}'\n```\n\n##### 39.6.2 验证路由传播\n\n```bash\n# 在 Leaf 上查看\nshow ip route bgp\n\n# 输出\nB    10.96.0.0/16 [200/0] via 10.1.5.10, eth0, ...\n```\n\n```bash\n# 在 Spine 上查看\nshow ip bgp 10.96.0.0/16\n\n# 路由已传播\n```\n\n**效果**：外部设备可以直接通过 BGP 路由访问 ClusterIP！\n\n#### 39.7 故障排查\n\n##### 39.7.1 常见问题\n\n| 问题 | 排查命令 | 解决方案 |\n|:---|:---|:---|\n| BGP 未建立 | `calicoctl node status` | 检查 IP/AS 配置 |\n| 路由缺失 | `ip route` | 检查 BGP 宣告 |\n| ECMP 不生效 | `show ip bgp` | 检查 maximum-paths |\n| 跨机架不通 | `tcpdump` | 检查 Spine 转发 |\n\n##### 39.7.2 调试命令\n\n```bash\n# 查看 bird 日志\nkubectl logs -n kube-system calico-node-xxxxx -c bird\n\n# 进入 bird 控制台\nkubectl exec -it calico-node-xxxxx -n kube-system -- birdcl\n\n# 查看 BGP 路由\nbirdc> show route protocol Mesh_10_1_5_1\n```\n\n#### 39.8 二层隔离的安全优势\n\n为什么使用不同网段（跨机架）：\n\n```mermaid\ngraph TB\n    subgraph \"Rack0 - 10.1.5.0/24\"\n        Infected[\"感染节点\"]\n        Healthy1[\"正常节点\"]\n    end\n    \n    subgraph \"三层路由器\"\n        Router[\"Router<br/>隔离广播\"]\n    end\n    \n    subgraph \"Rack1 - 10.1.8.0/24\"\n        Healthy2[\"正常节点\"]\n        Healthy3[\"正常节点\"]\n    end\n    \n    Infected -.->|\"广播风暴\"| Healthy1\n    Infected -.->|\"被路由器阻断\"| Router\n    Router -.->|\"隔离保护\"| Healthy2\n```\n\n**优势**：\n\n- 广播域隔离\n- 故障范围控制\n- 安全性增强\n\n#### 39.9 章节小结\n\n```mermaid\nmindmap\n  root((BGP RR 模式))\n    原理\n      解决 Fullmesh 复杂度\n      Leaf 作为 RR\n      Node 作为 RR Client\n    拓扑\n      Leaf-Spine\n      AS per Rack\n      iBGP + eBGP\n    配置\n      nodeToNodeMesh false\n      BGPPeer nodeSelector\n      route-reflector-client\n    ECMP\n      等价多路径\n      负载分担\n      故障备份\n    宣告\n      Service ClusterIP\n      外部可访问\n```\n\n> [!TIP]\n> **BGP RR 模式要点总结**：\n>\n> 1. **核心原理**：\n>    - Leaf 交换机作为 Route Reflector\n>    - K8s 节点作为 RR Client\n>    - 连接数从 N² 降低到 N\n>\n> 2. **拓扑设计**：\n>    - Leaf-Spine 架构\n>    - AS per Rack（每机架一个 AS）\n>    - iBGP（Node ↔ Leaf）+ eBGP（Leaf ↔ Spine）\n>\n> 3. **关键配置**：\n>    - `nodeToNodeMeshEnabled: false` — 禁用 Fullmesh\n>    - `BGPPeer` + `nodeSelector` — 按机架配置\n>    - `route-reflector-client` — Leaf 配置\n>\n> 4. **ECMP**：等价多路径，实现负载分担和高可用\n>\n> 5. **Service 宣告**：ClusterIP 可通过 BGP 向外宣告\n>\n> 6. **适用场景**：大规模集群（>200 节点）\n\n---", "subs": ["39.1 背景与概述", "39.2 配置详解", "39.3 Leaf 交换机配置", "39.4 ECMP 等价多路径", "39.5 验证步骤", "39.6 Service IP Advertisement", "39.7 故障排查", "39.8 二层隔离的安全优势", "39.9 章节小结"]}, {"title": "第四十章 Calico-eBPF-with-DSR 模式", "content": "本章介绍 Calico 的 eBPF 数据平面模式及 DSR（Direct Server Return）功能，这是一种高性能的替代方案，可以绑过 iptables 和 kube-proxy。\n\n#### 40.1 背景与概述\n\n##### 40.1.1 什么是 eBPF\n\n```mermaid\ngraph LR\n    subgraph \"传统方式\"\n        App1[\"应用\"] --> Kernel1[\"内核\"]\n        Kernel1 --> |\"修改需重编内核\"| Hardware1[\"硬件\"]\n    end\n    \n    subgraph \"eBPF 方式\"\n        App2[\"应用\"] --> eBPF[\"eBPF 程序\"]\n        eBPF --> Kernel2[\"内核虚拟机\"]\n        Kernel2 --> Hardware2[\"硬件\"]\n    end\n```\n\n**eBPF (extended Berkeley Packet Filter)**：\n\n- 内核中安全运行的虚拟机\n- 无需修改或重编内核\n- 动态加载/卸载程序\n- 广泛用于：网络、监控、安全、存储\n\n##### 40.1.2 Calico 与 eBPF 的结合\n\n**背景**：\n\n- 早期 Calico 不支持 eBPF\n- 随着 Cilium 的崛起和 eBPF 技术火热\n- Calico 3.x 版本引入 eBPF 数据平面\n\n**eBPF 数据平面优势**：\n\n| 对比项 | 传统 iptables | eBPF 数据平面 |\n|:---|:---|:---|\n| Service 实现 | kube-proxy + iptables | eBPF map |\n| 性能 | O(n) 规则匹配 | O(1) hash 查找 |\n| conntrack | 内核 conntrack | eBPF conntrack |\n| CPU 开销 | 较高 | 较低 |\n| 功能 | 完整 | 部分限制 |\n\n#### 40.2 eBPF 数据平面原理\n\n##### 40.2.1 Bypass kube-proxy\n\n```mermaid\ngraph TB\n    subgraph \"传统模式\"\n        Client1[\"Client\"] --> KubeProxy[\"kube-proxy\"]\n        KubeProxy --> |\"iptables 规则\"| Pod1[\"Pod\"]\n    end\n    \n    subgraph \"eBPF 模式\"\n        Client2[\"Client\"] --> eBPFProg[\"eBPF 程序\"]\n        eBPFProg --> |\"eBPF map 查找\"| Pod2[\"Pod\"]\n    end\n```\n\n**工作机制**：\n\n- Service ClusterIP → eBPF map\n- 直接查找后端 Pod\n- 绕过 iptables/IPVS\n\n##### 40.2.2 限制与适用场景\n\n**不推荐使用 eBPF 的场景**：\n\n- Service Mesh control plane（仍需 iptables）\n- Packet-by-packet 处理\n- 需要完整 iptables 功能\n\n**推荐使用 eBPF 的场景**：\n\n- Connect-time Load Balancing\n- XDP 加速\n- 高性能需求\n\n**平台兼容性**：\n\n| 支持 | 不支持 |\n|:---|:---|\n| OpenShift, AKS, EKS | GKE, RKE |\n| Ubuntu 20.04+ (5.4+ 内核) | 旧内核 (<4.18) |\n| kubeadm 安装 | IPv6, SCTP |\n\n#### 40.3 DSR 模式原理\n\n##### 40.3.1 什么是 DSR\n\n**DSR (Direct Server Return)**：\n\n- 响应包不经过 Load Balancer\n- 后端直接返回给客户端\n- 减少 LB 负载，提升性能\n\n```mermaid\ngraph LR\n    subgraph \"传统模式 (Tunnel)\"\n        C1[\"Client\"] -->|\"1.请求\"| LB1[\"LB/Node\"]\n        LB1 -->|\"2.转发\"| Backend1[\"Backend\"]\n        Backend1 -->|\"3.响应\"| LB1\n        LB1 -->|\"4.返回\"| C1\n    end\n```\n\n```mermaid\ngraph LR\n    subgraph \"DSR 模式\"\n        C2[\"Client\"] -->|\"1.请求\"| LB2[\"LB/Node\"]\n        LB2 -->|\"2.转发\"| Backend2[\"Backend\"]\n        Backend2 -->|\"3.直接返回\"| C2\n    end\n```\n\n##### 40.3.2 Tunnel vs DSR 对比\n\n**TCP 三次握手流程对比**：\n\n| 步骤 | Tunnel 模式 | DSR 模式 |\n|:---|:---|:---|\n| SYN | Client → LB → Backend | Client → LB → Backend |\n| SYN-ACK | Backend → LB → Client | Backend → Client (直接) |\n| ACK | Client → LB → Backend | Client → LB → Backend |\n| 总包数 | 6 个 | 4 个 |\n\n#### 40.4 配置与实现\n\n##### 40.4.1 启用 eBPF 数据平面\n\n**步骤 1：创建 ConfigMap**\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kubernetes-services-endpoint\n  namespace: kube-system\ndata:\n  KUBERNETES_SERVICE_HOST: \"<API_SERVER_IP>\"\n  KUBERNETES_SERVICE_PORT: \"6443\"\n```\n\n**步骤 2：禁用 kube-proxy**\n\n```bash\n# Kind 集群：创建时设置\nkubeProxyMode: none\n\n# 现有集群：scale down\nkubectl scale deployment kube-proxy -n kube-system --replicas=0\n```\n\n**步骤 3：启用 eBPF**\n\n```bash\ncalicoctl patch felixconfiguration default \\\n  --patch='{\"spec\": {\"bpfEnabled\": true}}'\n```\n\n##### 40.4.2 启用 DSR 模式\n\n```bash\ncalicoctl patch felixconfiguration default \\\n  --patch='{\"spec\": {\"bpfExternalServiceMode\": \"DSR\"}}'\n```\n\n**DSR 模式值**：\n\n| 模式 | 说明 |\n|:---|:---|\n| `Tunnel` | 默认，VxLAN 封装双向 |\n| `DSR` | 响应直接返回 |\n\n##### 40.4.3 验证配置\n\n```bash\n# 检查 Felix 配置\ncalicoctl get felixconfiguration default -o yaml\n\n# 检查 BPF 状态\nkubectl exec -n kube-system calico-node-xxx -- \\\n  calico-node -bpf conntrack dump\n```\n\n#### 40.5 抓包分析\n\n##### 40.5.1 Tunnel 模式抓包\n\n```mermaid\nsequenceDiagram\n    participant C as Client (172.18.0.1)\n    participant LB as LB Node (172.18.0.2)\n    participant B as Backend (172.18.0.3)\n    \n    C->>LB: SYN (端口 32000)\n    LB->>B: VxLAN封装 SYN\n    B->>LB: VxLAN封装 SYN-ACK\n    LB->>C: SYN-ACK\n    C->>LB: ACK\n    LB->>B: VxLAN封装 ACK\n```\n\n**特点**：\n\n- 中间节点进行 VxLAN 封装\n- 所有流量经过 LB 节点\n- 共 6 个包完成握手\n\n##### 40.5.2 DSR 模式抓包\n\n```mermaid\nsequenceDiagram\n    participant C as Client (172.18.0.1)\n    participant LB as LB Node (172.18.0.2)\n    participant B as Backend (172.18.0.3)\n    \n    C->>LB: SYN (端口 32000)\n    LB->>B: VxLAN封装 SYN\n    B-->>C: SYN-ACK (直接返回！)\n    C->>LB: ACK\n    LB->>B: VxLAN封装 ACK\n```\n\n**特点**：\n\n- SYN-ACK 从 Backend 直接返回 Client\n- 减少 LB 负载\n- 共 4 个包完成握手\n\n##### 40.5.3 VxLAN 封装分析\n\n```\n# 外层 IP 头\nSrc: 172.18.0.2 (LB)\nDst: 172.18.0.3 (Backend)\n\n# VxLAN 头\nPort: 4789\nVNI: xxx\n\n# 内层 IP 头 (原始包)\nSrc: 172.18.0.1 (Client)\nDst: 172.18.0.2 (Service ClusterIP)\n```\n\n> [!IMPORTANT]\n> **DSR 如何实现直接返回**：\n>\n> - VxLAN 内层包含原始 Client IP\n> - Backend 解封装后获取 Client 地址\n> - 直接构造响应包发送给 Client\n> - 响应包源 IP 为 Service IP（非 Backend IP）\n\n#### 40.6 验证步骤\n\n##### 40.6.1 检查 eBPF 启用状态\n\n```bash\n# 查看 Felix 配置\ncalicoctl get felixconfiguration default -o yaml | grep bpf\n\n# 输出\nbpfEnabled: true\nbpfExternalServiceMode: DSR\n```\n\n##### 40.6.2 验证无 kube-proxy\n\n```bash\n# 检查 iptables 规则（应该没有 Service 规则）\niptables -t nat -L KUBE-SERVICES\n\n# 检查 conntrack（eBPF 模式下为空）\nconntrack -L | grep <service-port>\n```\n\n##### 40.6.3 使用 BPF 工具查看\n\n```bash\n# 进入 calico-node Pod\nkubectl exec -it calico-node-xxx -n kube-system -- sh\n\n# 使用 calico-node 内置 BPF 工具\ncalico-node -bpf conntrack dump\ncalico-node -bpf routes dump\ncalico-node -bpf arp dump\n```\n\n#### 40.7 故障排查\n\n##### 40.7.1 常见问题\n\n| 问题 | 原因 | 解决方案 |\n|:---|:---|:---|\n| Service 不通 | eBPF 未正确加载 | 检查 Felix 日志 |\n| 性能没提升 | kube-proxy 仍运行 | 禁用 kube-proxy |\n| 部分功能失效 | 平台不支持 | 检查兼容性列表 |\n| conntrack 查不到 | 正常现象 | eBPF 有自己的 conntrack |\n\n##### 40.7.2 调试命令\n\n```bash\n# 查看 BPF 程序加载情况\ntc -s qdisc show dev eth0\n\n# 查看丢包统计\ntc -s filter show dev eth0\n\n# 查看 Felix 日志\nkubectl logs -n kube-system calico-node-xxx -c felix | grep -i bpf\n```\n\n#### 40.8 章节小结\n\n```mermaid\nmindmap\n  root((eBPF + DSR))\n    eBPF\n      内核虚拟机\n      无需重编内核\n      bypass iptables\n      性能提升\n    DSR\n      Direct Server Return\n      减少 LB 负载\n      响应直接返回\n    配置\n      bpfEnabled true\n      bpfExternalServiceMode DSR\n      禁用 kube-proxy\n    验证\n      calico-node bpf\n      conntrack 为空\n      抓包分析\n```\n\n> [!TIP]\n> **eBPF + DSR 模式要点总结**：\n>\n> 1. **eBPF 优势**：\n>    - 绕过 iptables/kube-proxy\n>    - O(1) 查找性能\n>    - 降低 CPU 开销\n>\n> 2. **DSR 原理**：\n>    - 响应包直接从 Backend 返回 Client\n>    - 减少 LB 节点负载\n>    - TCP 握手从 6 包减少到 4 包\n>\n> 3. **关键配置**：\n>    - `bpfEnabled: true`\n>    - `bpfExternalServiceMode: DSR`\n>    - 禁用 kube-proxy\n>\n> 4. **验证方法**：\n>    - `calico-node -bpf` 命令\n>    - 抓包分析 TCP 握手流程\n>    - conntrack 表为空（eBPF 管理）\n>\n> 5. **注意限制**：\n>    - 内核版本要求 (>= 5.4)\n>    - 部分平台不支持\n>    - 功能不如 iptables 完整\n\n---", "subs": ["40.1 背景与概述", "40.2 eBPF 数据平面原理", "40.3 DSR 模式原理", "40.4 配置与实现", "40.5 抓包分析", "40.6 验证步骤", "40.7 故障排查", "40.8 章节小结"]}, {"title": "第四十一章 Calico-VPP 模式", "content": "本章介绍 Calico 的 VPP（Vector Packet Processing）数据平面模式，这是一种高性能的用户态协议栈方案。\n\n#### 41.1 背景与概述\n\n##### 41.1.1 什么是 VPP\n\n**VPP (Vector Packet Processing)**：\n\n- 矢量包处理框架\n- 用户态协议栈\n- 思科开源项目 (fd.io)\n- 高性能网络处理\n\n```mermaid\ngraph LR\n    subgraph \"传统处理\"\n        P1[\"Packet 1\"] --> K1[\"内核协议栈\"]\n        P2[\"Packet 2\"] --> K1\n        P3[\"Packet 3\"] --> K1\n    end\n    \n    subgraph \"VPP 矢量处理\"\n        PV1[\"Packet Vector\"] --> N1[\"Node 1\"]\n        N1 --> N2[\"Node 2\"]\n        N2 --> N3[\"Node 3\"]\n    end\n```\n\n**矢量处理优势**：\n\n| 特性 | 传统逐包处理 | VPP 矢量处理 |\n|:---|:---|:---|\n| 处理方式 | 单包遍历所有层 | 批量处理同类包 |\n| Cache 命中 | 低（频繁切换） | 高（连续访问） |\n| 性能 | 较低 | 极高（百万 pps） |\n| 扩展性 | 内核态修改 | Plugin 机制 |\n\n##### 41.1.2 VPP 与 DPDK 的关系\n\n```mermaid\ngraph TB\n    subgraph \"VPP 架构\"\n        App[\"应用层<br/>Calico/Plugin\"]\n        VPP[\"VPP 协议栈<br/>L2/L3/L4\"]\n        Driver[\"数据平面驱动\"]\n        NIC[\"网卡\"]\n    end\n    \n    App --> VPP\n    VPP --> Driver\n    Driver --> NIC\n    \n    subgraph \"数据平面选项\"\n        D1[\"DPDK - 高性能\"]\n        D2[\"AF_PACKET - 兼容性\"]\n        D3[\"RDMA - 低延迟\"]\n        D4[\"Virtio - 虚拟化\"]\n    end\n    \n    Driver -.-> D1\n    Driver -.-> D2\n    Driver -.-> D3\n    Driver -.-> D4\n```\n\n**组合说明**：\n\n- **VPP**：提供用户态协议栈\n- **DPDK**：提供快速数据通道\n- **SR-IOV + DPDK**：生产环境最强组合\n\n#### 41.2 VPP 工作原理\n\n##### 41.2.1 Node Graph 处理模型\n\n```mermaid\ngraph LR\n    Input[\"DPDK Input\"] --> ARP[\"ARP Input\"]\n    Input --> IP4[\"IP4 Input\"]\n    IP4 --> IP4Lookup[\"IP4 Lookup\"]\n    IP4Lookup --> IP4Rewrite[\"IP4 Rewrite\"]\n    IP4Rewrite --> Interface[\"Interface Output\"]\n    Interface --> TX[\"DPDK TX\"]\n```\n\n**每个 Node 代表一个处理单元**：\n\n- `dpdk-input`：从网卡接收\n- `ip4-input`：IPv4 处理\n- `ip4-lookup`：路由查找\n- `interface-output`：发送\n\n##### 41.2.2 传统模式 vs VPP 模式\n\n**传统模式（内核协议栈）**：\n\n```\nPod → veth → Bridge/Route → 内核协议栈 → NIC → 交换机\n```\n\n**VPP 模式（用户态协议栈）**：\n\n```\nPod → tun/tap → VPP 协议栈 → DPDK/驱动 → NIC → 交换机\n```\n\n```mermaid\ngraph TB\n    subgraph \"Host Kernel\"\n        BGP[\"BIRD BGP\"]\n        Kubelet[\"kubelet\"]\n        Felix[\"Felix\"]\n        TUN[\"tun 设备\"]\n    end\n    \n    subgraph \"VPP 用户态\"\n        VPPCore[\"VPP Core\"]\n        Routing[\"Routing\"]\n        LB[\"Load Balancing\"]\n        Policy[\"Policy\"]\n        DataPlane[\"Data Plane<br/>(DPDK/AF_PACKET)\"]\n    end\n    \n    subgraph \"Pod\"\n        PodApp[\"应用\"]\n        PodTUN[\"tun 设备\"]\n    end\n    \n    PodApp --> PodTUN\n    PodTUN --> VPPCore\n    VPPCore --> DataPlane\n    DataPlane --> NIC[\"物理网卡\"]\n    \n    TUN <-.-> VPPCore\n    BGP <-.-> TUN\n```\n\n#### 41.3 环境配置\n\n##### 41.3.1 前置要求\n\n**HugePages（大页内存）**：\n\n```bash\n# 查看当前配置\ncat /proc/meminfo | grep Huge\n\n# 配置 HugePages（2MB）\necho 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages\n\n# 或配置 1GB HugePages\necho 4 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages\n```\n\n**Kubernetes 中查看 HugePages**：\n\n```bash\nkubectl describe node <node-name> | grep hugepages\n# 输出\n#   hugepages-1Gi: 0\n#   hugepages-2Mi: 0\n```\n\n##### 41.3.2 网卡驱动绑定\n\n**驱动类型对比**：\n\n| 驱动 | 性能 | HugePages | 适用场景 |\n|:---|:---|:---|:---|\n| `af_packet` | 低 | 不需要 | 测试/兼容 |\n| `uio_pci_generic` | 中 | 需要 | 通用 |\n| `igb_uio` | 高 | 需要 | 已淘汰 |\n| `vfio-pci` | 高 | 需要 | 生产推荐 |\n\n**绑定网卡到 DPDK**：\n\n```bash\n# 查看当前状态\ndpdk-devbind.py --status\n\n# 绑定到 vfio-pci\ndpdk-devbind.py --bind=vfio-pci 0000:82:00.0\n\n# 绑定后，网卡在内核中不可见\nip link show  # 看不到该网卡\n```\n\n> [!WARNING]\n> 网卡绑定到 DPDK 后，将从内核中消失。需要 VPP 创建 tap 设备维持 SSH 连接。\n\n#### 41.4 安装与配置\n\n##### 41.4.1 Calico VPP 安装\n\n**步骤 1：准备空集群**\n\n```bash\n# kubeadm init 后，不安装 CNI\nkubeadm init --pod-network-cidr=192.168.0.0/16\n```\n\n**步骤 2：安装 Calico Operator**\n\n```bash\nkubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml\n```\n\n**步骤 3：安装 VPP 数据平面**\n\n```yaml\n# vpp-dataplane.yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: calico-vpp-config\n  namespace: calico-vpp-dataplane\ndata:\n  CALICOVPP_INTERFACE: eth0\n  CALICOVPP_NATIVE_DRIVER: af_packet  # 或 dpdk\n  SERVICE_PREFIX: 10.96.0.0/16\n```\n\n```bash\nkubectl apply -f vpp-dataplane.yaml\n```\n\n##### 41.4.2 VPP 启动配置\n\n```\n# /etc/vpp/startup.conf\nunix {\n  nodaemon\n  full-coredump\n}\n\ncpu {\n  workers 1\n  main-core 0\n}\n\ndpdk {\n  dev 0000:82:00.0\n}\n\nplugins {\n  plugin dpdk_plugin.so { enable }\n  plugin ping_plugin.so { enable }\n}\n\nbuffers {\n  buffers-per-numa 131072\n}\n```\n\n**关键配置说明**：\n\n| 配置项 | 说明 |\n|:---|:---|\n| `cpu.workers` | 转发线程数 |\n| `dpdk.dev` | 网卡 PCI 地址 |\n| `plugins` | 启用的插件 |\n| `buffers` | 内存缓冲区 |\n\n#### 41.5 调试与验证\n\n##### 41.5.1 进入 VPP 控制台\n\n```bash\n# Calico VPP 环境\nkubectl exec -it calico-vpp-node-xxx -n calico-vpp-dataplane -- vppctl\n\n# 或直接执行命令\nkubectl exec calico-vpp-node-xxx -n calico-vpp-dataplane -- vppctl show interface\n```\n\n##### 41.5.2 常用 vppctl 命令\n\n```bash\n# 查看接口\nvppctl show interface\n\n# 查看接口统计\nvppctl show interface addr\n\n# 查看路由表\nvppctl show ip fib\n\n# 查看 ARP 表\nvppctl show ip neighbor\n\n# 查看隧道\nvppctl show vxlan tunnel\nvppctl show ipip tunnel\n\n# 查看运行状态\nvppctl show runtime\n```\n\n**输出示例**：\n\n```\nvpp# show interface\n              Name               Idx    State  MTU     RX packets     TX packets\nGigabitEthernet82/0/0             1      up     9000     12345678       87654321\ntap0                              2      up     1500        54321          12345\ntun0                              3      up     1500        11111          22222\n```\n\n#### 41.6 Pod 通信原理\n\n##### 41.6.1 Pod 到 VPP 的连接\n\n```mermaid\ngraph LR\n    subgraph \"Pod\"\n        App[\"应用进程\"]\n        NS[\"Network Namespace\"]\n        TUN[\"tun 设备\"]\n    end\n    \n    subgraph \"VPP\"\n        VPPTun[\"VPP tun\"]\n        Route[\"路由处理\"]\n        Output[\"接口输出\"]\n    end\n    \n    App --> NS\n    NS --> TUN\n    TUN <--> VPPTun\n    VPPTun --> Route\n    Route --> Output\n```\n\n**tun vs tap 设备**：\n\n| 类型 | 层级 | 用途 |\n|:---|:---|:---|\n| tun | L3（IP） | Pod 连接 VPP |\n| tap | L2（Ethernet） | 需要 MAC 地址场景 |\n\n##### 41.6.2 跨节点通信\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1 (Node1)\n    participant VPP1 as VPP (Node1)\n    participant NIC1 as NIC (Node1)\n    participant NIC2 as NIC (Node2)\n    participant VPP2 as VPP (Node2)\n    participant Pod2 as Pod2 (Node2)\n    \n    Pod1->>VPP1: tun 设备\n    VPP1->>NIC1: DPDK 发送\n    NIC1->>NIC2: 物理网络(VxLAN/IPIP)\n    NIC2->>VPP2: DPDK 接收\n    VPP2->>Pod2: tun 设备\n```\n\n#### 41.7 限制与注意事项\n\n##### 41.7.1 已知限制\n\n| 功能 | 状态 |\n|:---|:---|\n| BGP | 必须启用 |\n| Service Affinity | 不支持 |\n| EndpointSlice | 不支持 |\n| WireGuard | 部分限制 |\n| IPv6 | 支持 |\n\n##### 41.7.2 生产建议\n\n> [!CAUTION]\n> **VPP 模式仍为实验性功能**：\n>\n> - 官方标记为 \"Not Production Ready\"\n> - 建议在测试环境充分验证\n> - 生产环境考虑使用 Multus + VPP\n\n**适用场景**：\n\n- 高性能网络需求（流媒体、AI/ML）\n- SR-IOV 环境\n- 专用硬件加速\n\n#### 41.8 章节小结\n\n```mermaid\nmindmap\n  root((Calico VPP))\n    VPP 概念\n      矢量包处理\n      用户态协议栈\n      fd.io 开源\n    数据平面\n      DPDK 高性能\n      AF_PACKET 兼容\n      RDMA/Virtio\n    配置\n      HugePages\n      网卡驱动绑定\n      startup.conf\n    架构\n      Pod via tun\n      VPP 协议栈\n      快速转发\n    验证\n      vppctl\n      show interface\n      show ip fib\n```\n\n> [!TIP]\n> **VPP 模式要点总结**：\n>\n> 1. **VPP 是什么**：\n>    - 矢量包处理框架\n>    - 用户态高性能协议栈\n>    - 通过 Plugin 扩展功能\n>\n> 2. **与 DPDK 关系**：\n>    - VPP 提供协议栈\n>    - DPDK 提供快速数据通道\n>    - 生产推荐：SR-IOV + DPDK\n>\n> 3. **关键配置**：\n>    - HugePages 内存\n>    - 网卡驱动绑定（vfio-pci）\n>    - VPP startup.conf\n>\n> 4. **Pod 连接方式**：\n>    - 通过 tun 设备连接到 VPP\n>    - VPP 替代内核协议栈转发\n>\n> 5. **限制注意**：\n>    - 必须启用 BGP\n>    - 实验性功能，非生产就绪\n>    - 需要物理机或虚拟机（非容器化）\n\n---", "subs": ["41.1 背景与概述", "41.2 VPP 工作原理", "41.3 环境配置", "41.4 安装与配置", "41.5 调试与验证", "41.6 Pod 通信原理", "41.7 限制与注意事项", "41.8 章节小结"]}, {"title": "第四十二章 Calico-Service-DataPath", "content": "本章深入分析 Calico 环境下 Kubernetes Service 的数据路径，包括 ClusterIP、NodePort、LoadBalancer 三种类型的 NAT 转换过程。\n\n#### 42.1 背景与概述\n\n##### 42.1.1 Service 类型回顾\n\n| 类型 | 访问范围 | 使用场景 |\n|:---|:---|:---|\n| ClusterIP | 集群内部 | 默认类型，微服务通信 |\n| NodePort | 集群外部 | 通过节点端口访问 |\n| LoadBalancer | 外部 LB | 云环境，生产推荐 |\n| Headless | 集群内部 | StatefulSet，直连 Pod |\n\n##### 42.1.2 NAT 转换基础\n\n**NAT 类型说明**：\n\n| NAT 类型 | 说明 | 场景 |\n|:---|:---|:---|\n| SNAT | 修改源地址 | 内网访问外网 |\n| DNAT | 修改目的地址 | 外网访问内网 |\n| Reverse NAT | 反向还原 | 响应包还原地址 |\n\n```mermaid\ngraph LR\n    subgraph \"SNAT 场景\"\n        A[\"内网 IP\"] --> |修改源| B[\"公网 IP\"]\n    end\n    \n    subgraph \"DNAT 场景\"\n        C[\"Service IP\"] --> |修改目的| D[\"Pod IP\"]\n    end\n```\n\n#### 42.2 ClusterIP 数据路径\n\n##### 42.2.1 工作原理\n\nClusterIP 是 Kubernetes 默认的 Service 类型，只能在集群内部访问。\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A (Client)\n    participant VethA as veth pair\n    participant Host as Node (iptables)\n    participant PodB as Pod B (Backend)\n    \n    Note over PodA,PodB: 第一阶段: 发送请求\n    PodA->>VethA: SRC: PodA IP<br/>DST: ClusterIP\n    VethA->>Host: 进入 root namespace\n    Note over Host: iptables 执行 DNAT<br/>ClusterIP → PodB IP\n    Host->>PodB: SRC: PodA IP<br/>DST: PodB IP\n    \n    Note over PodA,PodB: 第二阶段: 返回响应\n    PodB->>Host: SRC: PodB IP<br/>DST: PodA IP\n    Note over Host: conntrack 执行 Reverse DNAT<br/>PodB IP → ClusterIP\n    Host->>VethA: SRC: ClusterIP<br/>DST: PodA IP\n    VethA->>PodA: 响应到达\n```\n\n##### 42.2.2 DNAT 详解\n\n**请求阶段**：\n\n```\nPod A 发送请求:\n  原始包: SRC=10.244.1.10 (PodA), DST=10.96.0.100 (ClusterIP)\n  \n经过 iptables DNAT:\n  转换后: SRC=10.244.1.10 (PodA), DST=10.244.2.20 (PodB)\n```\n\n**响应阶段**：\n\n```\nPod B 返回响应:\n  原始包: SRC=10.244.2.20 (PodB), DST=10.244.1.10 (PodA)\n\n经过 conntrack Reverse DNAT:\n  转换后: SRC=10.96.0.100 (ClusterIP), DST=10.244.1.10 (PodA)\n```\n\n> [!IMPORTANT]\n> **为什么需要 Reverse DNAT？**\n> Pod A 发送的请求目的是 ClusterIP，如果响应的源地址是 PodB IP，Pod A 会因为地址不匹配而丢弃该包。\n\n##### 42.2.3 抓包验证\n\n```bash\n# 在 Client Pod 网卡抓包\nkubectl exec client-pod -- tcpdump -i eth0 -nn\n\n# 观察第一个 SYN 包\n# SRC: 10.244.1.10 (PodA)\n# DST: 10.96.0.100 (ClusterIP)\n\n# 在 Host 网卡抓包\ntcpdump -i eth0 -nn host 10.244.2.20\n\n# 观察同一个 SYN 包 (DNAT 已完成)\n# SRC: 10.244.1.10 (PodA)  \n# DST: 10.244.2.20 (PodB) ← 目的地址已变化\n```\n\n#### 42.3 NodePort 数据路径\n\n##### 42.3.1 工作原理\n\nNodePort 允许从集群外部通过节点 IP + 端口访问服务。\n\n```mermaid\nsequenceDiagram\n    participant Client as 外部客户端\n    participant Node1 as Node1 (入口)\n    participant Node2 as Node2\n    participant PodB as Pod B (Backend)\n    \n    Note over Client,PodB: 第一阶段: 外部请求进入\n    Client->>Node1: SRC: ClientIP<br/>DST: Node1:30000\n    Note over Node1: SNAT + DNAT<br/>ClientIP→Node1IP<br/>Node1:30000→PodB:80\n    Node1->>Node2: SRC: Node1 IP<br/>DST: PodB IP\n    Node2->>PodB: 转发到 Pod\n    \n    Note over Client,PodB: 第二阶段: 响应返回\n    PodB->>Node2: SRC: PodB IP<br/>DST: Node1 IP\n    Node2->>Node1: 路由回 Node1\n    Note over Node1: Reverse SNAT + DNAT<br/>还原所有地址\n    Node1->>Client: SRC: Node1:30000<br/>DST: ClientIP\n```\n\n##### 42.3.2 为什么需要 SNAT？\n\n```mermaid\ngraph TB\n    subgraph \"问题场景 (不做 SNAT)\"\n        C1[\"Client: 172.18.0.1\"] --> N1[\"Node1: 172.18.0.2\"]\n        N1 --> |\"DST=PodB\"| P1[\"PodB: 10.244.2.20\"]\n        P1 --> |\"SRC=PodB<br/>DST=Client\"| C1\n        style P1 fill:#f66\n        Note1[\"❌ Client 收到 PodB 的响应<br/>但它期望的是 Node1 的响应\"]\n    end\n```\n\n**解决方案：SNAT**\n\n- 请求时：将源地址改为 Node1 IP\n- 响应时：PodB 将响应发回 Node1\n- Node1 再做 Reverse NAT 发回 Client\n\n##### 42.3.3 完整 NAT 过程\n\n| 阶段 | 源地址 | 目的地址 | NAT 操作 |\n|:---|:---|:---|:---|\n| Client→Node1 | ClientIP | Node1:30000 | - |\n| Node1→PodB | Node1 IP | PodB:80 | SNAT + DNAT |\n| PodB→Node1 | PodB IP | Node1 IP | - |\n| Node1→Client | Node1:30000 | ClientIP | Reverse NAT |\n\n##### 42.3.4 抓包验证\n\n```bash\n# 在 Node1 上抓包\ntcpdump -i eth0 -nn port 30000 -w nodeport.pcap\n\n# 从外部访问\ncurl 172.18.0.2:30000\n\n# 分析 pcap 文件\n# 可以看到 4 种不同的地址组合\n```\n\n#### 42.4 LoadBalancer 数据路径\n\n##### 42.4.1 工作原理\n\nLoadBalancer 在 NodePort 基础上增加了外部负载均衡器。\n\n```mermaid\nsequenceDiagram\n    participant Client as 外部客户端\n    participant LB as L4 LoadBalancer\n    participant Node1 as Node1\n    participant PodB as Pod B (Backend)\n    \n    Client->>LB: SRC: ClientIP<br/>DST: LB IP\n    Note over LB: DNAT: 选择后端节点<br/>LB IP → Node1 IP\n    LB->>Node1: SRC: ClientIP<br/>DST: Node1:30000\n    Note over Node1: 等同于 NodePort 流程\n    Node1->>PodB: SNAT + DNAT\n    PodB->>Node1: 响应\n    Node1->>LB: Reverse NAT\n    LB->>Client: 返回响应\n```\n\n##### 42.4.2 与 NodePort 的关系\n\n```\nLoadBalancer = 外部 L4 LB + NodePort\n\n数据流:\nClient → L4 LB (DNAT选择节点) → NodePort (SNAT+DNAT) → Pod\n```\n\n> [!TIP]\n> **L4 LB 的作用**：\n>\n> - 隐藏后端节点 IP\n> - 负载均衡到多个节点\n> - 提供统一入口（外部 IP/VIP）\n\n#### 42.5 iptables 规则分析\n\n##### 42.5.1 Service 相关规则链\n\n```bash\n# 查看 Service 规则\niptables -t nat -L KUBE-SERVICES -n --line-numbers\n\n# 查看特定 Service 的规则链\niptables -t nat -L KUBE-SVC-XXXXX -n\n```\n\n**规则链结构**：\n\n```mermaid\ngraph TD\n    A[\"PREROUTING/OUTPUT\"] --> B[\"KUBE-SERVICES\"]\n    B --> C[\"KUBE-SVC-xxx<br/>(Service 入口)\"]\n    C --> D[\"KUBE-SEP-xxx<br/>(Endpoint 1)\"]\n    C --> E[\"KUBE-SEP-yyy<br/>(Endpoint 2)\"]\n    D --> F[\"DNAT 到 Pod1\"]\n    E --> G[\"DNAT 到 Pod2\"]\n```\n\n##### 42.5.2 iptables trace 调试\n\n```bash\n# 添加 trace 规则\niptables -t raw -A PREROUTING -p tcp --dport 80 -j TRACE\niptables -t raw -A OUTPUT -p tcp --dport 80 -j TRACE\n\n# 查看 trace 日志\ndmesg -T | grep TRACE\n\n# 清除 trace 规则\niptables -t raw -D PREROUTING -p tcp --dport 80 -j TRACE\niptables -t raw -D OUTPUT -p tcp --dport 80 -j TRACE\n```\n\n#### 42.6 conntrack 连接跟踪\n\n##### 42.6.1 查看连接表\n\n```bash\n# 查看所有连接\nconntrack -L\n\n# 过滤特定端口\nconntrack -L -p tcp --dport 80\n\n# 查看 NAT 连接\nconntrack -L -n\n```\n\n##### 42.6.2 conntrack 表项解读\n\n```\ntcp  6 117 TIME_WAIT \n  src=10.244.1.10 dst=10.96.0.100 sport=45678 dport=80 \n  src=10.244.2.20 dst=10.244.1.10 sport=80 dport=45678\n\n解读:\n- 原始方向: PodA(10.244.1.10) → ClusterIP(10.96.0.100)\n- 回复方向: PodB(10.244.2.20) → PodA(10.244.1.10)\n- DNAT 映射: ClusterIP → PodB\n```\n\n#### 42.7 实验环境搭建\n\n##### 42.7.1 测试 Pod 部署\n\n```yaml\n# test-pods.yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: client-pod\nspec:\n  nodeName: node1  # 固定到 node1\n  containers:\n  - name: client\n    image: curlimages/curl\n    command: [\"sleep\", \"infinity\"]\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: backend-pod\n  labels:\n    app: backend\nspec:\n  nodeName: node2  # 固定到 node2，跨节点测试\n  containers:\n  - name: backend\n    image: nginx\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: backend-svc\nspec:\n  type: NodePort\n  selector:\n    app: backend\n  ports:\n  - port: 80\n    targetPort: 80\n    nodePort: 30000\n```\n\n##### 42.7.2 验证步骤\n\n```bash\n# 1. ClusterIP 测试\nkubectl exec client-pod -- curl backend-svc\n\n# 2. NodePort 测试 (从集群外)\ncurl <node-ip>:30000\n\n# 3. 抓包分析\n# 在不同位置抓包对比\n```\n\n#### 42.8 章节小结\n\n```mermaid\nmindmap\n  root((Service DataPath))\n    ClusterIP\n      仅 DNAT\n      集群内访问\n      Reverse DNAT 还原\n    NodePort\n      SNAT + DNAT\n      外部访问\n      跨节点需 SNAT\n    LoadBalancer\n      L4 LB + NodePort\n      负载均衡\n      隐藏后端\n    调试\n      tcpdump 抓包\n      iptables trace\n      conntrack 查看\n```\n\n> [!TIP]\n> **Service DataPath 要点总结**：\n>\n> 1. **ClusterIP**：\n>    - 仅做 DNAT（ClusterIP → PodIP）\n>    - conntrack 记录映射，响应时 Reverse DNAT\n>\n> 2. **NodePort**：\n>    - SNAT + DNAT 双重转换\n>    - SNAT 确保响应能回到入口节点\n>\n> 3. **LoadBalancer**：\n>    - L4 LB 选择后端节点\n>    - 后续流程等同 NodePort\n>\n> 4. **调试技巧**：\n>    - `tcpdump` 抓包：注意抓包位置影响看到的地址\n>    - `iptables trace`：追踪规则命中\n>    - `conntrack -L`：查看 NAT 映射关系\n>\n> 5. **注意事项**：\n>    - 抓包时 iptables 已处理完成\n>    - 生产环境谨慎修改 iptables 规则\n>    - 使用 BGP Fullmesh 简化分析（无 overlay）\n\n---", "subs": ["42.1 背景与概述", "42.2 ClusterIP 数据路径", "42.3 NodePort 数据路径", "42.4 LoadBalancer 数据路径", "42.5 iptables 规则分析", "42.6 conntrack 连接跟踪", "42.7 实验环境搭建", "42.8 章节小结"]}, {"title": "第四十三章 Calico 生产实践", "content": "本章介绍 Calico 在生产环境中的网络设计和最佳实践，包括数据中心网络拓扑、BGP 架构选型、AS 模式对比。\n\n#### 43.1 背景与概述\n\n##### 43.1.1 参考文档\n\n> [!IMPORTANT]\n> **生产环境必读文档**：\n>\n> - Calico 官方文档：`Reference → Architecture → Calico IP Fabric`\n> - IETF RFC 7938：*Use of BGP for Routing in Large-Scale Data Centers*\n>\n> **建议**：生产环境至少阅读 10 遍，理解每一句话的含义和技术依据。\n\n##### 43.1.2 数据中心网络演进\n\n| 时代 | 架构 | 特点 |\n|:---|:---|:---|\n| 传统 | 接入-汇聚-核心 | 生成树 + VRRP + BFD |\n| 现代 | Spine-Leaf (Clos) | BGP 路由 + ECMP |\n\n```mermaid\ngraph TB\n    subgraph \"传统三层架构\"\n        C1[\"核心层 Core\"]\n        A1[\"汇聚层 Aggregation\"]\n        A2[\"汇聚层 Aggregation\"]\n        S1[\"接入层 Access\"]\n        S2[\"接入层 Access\"]\n        S3[\"接入层 Access\"]\n        \n        C1 --- A1\n        C1 --- A2\n        A1 --- S1\n        A1 --- S2\n        A2 --- S2\n        A2 --- S3\n    end\n```\n\n```mermaid\ngraph TB\n    subgraph \"Spine-Leaf 架构\"\n        SP1[\"Spine 1\"]\n        SP2[\"Spine 2\"]\n        L1[\"Leaf/ToR 1\"]\n        L2[\"Leaf/ToR 2\"]\n        L3[\"Leaf/ToR 3\"]\n        \n        SP1 --- L1\n        SP1 --- L2\n        SP1 --- L3\n        SP2 --- L1\n        SP2 --- L2\n        SP2 --- L3\n    end\n```\n\n#### 43.2 BGP 网络拓扑模式\n\nCalico 支持三种主要的 BGP 网络拓扑模式：\n\n##### 43.2.1 模式对比\n\n| 模式 | AS 分配 | 复杂度 | 适用场景 |\n|:---|:---|:---|:---|\n| AS Per Rack | 每机架一个 AS | 中 | 大型数据中心 |\n| AS Per Node | 每节点一个 AS | 高 | 特殊需求 |\n| Downward Default | 默认路由下发 | 低 | 推荐生产 |\n\n#### 43.3 AS Per Rack 模式\n\n##### 43.3.1 架构原理\n\n每个机架（Rack）作为一个独立的自治系统（AS）。\n\n```mermaid\ngraph TB\n    subgraph \"Spine 层\"\n        SP[\"Spine Switch<br/>AS 65000\"]\n    end\n    \n    subgraph \"Rack A - AS 65001\"\n        ToR_A[\"ToR Switch<br/>Route Reflector\"]\n        N1[\"Node 1\"]\n        N2[\"Node 2\"]\n        N3[\"Node 3\"]\n    end\n    \n    subgraph \"Rack B - AS 65002\"\n        ToR_B[\"ToR Switch<br/>Route Reflector\"]\n        N4[\"Node 4\"]\n        N5[\"Node 5\"]\n        N6[\"Node 6\"]\n    end\n    \n    SP ---|eBGP| ToR_A\n    SP ---|eBGP| ToR_B\n    ToR_A ---|iBGP| N1\n    ToR_A ---|iBGP| N2\n    ToR_A ---|iBGP| N3\n    ToR_B ---|iBGP| N4\n    ToR_B ---|iBGP| N5\n    ToR_B ---|iBGP| N6\n```\n\n##### 43.3.2 工作原理\n\n1. **机架内部（iBGP）**：\n   - ToR 交换机作为 Route Reflector\n   - 计算节点与 ToR 建立 iBGP\n   - 同机架节点共享同一 AS 号\n\n2. **机架之间（eBGP）**：\n   - ToR 与 Spine 建立 eBGP\n   - 不同机架使用不同 AS 号\n   - Spine 交换机汇聚全网路由\n\n##### 43.3.3 优势与劣势\n\n| 方面 | 优势 | 劣势 |\n|:---|:---|:---|\n| 扩展性 | 机架级隔离 | 需要规划 AS 号 |\n| 故障域 | 故障隔离在机架 | ToR 压力较大 |\n| 管理 | 结构清晰 | 配置复杂 |\n\n#### 43.4 AS Per Node 模式\n\n##### 43.4.1 架构原理\n\n每个计算节点作为一个独立的自治系统。\n\n```mermaid\ngraph TB\n    subgraph \"Spine 层\"\n        SP[\"Spine Switch\"]\n    end\n    \n    subgraph \"Leaf 层\"\n        ToR[\"ToR Switch\"]\n    end\n    \n    subgraph \"Node 层\"\n        N1[\"Node 1<br/>AS 65001\"]\n        N2[\"Node 2<br/>AS 65002\"]\n        N3[\"Node 3<br/>AS 65003\"]\n    end\n    \n    SP ---|eBGP| ToR\n    ToR ---|eBGP| N1\n    ToR ---|eBGP| N2\n    ToR ---|eBGP| N3\n```\n\n##### 43.4.2 特点分析\n\n**优点**：\n\n- 每个节点完全独立\n- 路由隔离彻底\n\n**缺点**：\n\n- 节点 BGP 压力大（Bird 进程）\n- AS 号管理复杂\n- 开源 BGP 实现不如商业设备稳定\n\n> [!WARNING]\n> **不推荐在生产环境使用**\n>\n> 计算节点使用 Bird 提供 BGP 能力，其稳定性和性能不如商业路由设备。每个节点最多 200 个 Pod，路由条目有限，没必要每节点独立 AS。\n\n#### 43.5 Downward Default 模式（推荐）\n\n##### 43.5.1 架构原理\n\n下级设备只向上级通告默认路由，全网路由只在 Spine 维护。\n\n```mermaid\ngraph TB\n    subgraph \"Spine 层 - 全网路由\"\n        SP[\"Spine Switch<br/>掌握所有路由\"]\n    end\n    \n    subgraph \"Leaf 层 - 默认路由\"\n        ToR1[\"ToR 1<br/>默认路由指向 Spine\"]\n        ToR2[\"ToR 2<br/>默认路由指向 Spine\"]\n    end\n    \n    subgraph \"Node 层 - 默认路由\"\n        N1[\"Node 1\"]\n        N2[\"Node 2\"]\n        N3[\"Node 3\"]\n        N4[\"Node 4\"]\n    end\n    \n    SP --> |\"下发默认路由\"| ToR1\n    SP --> |\"下发默认路由\"| ToR2\n    ToR1 --> |\"下发默认路由\"| N1\n    ToR1 --> |\"下发默认路由\"| N2\n    ToR2 --> |\"下发默认路由\"| N3\n    ToR2 --> |\"下发默认路由\"| N4\n    \n    N1 -.-> |\"通告 Pod 网段\"| ToR1\n    N2 -.-> |\"通告 Pod 网段\"| ToR1\n    ToR1 -.-> |\"汇聚上报\"| SP\n```\n\n##### 43.5.2 工作原理\n\n```\n路由通告方向（上行）：\nNode → ToR → Spine\n每级只通告本级路由，汇聚后上报\n\n默认路由方向（下行）：\nSpine → ToR → Node\n每级下发默认路由，指向上级\n```\n\n##### 43.5.3 优势分析\n\n| 方面 | 说明 |\n|:---|:---|\n| 设备负载 | 专业设备做专业的事，Spine 处理复杂路由 |\n| 节点压力 | 计算节点只维护少量路由，释放资源 |\n| 配置简化 | 下级设备配置简单，默认路由即可 |\n| 可扩展性 | Spine 交换机能力强，支持大规模路由表 |\n\n> [!TIP]\n> **生产环境推荐使用 Downward Default 模式**\n>\n> 这种模式让专业设备处理复杂的 BGP 路由，计算节点专注于运行工作负载，是最合理的分工。\n\n#### 43.6 Route Reflector 配置策略\n\n##### 43.6.1 选择 Route Reflector\n\n```mermaid\ngraph LR\n    subgraph \"方案1: ToR 作为 RR\"\n        ToR1[\"ToR Switch<br/>性能好\"]\n    end\n    \n    subgraph \"方案2: 专用 RR 节点\"\n        RR1[\"RR Node 1\"]\n        RR2[\"RR Node 2\"]\n    end\n    \n    subgraph \"方案3: 控制节点作为 RR\"\n        CP[\"Control Plane Node\"]\n    end\n```\n\n**选择建议**：\n\n| 方案 | 适用场景 | 说明 |\n|:---|:---|:---|\n| ToR 交换机 | 大型数据中心 | 性能最好，需交换机支持 |\n| 专用 RR 节点 | 中型集群 | 灵活，需额外资源 |\n| 控制节点 | 小型集群 | 简单，复用现有资源 |\n\n##### 43.6.2 Route Reflector 数量\n\n```yaml\n# 推荐配置: 至少 2 个 RR 实现高可用\n# 使用 calicoctl 配置 RR\napiVersion: projectcalico.org/v3\nkind: BGPConfiguration\nmetadata:\n  name: default\nspec:\n  nodeToNodeMeshEnabled: false  # 禁用 Full Mesh\n  asNumber: 65001\n```\n\n#### 43.7 AS 号规划\n\n##### 43.7.1 私有 AS 号范围\n\n| 类型 | 范围 | 说明 |\n|:---|:---|:---|\n| 2 字节私有 | 64512-65534 | 常用，1023 个 |\n| 4 字节私有 | 4200000000-4294967294 | 扩展，约 9500 万个 |\n\n##### 43.7.2 规划示例\n\n```\n数据中心 AS 规划示例：\n\nSpine 层:\n  - Spine-1: AS 65000\n  - Spine-2: AS 65000 (同 AS，iBGP)\n\nLeaf/ToR 层:\n  - Rack-A: AS 65001\n  - Rack-B: AS 65002\n  - Rack-C: AS 65003\n  ...\n  - Rack-N: AS 6500N\n\n注意: 每个 Rack 使用不同 AS 号\n```\n\n#### 43.8 生产环境选型建议\n\n##### 43.8.1 决策流程\n\n```mermaid\nflowchart TD\n    A[\"开始选型\"] --> B{\"集群规模\"}\n    B --> |\"小型 <50 节点\"| C[\"Full Mesh\"]\n    B --> |\"中型 50-200 节点\"| D[\"AS Per Rack<br/>+ Route Reflector\"]\n    B --> |\"大型 >200 节点\"| E[\"Downward Default<br/>+ Spine Leaf\"]\n    \n    C --> F[\"控制节点作为 RR\"]\n    D --> G[\"ToR 作为 RR\"]\n    E --> H[\"Spine 承担路由\"]\n```\n\n##### 43.8.2 模式选型建议\n\n| 规模 | 推荐模式 | 理由 |\n|:---|:---|:---|\n| 小型 (<50) | Full Mesh | 简单，无需额外配置 |\n| 中型 (50-200) | AS Per Rack + RR | 平衡复杂度和扩展性 |\n| 大型 (>200) | Downward Default | 专业设备处理路由 |\n\n#### 43.9 ContainerLab 实验\n\n##### 43.9.1 验证不同 BGP 架构\n\n```bash\n# 使用 ContainerLab 模拟 Spine-Leaf 架构\n# 可以验证：\n# 1. AS Per Rack 模式\n# 2. AS Per Node 模式  \n# 3. Downward Default 模式\n\n# 查看 BGP 邻居\ncalicoctl node status\n\n# 查看路由表\nip route show\n```\n\n#### 43.10 章节小结\n\n```mermaid\nmindmap\n  root((Calico 生产实践))\n    网络拓扑\n      传统三层\n      Spine-Leaf\n      Clos 架构\n    BGP 模式\n      AS Per Rack\n      AS Per Node\n      Downward Default\n    Route Reflector\n      ToR 交换机\n      专用 RR 节点\n      控制节点\n    选型建议\n      小型: Full Mesh\n      中型: AS Per Rack\n      大型: Downward Default\n```\n\n> [!TIP]\n> **Calico 生产实践要点总结**：\n>\n> 1. **必读文档**：\n>    - Calico IP Fabric 设计文档\n>    - RFC 7938 数据中心 BGP 路由\n>\n> 2. **架构选型**：\n>    - **Downward Default**：推荐生产使用\n>    - **AS Per Rack**：大型数据中心\n>    - **AS Per Node**：不推荐\n>\n> 3. **设计原则**：\n>    - 专业设备做专业的事\n>    - Spine 处理复杂路由\n>    - 计算节点专注工作负载\n>\n> 4. **Route Reflector**：\n>    - 小型：控制节点兼任\n>    - 中大型：ToR 或专用节点\n>    - 至少 2 个实现高可用\n>\n> 5. **验证测试**：\n>    - 使用 ContainerLab 模拟\n>    - 理解每种模式的路由流向\n>    - 生产上线前充分测试\n\n---", "subs": ["43.1 背景与概述", "43.2 BGP 网络拓扑模式", "43.3 AS Per Rack 模式", "43.4 AS Per Node 模式", "43.5 Downward Default 模式（推荐）", "43.6 Route Reflector 配置策略", "43.7 AS 号规划", "43.8 生产环境选型建议", "43.9 ContainerLab 实验", "43.10 章节小结"]}, {"title": "第四十四章 Calico-IPAM 高级用法", "content": "本章介绍 Calico IPAM（IP Address Management）的高级配置，包括基于拓扑分配 IP、固定 IP、IP 池迁移、CNI 插件链等。\n\n#### 44.1 背景与概述\n\n##### 44.1.1 CNI 的两大核心组件\n\n一个完备的 CNI 包含两大核心组件：\n\n```mermaid\ngraph LR\n    subgraph \"CNI 核心组件\"\n        IPAM[\"IPAM<br/>IP 地址管理\"]\n        Network[\"Network<br/>网络通路\"]\n    end\n    \n    IPAM --> Pod[\"Pod 获取 IP\"]\n    Network --> Connectivity[\"Pod 互通\"]\n```\n\n| 组件 | 职责 | 重要性 |\n|:---|:---|:---|\n| IPAM | IP 地址分配和管理 | ⭐⭐⭐⭐⭐ |\n| Network | 网络连通性 | ⭐⭐⭐⭐⭐ |\n\n> [!IMPORTANT]\n> **两者并重**：不要只关注网络通路，IPAM 在生产环境中同样重要！\n\n##### 44.1.2 Calico IPAM 类型\n\n| 类型 | 说明 | 功能 |\n|:---|:---|:---|\n| calico-ipam | Calico 原生 IPAM | 支持高级特性 |\n| host-local | 主机本地 IPAM | 功能有限 |\n\n#### 44.2 基于拓扑分配 IP（Node Selector）\n\n##### 44.2.1 背景\n\n在大型数据中心，需要根据物理拓扑（如机架/Rack）分配 IP 地址，便于管理和路由汇聚。\n\n```mermaid\ngraph TB\n    subgraph \"Rack 0 - 192.168.0.0/24\"\n        Node1[\"Node 1\"]\n        Node2[\"Node 2\"]\n        Pod1[\"Pod: 192.168.0.x\"]\n        Pod2[\"Pod: 192.168.0.y\"]\n    end\n    \n    subgraph \"Rack 1 - 192.168.1.0/24\"\n        Node3[\"Node 3\"]\n        Node4[\"Node 4\"]\n        Pod3[\"Pod: 192.168.1.x\"]\n        Pod4[\"Pod: 192.168.1.y\"]\n    end\n    \n    Node1 --> Pod1\n    Node2 --> Pod2\n    Node3 --> Pod3\n    Node4 --> Pod4\n```\n\n##### 44.2.2 原理\n\n通过 IPPool 的 `nodeSelector` 字段，限制 IP 池只能在特定节点上使用。\n\n**默认配置**：\n\n```yaml\n# 默认 IPPool - 所有节点\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: default-pool\nspec:\n  cidr: 10.244.0.0/16\n  nodeSelector: all()  # 所有节点都使用此池\n```\n\n##### 44.2.3 实现步骤\n\n**步骤 1：为节点打标签**\n\n```bash\n# 标记机架\nkubectl label node node1 rack=rack-0\nkubectl label node node2 rack=rack-0\nkubectl label node node3 rack=rack-1\nkubectl label node node4 rack=rack-1\n```\n\n**步骤 2：创建基于拓扑的 IP 池**\n\n```yaml\n# Rack 0 的 IP 池\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: rack-0-pool\nspec:\n  cidr: 192.168.0.0/24\n  ipipMode: Always\n  natOutgoing: true\n  nodeSelector: rack == \"rack-0\"\n---\n# Rack 1 的 IP 池\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: rack-1-pool\nspec:\n  cidr: 192.168.1.0/24\n  ipipMode: Always\n  natOutgoing: true\n  nodeSelector: rack == \"rack-1\"\n```\n\n**步骤 3：验证**\n\n```bash\n# 创建测试 Pod\nkubectl create deployment test --image=nginx --replicas=4\n\n# 查看 Pod IP 分配\nkubectl get pods -o wide\n\n# 预期结果:\n# node1/node2 上的 Pod: 192.168.0.x\n# node3/node4 上的 Pod: 192.168.1.x\n```\n\n##### 44.2.4 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| 标签一致性 | 节点标签必须与 nodeSelector 匹配 |\n| 路由汇聚 | 同机架 IP 相同网段，便于路由聚合 |\n| 管理清晰 | 根据 IP 可快速定位物理位置 |\n| 故障隔离 | 网段隔离有助于故障排查 |\n\n#### 44.3 固定 IP 地址（Static IP）\n\n##### 44.3.1 背景\n\n某些应用（如数据库）需要固定 IP，即使 Pod 重建也保持相同 IP。\n\n##### 44.3.2 原理\n\n通过 Pod 注解指定固定 IP 地址。\n\n```mermaid\nsequenceDiagram\n    participant User as 用户\n    participant K8s as Kubernetes\n    participant IPAM as Calico IPAM\n    \n    User->>K8s: 创建 Pod (带 IP 注解)\n    K8s->>IPAM: 请求分配 IP\n    IPAM->>IPAM: 检查注解中的 IP\n    IPAM->>IPAM: 分配指定 IP\n    IPAM->>K8s: 返回固定 IP\n    K8s->>User: Pod 启动完成\n```\n\n##### 44.3.3 实现\n\n**创建带固定 IP 的 Pod**：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: static-ip-pod\n  annotations:\n    cni.projectcalico.org/ipAddrs: '[\"192.168.0.100\"]'\nspec:\n  containers:\n  - name: nginx\n    image: nginx\n```\n\n**验证**：\n\n```bash\nkubectl get pod static-ip-pod -o wide\n# NAME            READY   STATUS    IP              NODE\n# static-ip-pod   1/1     Running   192.168.0.100   node1\n```\n\n##### 44.3.4 固定 IP 的局限性\n\n> [!WARNING]\n> **Pod 重建时的 IP 冲突问题**\n>\n> 当 Pod 重建时，旧 Pod 的 IP 可能尚未释放，导致新 Pod 无法获取相同 IP。\n\n**解决方案**：使用 IP 池（多个 IP）\n\n```yaml\n# 为有状态应用分配 IP 范围\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: db-pool\nspec:\n  cidr: 192.168.100.0/28  # 16 个 IP\n  nodeSelector: app == \"database\"\n```\n\n> [!TIP]\n> **Spiderpool 项目**\n>\n> DaoCloud 开源的 [Spiderpool](https://github.com/spidernet-io/spiderpool) 项目对 Calico 的静态 IP 功能进行了增强，支持：\n>\n> - IP 池绑定到 Deployment\n> - Pod 重建时自动复用 IP\n> - 双栈 IP 地址管理\n\n#### 44.4 IP 池迁移（Migration）\n\n##### 44.4.1 背景\n\n当需要更换 Pod 网段时，需要从旧 IP 池迁移到新 IP 池。\n\n##### 44.4.2 原理\n\n```mermaid\nflowchart LR\n    A[\"创建新 IP 池\"] --> B[\"禁用旧 IP 池\"]\n    B --> C[\"重启 Pod\"]\n    C --> D[\"Pod 获取新 IP\"]\n```\n\n##### 44.4.3 实现步骤\n\n**步骤 1：创建新 IP 池**\n\n```yaml\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: new-pool\nspec:\n  cidr: 10.0.0.0/16\n  ipipMode: Always\n  natOutgoing: true\n```\n\n**步骤 2：禁用旧 IP 池**\n\n```bash\n# 查看当前 IP 池\ncalicoctl get ippool -o yaml\n\n# 编辑旧池，添加 disabled: true\ncalicoctl patch ippool old-pool -p '{\"spec\": {\"disabled\": true}}'\n\n# 验证\ncalicoctl get ippool\n# NAME       CIDR            SELECTOR   DISABLED\n# old-pool   10.244.0.0/16   all()      true\n# new-pool   10.0.0.0/16     all()      false\n```\n\n**步骤 3：重启 Pod**\n\n```bash\n# 方法1: 滚动更新\nkubectl rollout restart deployment <name>\n\n# 方法2: 删除 Pod\nkubectl delete pod --all -n <namespace>\n\n# 方法3: 使用 drain 节点\nkubectl drain <node> --ignore-daemonsets --delete-emptydir-data\n```\n\n**步骤 4：验证新 IP**\n\n```bash\nkubectl get pods -o wide\n# Pod IP 现在应该是 10.0.x.x\n```\n\n##### 44.4.4 关键点\n\n| 要点 | 说明 |\n|:---|:---|\n| 不可回滚 | 迁移后旧 IP 池已禁用 |\n| 需重启 Pod | 需要 Pod 重建才能获取新 IP |\n| 类似 DHCP | 类似 DHCP Server 更换后重新获取 IP |\n\n#### 44.5 指定 IP 池（Specific Pool）\n\n##### 44.5.1 背景\n\n在同一机架内，不同应用需要从不同 IP 池分配地址。\n\n##### 44.5.2 原理\n\n通过 Pod 注解指定从哪个 IP 池分配地址。\n\n```mermaid\ngraph TD\n    subgraph \"同一节点\"\n        DB[\"DB Pod<br/>注解: db-pool\"]\n        App[\"App Pod<br/>注解: app-pool\"]\n    end\n    \n    subgraph \"IP 池\"\n        DBPool[\"db-pool<br/>192.168.100.0/28\"]\n        AppPool[\"app-pool<br/>192.168.200.0/24\"]\n    end\n    \n    DB --> DBPool\n    App --> AppPool\n```\n\n##### 44.5.3 实现\n\n**创建多个 IP 池**：\n\n```yaml\n# 数据库专用池\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: db-pool\nspec:\n  cidr: 192.168.100.0/28\n  ipipMode: Always\n  natOutgoing: true\n---\n# 应用专用池\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: app-pool\nspec:\n  cidr: 192.168.200.0/24\n  ipipMode: Always\n  natOutgoing: true\n```\n\n**使用注解指定 IP 池**：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: db-pod\n  annotations:\n    cni.projectcalico.org/ipv4pools: '[\"db-pool\"]'\nspec:\n  containers:\n  - name: mysql\n    image: mysql:8.0\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: app-pod\n  annotations:\n    cni.projectcalico.org/ipv4pools: '[\"app-pool\"]'\nspec:\n  containers:\n  - name: nginx\n    image: nginx\n```\n\n##### 44.5.4 与 Node Selector 的区别\n\n| 功能 | Node Selector | 指定 IP 池 |\n|:---|:---|:---|\n| 粒度 | 节点级别 | Pod 级别 |\n| 配置位置 | IPPool | Pod 注解 |\n| 用途 | 机架隔离 | 应用隔离 |\n| 灵活性 | 较低 | 较高 |\n\n#### 44.6 CNI 插件链\n\n##### 44.6.1 背景\n\nCalico 支持 CNI 插件链，可以组合多个插件实现更多功能。\n\n##### 44.6.2 插件链架构\n\n```mermaid\ngraph LR\n    Main[\"主插件<br/>Calico\"]\n    PM[\"Port Mapping<br/>端口映射\"]\n    BW[\"Bandwidth<br/>带宽限制\"]\n    SBR[\"SBR<br/>源路由\"]\n    Tuning[\"Tuning<br/>内核参数\"]\n    \n    Main --> PM\n    PM --> BW\n    BW --> SBR\n    SBR --> Tuning\n```\n\n##### 44.6.3 常用辅助插件\n\n| 插件 | 类型 | 功能 |\n|:---|:---|:---|\n| portmap | 端口映射 | 支持 hostPort |\n| bandwidth | 带宽限制 | QoS 流量控制 |\n| sbr | 源路由 | Source Based Routing |\n| tuning | 内核调优 | 设置 sysctl 参数 |\n\n##### 44.6.4 配置示例\n\n**查看 CNI 配置**：\n\n```bash\ncat /etc/cni/net.d/10-calico.conflist\n```\n\n**带插件链的配置**：\n\n```json\n{\n  \"name\": \"k8s-pod-network\",\n  \"cniVersion\": \"0.3.1\",\n  \"plugins\": [\n    {\n      \"type\": \"calico\",\n      \"ipam\": {\n        \"type\": \"calico-ipam\"\n      }\n    },\n    {\n      \"type\": \"portmap\",\n      \"capabilities\": {\n        \"portMappings\": true\n      }\n    },\n    {\n      \"type\": \"bandwidth\",\n      \"capabilities\": {\n        \"bandwidth\": true\n      }\n    },\n    {\n      \"type\": \"tuning\",\n      \"sysctl\": {\n        \"net.core.somaxconn\": \"1024\"\n      }\n    }\n  ]\n}\n```\n\n##### 44.6.5 带宽限制示例\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: bandwidth-limited-pod\n  annotations:\n    kubernetes.io/ingress-bandwidth: \"10M\"\n    kubernetes.io/egress-bandwidth: \"10M\"\nspec:\n  containers:\n  - name: nginx\n    image: nginx\n```\n\n#### 44.7 IPAM 配置参考\n\n##### 44.7.1 IPPool 完整字段\n\n```yaml\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: example-pool\nspec:\n  # 必填字段\n  cidr: 192.168.0.0/24\n  \n  # 可选字段\n  blockSize: 26              # 每节点分配的子网大小\n  ipipMode: Always           # IPIP 模式: Always/CrossSubnet/Never\n  vxlanMode: Never           # VxLAN 模式\n  natOutgoing: true          # 出站 SNAT\n  disabled: false            # 是否禁用\n  nodeSelector: all()        # 节点选择器\n  allowedUses:               # 允许的用途\n    - Workload\n    - Tunnel\n```\n\n##### 44.7.2 常用注解\n\n| 注解 | 用途 | 示例 |\n|:---|:---|:---|\n| `cni.projectcalico.org/ipAddrs` | 指定固定 IP | `[\"192.168.0.100\"]` |\n| `cni.projectcalico.org/ipv4pools` | 指定 IPv4 池 | `[\"my-pool\"]` |\n| `cni.projectcalico.org/ipv6pools` | 指定 IPv6 池 | `[\"my-ipv6-pool\"]` |\n\n#### 44.8 章节小结\n\n```mermaid\nmindmap\n  root((Calico IPAM 高级用法))\n    基于拓扑分配\n      Node Selector\n      机架隔离\n      路由汇聚\n    固定 IP\n      Pod 注解\n      静态 IP\n      Spiderpool 增强\n    IP 池迁移\n      禁用旧池\n      重启 Pod\n      获取新 IP\n    指定 IP 池\n      Pod 级别\n      应用隔离\n      更灵活\n    CNI 插件链\n      Port Mapping\n      Bandwidth\n      SBR\n      Tuning\n```\n\n> [!TIP]\n> **Calico IPAM 高级用法要点总结**：\n>\n> 1. **CNI 两大核心**：\n>    - IPAM：IP 地址管理\n>    - Network：网络通路\n>\n> 2. **基于拓扑分配（Node Selector）**：\n>    - 节点打标签 + IPPool nodeSelector\n>    - 同机架使用同网段，便于管理\n>\n> 3. **固定 IP**：\n>    - 使用 `cni.projectcalico.org/ipAddrs` 注解\n>    - 注意 Pod 重建时的 IP 冲突问题\n>\n> 4. **IP 池迁移**：\n>    - 创建新池 → 禁用旧池 → 重启 Pod\n>    - 类似 DHCP Server 更换\n>\n> 5. **指定 IP 池**：\n>    - 使用 `cni.projectcalico.org/ipv4pools` 注解\n>    - Pod 级别的精细控制\n>\n> 6. **CNI 插件链**：\n>    - 多个插件组合使用\n>    - 扩展功能：端口映射、带宽限制、内核调优\n\n---", "subs": ["44.1 背景与概述", "44.2 基于拓扑分配 IP（Node Selector）", "44.3 固定 IP 地址（Static IP）", "44.4 IP 池迁移（Migration）", "44.5 指定 IP 池（Specific Pool）", "44.6 CNI 插件链", "44.7 IPAM 配置参考", "44.8 章节小结"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

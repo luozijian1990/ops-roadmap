@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>VictoriaMetrics 学习笔记 · 第三册：备份、恢复与实践 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>VictoriaMetrics 学习笔记 · 第三册：备份、恢复与实践</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "VictoriaMetrics 学习笔记 · 第三册：备份、恢复与实践", "intro": "", "parts": [{"title": "第 7 章：vmbackup - 数据备份工具", "sections": [{"title": "7.1 vmbackup 概述", "content": "**核心定位**：vmbackup 是 VictoriaMetrics 的数据备份工具，用于：\n\n- 防止硬件故障导致的数据丢失\n- 防止意外数据删除\n- 从即时快照创建备份\n- 支持增量备份和完整备份\n\n**核心特性**：\n\n- ✅ 基于即时快照（Instant Snapshots）的备份\n- ✅ 支持增量备份（仅上传变化的数据）\n- ✅ 服务器端复制（Server-side Copy）加速备份\n- ✅ 可中断恢复（断点续传）\n- ✅ 支持多种对象存储（GCS、S3、Azure、MinIO 等）\n- ✅ 单节点和集群版本均支持\n\n**工作原理**：\n\n```mermaid\ngraph LR\n    A[VictoriaMetrics] -->|1. 创建快照| B[Instant Snapshot]\n    B -->|2. 读取数据| C[vmbackup]\n    C -->|3. 上传备份| D[对象存储<br/>GCS/S3/Azure]\n    C -->|4. 删除快照| B\n    D -->|恢复| E[vmrestore]\n```\n\n---", "subs": ["防止硬件故障导致的数据丢失", "防止意外数据删除", "从即时快照创建备份", "支持增量备份和完整备份", "✅ 基于即时快照（Instant Snapshots）的备份", "✅ 支持增量备份（仅上传变化的数据）"]}, {"title": "7.2 支持的存储类型", "content": "vmbackup 通过 `-dst` 参数支持以下存储类型：\n\n| 存储类型                | 示例                            | 说明                       |\n| ----------------------- | ------------------------------- | -------------------------- |\n| **GCS**           | `gs://<bucket>/<path>`        | Google Cloud Storage       |\n| **S3**            | `s3://<bucket>/<path>`        | Amazon S3                  |\n| **Azure Blob**    | `azblob://<container>/<path>` | Azure Blob Storage         |\n| **S3-compatible** | `s3://<bucket>/<path>`        | MinIO、Ceph 等             |\n| **本地文件系统**  | `fs://</abs/path>`            | 本地目录（不推荐用于生产） |\n\n**注意事项**：\n\n- 本地文件系统目录不能是 `-storageDataPath`（数据目录）\n- S3 兼容存储需配置 `-customS3Endpoint`\n\n---", "subs": ["本地文件系统目录不能是", "S3 兼容存储需配置"]}, {"title": "7.3 单节点备份", "content": "#### 7.3.1 基本备份命令\n\n```bash\n./vmbackup \\\n  -storageDataPath=</path/to/victoria-metrics-data> \\   # VictoriaMetrics 数据目录\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\  # 快照创建接口\n  -dst=gs://<bucket>/<path/to/backup>                   # 备份目标路径\n```\n\n**参数说明**：\n\n- **`-storageDataPath`**：VictoriaMetrics 的数据目录（`-storageDataPath` 参数值）\n- **`-snapshot.createURL`**：创建快照的 HTTP 接口\n- **`-dst`**：备份目标路径\n\n**无需停机**：vmbackup 基于即时快照工作，无需停止 VictoriaMetrics 服务。\n\n---", "subs": ["7.3.1 基本备份命令"]}, {"title": "7.4 集群备份", "content": "#### 7.4.1 集群备份方式\n\n**要点**：\n\n- 必须在**每个 vmstorage 节点**上运行 vmbackup\n- 不同节点的备份必须放到**不同的目录**\n- 需要访问每个 vmstorage 的数据目录\n\n#### 7.4.2 集群备份示例\n\n**3 个 vmstorage 节点的备份**：\n\n```bash\n# vmstorage-1\n./vmbackup \\\n  -storageDataPath=</path/to/vmstorage-data> \\\n  -snapshot.createURL=http://vmstorage1:8482/snapshot/create \\\n  -dst=gs://<bucket>/vmstorage-1\n\n# vmstorage-2\n./vmbackup \\\n  -storageDataPath=</path/to/vmstorage-data> \\\n  -snapshot.createURL=http://vmstorage2:8482/snapshot/create \\\n  -dst=gs://<bucket>/vmstorage-2\n\n# vmstorage-3\n./vmbackup \\\n  -storageDataPath=</path/to/vmstorage-data> \\\n  -snapshot.createURL=http://vmstorage3:8482/snapshot/create \\\n  -dst=gs://<bucket>/vmstorage-3\n```\n\n#### 7.4.3 Kubernetes 部署建议\n\n**使用 Sidecar 容器**：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: vmstorage-1\nspec:\n  containers:\n    # 主容器：vmstorage\n    - name: vmstorage\n      image: victoriametrics/vmstorage:latest\n      volumeMounts:\n        - name: storage\n          mountPath: /storage\n\n    # Sidecar 容器：vmbackup\n    - name: vmbackup\n      image: victoriametrics/vmbackup:latest\n      volumeMounts:\n        - name: storage\n          mountPath: /storage\n      command:\n        - /vmbackup\n        - -storageDataPath=/storage\n        - -snapshot.createURL=http://localhost:8482/snapshot/create\n        - -dst=gs://bucket/vmstorage-1\n```\n\n---", "subs": ["7.4.1 集群备份方式", "7.4.2 集群备份示例", "7.4.3 Kubernetes 部署建议"]}, {"title": "7.5 备份类型", "content": "#### 7.5.1 完整备份（Full Backup）\n\n**创建完整备份**：\n\n```bash\n./vmbackup \\\n  -storageDataPath=</path/to/victoriametrics-data> \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://<bucket>/<path/to/new/backup>\n```\n\n**特点**：\n\n- 备份所有数据到新目录\n- 适合首次备份或定期完整备份\n\n#### 7.5.2 完整备份 + 服务器端复制\n\n**利用已有备份加速**：\n\n```bash\n./vmbackup \\\n  -storageDataPath=</path/to/victoriametrics-data> \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://<bucket>/<path/to/new/backup> \\\n  -origin=gs://<bucket>/<path/to/existing/backup>  # 源备份路径\n```\n\n**优势**：\n\n- 对于共享的数据文件，执行**服务器端复制**\n- 不需要本地下载再上传，节省时间和带宽\n- 仅上传新增或变化的数据\n\n**注意事项**：\n\n- `-origin` 和 `-dst` 必须在**同一个对象存储桶**\n- S3 Glacier 等存储可能执行完整对象复制（慢且贵）\n- 建议查阅云存储提供商的文档确认行为\n\n#### 7.5.3 增量备份（Incremental Backup）\n\n**概念**：如果 `-dst` 已包含之前的备份数据，vmbackup 自动执行增量备份。\n\n**增量备份命令**：\n\n```bash\n./vmbackup \\\n  -storageDataPath=</path/to/victoriametrics-data> \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://<bucket>/<path/to/existing/backup>  # 已存在的备份路径\n```\n\n**工作方式**：\n\n- 仅上传新增或变化的数据\n- 删除目标中不再存在的旧文件\n- 节省时间和带宽成本\n\n**适用场景**：\n\n- 定期备份（每小时、每天）\n- 大规模数据备份\n\n---", "subs": ["7.5.1 完整备份（Full Backup）", "7.5.2 完整备份 + 服务器端复制", "7.5.3 增量备份（Incremental Backup）"]}, {"title": "7.6 Smart Backup 策略（推荐）", "content": "#### 7.6.1 Smart Backup 概念\n\n**定义**：结合完整备份、增量备份和清理操作的备份策略。\n\n**VictoriaMetrics 的 Smart Backup**：\n\n- **每小时增量备份** → 保存到 `latest` 目录\n- **每天完整备份** → 服务器端复制到 `YYYYMMDD` 目录\n\n#### 7.6.2 Smart Backup 实施步骤\n\n**步骤 1：每小时增量备份**\n\n```bash\n# 配置 Cron 任务，每小时执行一次\n0 * * * * /vmbackup \\\n  -storageDataPath=</path/to/victoriametrics-data> \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://<bucket>/latest\n```\n\n**作用**：\n\n- 创建即时快照\n- 仅上传变化的数据（增量）\n- 保存到 `gs://<bucket>/latest`\n\n**步骤 2：每天完整备份**\n\n```bash\n# 配置 Cron 任务，每天凌晨执行一次\n0 0 * * * /vmbackup \\\n  -origin=gs://<bucket>/latest \\\n  -dst=gs://<bucket>/$(date +\\%Y\\%m\\%d)\n```\n\n**作用**：\n\n- 将 `latest` 备份服务器端复制到 `YYYYMMDD` 目录\n- 例如：`gs://<bucket>/20250124`\n- 快速且低成本\n\n**步骤 3：定期清理旧备份**\n\n```bash\n# 删除 30 天前的备份\ngsutil -m rm -r gs://<bucket>/$(date -d '30 days ago' +\\%Y\\%m\\%d)\n```\n\n#### 7.6.3 Smart Backup 优势\n\n1. **节省成本**：小时级备份使用增量，降低网络传输成本\n2. **灵活恢复**：\n   - 恢复最近 1 小时数据：使用 `latest`\n   - 恢复特定日期数据：使用 `YYYYMMDD`\n3. **高效快速**：服务器端复制避免数据传输\n\n#### 7.6.4 注意事项\n\n⚠️ **避免冲突**：每日备份运行时，暂停小时级备份。\n\n✅ **使用 vmbackupmanager**：Enterprise 版本提供自动化工具，简化 Smart Backup 管理。\n\n---", "subs": ["7.6.1 Smart Backup 概念", "7.6.2 Smart Backup 实施步骤", "7.6.3 Smart Backup 优势", "7.6.4 注意事项"]}, {"title": "7.7 服务器端复制", "content": "#### 7.7.1 服务器端复制命令\n\n**仅复制备份（不创建快照）**：\n\n```bash\n./vmbackup \\\n  -origin=gs://bucket/source-backup \\\n  -dst=gs://bucket/destination-backup\n```\n\n**用途**：\n\n- 复制已有备份到新位置\n- 创建备份的副本\n- 跨区域备份迁移\n\n#### 7.7.2 服务器端复制特性\n\n- **同一存储桶**：`-origin` 和 `-dst` 必须在同一对象存储\n- **增量复制**：如果 `-dst` 已有数据，则同步差异\n- **高效快速**：数据不经过本地，直接在云端复制\n\n**性能差异**：\n\n- **大多数对象存储**：创建新对象名指向已有数据（快）\n- **S3 Glacier**：执行完整对象复制（慢且贵）\n\n---", "subs": ["7.7.1 服务器端复制命令", "7.7.2 服务器端复制特性"]}, {"title": "7.8 备份工作原理", "content": "#### 7.8.1 备份算法\n\n**7 个步骤**：\n\n1. **创建快照**：调用 `-snapshot.createURL` 创建即时快照\n2. **收集文件信息**：\n   - 快照中的文件\n   - `-dst` 目标中的文件\n   - `-origin` 源中的文件（如果指定）\n3. **删除过时文件**：删除 `-dst` 中存在但快照中不存在的文件\n4. **确定需上传文件**：快照中存在但 `-dst` 中缺失的文件\n5. **服务器端复制**：从 `-origin` 复制步骤 4 中的共享文件到 `-dst`\n6. **上传剩余文件**：上传步骤 4 中不在 `-origin` 的文件\n7. **删除快照**：自动删除创建的快照\n\n#### 7.8.2 文件分块\n\n**分块策略**：\n\n- 源文件按 **1 GiB** 分块\n- 每个分块作为独立文件上传\n- 平衡文件数量和重传数据量\n\n#### 7.8.3 即时快照特性\n\nvmbackup 依赖即时快照的以下特性：\n\n1. ✅ 快照中的文件**不可变**\n2. ✅ 旧文件定期**合并**为新文件\n3. ✅ 小文件更可能被合并\n4. ✅ 连续快照共享大量相同文件\n\n这些特性保证了：\n\n- 增量备份的高效性\n- 服务器端复制的可行性\n\n---", "subs": ["7.8.1 备份算法", "7.8.2 文件分块", "7.8.3 即时快照特性"]}, {"title": "7.9 故障排查", "content": "#### 7.9.1 备份速度慢\n\n**问题**：备份耗时过长\n\n**解决方案**：\n\n```bash\n./vmbackup -concurrency=20 ...  # 增加并发数（默认 10）\n```\n\n#### 7.9.2 占用网络带宽或 CPU 过高\n\n**问题**：vmbackup 消耗过多资源\n\n**解决方案**：\n\n```bash\n# 方案 1：降低并发\n./vmbackup -concurrency=5 ...\n\n# 方案 2：限制上传速度\n./vmbackup -maxBytesPerSecond=10MB ...  # 限制 10 MB/s\n```\n\n#### 7.9.3 CPU 占用过高（多核心系统）\n\n**解决方案**：\n\n```bash\n./vmbackup -filestream.disableFadvise ...\n```\n\n#### 7.9.4 备份中断后恢复\n\n**问题**：备份因临时错误中断\n\n**解决方案**：\n\n- 使用**相同参数**重启 vmbackup\n- vmbackup 自动从中断点恢复\n- ⚠️ 完成后手动删除失败时创建的快照\n\n#### 7.9.5 单节点备份不能恢复到集群（反之亦然）\n\n**原因**：单节点和集群的数据格式不兼容\n\n**解决方案**：确保备份和恢复的 VictoriaMetrics 版本类型一致。\n\n#### 7.9.6 快照占用磁盘空间\n\n参考快照故障排查文档（Snapshot Troubleshooting）了解快照的磁盘使用和建议。\n\n---", "subs": ["7.9.1 备份速度慢", "7.9.2 占用网络带宽或 CPU 过高", "7.9.3 CPU 占用过高（多核心系统）", "7.9.4 备份中断后恢复", "7.9.5 单节点备份不能恢复到集群（反之亦然）", "7.9.6 快照占用磁盘空间"]}, {"title": "7.10 凭据配置", "content": "#### 7.10.1 通过文件提供凭据\n\n**S3（AWS、MinIO）凭据文件**（`/etc/credentials`）：\n\n```ini\n[default]\naws_access_key_id=theaccesskey\naws_secret_access_key=thesecretaccesskeyvalue\n```\n\n**GCP 凭据文件**（`/etc/credentials.json`）：\n\n```json\n{\n   \"type\": \"service_account\",\n   \"project_id\": \"project-id\",\n   \"private_key_id\": \"key-id\",\n   \"private_key\": \"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n\",\n   \"client_email\": \"service-account-email\",\n   ...\n}\n```\n\n**使用文件**：\n\n```bash\n./vmbackup -credsFilePath=/etc/credentials ...\n```\n\n#### 7.10.2 通过环境变量提供凭据\n\n**AWS S3**：\n\n```bash\nexport AWS_ACCESS_KEY_ID=<key>\nexport AWS_SECRET_ACCESS_KEY=<secret>\n# 或\nexport AWS_SHARED_CREDENTIALS_FILE=/path/to/credentials\n```\n\n**GCP**：\n\n```bash\nexport GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json\n```\n\n**Azure**：\n\n```bash\n# 方式 1：连接字符串\nexport AZURE_STORAGE_ACCOUNT_CONNECTION_STRING=\"<connection_string>\"\n\n# 方式 2：账户名 + Key\nexport AZURE_STORAGE_ACCOUNT_NAME=<account_name>\nexport AZURE_STORAGE_ACCOUNT_KEY=<account_key>\n\n# 方式 3：DefaultAzureCredential（托管身份）\nexport AZURE_USE_DEFAULT_CREDENTIAL=true\nexport AZURE_STORAGE_ACCOUNT_NAME=<account_name>\nexport AZURE_CLIENT_ID=<client_id>  # 可选：指定特定凭据\n\n# 可选：自定义域\nexport AZURE_STORAGE_DOMAIN=<custom_domain>\n```\n\n#### 7.10.3 云提供商元数据服务\n\n**自动获取凭据**：\n\n- vmbackup 在云环境中运行时自动使用元数据服务获取凭据\n- 无需显式提供 `-credsFilePath` 或环境变量\n\n**支持的云**：\n\n- AWS EC2\n- GCP GCE\n- Azure VM\n\n#### 7.10.4 Kubernetes 中的凭据配置\n\n**方式 1：使用 Secret + 环境变量**\n\n```yaml\n# Secret 定义\napiVersion: v1\nkind: Secret\nmetadata:\n  name: vmbackup-credentials\ndata:\n  access_key: <base64-encoded-key>\n  secret_key: <base64-encoded-secret>\n\n---\n# Pod 配置\nspec:\n  containers:\n    - name: vmbackup\n      env:\n        - name: AWS_ACCESS_KEY_ID\n          valueFrom:\n            secretKeyRef:\n              name: vmbackup-credentials\n              key: access_key\n        - name: AWS_SECRET_ACCESS_KEY\n          valueFrom:\n            secretKeyRef:\n              name: vmbackup-credentials\n              key: secret_key\n```\n\n**方式 2：IAM Roles for Service Accounts（推荐）**\n\n**AWS EKS**：\n\n```yaml\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: monitoring-backups\n  annotations:\n    eks.amazonaws.com/role-arn: arn:aws:iam::{ACCOUNT_ID}:role/{ROLE_NAME}\n\n---\nspec:\n  serviceAccountName: monitoring-backups\n```\n\n**GCP GKE（Workload Identity）**：\n\n```yaml\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: monitoring-backups\n  annotations:\n    iam.gke.io/gcp-service-account: {sa_name}@{project_name}.iam.gserviceaccount.com\n\n---\nspec:\n  serviceAccountName: monitoring-backups\n```\n\n---", "subs": ["7.10.1 通过文件提供凭据", "7.10.2 通过环境变量提供凭据", "7.10.3 云提供商元数据服务", "7.10.4 Kubernetes 中的凭据配置"]}, {"title": "7.11 高级配置", "content": "#### 7.11.1 自定义 S3 端点\n\n**MinIO 示例**：\n\n```bash\n./vmbackup \\\n  -customS3Endpoint=http://localhost:9000 \\\n  -dst=s3://bucket/backup ...\n```\n\n**AWS GovCloud 示例**：\n\n```bash\n./vmbackup \\\n  -customS3Endpoint=https://s3-fips.us-gov-west-1.amazonaws.com \\\n  -dst=s3://bucket/backup ...\n```\n\n#### 7.11.2 永久删除 S3 对象版本\n\n**问题**：S3 启用版本控制时，标准删除仅删除当前版本。\n\n**解决方案**：\n\n```bash\n./vmbackup -deleteAllObjectVersions ...\n```\n\n**替代方案**：配置对象存储的生命周期规则自动删除非当前版本。\n\n#### 7.11.3 设置对象元数据\n\n**示例**：\n\n```bash\n./vmbackup \\\n  -objectMetadata='{\"param1\":\"value1\",\"param2\":\"value2\"}' \\\n  -dst=s3://bucket/backup ...\n```\n\n**限制**：本地文件系统目标不支持元数据。\n\n#### 7.11.4 设置 S3 对象标签\n\n```bash\n./vmbackup \\\n  -s3ObjectTags='{\"Environment\":\"Production\",\"Team\":\"Platform\"}' \\\n  -dst=s3://bucket/backup ...\n```\n\n#### 7.11.5 设置 S3 存储类\n\n```bash\n./vmbackup \\\n  -s3StorageClass=GLACIER \\  # 或其他存储类\n  -dst=s3://bucket/backup ...\n```\n\n**支持的存储类**：\n\n- `STANDARD`\n- `STANDARD_IA`\n- `ONEZONE_IA`\n- `INTELLIGENT_TIERING`\n- `GLACIER`\n- `GLACIER_IR`\n- `DEEP_ARCHIVE`\n\n---", "subs": ["7.11.1 自定义 S3 端点", "7.11.2 永久删除 S3 对象版本", "7.11.3 设置对象元数据", "7.11.4 设置 S3 对象标签", "7.11.5 设置 S3 存储类"]}, {"title": "7.12 核心 Flag 总览", "content": "#### 7.12.1 必需参数\n\n| Flag                 | 说明                                                       |\n| -------------------- | ---------------------------------------------------------- |\n| `-dst`             | 备份目标路径（必需）                                       |\n| `-storageDataPath` | VictoriaMetrics 数据目录（默认 `victoria-metrics-data`） |\n\n#### 7.12.2 重要参数\n\n**快照相关**：\n\n- `-snapshot.createURL` - 创建快照的 URL（推荐使用）\n- `-snapshot.deleteURL` - 删除快照的 URL（可选，自动生成）\n- `-snapshotName` - 已存在的快照名称（与 `-snapshot.createURL` 二选一）\n\n**备份策略**：\n\n- `-origin` - 源备份路径（用于服务器端复制）\n- `-concurrency` - 并发工作线程数（默认 10）\n- `-maxBytesPerSecond` - 最大上传速度限制\n- `-deleteAllObjectVersions` - 删除所有对象版本（S3）\n\n**凭据**：\n\n- `-credsFilePath` - 凭据文件路径\n- `-customS3Endpoint` - 自定义 S3 端点（MinIO 等）\n\n**对象存储配置**：\n\n- `-s3StorageClass` - S3 存储类\n- `-s3ObjectTags` - S3 对象标签（JSON）\n- `-objectMetadata` - 对象元数据（JSON）\n- `-s3ForcePathStyle` - 使用路径风格 URL（默认 true）\n- `-s3TLSInsecureSkipVerify` - 跳过 TLS 验证\n\n**TLS 配置**：\n\n- `-snapshot.tlsCAFile` - 验证快照 URL 的 CA 文件\n- `-snapshot.tlsCertFile` - 客户端证书\n- `-snapshot.tlsKeyFile` - 客户端密钥\n- `-snapshot.tlsInsecureSkipVerify` - 跳过 TLS 验证\n- `-snapshot.tlsServerName` - TLS ServerName\n\n**性能调优**：\n\n- `-filestream.disableFadvise` - 禁用 fadvise() 系统调用\n\n**监控**：\n\n- `-httpListenAddr` - HTTP 监听地址（默认 `:8420`）\n\n---", "subs": ["7.12.1 必需参数", "7.12.2 重要参数"]}, {"title": "7.13 vmbackupmanager（Enterprise）", "content": "#### 7.13.1 简介\n\n**核心功能**：\n\n- 基于 vmbackup 构建的自动化备份管理工具\n- 简化小时级、日级、周级、月级备份的创建\n- 自动清理旧备份\n\n**获取方式**：\n\n- Enterprise 版本提供\n- 可免费试用：从 [releases 页面](https://github.com/VictoriaMetrics/VictoriaMetrics/releases) 下载\n- 申请免费试用许可证\n\n#### 7.13.2 典型使用场景\n\n**自动化 Smart Backup**：\n\n- 自动执行每小时增量备份\n- 自动执行每日完整备份（服务器端复制）\n- 按保留策略自动删除旧备份\n\n**配置示例**：\n\n```bash\n./vmbackupmanager \\\n  -storageDataPath=/victoria-metrics-data \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://bucket/backups \\\n  -retention.hourly=24 \\   # 保留 24 小时备份\n  -retention.daily=7 \\     # 保留 7 天备份\n  -retention.weekly=4 \\    # 保留 4 周备份\n  -retention.monthly=12    # 保留 12 月备份\n```\n\n---", "subs": ["7.13.1 简介", "7.13.2 典型使用场景"]}, {"title": "7.14 最佳实践", "content": "#### 7.14.1 备份策略建议\n\n1. ✅ **使用 Smart Backup 策略**\n\n   - 每小时增量备份到 `latest`\n   - 每天完整备份到 `YYYYMMDD`\n2. ✅ **定期清理旧备份**\n\n   - 避免存储成本累积\n   - 根据数据保留策略删除过期备份\n3. ✅ **验证备份可恢复性**\n\n   - 定期测试恢复流程\n   - 确认备份完整性\n4. ✅ **监控备份任务**\n\n   - 监控备份成功率\n   - 设置告警检测备份失败\n\n#### 7.14.2 集群备份建议\n\n1. ✅ **使用 Sidecar 模式**（Kubernetes）\n\n   - 与 vmstorage 运行在同一 Pod\n   - 共享数据卷\n2. ✅ **分离备份目录**\n\n   - 不同 vmstorage 节点备份到不同路径\n   - 避免备份数据冲突\n3. ✅ **并行执行备份**\n\n   - 所有 vmstorage 节点同时备份\n   - 加快整体备份速度\n\n#### 7.14.3 安全建议\n\n1. ✅ **使用 IAM Roles**（Kubernetes）\n\n   - 避免在配置中硬编码凭据\n   - 使用 IAM Roles for Service Accounts（AWS）\n   - 使用 Workload Identity（GCP）\n2. ✅ **加密传输**\n\n   - 使用 HTTPS 端点\n   - 启用对象存储的传输加密\n3. ✅ **访问控制**\n\n   - 限制备份存储桶的访问权限\n   - 使用最小权限原则\n\n#### 7.14.4 成本优化\n\n1. ✅ **使用增量备份**\n\n   - 减少网络传输成本\n   - 节省存储空间\n2. ✅ **选择合适的存储类**\n\n   - 频繁访问：`STANDARD`\n   - 长期归档：`GLACIER`、`DEEP_ARCHIVE`\n3. ✅ **清理旧备份**\n\n   - 避免无限累积存储成本\n   - 配置生命周期规则自动删除\n\n---", "subs": ["7.14.1 备份策略建议", "7.14.2 集群备份建议", "7.14.3 安全建议", "7.14.4 成本优化"]}, {"title": "7.15 总结", "content": "**vmbackup 核心优势**：\n\n1. ✅ 基于即时快照的无中断备份\n2. ✅ 增量备份节省时间和成本\n3. ✅ 服务器端复制加速完整备份\n4. ✅ 自动断点续传\n5. ✅ 支持多种对象存储\n6. ✅ 灵活的凭据配置方式\n\n**Smart Backup 策略**：\n\n- 每小时增量备份（`latest`）\n- 每天完整备份（`YYYYMMDD`）\n- 灵活恢复：最近 1 小时或特定日期\n\n**典型工作流**：\n\n```mermaid\ngraph TD\n    A[每小时增量备份] -->|写入| B[gs://bucket/latest]\n    B -->|每天服务器端复制| C[gs://bucket/20250124]\n    C -->|定期清理| D[删除 30 天前备份]\n```\n\n**配合工具**：\n\n- **vmrestore**：从备份恢复数据\n- **vmbackupmanager**（Enterprise）：自动化备份管理\n\n**🎯 第 7 章完成！** 下一步将继续学习 vmrestore 组件...\n\n---\n\n---", "subs": ["每小时增量备份（latest）", "每天完整备份（YYYYMMDD）", "灵活恢复：最近 1 小时或特定日期", "vmrestore", "vmbackupmanager（Enterprise）"]}]}, {"title": "第 8 章：vmrestore - 数据恢复工具", "sections": [{"title": "8.1 vmrestore 概述", "content": "**核心定位**：vmrestore 是 VictoriaMetrics 的数据恢复工具，用于：\n\n- 从 vmbackup 创建的备份中恢复数据\n- 支持断点续传（可中断恢复）\n- 支持多种对象存储\n\n**工作原理**：\n\n```mermaid\ngraph LR\n    A[对象存储<br/>GCS/S3/Azure] -->|读取备份| B[vmrestore]\n    B -->|恢复数据| C[本地数据目录<br/>-storageDataPath]\n    C -->|启动| D[VictoriaMetrics]\n```\n\n**关键特性**：\n\n- ✅ 自动断点续传（中断后重启自动恢复）\n- ✅ 类似 `rsync --delete` 的同步机制\n- ✅ 支持多种存储（GCS、S3、Azure、本地文件系统）\n- ✅ 可覆盖现有数据目录\n\n---", "subs": ["从 vmbackup 创建的备份中恢复数据", "支持断点续传（可中断恢复）", "支持多种对象存储", "✅ 自动断点续传（中断后重启自动恢复）", "✅ 类似 rsync", "✅ 支持多种存储（GCS、S3、Azure、本地文件系统）"]}, {"title": "8.2 基本用法", "content": "#### 8.2.1 必要前提\n\n⚠️ **重要**：恢复前必须停止 VictoriaMetrics 或 vmstorage。\n\n#### 8.2.2 基本恢复命令\n\n```bash\n./vmrestore \\\n  -src=<storageType>://<path/to/backup> \\\n  -storageDataPath=<local/path/to/restore>\n```\n\n**参数说明**：\n\n- **`-src`**：备份源路径（vmbackup 创建的备份位置）\n- **`-storageDataPath`**：本地恢复目标路径（VictoriaMetrics 的数据目录）\n\n#### 8.2.3 支持的存储类型\n\n| 存储类型                | `-src` 示例                                    |\n| ----------------------- | ------------------------------------------------ |\n| **GCS**           | `gs://<bucket>/<path/to/backup>`               |\n| **S3**            | `s3://<bucket>/<path/to/backup>`               |\n| **Azure Blob**    | `azblob://<container>/<path/to/backup>`        |\n| **S3-compatible** | `s3://<bucket>/<path>` + `-customS3Endpoint` |\n| **本地文件系统**  | `fs://</absolute/path/to/backup>`              |\n\n---", "subs": ["8.2.1 必要前提", "8.2.2 基本恢复命令", "8.2.3 支持的存储类型"]}, {"title": "8.3 恢复示例", "content": "#### 8.3.1 从 GCS 恢复\n\n```bash\n# 停止 VictoriaMetrics\nsystemctl stop victoriametrics\n\n# 恢复备份\n./vmrestore \\\n  -src=gs://my-bucket/backups/20250124 \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 启动 VictoriaMetrics\nsystemctl start victoriametrics\n```\n\n#### 8.3.2 从 S3 恢复\n\n```bash\n# 停止 VictoriaMetrics\nsystemctl stop victoriametrics\n\n# 恢复备份\n./vmrestore \\\n  -src=s3://my-bucket/backups/latest \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 启动 VictoriaMetrics\nsystemctl start victoriametrics\n```\n\n#### 8.3.3 从 MinIO 恢复\n\n```bash\n# 停止 VictoriaMetrics\nsystemctl stop victoriametrics\n\n# 恢复备份（自定义 S3 端点）\n./vmrestore \\\n  -src=s3://my-bucket/backups/latest \\\n  -customS3Endpoint=http://minio-server:9000 \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 启动 VictoriaMetrics\nsystemctl start victoriametrics\n```\n\n#### 8.3.4 从本地文件系统恢复\n\n```bash\n# 停止 VictoriaMetrics\nsystemctl stop victoriametrics\n\n# 恢复备份\n./vmrestore \\\n  -src=fs:///mnt/backups/20250124 \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 启动 VictoriaMetrics\nsystemctl start victoriametrics\n```\n\n---", "subs": ["8.3.1 从 GCS 恢复", "8.3.2 从 S3 恢复", "8.3.3 从 MinIO 恢复", "8.3.4 从本地文件系统恢复"]}, {"title": "8.4 集群恢复", "content": "#### 8.4.1 集群恢复流程\n\n**要求**：\n\n- 在每个 vmstorage 节点上恢复对应的备份\n- 停止所有 vmstorage 节点\n- 恢复完成后启动所有节点\n\n#### 8.4.2 集群恢复示例\n\n**3 个 vmstorage 节点的恢复**：\n\n```bash\n# === vmstorage-1 节点 ===\n# 停止 vmstorage-1\nsystemctl stop vmstorage-1\n\n# 恢复备份\n./vmrestore \\\n  -src=gs://my-bucket/vmstorage-1/20250124 \\\n  -storageDataPath=/var/lib/vmstorage-1-data\n\n# 启动 vmstorage-1\nsystemctl start vmstorage-1\n\n\n# === vmstorage-2 节点 ===\n# 停止 vmstorage-2\nsystemctl stop vmstorage-2\n\n# 恢复备份\n./vmrestore \\\n  -src=gs://my-bucket/vmstorage-2/20250124 \\\n  -storageDataPath=/var/lib/vmstorage-2-data\n\n# 启动 vmstorage-2\nsystemctl start vmstorage-2\n\n\n# === vmstorage-3 节点 ===\n# 停止 vmstorage-3\nsystemctl stop vmstorage-3\n\n# 恢复备份\n./vmrestore \\\n  -src=gs://my-bucket/vmstorage-3/20250124 \\\n  -storageDataPath=/var/lib/vmstorage-3-data\n\n# 启动 vmstorage-3\nsystemctl start vmstorage-3\n```\n\n#### 8.4.3 Kubernetes 集群恢复\n\n**使用 Init Container**：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: vmstorage-1\nspec:\n  initContainers:\n    # Init Container: 恢复备份\n    - name: vmrestore\n      image: victoriametrics/vmrestore:latest\n      volumeMounts:\n        - name: storage\n          mountPath: /storage\n      command:\n        - /vmrestore\n        - -src=gs://bucket/vmstorage-1/20250124\n        - -storageDataPath=/storage\n      env:\n        - name: GOOGLE_APPLICATION_CREDENTIALS\n          value: /credentials/gcp-key.json\n  \n  containers:\n    # 主容器: vmstorage\n    - name: vmstorage\n      image: victoriametrics/vmstorage:latest\n      volumeMounts:\n        - name: storage\n          mountPath: /storage\n```\n\n---", "subs": ["8.4.1 集群恢复流程", "8.4.2 集群恢复示例", "8.4.3 Kubernetes 集群恢复"]}, {"title": "8.5 恢复行为", "content": "#### 8.5.1 rsync 式同步\n\n**恢复行为**类似 `rsync --delete`：\n\n- ✅ 从备份中复制所有文件到目标目录\n- ✅ 删除目标目录中备份不存在的文件\n- ✅ 覆盖目标目录中已存在的同名文件\n\n**示例**：\n\n**场景 1：目标目录为空**\n\n```\n备份:      file1, file2, file3\n目标目录:   (空)\n恢复后:    file1, file2, file3\n```\n\n**场景 2：目标目录有旧数据**\n\n```\n备份:      file1, file2, file3\n目标目录:   file1, file4, file5\n恢复后:    file1, file2, file3  （file4 和 file5 被删除）\n```\n\n#### 8.5.2 断点续传\n\n**中断恢复**：\n\n- 恢复过程可随时中断（Ctrl+C、网络故障、系统重启等）\n- 使用**相同参数**重启 vmrestore 自动从中断点继续\n- 已下载的文件不会重新下载\n\n**示例**：\n\n```bash\n# 第一次运行（中断）\n./vmrestore -src=gs://bucket/backup -storageDataPath=/data\n# ... 下载了 50% 后中断\n\n# 重启（自动从 50% 继续）\n./vmrestore -src=gs://bucket/backup -storageDataPath=/data\n# ... 继续下载剩余 50%\n```\n\n---", "subs": ["8.5.1 rsync 式同步", "8.5.2 断点续传"]}, {"title": "8.6 凭据配置", "content": "vmrestore 的凭据配置方式与 vmbackup 完全相同。\n\n#### 8.6.1 通过文件提供凭据\n\n```bash\n./vmrestore \\\n  -credsFilePath=/etc/credentials \\\n  -src=s3://bucket/backup \\\n  -storageDataPath=/data\n```\n\n#### 8.6.2 通过环境变量提供凭据\n\n**AWS S3**：\n\n```bash\nexport AWS_ACCESS_KEY_ID=<key>\nexport AWS_SECRET_ACCESS_KEY=<secret>\n\n./vmrestore -src=s3://bucket/backup -storageDataPath=/data\n```\n\n**GCP**：\n\n```bash\nexport GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json\n\n./vmrestore -src=gs://bucket/backup -storageDataPath=/data\n```\n\n**Azure**：\n\n```bash\nexport AZURE_STORAGE_ACCOUNT_NAME=<account_name>\nexport AZURE_STORAGE_ACCOUNT_KEY=<account_key>\n\n./vmrestore -src=azblob://container/backup -storageDataPath=/data\n```\n\n#### 8.6.3 云提供商元数据服务\n\n在云环境中运行时，vmrestore 自动使用云提供商的元数据服务获取凭据：\n\n- AWS EC2 Instance Profile\n- GCP Service Account\n- Azure Managed Identity\n\n---", "subs": ["8.6.1 通过文件提供凭据", "8.6.2 通过环境变量提供凭据", "8.6.3 云提供商元数据服务"]}, {"title": "8.7 故障排查", "content": "#### 8.7.1 下载速度限制\n\n**问题**：vmrestore 占用所有网络带宽\n\n**解决方案**：\n\n```bash\n./vmrestore \\\n  -maxBytesPerSecond=50MB \\  # 限制下载速度为 50 MB/s\n  -src=gs://bucket/backup \\\n  -storageDataPath=/data\n```\n\n#### 8.7.2 恢复速度慢\n\n**问题**：恢复耗时过长\n\n**解决方案**：\n\n```bash\n./vmrestore \\\n  -concurrency=20 \\  # 增加并发数（默认 10）\n  -src=gs://bucket/backup \\\n  -storageDataPath=/data\n```\n\n#### 8.7.3 恢复中断\n\n**问题**：恢复因临时错误中断\n\n**解决方案**：\n\n- 使用**相同参数**重启 vmrestore\n- vmrestore 自动从中断点继续\n\n```bash\n# 重启恢复\n./vmrestore -src=gs://bucket/backup -storageDataPath=/data\n```\n\n#### 8.7.4 旧备份缺少完整性标记\n\n**问题**：恢复旧备份时报错\"missing backup complete file\"\n\n**解决方案**：\n\n```bash\n./vmrestore \\\n  -skipBackupCompleteCheck \\  # 跳过完整性检查\n  -src=gs://bucket/old-backup \\\n  -storageDataPath=/data\n```\n\n**适用场景**：恢复在引入完整性检查前创建的旧备份。\n\n---", "subs": ["8.7.1 下载速度限制", "8.7.2 恢复速度慢", "8.7.3 恢复中断", "8.7.4 旧备份缺少完整性标记"]}, {"title": "8.8 核心 Flag 总览", "content": "#### 8.8.1 必需参数\n\n| Flag                 | 说明                                           |\n| -------------------- | ---------------------------------------------- |\n| `-src`             | 备份源路径（必需）                             |\n| `-storageDataPath` | 恢复目标路径（默认 `victoria-metrics-data`） |\n\n#### 8.8.2 重要参数\n\n**性能调优**：\n\n- `-concurrency` - 并发工作线程数（默认 10）\n- `-maxBytesPerSecond` - 最大下载速度限制\n\n**凭据**：\n\n- `-credsFilePath` - 凭据文件路径\n- `-customS3Endpoint` - 自定义 S3 端点（MinIO 等）\n\n**S3 配置**：\n\n- `-s3ForcePathStyle` - 使用路径风格 URL（默认 true）\n- `-s3StorageClass` - S3 存储类\n- `-s3TLSInsecureSkipVerify` - 跳过 TLS 验证\n- `-deleteAllObjectVersions` - 删除所有对象版本\n\n**高级选项**：\n\n- `-skipBackupCompleteCheck` - 跳过备份完整性检查（用于旧备份）\n- `-filestream.disableFadvise` - 禁用 fadvise() 系统调用\n\n**监控**：\n\n- `-httpListenAddr` - HTTP 监听地址（默认 `:8421`）\n\n---", "subs": ["8.8.1 必需参数", "8.8.2 重要参数"]}, {"title": "8.9 最佳实践", "content": "#### 8.9.1 恢复前准备\n\n1. ✅ **停止 VictoriaMetrics**\n\n   - 单节点：停止 VictoriaMetrics 进程\n   - 集群：停止所有 vmstorage 节点\n2. ✅ **验证备份可用性**\n\n   - 确认备份路径存在且可访问\n   - 检查凭据配置正确\n3. ✅ **备份当前数据**（可选）\n\n   - 如果当前数据目录有重要数据，先备份\n\n#### 8.9.2 恢复流程\n\n**标准恢复流程**：\n\n```bash\n# 1. 停止服务\nsystemctl stop victoriametrics\n\n# 2. 备份当前数据（可选）\nmv /var/lib/victoria-metrics-data /var/lib/victoria-metrics-data.backup\n\n# 3. 恢复备份\n./vmrestore \\\n  -src=gs://bucket/backups/20250124 \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 4. 验证恢复结果\nls -lh /var/lib/victoria-metrics-data\n\n# 5. 启动服务\nsystemctl start victoriametrics\n\n# 6. 验证服务正常\ncurl http://localhost:8428/health\n```\n\n#### 8.9.3 集群恢复建议\n\n1. ✅ **并行恢复**\n\n   - 同时在所有 vmstorage 节点执行恢复\n   - 缩短整体恢复时间\n2. ✅ **验证一致性**\n\n   - 确保所有节点恢复同一时间点的备份\n   - 避免数据不一致\n3. ✅ **分阶段启动**\n\n   - 先启动一个节点验证\n   - 确认无问题后启动其他节点\n\n#### 8.9.4 安全建议\n\n1. ✅ **使用 IAM Roles**\n\n   - Kubernetes：使用 IAM Roles for Service Accounts\n   - 避免在配置中硬编码凭据\n2. ✅ **加密传输**\n\n   - 使用 HTTPS 端点\n   - 验证 TLS 证书\n3. ✅ **访问控制**\n\n   - 限制备份存储的读取权限\n   - 使用最小权限原则\n\n#### 8.9.5 测试恢复流程\n\n**定期测试**：\n\n- 至少每月测试一次恢复流程\n- 验证备份的完整性和可用性\n- 记录恢复所需时间\n\n**测试环境**：\n\n```bash\n# 在测试环境恢复\n./vmrestore \\\n  -src=gs://bucket/backups/latest \\\n  -storageDataPath=/tmp/test-restore\n\n# 启动测试实例\n./victoria-metrics -storageDataPath=/tmp/test-restore -httpListenAddr=:8429\n\n# 验证数据\ncurl http://localhost:8429/api/v1/query?query=up\n\n# 清理\nrm -rf /tmp/test-restore\n```\n\n---", "subs": ["8.9.1 恢复前准备", "8.9.2 恢复流程", "8.9.3 集群恢复建议", "8.9.4 安全建议", "8.9.5 测试恢复流程"]}, {"title": "8.10 与 vmbackup 的配合使用", "content": "#### 8.10.1 完整备份恢复流程\n\n**备份 → 恢复的完整示例**：\n\n```bash\n# === 备份阶段 ===\n# 1. 创建备份\n./vmbackup \\\n  -storageDataPath=/var/lib/victoria-metrics-data \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://bucket/backups/20250124\n\n# 2. 验证备份\n./vmbackup \\\n  -src=gs://bucket/backups/20250124 \\\n  -dst=gs://bucket/test-restore-check\n\n\n# === 恢复阶段 ===\n# 3. 停止服务\nsystemctl stop victoriametrics\n\n# 4. 恢复数据\n./vmrestore \\\n  -src=gs://bucket/backups/20250124 \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 5. 启动服务\nsystemctl start victoriametrics\n```\n\n#### 8.10.2 Smart Backup 恢复\n\n**恢复最新数据（latest）**：\n\n```bash\n./vmrestore \\\n  -src=gs://bucket/latest \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n```\n\n**恢复特定日期数据**：\n\n```bash\n./vmrestore \\\n  -src=gs://bucket/20250120 \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n```\n\n---", "subs": ["8.10.1 完整备份恢复流程", "8.10.2 Smart Backup 恢复"]}, {"title": "8.11 常见场景", "content": "#### 8.11.1 灾难恢复\n\n**场景**：生产环境数据丢失\n\n**恢复步骤**：\n\n```bash\n# 1. 停止故障节点\nsystemctl stop victoriametrics\n\n# 2. 清空数据目录\nrm -rf /var/lib/victoria-metrics-data/*\n\n# 3. 从最新备份恢复\n./vmrestore \\\n  -src=gs://bucket/latest \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 4. 启动服务\nsystemctl start victoriametrics\n\n# 5. 验证数据\ncurl \"http://localhost:8428/api/v1/query?query=up\"\n```\n\n#### 8.11.2 迁移到新服务器\n\n**场景**：将 VictoriaMetrics 迁移到新服务器\n\n**步骤**：\n\n```bash\n# === 旧服务器 ===\n# 1. 创建最新备份\n./vmbackup \\\n  -storageDataPath=/var/lib/victoria-metrics-data \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://bucket/migration-backup\n\n\n# === 新服务器 ===\n# 2. 安装 VictoriaMetrics\n# ...\n\n# 3. 恢复备份\n./vmrestore \\\n  -src=gs://bucket/migration-backup \\\n  -storageDataPath=/var/lib/victoria-metrics-data\n\n# 4. 启动服务\nsystemctl start victoriametrics\n\n# 5. 更新 DNS / 负载均衡器指向新服务器\n```\n\n#### 8.11.3 测试环境同步\n\n**场景**：将生产数据同步到测试环境\n\n**步骤**：\n\n```bash\n# === 生产环境（定期备份）===\n./vmbackup \\\n  -storageDataPath=/var/lib/victoria-metrics-data \\\n  -snapshot.createURL=http://localhost:8428/snapshot/create \\\n  -dst=gs://bucket/production-latest\n\n\n# === 测试环境 ===\n# 停止测试环境\nsystemctl stop victoriametrics-test\n\n# 恢复生产数据\n./vmrestore \\\n  -src=gs://bucket/production-latest \\\n  -storageDataPath=/var/lib/victoria-metrics-test-data\n\n# 启动测试环境\nsystemctl start victoriametrics-test\n```\n\n---", "subs": ["8.11.1 灾难恢复", "8.11.2 迁移到新服务器", "8.11.3 测试环境同步"]}, {"title": "8.12 总结", "content": "**vmrestore 核心优势**：\n\n1. ✅ 简单易用的恢复流程\n2. ✅ 自动断点续传\n3. ✅ rsync 式智能同步\n4. ✅ 支持多种对象存储\n5. ✅ 与 vmbackup 完美配合\n\n**关键要点**：\n\n- ⚠️ 恢复前**必须停止** VictoriaMetrics\n- ✅ 支持**断点续传**（中断后重启自动继续）\n- ✅ 恢复行为类似 `rsync --delete`\n- ✅ 凭据配置与 vmbackup 相同\n\n**典型工作流**：\n\n```mermaid\ngraph TD\n    A[vmbackup 创建备份] --> B[备份存储到对象存储]\n    B --> C[vmrestore 从备份恢复]\n    C --> D[启动 VictoriaMetrics]\n    D --> E[数据恢复完成]\n```\n\n**配合工具**：\n\n- **vmbackup**：创建备份\n- **vmrestore**：恢复备份\n- **vmbackupmanager**（Enterprise）：自动化备份管理\n\n**🎯 第 8 章完成！** 下一步将继续学习 bestpractices（最佳实践）...\n\n---\n\n---", "subs": ["⚠️ 恢复前必须停止 VictoriaMetrics", "✅ 支持断点续传（中断后重启自动继续）", "✅ 恢复行为类似 rsync", "✅ 凭据配置与 vmbackup 相同", "vmbackup", "vmrestore"]}]}, {"title": "第 9 章：最佳实践", "sections": [{"title": "🎯 生产级 VictoriaMetrics 监控系统架构", "content": "```mermaid\ngraph TB\n    subgraph Data_Layer[\"数据源层\"]\n        D1[Kubernetes<br/>Pods & Services]\n        D2[主机监控<br/>Node Exporter]\n        D3[应用程序<br/>Custom Metrics]\n        D4[Prometheus<br/>Federation]\n        D5[第三方 Exporters<br/>MySQL/Redis/etc]\n    end\n  \n    subgraph Collection_Layer[\"采集层 - vmagent 集群\"]\n        V1[vmagent-1<br/>HA Instance]\n        V2[vmagent-2<br/>HA Instance]\n    end\n  \n    subgraph Auth_Layer[\"认证路由层 - vmauth\"]\n        A1[vmauth<br/>Load Balancer]\n    end\n  \n    subgraph Storage_Layer[\"存储层 - VictoriaMetrics Cluster\"]\n        direction TB\n        I1[vminsert-1] & I2[vminsert-2] & I3[vminsert-3]\n        S1[vmstorage-1] & S2[vmstorage-2] & S3[vmstorage-3]\n        Q1[vmselect-1] & Q2[vmselect-2]\n      \n        I1 & I2 & I3 -->|shard & replicate| S1 & S2 & S3\n        S1 & S2 & S3 -.->|query| Q1 & Q2\n    end\n  \n    subgraph Alert_Layer[\"告警层\"]\n        AL1[vmalert-1<br/>HA Instance]\n        AL2[vmalert-2<br/>HA Instance]\n        AM[Alertmanager<br/>Cluster]\n    end\n  \n    subgraph Backup_Layer[\"备份层\"]\n        B1[vmbackup<br/>Hourly + Daily]\n        B2[Object Storage<br/>S3/GCS/Azure]\n        B3[vmrestore<br/>Disaster Recovery]\n    end\n  \n    subgraph Visualization_Layer[\"可视化层\"]\n        G1[Grafana<br/>Cluster]\n    end\n  \n    %% Data flow\n    D1 & D2 & D3 & D4 & D5 -->|scrape/push| V1 & V2\n    V1 & V2 -->|remote write| A1\n    A1 -->|auth & route| I1 & I2 & I3\n  \n    %% Alert flow\n    AL1 & AL2 -.->|query rules| Q1 & Q2\n    AL1 & AL2 -->|fire alerts| AM\n    AM -->|notify| N[Email/Slack/PagerDuty]\n  \n    %% Backup flow\n    S1 & S2 & S3 -->|snapshot| B1\n    B1 -->|backup| B2\n    B2 -.->|restore| B3\n    B3 -.->|recover| S1 & S2 & S3\n  \n    %% Query flow\n    A1 -->|query API| Q1 & Q2\n    Q1 & Q2 -->|metrics| G1\n  \n    %% Styling\n    style V1 fill:#e1f5ff\n    style V2 fill:#e1f5ff\n    style A1 fill:#fff4e1\n    style I1 fill:#e1f5ff\n    style I2 fill:#e1f5ff\n    style I3 fill:#e1f5ff\n    style S1 fill:#ffe1e1\n    style S2 fill:#ffe1e1\n    style S3 fill:#ffe1e1\n    style Q1 fill:#fff4e1\n    style Q2 fill:#fff4e1\n    style AL1 fill:#e8f5e1\n    style AL2 fill:#e8f5e1\n    style B1 fill:#f0e1ff\n    style B2 fill:#f0e1ff\n    style B3 fill:#f0e1ff\n```\n\n**架构特点**：\n\n- ✅ **高可用**: vmagent、vmalert、Grafana 采用 HA 部署\n- ✅ **水平扩展**: VictoriaMetrics 集群支持按需扩展\n- ✅ **安全认证**: vmauth 提供统一的认证和路由\n- ✅ **自动备份**: vmbackup 实施 Smart Backup 策略\n- ✅ **告警机制**: vmalert + Alertmanager 完整告警链路\n\n**关键配置**：\n\n- vmagent 配置去重：`-promscrape.cluster.name` 区分实例\n- VictoriaMetrics 配置去重：`-dedup.minScrapeInterval=30s`\n- vmauth 配置负载均衡：`load_balancing_policy: least_loaded`\n- vmbackup 配置 Smart Backup：每小时增量 + 每日完整\n\n---", "subs": ["✅ 高可用: vmagent、vmalert、Grafana 采用 HA 部署", "✅ 水平扩展", "✅ 安全认证", "✅ 自动备份", "✅ 告警机制", "vmagent 配置去重"]}, {"title": "9.1 安装建议", "content": "#### 9.1.1 版本选择\n\n✅ **推荐使用最新版本**：\n\n- 从 [Releases 页面](https://github.com/VictoriaMetrics/VictoriaMetrics/releases) 下载最新版本\n- 最新版本包含所有 Bug 修复和性能优化\n- 包含最新功能和增强\n\n#### 9.1.2 默认配置\n\n✅ **无需手动调优**：\n\n- VictoriaMetrics 使用合理的默认命令行参数\n- 自动根据可用的 CPU 和内存资源调整参数\n- 无需操作系统级别调优（已针对默认 OS 设置优化）\n\n#### 9.1.3 系统资源限制\n\n**唯一需要调整的配置**：增加打开文件数限制\n\n**原因**：\n\n- VictoriaMetrics 需要接受更多的入站连接\n- 需要保持更多的数据文件打开\n\n**Linux 配置示例**：\n\n**临时设置**：\n\n```bash\n# 当前会话\nulimit -n 65536\n```\n\n**永久设置**（`/etc/security/limits.conf`）：\n\n```ini\n# VictoriaMetrics 用户\nvictoriametrics soft nofile 65536\nvictoriametrics hard nofile 65536\n\n# 或全局设置\n* soft nofile 65536\n* hard nofile 65536\n```\n\n**systemd 服务配置**（`/etc/systemd/system/victoriametrics.service`）：\n\n```ini\n[Service]\nLimitNOFILE=65536\n```\n\n**验证配置**：\n\n```bash\n# 查看当前限制\nulimit -n\n\n# 或查看进程限制\ncat /proc/<pid>/limits | grep \"open files\"\n```\n\n---", "subs": ["9.1.1 版本选择", "9.1.2 默认配置", "9.1.3 系统资源限制"]}, {"title": "9.2 文件系统", "content": "#### 9.2.1 推荐文件系统\n\n✅ **推荐使用 ext4**\n\n#### 9.2.2 ext4 优化配置\n\n**适用场景**：\n\n- 计划存储超过 1TB 数据\n- 分区可能扩展到超过 16TB\n\n**推荐的 mkfs.ext4 参数**：\n\n```bash\nmkfs.ext4 /dev/sdX -O 64bit,huge_file,extent -T huge\n```\n\n**参数说明**：\n\n- **`-O 64bit`**：启用 64 位模式，支持大于 16TB 的文件系统\n- **`-O huge_file`**：支持大文件（超过 2TB）\n- **`-O extent`**：使用 extent 基础的文件分配\n- **`-T huge`**：针对大文件优化的文件系统配置\n\n#### 9.2.3 其他文件系统\n\nVictoriaMetrics 也能在其他文件系统上正常工作：\n\n- **XFS**：适合大文件和高并发\n- **Btrfs**：提供快照和压缩功能\n- **ZFS**：提供数据完整性和快照\n\n**注意**：虽然支持，但 ext4 是经过最充分测试和推荐的选择。\n\n---", "subs": ["9.2.1 推荐文件系统", "9.2.2 ext4 优化配置", "9.2.3 其他文件系统"]}, {"title": "9.3 操作系统支持", "content": "#### 9.3.1 生产就绪的操作系统\n\n✅ **完全支持以下操作系统**：\n\n| 操作系统                  | 说明                                            |\n| ------------------------- | ----------------------------------------------- |\n| **Linux**           | Alpine, Ubuntu, Debian, RedHat, CentOS, RHEL 等 |\n| **FreeBSD**         | 生产就绪                                        |\n| **OpenBSD**         | 生产就绪                                        |\n| **Solaris/SmartOS** | 生产就绪                                        |\n\n#### 9.3.2 实验性支持\n\n⚠️ **Windows**：实验性支持（建议仅用于测试）\n\n#### 9.3.3 开发测试环境\n\n✅ **macOS**：可用于测试和开发\n\n---", "subs": ["9.3.1 生产就绪的操作系统", "9.3.2 实验性支持", "9.3.3 开发测试环境"]}, {"title": "9.4 支持的架构", "content": "#### 9.4.1 按操作系统分类\n\n| 操作系统                  | 支持的架构                              |\n| ------------------------- | --------------------------------------- |\n| **Linux**           | i386, amd64, arm, arm64, ppc64le, s390x |\n| **FreeBSD**         | i386, amd64, arm                        |\n| **OpenBSD**         | i386, amd64, arm                        |\n| **Solaris/SmartOS** | i386, amd64                             |\n| **macOS**           | amd64, arm64（仅测试和开发）            |\n| **Windows**         | amd64（实验性）                         |\n\n#### 9.4.2 常见架构说明\n\n| 架构              | 说明                  | 典型硬件                  |\n| ----------------- | --------------------- | ------------------------- |\n| **amd64**   | 64 位 x86             | Intel/AMD 服务器、桌面    |\n| **arm64**   | 64 位 ARM             | AWS Graviton、Apple M1/M2 |\n| **arm**     | 32 位 ARM             | Raspberry Pi 等           |\n| **ppc64le** | 64 位 PowerPC（小端） | IBM Power 服务器          |\n| **s390x**   | 64 位 IBM Z           | IBM Z 系列大型机          |\n\n---", "subs": ["9.4.1 按操作系统分类", "9.4.2 常见架构说明"]}, {"title": "9.5 Kubernetes 部署", "content": "#### 9.5.1 部署方式\n\nVictoriaMetrics 原生支持 Kubernetes 部署：\n\n1. **Helm Charts**：\n\n   ```bash\n   # 添加 Helm 仓库\n   helm repo add vm https://victoriametrics.github.io/helm-charts/\n   helm repo update\n\n   # 单节点部署\n   helm install victoria-metrics vm/victoria-metrics-single\n\n   # 集群部署\n   helm install victoria-metrics vm/victoria-metrics-cluster\n   ```\n\n2. **Kubernetes Operator**：\n\n   - 更高级的部署和管理\n   - 自动化操作\n   - 参考：[k8s operator 快速开始](https://docs.victoriametrics.com/operator/)\n\n#### 9.5.2 Kubernetes 部署建议\n\n**1. 资源配置：Requests = Limits**\n\n✅ **推荐**：对于有状态组件（如 vmstorage），设置 requests = limits\n\n**原因**：\n\n- 避免不必要的组件重启\n- 确保资源稳定性\n- Kubernetes 不会因为节点资源压力驱逐 Pod\n\n**示例**：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: vmstorage\nspec:\n  containers:\n    - name: vmstorage\n      image: victoriametrics/vmstorage:latest\n      resources:\n        requests:\n          memory: \"16Gi\"\n          cpu: \"4\"        # 整数 CPU\n        limits:\n          memory: \"16Gi\"\n          cpu: \"4\"        # 与 requests 相同\n```\n\n**2. 避免使用小数 CPU**\n\n⚠️ **不推荐**：使用小数 CPU 单位（如 `0.5`、`1.5`）\n\n**原因**：\n\n- VictoriaMetrics 使用 Go 编写\n- Go runtime 需要指定**整数**并发线程数\n- 小数 CPU 会被自动向下取整，导致性能损失\n\n**示例**：\n\n```yaml\n# ❌ 不推荐\nresources:\n  limits:\n    cpu: \"1.5\"  # 会被取整为 1\n\n# ✅ 推荐\nresources:\n  limits:\n    cpu: \"2\"    # 使用整数\n```\n\n---", "subs": ["9.5.1 部署方式", "9.5.2 Kubernetes 部署建议"]}, {"title": "9.6 升级流程", "content": "#### 9.6.1 升级安全性\n\n✅ **安全升级**：\n\n- 升级到新版本是安全的（除非发行说明另有说明）\n- 可以跨多个版本升级（除非发行说明另有说明）\n- 建议定期升级到最新版本\n\n✅ **安全降级**：\n\n- 降级到之前的版本是安全的（除非发行说明另有说明）\n\n#### 9.6.2 升级步骤\n\n**单节点 VictoriaMetrics 升级**：\n\n```bash\n# 1. 发送 SIGINT 信号优雅停止\nkill -SIGINT $(pidof victoria-metrics)\n# 或使用 systemd\nsystemctl stop victoriametrics\n\n# 2. 等待进程完全停止（通常几秒钟）\n# 可以通过以下命令确认\nps aux | grep victoria-metrics\n\n# 3. 备份当前二进制文件（可选）\ncp /usr/local/bin/victoria-metrics /usr/local/bin/victoria-metrics.backup\n\n# 4. 替换为新版本\nwget https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/<version>/victoria-metrics-linux-amd64-<version>.tar.gz\ntar -xzf victoria-metrics-linux-amd64-<version>.tar.gz\nmv victoria-metrics-prod /usr/local/bin/victoria-metrics\n\n# 5. 启动新版本\nsystemctl start victoriametrics\n# 或直接运行\n/usr/local/bin/victoria-metrics <flags>\n\n# 6. 验证服务正常\ncurl http://localhost:8428/health\n```\n\n**集群升级**：\n\n**推荐升级顺序**：\n\n1. vmselect（查询节点）\n2. vminsert（写入节点）\n3. vmstorage（存储节点）\n\n**原因**：vmstorage 最关键，最后升级以减少风险。\n\n**集群升级示例**：\n\n```bash\n# === 升级 vmselect ===\n# 在每个 vmselect 节点上\nkill -SIGINT $(pidof vmselect)\n# 替换二进制文件\nsystemctl start vmselect\n\n# === 升级 vminsert ===\n# 在每个 vminsert 节点上\nkill -SIGINT $(pidof vminsert)\n# 替换二进制文件\nsystemctl start vminsert\n\n# === 升级 vmstorage ===\n# 在每个 vmstorage 节点上（逐个升级）\nkill -SIGINT $(pidof vmstorage)\n# 替换二进制文件\nsystemctl start vmstorage\n```\n\n#### 9.6.3 降级步骤\n\n**降级流程**与升级相同：\n\n```bash\n# 1. 停止服务\nkill -SIGINT $(pidof victoria-metrics)\n\n# 2. 恢复旧版本二进制文件\ncp /usr/local/bin/victoria-metrics.backup /usr/local/bin/victoria-metrics\n\n# 3. 启动服务\nsystemctl start victoriametrics\n```\n\n#### 9.6.4 升级注意事项\n\n1. ✅ **阅读发行说明**\n\n   - 检查是否有破坏性变更\n   - 了解新功能和 Bug 修复\n   - 确认升级/降级的特殊要求\n2. ✅ **备份数据**\n\n   - 升级前使用 vmbackup 备份数据\n   - 保留旧版本二进制文件\n3. ✅ **测试环境验证**\n\n   - 先在测试环境升级\n   - 验证功能和性能\n   - 确认无问题后再升级生产环境\n4. ✅ **监控升级过程**\n\n   - 观察日志输出\n   - 监控关键指标（查询延迟、写入速率等）\n   - 准备回滚方案\n\n---", "subs": ["9.6.1 升级安全性", "9.6.2 升级步骤", "9.6.3 降级步骤", "9.6.4 升级注意事项"]}, {"title": "9.7 备份建议", "content": "#### 9.7.1 备份工具\n\nVictoriaMetrics 支持以下备份工具：\n\n| 工具                      | 说明                         |\n| ------------------------- | ---------------------------- |\n| **vmbackup**        | 创建备份                     |\n| **vmrestore**       | 恢复备份                     |\n| **vmbackupmanager** | 自动化备份管理（Enterprise） |\n\n#### 9.7.2 备份策略建议\n\n✅ **使用 Smart Backup 策略**：\n\n- 每小时增量备份到 `latest`\n- 每天完整备份到 `YYYYMMDD`\n- 定期清理过期备份\n\n✅ **备份频率**：\n\n- 小时级增量备份：每小时一次\n- 日级完整备份：每天一次\n- 周级备份：根据需求保留\n- 月级备份：根据需求保留\n\n✅ **备份保留策略**：\n\n- 小时级备份：保留 24-48 小时\n- 日级备份：保留 7-30 天\n- 周级备份：保留 4-12 周\n- 月级备份：保留 3-12 个月\n\n#### 9.7.3 验证备份\n\n✅ **定期验证**：\n\n- 至少每月测试恢复流程\n- 验证备份完整性\n- 记录恢复所需时间\n\n**测试恢复示例**：\n\n```bash\n# 在测试环境恢复最新备份\n./vmrestore \\\n  -src=gs://bucket/backups/latest \\\n  -storageDataPath=/tmp/restore-test\n\n# 启动测试实例\n./victoria-metrics -storageDataPath=/tmp/restore-test -httpListenAddr=:8429\n\n# 验证数据\ncurl \"http://localhost:8429/api/v1/query?query=up\"\n\n# 清理\nrm -rf /tmp/restore-test\n```\n\n---", "subs": ["9.7.1 备份工具", "9.7.2 备份策略建议", "9.7.3 验证备份"]}, {"title": "9.8 综合最佳实践清单", "content": "#### 9.8.1 安装和配置\n\n- [ ] 使用最新稳定版本\n- [ ] 增加系统打开文件数限制（65536+）\n- [ ] 使用 ext4 文件系统（大数据场景）\n- [ ] 使用推荐的 ext4 格式化参数（大于 1TB）\n- [ ] 在生产就绪的操作系统上部署（Linux、FreeBSD 等）\n\n#### 9.8.2 Kubernetes 部署\n\n- [ ] 有状态组件设置 requests = limits\n- [ ] 使用整数 CPU 单位（避免小数）\n- [ ] 使用 Helm Charts 或 Operator 部署\n- [ ] 配置持久化存储（PVC）\n- [ ] 配置适当的资源请求和限制\n\n#### 9.8.3 升级和维护\n\n- [ ] 阅读发行说明\n- [ ] 在测试环境验证\n- [ ] 升级前备份数据\n- [ ] 使用优雅停止（SIGINT）\n- [ ] 监控升级过程\n- [ ] 保留回滚能力\n\n#### 9.8.4 备份和恢复\n\n- [ ] 实施 Smart Backup 策略\n- [ ] 配置自动化备份（cron 或 vmbackupmanager）\n- [ ] 定期清理旧备份\n- [ ] 每月测试恢复流程\n- [ ] 验证备份完整性\n- [ ] 记录 RTO（恢复时间目标）\n\n#### 9.8.5 监控和告警\n\n- [ ] 配置 VictoriaMetrics 自监控\n- [ ] 导入官方 Grafana Dashboard\n- [ ] 配置关键指标告警：\n  - 内存使用率\n  - 磁盘使用率\n  - 查询延迟\n  - 写入速率\n  - 慢查询数量\n- [ ] 配置备份成功率告警\n\n#### 9.8.6 安全建议\n\n- [ ] 使用 `-httpAuth` 保护 HTTP 端点\n- [ ] 限制网络访问（防火墙规则）\n- [ ] 使用 TLS 加密传输（生产环境）\n- [ ] 定期更新到最新版本（安全补丁）\n- [ ] 审计访问日志\n\n---", "subs": ["9.8.1 安装和配置", "9.8.2 Kubernetes 部署", "9.8.3 升级和维护", "9.8.4 备份和恢复", "9.8.5 监控和告警", "9.8.6 安全建议"]}, {"title": "9.9 总结", "content": "**核心最佳实践**：\n\n1. ✅ **使用最新版本** - 获得最佳性能和最新功能\n2. ✅ **增加文件描述符限制** - 唯一必要的系统调优\n3. ✅ **选择正确的文件系统** - ext4 是推荐选择\n4. ✅ **Kubernetes 资源配置** - requests = limits，整数 CPU\n5. ✅ **优雅升级** - SIGINT 停止，小心验证\n6. ✅ **Smart Backup 策略** - 增量 + 完整备份结合\n7. ✅ **定期验证备份** - 确保灾难恢复能力\n\n**关键要点**：\n\n- VictoriaMetrics 开箱即用，无需复杂调优\n- 默认配置已针对常见场景优化\n- follow 官方建议可获得最佳性能和稳定性\n\n**配合工具生态**：\n\n```mermaid\ngraph TD\n    A[VictoriaMetrics] -->|数据采集| B[vmagent]\n    A -->|告警规则| C[vmalert]\n    A -->|认证路由| D[vmauth]\n    A -->|数据备份| E[vmbackup]\n    E -->|数据恢复| F[vmrestore]\n    E -->|自动化| G[vmbackupmanager<br/>Enterprise]\n    A -->|可视化| H[Grafana]\n    A -->|监控| I[官方 Dashboard]\n```\n\n**🎉 恭喜！VictoriaMetrics 学习笔记全部完成！**\n\n---", "subs": ["VictoriaMetrics 开箱即用", "默认配置已针对常见场景优化", "follow 官方建议可获得最佳性能和稳定性"]}]}, {"title": "附录", "sections": [{"title": "附录 A：官方资源", "content": "- **官方文档**: [https://docs.victoriametrics.com/](https://docs.victoriametrics.com/)\n- **GitHub 仓库**: [https://github.com/VictoriaMetrics/VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics)\n- **Releases**: [https://github.com/VictoriaMetrics/VictoriaMetrics/releases](https://github.com/VictoriaMetrics/VictoriaMetrics/releases)\n- **Helm Charts**: [https://github.com/VictoriaMetrics/helm-charts](https://github.com/VictoriaMetrics/helm-charts)\n- **Kubernetes Operator**: [https://docs.victoriametrics.com/operator/](https://docs.victoriametrics.com/operator/)\n- **Grafana Dashboards**: [https://grafana.com/orgs/victoriametrics](https://grafana.com/orgs/victoriametrics)", "subs": ["官方文档: https://docs.victoriametrics.com/", "GitHub 仓库", "Releases", "Helm Charts", "Kubernetes Operator", "Grafana Dashboards"]}, {"title": "附录 B：社区与支持", "content": "- **Slack**: [https://slack.victoriametrics.com/](https://slack.victoriametrics.com/)\n- **Google Group**: [https://groups.google.com/g/victoriametrics-users](https://groups.google.com/g/victoriametrics-users)\n- **Stack Overflow**: 标签 `victoriametrics`\n- **Commercial Support**: <info@victoriametrics.com>", "subs": ["Slack: https://slack.victoriametrics.com/", "Google Group", "Stack Overflow", "Commercial Support"]}, {"title": "附录 C：学习路径建议", "content": "**入门路径**（1-2 周）：\n\n1. 阅读第 1 章：快速开始\n2. 实践第 2 章：单节点部署\n3. 学习第 4 章：vmagent 数据采集\n4. 学习第 5 章：vmalert 告警规则\n5. 实践第 7 章：vmbackup 备份\n\n**进阶路径**（2-4 周）：\n\n1. 学习第 3 章：集群部署\n2. 学习第 6 章：vmauth 认证与路由\n3. 深入研究 MetricsQL 查询语言\n4. 配置 Grafana Dashboard\n5. 实施 Smart Backup 策略\n\n**生产部署**（持续）：\n\n1. 按第 9 章最佳实践部署\n2. 配置完善的监控告警\n3. 定期升级和维护\n4. 性能调优和优化\n\n---\n\n**文档编写完成时间**: 2025-11-24\n**文档版本**: v1.0\n**涵盖 VictoriaMetrics 版本**: 最新稳定版\n\n**愿本学习笔记帮助你掌握 VictoriaMetrics，构建高性能的监控系统！** 🚀\n\n---", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

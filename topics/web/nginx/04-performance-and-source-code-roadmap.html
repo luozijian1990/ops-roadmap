@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Nginx 学习笔记 · 第四册：性能优化与源码 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nginx 学习笔记 · 第四册：性能优化与源码</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Nginx 学习笔记 · 第四册：性能优化与源码", "intro": "", "parts": [{"title": "第五部分：Nginx的系统层性能优化", "sections": [{"title": "5.1 性能优化方法论", "content": "#### 5.1.1 优化目标\n\nNginx性能优化需要从软件和硬件两个层面入手,核心目标是提升硬件资源的使用效率:\n\n```mermaid\ngraph TD\n    A[性能优化] --> B[软件层面优化]\n    A --> C[硬件层面优化]\n    A --> D[集群化扩展]\n  \n    B --> B1[提升CPU利用率]\n    B --> B2[提升内存利用率]\n    B --> B3[提升磁盘IO利用率]\n    B --> B4[提升网络带宽利用率]\n  \n    C --> C1[升级网卡 千兆 - 万兆]\n    C --> C2[升级磁盘 机械 - 固态]\n    C --> C3[升级CPU 更快主频/更多核心]\n    C --> C4[升级内存 更大容量/更快速度]\n  \n    D --> D1[DNS负载均衡]\n    D --> D2[多台Nginx集群]\n```\n\n#### 5.1.2 软件优化方向\n\n**1. 提升CPU利用率**\n\n- 避免惊群问题(accept_mutex, reuseport)\n- 使用gzip_static模块预压缩,避免实时压缩消耗CPU\n- 减少进程上下文切换\n- 提高进程优先级(worker_priority)\n\n**2. 提升内存利用率**\n\n- 合理配置缓冲区大小,避免浪费\n- 绑定CPU(worker_cpu_affinity),提高CPU缓存命中率\n- 考虑NUMA架构的内存访问特性\n\n**3. 提升磁盘IO利用率**\n\n- 使用empty_gif模块,避免磁盘访问\n- 使用内存盘或SSD\n- 启用AIO异步IO\n- 使用线程池处理阻塞IO\n\n**4. 提升网络带宽利用率**\n\n- 增大TCP初始拥塞窗口\n- 启用HTTP/2\n- 启用Gzip压缩\n- 优化TCP参数\n\n#### 5.1.3 硬件升级优先级\n\n1. **网卡** - 千兆 → 万兆(效果最明显)\n2. **磁盘** - 机械硬盘 → 固态硬盘(提升IOPS)\n3. **CPU** - 更高主频、更多核心、更大缓存\n4. **内存** - 更大容量、更快访问速度", "subs": ["5.1.1 优化目标", "5.1.2 软件优化方向", "5.1.3 硬件升级优先级"]}, {"title": "5.2 CPU性能优化", "content": "#### 5.2.1 高效使用CPU的三个关键\n\n**1. 使用全部CPU资源**\n\n```nginx\n# Worker进程数量应等于CPU核心数\nworker_processes auto;  # 自动检测CPU核心数\n# 或手动指定\nworker_processes 8;\n```\n\n**原则:**\n\n- `worker_processes >= CPU核心数` - 使用全部CPU\n- `worker_processes = CPU核心数` - 最佳配置(避免进程间竞争)\n- `worker_processes > CPU核心数` - 会导致进程间竞争,降低性能\n\n**2. 避免Worker进程做无用功**\n\n- 不要主动让出CPU\n- 避免Worker进程间资源争抢\n- 避免调用阻塞API(特别是OpenResty中的第三方库)\n\n**3. 减少与其他进程的资源竞争**\n\n```nginx\n# 提升Worker进程优先级\nworker_priority -20;  # 范围: -20(最高) 到 19(最低)\n```\n\n- 移除耗资源的非Nginx进程\n- 提高Worker进程优先级,占用更长时间片\n\n#### 5.2.2 进程调度与上下文切换\n\n**进程状态:**\n\n| 状态        | 说明             | 查看命令   |\n| ----------- | ---------------- | ---------- |\n| R (Running) | 正在运行或就绪   | `ps aux` |\n| S (Sleep)   | 可中断睡眠(阻塞) | `ps aux` |\n| D           | 不可中断睡眠     | `ps aux` |\n| Z           | 僵尸进程         | `ps aux` |\n| T           | 停止             | `ps aux` |\n\n**查看上下文切换:**\n\n```bash\n# 查看系统级上下文切换\nvmstat 1\n# 输出: cs列表示每秒上下文切换次数\n\n# 查看系统级上下文切换(dstat)\ndstat\n# 输出: csw列\n\n# 查看进程级上下文切换\npidstat -w -p <pid> 1\n# voluntary context switches (主动切换)\n# non voluntary context switches (被动切换)\n```\n\n**减少上下文切换的方法:**\n\n1. 保持Worker进程处于R状态\n2. 减少主动切换(避免阻塞API)\n3. 减少被动切换(提高进程优先级)\n4. 绑定CPU(减少进程迁移)\n5. 延迟处理新连接(`tcp_defer_accept`)\n\n#### 5.2.3 进程优先级与时间片\n\n**静态优先级(Nice值):**\n\n```nginx\n# Nginx配置\nworker_priority -20;  # 范围: -20(最高) 到 19(最低)\n```\n\n- Nice值越小,优先级越高\n- Nice值越小,时间片越长\n- 默认为0\n\n**动态优先级(PR值):**\n\nLinux内核会根据进程行为动态调整优先级:\n\n- **2.6.23之前(O(1)调度算法):**\n\n  - 动态优先级 = 静态优先级 ± 5\n  - 时间片: 5ms ~ 800ms\n- **2.6.23之后(CFS调度算法):**\n\n  - PR = Nice + 20\n  - 完全公平调度\n\n**查看进程优先级:**\n\n```bash\nps -eo pid,ni,pri,comm | grep nginx\n# ni: Nice值\n# pri: 优先级(PR值)\n```", "subs": ["5.2.1 高效使用CPU的三个关键", "5.2.2 进程调度与上下文切换", "5.2.3 进程优先级与时间片"]}, {"title": "5.3 多核负载均衡", "content": "#### 5.3.1 惊群问题与解决方案\n\n**惊群问题:**\n\n多个Worker进程同时监听同一端口,新连接到来时,所有进程都被唤醒,但只有一个进程能处理,其他进程白白浪费CPU。\n\n**解决方案对比:**\n\n| 方案             | 配置           | 性能 | 说明                |\n| ---------------- | -------------- | ---- | ------------------- |\n| accept_mutex on  | 应用层加锁     | 低   | 旧版本默认,现已弃用 |\n| accept_mutex off | 无锁           | 中   | 现版本默认          |\n| reuseport        | 内核层负载均衡 | 高   | Linux 3.9+,推荐     |\n\n**reuseport配置:**\n\n```nginx\nhttp {\n    server {\n        listen 80 reuseport;  # 启用SO_REUSEPORT\n  \n        location / {\n            proxy_pass http://backend;\n        }\n    }\n}\n```\n\n**性能对比:**\n\n- **吞吐量:** reuseport > accept_mutex off > accept_mutex on\n- **延迟:** reuseport < accept_mutex off < accept_mutex on\n- **延迟标准差:** reuseport < accept_mutex off < accept_mutex on\n\n**要求:**\n\n- Linux内核 3.9+\n- CentOS 7+, Ubuntu 14.04+\n\n#### 5.3.2 多队列网卡\n\n**RSS (Receive Side Scaling)**\n\n- 硬件层面,将网络数据包分发到多个CPU队列\n- 需要网卡支持\n- 提升硬中断处理性能\n\n**RPS (Receive Packet Steering)**\n\n- 软件层面,在软中断阶段分发数据包\n- 不需要硬件支持\n- 适用于不支持RSS的网卡\n\n**RFS (Receive Flow Steering)**\n\n- 基于RPS,考虑CPU亲和性\n- 将同一流的数据包分发到同一CPU\n- 提高缓存命中率\n\n**注意:** 这些特性需要根据具体场景测试,不一定都能提升性能。\n\n#### 5.3.3 CPU缓存与绑定\n\n**CPU缓存层级:**\n\n| 缓存     | 大小  | 访问延迟   | 说明     |\n| -------- | ----- | ---------- | -------- |\n| 寄存器   | -     | ~1 cycle   | CPU内部  |\n| L1 Cache | 32KB  | ~4 cycles  | 每核独立 |\n| L2 Cache | 256KB | ~12 cycles | 每核独立 |\n| L3 Cache | 20MB  | ~40 cycles | 多核共享 |\n| 内存     | GB级  | ~60ns      | 系统内存 |\n\n**查看CPU缓存:**\n\n```bash\n# 查看L1缓存\nlscpu | grep \"L1\"\n# L1d cache: 32K (数据缓存)\n# L1i cache: 32K (指令缓存)\n\n# 查看L2缓存\nlscpu | grep \"L2\"\n# L2 cache: 256K\n\n# 查看L3缓存\nlscpu | grep \"L3\"\n# L3 cache: 20480K\n```\n\n**绑定CPU:**\n\n```nginx\n# 自动绑定(推荐)\nworker_cpu_affinity auto;\n\n# 手动绑定(8核CPU)\nworker_processes 8;\nworker_cpu_affinity 00000001 00000010 00000100 00001000 00010000 00100000 01000000 10000000;\n\n# 手动绑定(4核CPU,每个Worker绑定2个核)\nworker_processes 4;\nworker_cpu_affinity 0101 1010 0101 1010;\n```\n\n**优点:**\n\n- 提高CPU缓存命中率\n- 减少进程迁移开销\n- 降低上下文切换成本\n\n#### 5.3.4 NUMA架构\n\n**NUMA (Non-Uniform Memory Access):**\n\n```\n[CPU 0-15] ←→ [Memory Node 0: 64GB]\n     ↓\n  跨节点访问(慢)\n     ↓\n[CPU 16-31] ←→ [Memory Node 1: 64GB]\n```\n\n**特点:**\n\n- 访问本地内存快(近)\n- 访问远程内存慢(远,3-4倍延迟)\n- 解决多核CPU内存总线瓶颈\n\n**查看NUMA信息:**\n\n```bash\n# 查看NUMA节点\nnumactl --hardware\n\n# 查看NUMA统计\nnumastat\n\n# 查看进程NUMA使用情况\nnumastat -p <pid>\n```\n\n**优化方案:**\n\n1. **BIOS禁用NUMA** - 获得平均性能\n2. **本地访问优先** - 允许访问远程,但优先本地\n3. **仅本地访问** - 禁止访问远程节点\n4. **绑定Worker到NUMA节点** - 配合worker_cpu_affinity", "subs": ["5.3.1 惊群问题与解决方案", "5.3.2 多队列网卡", "5.3.3 CPU缓存与绑定", "5.3.4 NUMA架构"]}, {"title": "5.4 TCP连接优化", "content": "#### 5.4.1 TCP三次握手流程\n\n```mermaid\nsequenceDiagram\n    participant C as Client\n    participant S as Server\n  \n    Note over C: connect()\n    C->>S: SYN (seq=x)\n    Note over C: SYN_SENT\n  \n    Note over S: listen()\n    Note over S: SYN_RECV\n    S->>C: SYN+ACK (seq=y, ack=x+1)\n  \n    C->>S: ACK (ack=y+1)\n    Note over C: ESTABLISHED\n    Note over S: ESTABLISHED\n    Note over S: accept()\n```\n\n**状态说明:**\n\n| 状态        | 端     | 说明                        |\n| ----------- | ------ | --------------------------- |\n| LISTEN      | Server | 监听端口,等待连接           |\n| SYN_SENT    | Client | 发送SYN,等待SYN+ACK         |\n| SYN_RECV    | Server | 收到SYN,发送SYN+ACK,等待ACK |\n| ESTABLISHED | Both   | 连接建立完成                |\n\n**查看连接状态:**\n\n```bash\n# 查看所有TCP连接状态\nnetstat -antp\n\n# 统计各状态连接数\nnetstat -antp | awk '{print $6}' | sort | uniq -c\n```\n\n#### 5.4.2 三次握手相关参数\n\n**Client端参数:**\n\n```bash\n# SYN重传次数\nnet.ipv4.tcp_syn_retries = 6  # 默认6次\n\n# 本地端口范围\nnet.ipv4.ip_local_port_range = 32768 60999\n# 限制了对单个上游服务器的最大并发连接数\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    # 连接超时(应用层)\n    proxy_connect_timeout 60s;\n}\n\nstream {\n    # 连接超时(四层)\n    proxy_connect_timeout 60s;\n}\n```\n\n**Server端参数:**\n\n```bash\n# 半连接队列最大长度\nnet.ipv4.tcp_max_syn_backlog = 8192\n\n# SYN+ACK重传次数\nnet.ipv4.tcp_synack_retries = 5  # 默认5次\n\n# 全连接队列最大长度\nnet.core.somaxconn = 128  # 系统级\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    server {\n        listen 80 backlog=511;  # 全连接队列长度,默认511\n    }\n}\n```\n\n#### 5.4.3 SYN Flood攻击防御\n\n**SYN Flood攻击:**\n\n攻击者伪造大量SYN包,占满半连接队列,导致正常用户无法建立连接。\n\n**防御措施:**\n\n**1. 增大队列长度**\n\n```bash\n# 增大网卡接收队列\nnet.core.netdev_max_backlog = 5000\n\n# 增大半连接队列\nnet.ipv4.tcp_max_syn_backlog = 8192\n\n# 超出队列时直接丢弃\nnet.ipv4.tcp_abort_on_overflow = 0  # 0=丢弃,1=发送RST\n```\n\n**2. 启用SYN Cookies**\n\n```bash\n# 启用SYN Cookies\nnet.ipv4.tcp_syncookies = 1\n```\n\n**SYN Cookies工作原理:**\n\n```mermaid\ngraph TD\n    A[收到SYN] --> B{半连接队列满?}\n    B -->|否| C[加入半连接队列]\n    B -->|是| D[计算SYN Cookie]\n    D --> E[发送SYN+ACK含Cookie]\n    E --> F[收到ACK]\n    F --> G[验证Cookie]\n    G -->|通过| H[直接建立连接]\n    G -->|失败| I[丢弃]\n```\n\n**注意:**\n\n- SYN Cookies会占用TCP序列号空间\n- 导致TCP扩展功能失效(窗口扩展、时间戳等)\n- 仅在队列满时启用\n\n#### 5.4.4 文件句柄限制\n\n**三个层级的限制:**\n\n**1. 系统级**\n\n```bash\n# 查看系统最大文件句柄数\ncat /proc/sys/fs/file-max\n\n# 查看当前使用情况\ncat /proc/sys/fs/file-nr\n# 输出: 已分配  已使用  最大值\n\n# 设置系统最大值\necho \"fs.file-max = 1000000\" >> /etc/sysctl.conf\nsysctl -p\n```\n\n**2. 用户级**\n\n```bash\n# 查看当前用户限制\nulimit -n\n\n# 临时修改\nulimit -n 65535\n\n# 永久修改\nvi /etc/security/limits.conf\n# 添加:\n*  soft  nofile  65535\n*  hard  nofile  65535\n```\n\n**3. 进程级**\n\n```nginx\n# Nginx配置\nworker_rlimit_nofile 65535;\n```\n\n**关系:**\n\n- 进程级 ≤ 用户级 ≤ 系统级\n- `worker_connections` 也会受文件句柄限制\n- 每个连接消耗2个文件句柄(客户端+上游)\n\n#### 5.4.5 TCP Fast Open\n\n**TFO (TCP Fast Open):**\n\n在SYN包中携带数据,减少一个RTT。\n\n```mermaid\nsequenceDiagram\n    participant C as Client\n    participant S as Server\n  \n    Note over C,S: 第一次连接\n    C->>S: SYN\n    S->>C: SYN+ACK + TFO Cookie\n    C->>S: ACK + HTTP Request\n    S->>C: HTTP Response\n  \n    Note over C,S: 第二次连接(使用TFO)\n    C->>S: SYN + TFO Cookie + HTTP Request\n    Note over S: 验证Cookie\n    Note over S: 立即处理请求\n    S->>C: SYN+ACK + HTTP Response\n    C->>S: ACK\n```\n\n**Linux配置:**\n\n```bash\n# 启用TFO\nnet.ipv4.tcp_fastopen = 3\n# 0: 禁用\n# 1: 作为客户端\n# 2: 作为服务器\n# 3: 客户端+服务器\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    server {\n        # 服务器端TFO\n        listen 80 fastopen=256;  # 队列长度\n    }\n  \n    upstream backend {\n        server 192.168.1.10:8080;\n    }\n  \n    location / {\n        # 客户端TFO(连接上游)\n        proxy_pass http://backend;\n        proxy_socket_keepalive on;\n    }\n}\n```\n\n**优点:**\n\n- 减少1个RTT延迟\n- 提升连接建立速度\n- 适用于短连接场景\n\n**注意:**\n\n- 需要Linux 3.7+\n- 需要防范TFO SYN Flood攻击\n- 通过fastopen参数限制队列长度", "subs": ["5.4.1 TCP三次握手流程", "5.4.2 三次握手相关参数", "5.4.3 SYN Flood攻击防御", "5.4.4 文件句柄限制", "5.4.5 TCP Fast Open"]}, {"title": "5.5 TCP传输优化", "content": "#### 5.5.1 滑动窗口\n\n**滑动窗口作用:**\n\n- 流量控制\n- 拥塞控制\n- 可靠传输\n- 处理乱序报文\n\n**发送窗口示例:**\n\n```\n发送缓冲区: [已发送已确认|已发送未确认|可发送|不可发送]\n             ←----------发送窗口----------→\n```\n\n**接收窗口示例:**\n\n```\n接收缓冲区: [已接收已读取|已接收未读取|可接收|不可接收]\n             ←----------接收窗口----------→\n```\n\n**窗口大小通告:**\n\n每个TCP报文都会在头部的Window字段通告自己的接收窗口大小。\n\n#### 5.5.2 TCP缓冲区配置\n\n**读缓冲区(接收):**\n\n```bash\n# TCP接收缓冲区\nnet.ipv4.tcp_rmem = 4096 87380 6291456\n# 格式: 最小值 默认值 最大值(字节)\n\n# 覆盖全局设置\nnet.core.rmem_max = 6291456\n```\n\n**写缓冲区(发送):**\n\n```bash\n# TCP发送缓冲区\nnet.ipv4.tcp_wmem = 4096 16384 4194304\n# 格式: 最小值 默认值 最大值(字节)\n\n# 覆盖全局设置\nnet.core.wmem_max = 4194304\n```\n\n**自动调整:**\n\n```bash\n# 启用自动调整\nnet.ipv4.tcp_moderate_rcvbuf = 1\n\n# 内存压力阈值\nnet.ipv4.tcp_mem = 88560 118080 177120\n# 格式: 无压力 启动压力 最大值(页,4KB)\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    server {\n        listen 80 rcvbuf=8k sndbuf=8k;  # 设置后无法自动调整\n    }\n}\n```\n\n**缓冲区划分:**\n\n```bash\n# 应用缓存与滑动窗口比例\nnet.ipv4.tcp_adv_win_scale = 1\n# 1: 应用缓存 = 总缓冲区 / 2\n# 2: 应用缓存 = 总缓冲区 / 4\n```\n\n#### 5.5.3 带宽时延积(BDP)\n\n**BDP计算:**\n\n```\nBDP = 带宽 × RTT\n\n例如:\n带宽 = 100 Mbps = 12.5 MB/s\nRTT = 20ms = 0.02s\nBDP = 12.5 MB/s × 0.02s = 250 KB\n```\n\n**接收窗口应设置为BDP大小,以充分利用带宽。**\n\n**吞吐量计算:**\n\n```\n吞吐量 = 窗口大小 / RTT\n\n例如:\n窗口 = 64 KB\nRTT = 20ms\n吞吐量 = 64 KB / 0.02s = 3.2 MB/s = 25.6 Mbps\n```\n\n#### 5.5.4 Nagle算法\n\n**Nagle算法目的:**\n\n合并小数据包,减少网络中的小报文数量,提高带宽利用率。\n\n**工作原理:**\n\n```\n发送数据:\n1. 如果有未确认的数据,缓存新数据\n2. 直到收到ACK或缓存达到MSS,才发送\n\n结果:\n- 减少小报文数量\n- 增加延迟\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    # 禁用Nagle算法(降低延迟)\n    tcp_nodelay on;  # 默认on,仅对keepalive连接生效\n  \n    # 延迟发送(提高吞吐量)\n    postpone_output 1460;  # 默认1460字节\n}\n\nstream {\n    # 禁用Nagle算法\n    tcp_nodelay on;  # 默认on,对所有连接生效\n}\n```\n\n**选择:**\n\n- **低延迟场景** - `tcp_nodelay on`(禁用Nagle)\n- **高吞吐量场景** - `tcp_nodelay off`(启用Nagle)\n\n#### 5.5.5 Cork算法\n\n**Cork算法:**\n\n比Nagle更激进,完全禁止小报文。\n\n```nginx\nhttp {\n    # 启用Cork算法(需要配合sendfile)\n    tcp_nopush on;  # 默认off\n    sendfile on;\n}\n```\n\n**工作原理:**\n\n- 等待数据填满MSS才发送\n- 或等待连接关闭才发送\n- 仅在启用sendfile时生效\n\n**注意:** Cork和Nagle可以同时启用,Cork优先级更高。\n\n#### 5.5.6 超时配置\n\n**Nginx超时指令:**\n\n```nginx\nhttp {\n    # 客户端Body接收超时(两次读操作间)\n    client_body_timeout 60s;\n  \n    # 发送响应超时(两次写操作间)\n    send_timeout 60s;\n  \n    # 上游连接超时\n    proxy_connect_timeout 60s;\n    proxy_send_timeout 60s;\n    proxy_read_timeout 60s;\n}\n```\n\n**重传参数:**\n\n```bash\n# 重传次数\nnet.ipv4.tcp_retries1 = 3  # 达到后更新路由缓存\nnet.ipv4.tcp_retries2 = 15  # 达到后关闭连接\n```", "subs": ["5.5.1 滑动窗口", "5.5.2 TCP缓冲区配置", "5.5.3 带宽时延积(BDP)", "5.5.4 Nagle算法", "5.5.5 Cork算法", "5.5.6 超时配置"]}, {"title": "5.6 磁盘IO优化", "content": "#### 5.6.1 磁盘介质选择\n\n| 特性                   | 机械硬盘(HDD)  | 固态硬盘(SSD)      |\n| ---------------------- | -------------- | ------------------ |\n| **价格**         | 低             | 高                 |\n| **容量**         | 大(TB级)       | 小(GB级)           |\n| **BPS(吞吐量)**  | 中等           | 高                 |\n| **IOPS(随机IO)** | 低(100-200)    | 高(10K-100K+)      |\n| **适用场景**     | 顺序读写(日志) | 随机读写(静态资源) |\n| **寿命**         | 长             | 短(写次数限制)     |\n\n**性能测试:**\n\n```bash\n# 使用fio测试磁盘性能\nfio --name=test --filename=/tmp/testfile --size=1G \\\n    --rw=randread --bs=4k --direct=1 --numjobs=4 \\\n    --runtime=60 --group_reporting\n```\n\n#### 5.6.2 减少磁盘IO的方法\n\n**1. 优化读取**\n\n- 使用sendfile零拷贝\n- 使用内存盘(tmpfs)\n- 使用SSD固态硬盘\n- 启用open_file_cache\n\n**2. 减少写入**\n\n```nginx\nhttp {\n    # 提升日志级别,减少日志量\n    error_log /var/log/nginx/error.log warn;\n  \n    # 关闭访问日志\n    access_log off;\n  \n    # 压缩访问日志\n    access_log /var/log/nginx/access.log combined gzip;\n  \n    # 关闭proxy缓冲\n    proxy_buffering off;\n  \n    # 使用syslog(UDP,无磁盘IO)\n    access_log syslog:server=192.168.1.100:514 combined;\n}\n```\n\n**3. 使用线程池**\n\n```nginx\n# 编译时启用\n./configure --with-threads\n\n# 配置线程池\nthread_pool default threads=32 max_queue=65536;\n\nhttp {\n    # 启用AIO和线程池\n    aio threads=default;\n}\n```\n\n#### 5.6.3 Direct IO(直接IO)\n\n**传统IO流程:**\n\n```\n用户空间 ←→ 内核缓冲区(Page Cache) ←→ 磁盘\n         拷贝1           拷贝2\n```\n\n**Direct IO流程:**\n\n```\n用户空间 ←→ 磁盘\n         拷贝1\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    location / {\n        # 大于10MB的文件使用Direct IO\n        directio 10m;\n  \n        # 对齐方式(一般不需要修改)\n        directio_alignment 512;\n  \n        root /data/files;\n    }\n}\n```\n\n**适用场景:**\n\n- 大文件(几GB)\n- 文件不太可能被缓存\n- 避免污染Page Cache\n\n**注意:**\n\n- 启用directio会自动禁用sendfile\n- 小文件不建议使用(失去缓存优势)\n\n#### 5.6.4 异步IO(AIO)\n\n**传统阻塞IO:**\n\n```\n用户进程 → read() → 阻塞等待 → 磁盘读取 → 返回数据 → 继续执行\n```\n\n**异步IO:**\n\n```\n用户进程 → aio_read() → 继续执行其他任务\n                      ↓\n              磁盘读取完成 → 回调处理\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    # 启用AIO\n    aio on;  # 默认off\n  \n    # 对写操作也使用AIO(仅特定场景)\n    aio_write on;  # 默认off\n  \n    # 配合线程池使用\n    aio threads=default;\n  \n    location / {\n        root /data/files;\n    }\n}\n```\n\n**aio_write使用场景:**\n\n仅在以下情况启用:\n\n- 接收上游响应\n- 启用proxy_buffering\n- 写入临时文件\n\n**注意:**\n\n- 需要Linux内核支持(2.6.22+)\n- 对写操作通常无需AIO(Page Cache已足够快)\n\n#### 5.6.5 线程池\n\n**线程池架构:**\n\n```mermaid\ngraph LR\n    A[Worker Process] --> B[Task Queue]\n    B --> C[Thread 1]\n    B --> D[Thread 2]\n    B --> E[Thread 3]\n    C --> F[阻塞IO操作]\n    D --> F\n    E --> F\n    F --> G[完成后回到Worker]\n```\n\n**配置:**\n\n```nginx\n# 定义线程池\nthread_pool pool1 threads=32 max_queue=65536;\nthread_pool pool2 threads=16 max_queue=32768;\n\nhttp {\n    # 使用线程池\n    aio threads=pool1;\n  \n    location /files {\n        aio threads=pool2;\n        root /data;\n    }\n}\n```\n\n**参数说明:**\n\n| 参数          | 说明             | 默认值 |\n| ------------- | ---------------- | ------ |\n| `threads`   | 线程数量         | 32     |\n| `max_queue` | 任务队列最大长度 | 65536  |\n\n**适用场景:**\n\n- 大量小文件静态资源服务\n- 文件缓存(inode cache)失效\n- 避免阻塞Worker进程\n\n**性能提升:**\n\n- 官方测试显示最高9倍性能提升\n- 具体效果取决于文件数量和缓存命中率\n\n**编译要求:**\n\n```bash\n./configure --with-threads\n```\n\n#### 5.6.6 AIO读取缓存\n\n```nginx\nhttp {\n    # AIO读取缓存大小\n    output_buffers 2 32k;  # 2个32KB缓冲区\n}\n```", "subs": ["5.6.1 磁盘介质选择", "5.6.2 减少磁盘IO的方法", "5.6.3 Direct IO(直接IO)", "5.6.4 异步IO(AIO)", "5.6.5 线程池", "5.6.6 AIO读取缓存"]}, {"title": "5.7 零拷贝技术", "content": "#### 5.7.1 传统文件发送流程\n\n```mermaid\ngraph TD\n    A[磁盘] -->|DMA拷贝| B[内核缓冲区]\n    B -->|CPU拷贝| C[用户空间]\n    C -->|CPU拷贝| D[Socket缓冲区]\n    D -->|DMA拷贝| E[网卡]\n  \n    style B fill:#f9f\n    style C fill:#9ff\n    style D fill:#ff9\n```\n\n**步骤:**\n\n1. read(): 磁盘 → 内核缓冲区 → 用户空间 (2次拷贝)\n2. send(): 用户空间 → Socket缓冲区 → 网卡 (2次拷贝)\n\n**总计:** 4次拷贝,2次系统调用\n\n#### 5.7.2 sendfile零拷贝\n\n```mermaid\ngraph TD\n    A[磁盘] -->|DMA拷贝| B[内核缓冲区]\n    B -->|CPU拷贝| C[Socket缓冲区]\n    C -->|DMA拷贝| D[网卡]\n  \n    style B fill:#f9f\n    style C fill:#ff9\n```\n\n**步骤:**\n\n1. sendfile(): 磁盘 → 内核缓冲区 → Socket缓冲区 → 网卡 (3次拷贝)\n\n**总计:** 3次拷贝,1次系统调用\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    # 启用sendfile\n    sendfile on;  # 默认off\n  \n    # 配合tcp_nopush使用\n    tcp_nopush on;\n  \n    location / {\n        root /data/files;\n    }\n}\n```\n\n**注意:**\n\n- 启用directio会自动禁用sendfile\n- 两者不能同时使用\n\n#### 5.7.3 gzip_static模块\n\n**问题:** 启用gzip压缩会导致sendfile失效(需要在用户空间压缩)\n\n**解决方案:** 预压缩文件\n\n```bash\n# 预压缩文件\ncd /data/files\ngzip -k -9 index.html  # 生成index.html.gz\n```\n\n**Nginx配置:**\n\n```nginx\nhttp {\n    # 启用gzip_static\n    gzip_static on;  # 默认off,需要编译时启用\n    # gzip_static always;  # 不检查客户端是否支持gzip\n  \n    sendfile on;\n  \n    location / {\n        root /data/files;\n    }\n}\n```\n\n**编译:**\n\n```bash\n./configure --with-http_gzip_static_module\n```\n\n**工作流程:**\n\n1. 客户端请求 `/index.html`\n2. Nginx检查 `/data/files/index.html.gz` 是否存在\n3. 如果存在且客户端支持gzip,直接返回 `.gz`文件\n4. 否则返回原文件\n\n**gzip_static参数:**\n\n| 值         | 说明                  |\n| ---------- | --------------------- |\n| `off`    | 禁用(默认)            |\n| `on`     | 启用,检查客户端支持   |\n| `always` | 启用,不检查客户端支持 |\n\n#### 5.7.4 gunzip模块\n\n**场景:** 客户端不支持gzip,但服务器只有压缩文件\n\n```nginx\nhttp {\n    # 编译时启用\n    # ./configure --with-http_gunzip_module\n  \n    gzip_static on;\n    gunzip on;  # 实时解压\n    gunzip_buffers 16 8k;\n  \n    location / {\n        root /data/files;\n    }\n}\n```\n\n**工作流程:**\n\n1. 客户端不支持gzip\n2. 服务器只有 `.gz`文件\n3. Nginx实时解压\n4. 返回解压后的内容", "subs": ["5.7.1 传统文件发送流程", "5.7.2 sendfile零拷贝", "5.7.3 gzip_static模块", "5.7.4 gunzip模块"]}, {"title": "5.8 内存优化", "content": "#### 5.8.1 TCMalloc\n\n**TCMalloc (Thread-Caching Malloc):**\n\nGoogle开发的高性能内存分配器,替代系统默认的malloc。\n\n**优点:**\n\n- 减少内存碎片\n- 提升多线程性能\n- 降低锁竞争\n\n**安装:**\n\n```bash\n# CentOS\nyum install gperftools-devel\n\n# Ubuntu\napt-get install libgoogle-perftools-dev\n```\n\n**编译Nginx:**\n\n```bash\n./configure --with-google_perftools_module\nmake && make install\n```\n\n**配置:**\n\n```nginx\n# 主配置\ngoogle_perftools_profiles /tmp/tcmalloc;\n```\n\n**验证:**\n\n```bash\nlsof -p <nginx_pid> | grep tcmalloc\n```", "subs": ["5.8.1 TCMalloc"]}, {"title": "5.9 性能监控", "content": "#### 5.9.1 stub_status模块\n\n```nginx\nhttp {\n    server {\n        location /nginx_status {\n            stub_status;\n            allow 127.0.0.1;\n            deny all;\n        }\n    }\n}\n```\n\n**输出示例:**\n\n```\nActive connections: 291\nserver accepts handled requests\n 16630948 16630948 31070465\nReading: 6 Writing: 179 Waiting: 106\n```\n\n**字段说明:**\n\n| 字段               | 说明                   |\n| ------------------ | ---------------------- |\n| Active connections | 当前活跃连接数         |\n| accepts            | 已接受的连接总数       |\n| handled            | 已处理的连接总数       |\n| requests           | 已处理的请求总数       |\n| Reading            | 正在读取请求头的连接数 |\n| Writing            | 正在发送响应的连接数   |\n| Waiting            | 空闲keepalive连接数    |\n\n**编译:**\n\n```bash\n./configure --with-http_stub_status_module\n```\n\n#### 5.9.2 Google PerfTools\n\n**CPU性能分析:**\n\n```nginx\n# 启用CPU profiling\ngoogle_perftools_profiles /tmp/profile;\n```\n\n**生成火焰图:**\n\n```bash\n# 安装pprof\ngo get -u github.com/google/pprof\n\n# 分析profile文件\npprof --pdf /path/to/nginx /tmp/profile > profile.pdf\n```\n\n---\n\n**第五部分总结:**\n\n系统层性能优化是Nginx达到极致性能的关键,本部分详细介绍了:\n\n1. **CPU优化** - 进程数、优先级、绑定、NUMA\n2. **多核负载均衡** - reuseport、多队列网卡、CPU缓存\n3. **TCP连接优化** - 三次握手、SYN Flood防御、文件句柄、TFO\n4. **TCP传输优化** - 滑动窗口、缓冲区、BDP、Nagle/Cork算法\n5. **磁盘IO优化** - Direct IO、AIO、线程池\n6. **零拷贝** - sendfile、gzip_static、gunzip\n7. **内存优化** - TCMalloc\n8. **性能监控** - stub_status、PerfTools\n\n通过本部分的学习,你应该能够:\n\n- 理解Linux内核与Nginx的交互\n- 配置TCP/IP协议栈参数\n- 优化磁盘IO性能\n- 使用零拷贝技术\n- 监控Nginx性能指标\n- 针对具体场景进行性能调优\n\n这些优化措施需要根据实际场景选择性使用,过度优化可能适得其反。建议:\n\n1. 先进行性能测试,找出瓶颈\n2. 针对瓶颈进行优化\n3. 优化后再次测试,验证效果\n4. 逐步迭代,持续改进\n\n---\n\n**待续:第六部分 - 从源码视角深入使用Nginx**", "subs": ["5.9.1 stub_status模块", "5.9.2 Google PerfTools"]}]}, {"title": "第六部分：从源码视角深入使用Nginx", "sections": [{"title": "6.1 第三方模块源码阅读", "content": "#### 6.1.1 第三方模块的基本结构\n\n每个Nginx第三方模块都必须包含以下核心文件:\n\n```\nmodule_name/\n├── config          # 必需,定义模块编译配置\n├── ngx_module.c    # 核心源码文件\n└── ...             # 其他源码文件\n```\n\n#### 6.1.2 源码阅读方法\n\n**1. 分析config文件**\n\n`config`文件是configure脚本执行时必须读取的文件,主要完成三件事:\n\n```bash\n# 1. 定义模块名称\nngx_addon_name=ngx_http_mymodule\n\n# 2. 将HTTP模块添加到模块数组\nHTTP_MODULES=\"$HTTP_MODULES ngx_http_mymodule\"\n\n# 3. 添加源码文件到编译列表\nNGX_ADDON_SRCS=\"$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_mymodule.c\"\n```\n\n**2. 分析ngx_module_t结构体**\n\n```c\nngx_module_t ngx_http_mymodule = {\n    NGX_MODULE_V1,\n    &ngx_http_mymodule_ctx,      /* module context */\n    ngx_http_mymodule_commands,  /* module directives */\n    NGX_HTTP_MODULE,             /* module type */\n    NULL,                        /* init master */\n    NULL,                        /* init module */\n    NULL,                        /* init process */\n    NULL,                        /* init thread */\n    NULL,                        /* exit thread */\n    NULL,                        /* exit process */\n    NULL,                        /* exit master */\n    NGX_MODULE_V1_PADDING\n};\n```\n\n**生命周期回调:**\n\n| 回调方法         | 调用时机         | 进程   |\n| ---------------- | ---------------- | ------ |\n| `init_module`  | 解析完配置文件后 | Master |\n| `init_process` | Worker进程启动时 | Worker |\n| `exit_process` | Worker进程退出时 | Worker |\n| `exit_master`  | Master进程退出时 | Master |\n\n**注意:** `init_master`, `init_thread`, `exit_thread`目前未被使用。\n\n**3. 分析ngx_command_t指令数组**\n\n```c\nstatic ngx_command_t ngx_http_mymodule_commands[] = {\n    {\n        ngx_string(\"mymodule_directive\"),\n        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,\n        ngx_http_mymodule_set,\n        NGX_HTTP_LOC_CONF_OFFSET,\n        offsetof(ngx_http_mymodule_loc_conf_t, value),\n        NULL\n    },\n    ngx_null_command\n};\n```\n\n**4. 分析ngx_http_module_t结构体**\n\n```c\nstatic ngx_http_module_t ngx_http_mymodule_ctx = {\n    NULL,                                  /* preconfiguration */\n    ngx_http_mymodule_init,                /* postconfiguration */\n  \n    NULL,                                  /* create main configuration */\n    NULL,                                  /* init main configuration */\n  \n    NULL,                                  /* create server configuration */\n    NULL,                                  /* merge server configuration */\n  \n    ngx_http_mymodule_create_loc_conf,     /* create location configuration */\n    ngx_http_mymodule_merge_loc_conf       /* merge location configuration */\n};\n```\n\n**5. 确定模块生效方式**\n\n模块生效方式有四种:\n\n1. **在HTTP的11个阶段生效** - 通过postconfiguration注册handler\n2. **提供新变量** - 通过preconfiguration注册变量\n3. **作为过滤模块** - 注册header/body filter\n4. **作为反向代理** - 设置content handler\n\n#### 6.1.3 configure脚本工作流程\n\n```mermaid\ngraph TD\n    A[执行./configure] --> B[解析命令行参数]\n    B --> C[检测操作系统和编译器特性]\n    C --> D[生成ngx_modules.c]\n    C --> E[生成Makefile]\n    D --> F[显示配置结果]\n    E --> F\n```\n\n**configure主要工作:**\n\n1. **解析参数** - 处理 `--add-module`, `--with-*`等选项\n2. **检测特性** - 根据OS和架构选择特性(如AIO)\n3. **生成文件** - 生成 `ngx_modules.c`和 `Makefile`\n4. **显示结果** - 输出配置摘要和路径信息\n\n**配置结果示例:**\n\n```\nConfiguration summary\n  + using system PCRE library\n  + using system OpenSSL library\n  + using system zlib library\n\n  nginx path prefix: \"/usr/local/nginx\"\n  nginx binary file: \"/usr/local/nginx/sbin/nginx\"\n  nginx modules path: \"/usr/local/nginx/modules\"\n  nginx configuration prefix: \"/usr/local/nginx/conf\"\n  nginx configuration file: \"/usr/local/nginx/conf/nginx.conf\"\n  nginx pid file: \"/usr/local/nginx/logs/nginx.pid\"\n  nginx error log file: \"/usr/local/nginx/logs/error.log\"\n  nginx http access log file: \"/usr/local/nginx/logs/access.log\"\n```", "subs": ["6.1.1 第三方模块的基本结构", "6.1.2 源码阅读方法", "6.1.3 configure脚本工作流程"]}, {"title": "6.2 Nginx启动流程", "content": "#### 6.2.1 进程启动回调时机\n\n```mermaid\nsequenceDiagram\n    participant M as Master进程\n    participant W as Worker进程\n  \n    Note over M: 1. 启动Master进程\n    M->>M: 解析配置文件\n    M->>M: 调用所有模块的init_module()\n    M->>M: 创建共享内存\n    M->>M: 监听端口\n  \n    Note over M: 2. 启动Worker进程\n    M->>W: fork() Worker进程\n    W->>W: 调用所有模块的init_process()\n    W->>W: 进入事件循环\n  \n    Note over W: 3. Worker进程退出\n    W->>W: 调用所有模块的exit_process()\n  \n    Note over M: 4. Master进程退出\n    M->>M: 调用所有模块的exit_master()\n```\n\n#### 6.2.2 ngx_cycle_t核心结构体\n\n`ngx_cycle_t`是Nginx最核心的数据结构,贯穿整个生命周期:\n\n```c\nstruct ngx_cycle_s {\n    ngx_array_t          modules;         /* 所有模块数组 */\n    ngx_array_t          listening;       /* 监听端口数组 */\n    ngx_array_t          open_files;      /* 打开的文件 */\n    ngx_list_t           shared_memory;   /* 共享内存列表 */\n    ngx_queue_t          free_connections;/* 空闲连接池 */\n    ngx_log_t           *log;             /* 日志对象 */\n    ngx_connection_t    *connections;     /* 连接池 */\n    // ... 更多字段\n};\n```\n\n**用途:**\n\n- 调试时查看模块信息\n- 查看监听端口和处理函数\n- 查看连接池使用情况\n- 查看共享内存分配情况\n- 查看打开的文件列表\n\n#### 6.2.3 Nginx启动详细流程\n\n```mermaid\ngraph TD\n    A[执行nginx命令] --> B[解析命令行参数]\n    B --> C[获取配置文件路径]\n    C --> D[解析配置文件]\n    D --> E[调用核心模块的init_module]\n    E --> F[初始化共享内存]\n    F --> G[监听端口]\n    G --> H[调用所有模块的init_module]\n    H --> I{启动方式}\n  \n    I -->|单进程模式| J[Worker事件循环]\n    I -->|Master-Worker模式| K[启动Worker进程]\n  \n    K --> L[Worker进程调用init_process]\n    L --> M[启动Cache Manager进程]\n    L --> N[启动Cache Loader进程]\n    L --> J\n  \n    J --> O[检查并分发事件]\n    O --> P[处理网络事件]\n    O --> Q[处理定时器事件]\n    P --> O\n    Q --> O\n```\n\n**关键步骤说明:**\n\n1. **解析配置文件(Master进程)** - 所有HTTP模块的配置都在此时解析\n2. **监听端口** - Master和Worker进程都会监听(继承)\n3. **init_module回调** - 在Master进程中调用\n4. **init_process回调** - 在Worker进程中调用(OpenResty的 `init_worker_by_lua`在此执行)\n5. **Cache Loader** - 加载磁盘缓存到内存\n6. **Cache Manager** - 定期淘汰过期缓存", "subs": ["6.2.1 进程启动回调时机", "6.2.2 ngx_cycle_t核心结构体", "6.2.3 Nginx启动详细流程"]}, {"title": "6.3 HTTP模块初始化", "content": "#### 6.3.1 HTTP模块的8个回调方法\n\n```c\ntypedef struct {\n    ngx_int_t   (*preconfiguration)(ngx_conf_t *cf);\n    ngx_int_t   (*postconfiguration)(ngx_conf_t *cf);\n  \n    void       *(*create_main_conf)(ngx_conf_t *cf);\n    char       *(*init_main_conf)(ngx_conf_t *cf, void *conf);\n  \n    void       *(*create_srv_conf)(ngx_conf_t *cf);\n    char       *(*merge_srv_conf)(ngx_conf_t *cf, void *prev, void *conf);\n  \n    void       *(*create_loc_conf)(ngx_conf_t *cf);\n    char       *(*merge_loc_conf)(ngx_conf_t *cf, void *prev, void *conf);\n} ngx_http_module_t;\n```\n\n#### 6.3.2 HTTP模块初始化流程\n\n```mermaid\ngraph TD\n    A[开始解析http块] --> B[初始化HTTP模块序号]\n    B --> C[调用所有HTTP模块的preconfiguration]\n    C --> D[调用create_main_conf]\n    C --> E[调用create_srv_conf]\n    C --> F[调用create_loc_conf]\n  \n    D --> G[解析http块配置指令]\n    E --> G\n    F --> G\n  \n    G --> H[调用init_main_conf]\n    H --> I[合并server和location配置]\n    I --> J[调用merge_srv_conf]\n    I --> K[调用merge_loc_conf]\n  \n    J --> L[构造location二叉查找树]\n    K --> L\n    L --> M[初始化HTTP阶段动态数组]\n    M --> N[调用所有HTTP模块的postconfiguration]\n    N --> O[构造HTTP阶段处理数组]\n    O --> P[构造虚拟主机散列表]\n    P --> Q[构造监听端口]\n```\n\n#### 6.3.3 在HTTP阶段注册Handler\n\n**方法一: 在postconfiguration中注册**\n\n```c\nstatic ngx_int_t\nngx_http_mymodule_init(ngx_conf_t *cf)\n{\n    ngx_http_handler_pt        *h;\n    ngx_http_core_main_conf_t  *cmcf;\n  \n    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);\n  \n    /* 在ACCESS阶段注册handler */\n    h = ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers);\n    if (h == NULL) {\n        return NGX_ERROR;\n    }\n  \n    *h = ngx_http_mymodule_handler;\n  \n    return NGX_OK;\n}\n```\n\n**方法二: 反向代理模块(排他性)**\n\n```c\nstatic char *\nngx_http_mymodule_pass(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)\n{\n    ngx_http_core_loc_conf_t  *clcf;\n  \n    clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);\n    clcf->handler = ngx_http_mymodule_handler;  /* 直接设置handler */\n  \n    return NGX_CONF_OK;\n}\n```\n\n#### 6.3.4 注册过滤模块\n\n**过滤模块链表结构:**\n\n```\nngx_http_top_header_filter → filter1 → filter2 → ... → ngx_http_header_filter\nngx_http_top_body_filter   → filter1 → filter2 → ... → ngx_http_write_filter\n```\n\n**注册方法:**\n\n```c\nstatic ngx_http_output_header_filter_pt  ngx_http_next_header_filter;\nstatic ngx_http_output_body_filter_pt    ngx_http_next_body_filter;\n\nstatic ngx_int_t\nngx_http_myfilter_init(ngx_conf_t *cf)\n{\n    /* 插入到header filter链表头部 */\n    ngx_http_next_header_filter = ngx_http_top_header_filter;\n    ngx_http_top_header_filter = ngx_http_myfilter_header_filter;\n  \n    /* 插入到body filter链表头部 */\n    ngx_http_next_body_filter = ngx_http_top_body_filter;\n    ngx_http_top_body_filter = ngx_http_myfilter_body_filter;\n  \n    return NGX_OK;\n}\n\n/* Header过滤函数 */\nstatic ngx_int_t\nngx_http_myfilter_header_filter(ngx_http_request_t *r)\n{\n    /* 处理响应头 */\n    // ...\n  \n    /* 调用下一个filter */\n    return ngx_http_next_header_filter(r);\n}\n\n/* Body过滤函数 */\nstatic ngx_int_t\nngx_http_myfilter_body_filter(ngx_http_request_t *r, ngx_chain_t *in)\n{\n    /* 处理响应体 */\n    // ...\n  \n    /* 调用下一个filter */\n    return ngx_http_next_body_filter(r, in);\n}\n```\n\n**注意:**\n\n- 每个过滤模块都有自己的 `static`局部变量 `next_*_filter`\n- 通过这种方式构成单链表\n- 过滤模块的执行顺序与编译顺序相反(后编译的先执行)", "subs": ["6.3.1 HTTP模块的8个回调方法", "6.3.2 HTTP模块初始化流程", "6.3.3 在HTTP阶段注册Handler", "6.3.4 注册过滤模块"]}, {"title": "6.4 Rewrite模块与if指令", "content": "#### 6.4.1 Rewrite脚本指令\n\nRewrite模块提供5个脚本式指令,都在REWRITE阶段执行:\n\n| 指令        | 功能            |\n| ----------- | --------------- |\n| `set`     | 设置变量        |\n| `if`      | 条件判断        |\n| `break`   | 中断rewrite脚本 |\n| `rewrite` | URL重写         |\n| `return`  | 返回响应        |\n\n#### 6.4.2 Rewrite脚本执行原理\n\n**类似协程的执行方式:**\n\n```c\n/* Rewrite脚本指令数组 */\nngx_http_rewrite_loc_conf_t {\n    ngx_array_t  *codes;  /* 指令数组 */\n};\n\n/* 执行上下文 */\nngx_http_script_engine_t {\n    u_char     *ip;    /* 指令指针(类似CPU的IP寄存器) */\n    u_char     *sp;    /* 数据栈指针 */\n    ngx_http_request_t  *request;  /* 当前请求 */\n    // ...\n};\n```\n\n**执行流程:**\n\n1. 将所有rewrite指令编译成指令数组\n2. 每个请求维护自己的执行上下文\n3. `ip`指针指向下一条待执行的指令\n4. 顺序执行指令,直到遇到 `break`或执行完毕\n\n#### 6.4.3 if指令的\"邪恶\"之处\n\n**问题示例1: 连续if导致配置丢失**\n\n```nginx\nlocation / {\n    set $a 1;\n  \n    if ($a) {\n        add_header X-First 1;  # 添加头部1\n    }\n  \n    if ($a) {\n        add_header X-Second 2;  # 添加头部2\n    }\n  \n    return 204;\n}\n```\n\n**预期结果:** 响应包含 `X-First: 1`和 `X-Second: 2`两个头部\n\n**实际结果:** 只包含 `X-Second: 2`,`X-First`丢失!\n\n**原因分析:**\n\n```mermaid\ngraph TD\n    A[请求开始] --> B[使用location的配置]\n    B --> C{第一个if为真?}\n    C -->|是| D[切换到if块的配置]\n    D --> E[执行add_header X-First]\n    E --> F{第二个if为真?}\n    F -->|是| G[切换到第二个if块的配置]\n    G --> H[第一个if的配置被覆盖!]\n    H --> I[执行add_header X-Second]\n    I --> J[return 204]\n  \n    style H fill:#f99\n```\n\n**核心问题:**\n\n- 每个if块都有自己的配置(`loc_conf`)\n- if块内的配置会替换当前请求的配置\n- 连续的if块会相互覆盖\n- 第一个if块的配置完全失效\n\n**问题示例2: proxy_pass丢失**\n\n```nginx\nlocation / {\n    if ($condition1) {\n        proxy_pass http://backend1;\n    }\n  \n    if ($condition2) {\n        # 第二个if块没有proxy_pass\n        set $var value;\n    }\n  \n    # 如果condition2为真,proxy_pass配置丢失!\n}\n```\n\n**结果:** 如果两个if都为真,会返回500错误或crash(旧版本)\n\n#### 6.4.4 if指令的正确用法\n\n**原则:**\n\n1. **理解执行时机** - if在REWRITE阶段执行,但影响后续所有阶段\n2. **避免连续if** - 多个if块会相互覆盖配置\n3. **if块内配置完整** - if块内的配置必须能独立处理请求\n4. **使用break中断** - 需要时使用break阻止后续if执行\n\n**正确示例1: 使用break**\n\n```nginx\nlocation / {\n    if ($condition1) {\n        proxy_pass http://backend1;\n        break;  # 阻止后续if执行\n    }\n  \n    if ($condition2) {\n        proxy_pass http://backend2;\n        break;\n    }\n  \n    proxy_pass http://backend_default;\n}\n```\n\n**正确示例2: 嵌套if**\n\n```nginx\nlocation / {\n    if ($condition1) {\n        if ($condition2) {\n            proxy_pass http://backend;\n        }\n    }\n}\n```\n\n**正确示例3: 使用map替代**\n\n```nginx\nmap $condition $backend {\n    default  http://backend_default;\n    \"1\"      http://backend1;\n    \"2\"      http://backend2;\n}\n\nlocation / {\n    proxy_pass $backend;\n}\n```\n\n**为什么if性能好?**\n\nif指令虽然有陷阱,但性能极高,因为:\n\n- 编译成字节码,执行快速\n- 避免了传统if语句的开销\n- 适合高并发场景", "subs": ["6.4.1 Rewrite脚本指令", "6.4.2 Rewrite脚本执行原理", "6.4.3 if指令的\"邪恶\"之处", "6.4.4 if指令的正确用法"]}, {"title": "6.5 Core Dump调试", "content": "#### 6.5.1 启用Core Dump\n\n```nginx\n# 设置core文件大小限制\nworker_rlimit_core 500M;\n\n# 设置core文件存放目录\nworking_directory /tmp/nginx_core;\n```\n\n**系统配置:**\n\n```bash\n# 查看core文件大小限制\nulimit -c\n\n# 设置unlimited\nulimit -c unlimited\n\n# 永久设置\necho \"* soft core unlimited\" >> /etc/security/limits.conf\n```\n\n#### 6.5.2 使用GDB分析Core Dump\n\n**启动GDB:**\n\n```bash\ngdb /path/to/nginx /tmp/nginx_core/core.12345\n```\n\n**常用GDB命令:**\n\n| 命令                    | 说明             | 示例                    |\n| ----------------------- | ---------------- | ----------------------- |\n| `bt`                  | 显示函数调用栈   | `bt`                  |\n| `frame N`             | 切换到第N层栈帧  | `frame 1`             |\n| `print var`           | 打印变量值       | `p cycle->log`        |\n| `list`                | 显示当前代码     | `list`                |\n| `x/addr`              | 查看内存地址     | `x/10x 0x12345`       |\n| `info registers`      | 查看寄存器       | `i r`                 |\n| `thread apply all bt` | 所有线程的调用栈 | `thread apply all bt` |\n\n**分析ngx_cycle_t:**\n\n```gdb\n# 切换到ngx_process_events_and_timers栈帧\n(gdb) frame 1\n\n# 查看cycle变量\n(gdb) p *cycle\n$1 = {\n  conf_ctx = 0x...,\n  pool = 0x...,\n  log = 0x...,\n  modules = {...},\n  ...\n}\n\n# 查看所有模块\n(gdb) p cycle->modules[0]\n$2 = (ngx_module_t *) 0x...\n\n# 查看模块名称\n(gdb) p cycle->modules[10]->name\n$3 = \"ngx_http_core_module\"\n\n# 查看模块指令\n(gdb) p cycle->modules[10]->commands[3]\n$4 = {\n  name = {len = 8, data = \"location\"},\n  ...\n}\n\n# 查看监听端口\n(gdb) p *(ngx_listening_t *)((ngx_array_t *)&cycle->listening)->elts\n$5 = {\n  fd = 6,\n  sockaddr = {...},\n  ...\n}\n\n# 查看共享内存\n(gdb) p *(ngx_shm_zone_t *)cycle->shared_memory.part.elts\n$6 = {\n  shm = {addr = 0x..., size = 10485760, name = \"limit_conn_zone\", ...},\n  ...\n}\n```\n\n#### 6.5.3 Debug Points\n\n```nginx\n# 遇到特定错误时生成core dump\ndebug_points abort;  # 生成core dump并退出\n# debug_points stop;   # 直接退出,不生成core dump\n```\n\n**触发条件:**\n\n仅在模块调用 `ngx_debug_point()`时生效,例如:\n\n- SSI模块: \"the same buf was used in ssi\"\n- Slab分配器: \"ngx_slab_alloc() failed: no memory\"\n\n**用途:**\n\n- 开发环境调试\n- 定位疑难问题\n- 生产环境不建议启用", "subs": ["6.5.1 启用Core Dump", "6.5.2 使用GDB分析Core Dump", "6.5.3 Debug Points"]}, {"title": "6.6 Debug日志分析", "content": "#### 6.6.1 启用Debug日志\n\n**编译时启用:**\n\n```bash\n./configure --with-debug\n```\n\n**配置debug_connection:**\n\n```nginx\nevents {\n    # 只对特定IP启用debug日志\n    debug_connection 192.168.1.100;\n    debug_connection 10.0.0.0/8;\n}\n\nhttp {\n    error_log /var/log/nginx/error.log info;  # 默认级别\n}\n```\n\n**作用:**\n\n- 避免debug日志过多\n- 只对开发/运维机器启用\n- 生产环境可安全使用\n\n#### 6.6.2 Debug日志的5个关键部分\n\n**1. 建立连接与SSL握手**\n\n```\n2024/01/01 12:00:00 [debug] 12345#0: *1 accept: 192.168.1.100:54321 fd:3\n2024/01/01 12:00:00 [debug] 12345#0: *1 event timer add: 3: 60000:1234567890\n2024/01/01 12:00:00 [debug] 12345#0: *1 SSL_do_handshake: 1\n2024/01/01 12:00:00 [debug] 12345#0: *1 SSL: TLSv1.2, cipher: \"ECDHE-RSA-AES128-GCM-SHA256\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 SSL reused session\n```\n\n**关键点:**\n\n- 客户端IP和端口\n- SSL协议版本和加密套件\n- 是否复用SSL会话\n\n**2. 接收HTTP请求头**\n\n```\n2024/01/01 12:00:00 [debug] 12345#0: *1 http process request line\n2024/01/01 12:00:00 [debug] 12345#0: *1 http request line: \"GET /index.html HTTP/1.1\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http uri: \"/index.html\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http args: \"\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http exten: \"html\"\n\n2024/01/01 12:00:00 [debug] 12345#0: *1 http process request header line\n2024/01/01 12:00:00 [debug] 12345#0: *1 http header: \"Host: example.com\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http header: \"User-Agent: curl/7.29.0\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http header: \"Accept: */*\"\n```\n\n**关键点:**\n\n- 请求方法、URI、协议版本\n- 所有请求头部\n- URI参数解析\n\n**3. HTTP处理阶段**\n\n```\n2024/01/01 12:00:00 [debug] 12345#0: *1 http process request\n2024/01/01 12:00:00 [debug] 12345#0: *1 rewrite phase: 0\n2024/01/01 12:00:00 [debug] 12345#0: *1 test location: \"/\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 test location: \"/api\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 using configuration \"/\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http cl:-1 max:1048576\n2024/01/01 12:00:00 [debug] 12345#0: *1 rewrite phase: 2\n2024/01/01 12:00:00 [debug] 12345#0: *1 post rewrite phase: 3\n2024/01/01 12:00:00 [debug] 12345#0: *1 generic phase: 4\n2024/01/01 12:00:00 [debug] 12345#0: *1 generic phase: 5\n2024/01/01 12:00:00 [debug] 12345#0: *1 access phase: 6\n2024/01/01 12:00:00 [debug] 12345#0: *1 access phase: 7\n2024/01/01 12:00:00 [debug] 12345#0: *1 post access phase: 8\n2024/01/01 12:00:00 [debug] 12345#0: *1 try files phase: 9\n2024/01/01 12:00:00 [debug] 12345#0: *1 content phase: 10\n```\n\n**关键点:**\n\n- **using configuration** - 最终选中的location(非常重要!)\n- 各个阶段的执行顺序\n- 缓存是否命中\n\n**4. 反向代理(发送上游请求)**\n\n```\n2024/01/01 12:00:00 [debug] 12345#0: *1 http proxy connect: 192.168.1.10:8080\n2024/01/01 12:00:00 [debug] 12345#0: *1 http proxy header:\n\"GET /api/users HTTP/1.1\nHost: backend.example.com\nConnection: close\nUser-Agent: nginx\nX-Real-IP: 192.168.1.100\nX-Forwarded-For: 192.168.1.100\n\"\n```\n\n**关键点:**\n\n- 发送给上游的完整请求头\n- 可以快速定位配置错误\n\n**5. 构造和发送响应**\n\n```\n2024/01/01 12:00:00 [debug] 12345#0: *1 http proxy status 200 \"200 OK\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http proxy header: \"Server: nginx\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http proxy header: \"Content-Type: text/html\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http proxy header: \"Content-Length: 1234\"\n\n2024/01/01 12:00:00 [debug] 12345#0: *1 http output filter \"/index.html?\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http copy filter: \"/index.html?\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http postpone filter \"/index.html?\"\n2024/01/01 12:00:00 [debug] 12345#0: *1 http gzip filter\n2024/01/01 12:00:00 [debug] 12345#0: *1 http chunked filter\n2024/01/01 12:00:00 [debug] 12345#0: *1 http write filter: l:1 f:0 s:1234\n2024/01/01 12:00:00 [debug] 12345#0: *1 http write filter limit 0\n```\n\n**关键点:**\n\n- 上游响应的状态码和头部\n- 过滤模块的执行顺序\n- 响应体的发送过程\n\n#### 6.6.3 Debug日志分析技巧\n\n**1. 关注\"using configuration\"**\n\n这行日志显示最终选中的location,是定位配置问题的关键:\n\n```\n2024/01/01 12:00:00 [debug] 12345#0: *1 using configuration \"/api\"\n```\n\n如果选中的location不符合预期,说明location匹配规则有问题。\n\n**2. 检查上游请求**\n\n查看\"http proxy header\"部分,确认发送给上游的请求是否正确:\n\n```\nhttp proxy header:\n\"GET /api/users HTTP/1.1\nHost: backend.example.com\nX-Custom-Header: value\n\"\n```\n\n**3. 跟踪过滤模块**\n\n通过过滤模块的执行顺序,可以了解响应的处理流程:\n\n```\nhttp output filter → copy filter → postpone filter → gzip filter → chunked filter → write filter\n```\n\n**4. 查看缓存命中**\n\n```\n2024/01/01 12:00:00 [debug] 12345#0: *1 http file cache exists: /path/to/cache/file\n```\n\n如果看到这行,说明缓存命中,不会访问上游。\n\n---\n\n**第六部分总结:**\n\n从源码视角深入使用Nginx是掌握Nginx的最高境界,本部分详细介绍了:\n\n1. **第三方模块源码阅读** - config文件、ngx_module_t、ngx_command_t、ngx_http_module_t\n2. **Nginx启动流程** - 进程启动回调、ngx_cycle_t结构体、Master-Worker模式\n3. **HTTP模块初始化** - 8个回调方法、注册handler、注册过滤模块\n4. **Rewrite模块与if指令** - 脚本执行原理、if指令的陷阱、正确用法\n5. **Core Dump调试** - 启用core dump、GDB命令、分析ngx_cycle_t\n6. **Debug日志分析** - 5个关键部分、分析技巧\n\n通过本部分的学习,你应该能够:\n\n- 阅读和理解第三方模块源码\n- 理解Nginx的启动和初始化流程\n- 开发自己的Nginx模块\n- 正确使用if指令,避免常见陷阱\n- 使用GDB调试Nginx问题\n- 通过debug日志快速定位问题\n\n这些技能对于深入理解Nginx、定位复杂问题、开发高性能模块都是必不可少的。\n\n---", "subs": ["6.6.1 启用Debug日志", "6.6.2 Debug日志的5个关键部分", "6.6.3 Debug日志分析技巧"]}]}, {"title": "全书总结", "sections": [{"title": "学习路径回顾", "content": "恭喜你完成了Nginx学习笔记的全部内容!让我们回顾一下这六个部分:\n\n\n```mermaid\ngraph LR\n    A[第一部分: 初识Nginx] --> B[第二部分: 基础架构]\n    B --> C[第三部分: HTTP模块]\n    C --> D[第四部分: 反向代理与负载均衡]\n    D --> E[第五部分: 系统层性能优化]\n    E --> F[第六部分: 源码视角]\n  \n    style A fill:#e1f5ff\n    style B fill:#fff4e1\n    style C fill:#ffe1f5\n    style D fill:#e1ffe1\n    style E fill:#f5e1ff\n    style F fill:#ffe1e1\n```", "subs": []}, {"title": "核心知识点", "content": "1. **Nginx基础** - 安装、配置、命令行、基本使用\n2. **架构设计** - Master-Worker、事件驱动、模块系统、内存管理\n3. **HTTP处理** - 11个阶段、变量系统、过滤模块、访问控制\n4. **反向代理** - 负载均衡算法、proxy模块、缓存、upstream\n5. **性能优化** - CPU、网络、磁盘、零拷贝、监控\n6. **源码分析** - 模块开发、启动流程、调试技巧", "subs": []}, {"title": "实战能力", "content": "通过本笔记的学习,你应该具备以下能力:\n\n- ✅ 独立搭建和配置Nginx服务器\n- ✅ 配置静态资源服务、反向代理、负载均衡\n- ✅ 实现访问控制、限流、防盗链等安全功能\n- ✅ 配置HTTPS和HTTP/2\n- ✅ 进行系统层性能优化\n- ✅ 阅读第三方模块源码\n- ✅ 使用GDB和debug日志定位问题\n- ✅ 开发自己的Nginx模块", "subs": ["✅ 独立搭建和配置Nginx服务器", "✅ 配置静态资源服务、反向代理、负载均衡", "✅ 实现访问控制、限流、防盗链等安全功能", "✅ 配置HTTPS和HTTP/2", "✅ 进行系统层性能优化", "✅ 阅读第三方模块源码"]}, {"title": "继续学习", "content": "Nginx的学习是一个持续的过程,建议:\n\n1. **实践为主** - 在实际项目中应用所学知识\n2. **阅读源码** - 深入理解Nginx内部实现\n3. **关注社区** - 了解最新特性和最佳实践\n4. **学习OpenResty** - 使用Lua扩展Nginx功能\n5. **性能测试** - 使用ab、wrk等工具进行压测\n6. **监控运维** - 使用Prometheus、Grafana等监控Nginx", "subs": []}, {"title": "参考资源", "content": "- **官方文档:** http://nginx.org/en/docs/\n- **OpenResty:** https://openresty.org/\n- **Nginx源码:** https://github.com/nginx/nginx\n\n---\n\n**感谢你的学习!祝你在Nginx的道路上越走越远!** 🚀", "subs": ["官方文档: http://nginx.org/en/docs/", "OpenResty", "Nginx源码"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

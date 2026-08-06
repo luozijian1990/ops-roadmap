@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Nginx 学习笔记 · 第一册：基础与架构 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nginx 学习笔记 · 第一册：基础与架构</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Nginx 学习笔记 · 第一册：基础与架构", "intro": "> 本笔记基于Nginx深度学习课程整理，适合初学者系统学习Nginx\n\n---", "parts": [{"title": "第一部分：初识Nginx", "sections": [{"title": "1.1 课程概述", "content": "本课程旨在帮助学习者从Nginx初级使用者成长为高阶使用者，课程主要分为六个部分：\n\n1. **初识Nginx** - 了解Nginx背景和基本用法\n2. **Nginx架构基础** - 探讨进程模型和数据结构\n3. **详解HTTP模块** - 深入理解HTTP请求处理流程\n4. **反向代理与负载均衡** - 七层和四层负载均衡\n5. **系统层优化** - Linux系统调优与Nginx配置协同\n6. **源码视角深入使用** - 从实现层面理解Nginx机制\n\n**学习目标：**\n\n- 彻底明确Nginx的能力模型\n- 了解Nginx的工作原理\n- 搭建定制化的Web服务器和负载均衡服务\n- 理解适合用Nginx编写的API服务场景\n- 优化Linux系统使Nginx轻松应对百万并发连接", "subs": ["彻底明确Nginx的能力模型", "了解Nginx的工作原理", "搭建定制化的Web服务器和负载均衡服务", "理解适合用Nginx编写的API服务场景", "优化Linux系统使Nginx轻松应对百万并发连接"]}, {"title": "1.2 Nginx的应用场景", "content": "Nginx主要有三个核心使用场景：\n\n#### 1.2.1 静态资源服务\n\n直接通过本地文件系统提供CSS、JavaScript、图片等静态资源的访问，无需经过应用服务器处理。\n\n#### 1.2.2 反向代理服务\n\n- **负载均衡**：将请求分发到多台应用服务器，实现水平扩展和高可用\n- **缓存加速**：缓存动态内容，减少用户访问延迟\n- **容灾处理**：当某些服务器出现问题时，自动转发到正常服务器\n\n#### 1.2.3 API服务\n\n利用Nginx强大的并发性能，结合OpenResty或JavaScript，直接访问数据库或Redis，实现复杂的业务功能（如Web防火墙）。\n\n```mermaid\ngraph TD\n    A[客户端请求] --> B[Nginx边缘节点]\n    B --> C{请求类型}\n    C -->|静态资源| D[本地文件系统]\n    C -->|动态请求| E[反向代理]\n    C -->|API服务| F[直接访问数据库]\n    E --> G[应用服务集群]\n    G --> H[Tomcat/Django等]\n    H --> I[MySQL/Redis]\n    F --> I\n    D --> J[返回响应]\n    E --> J\n    F --> J\n    J --> A\n```", "subs": ["1.2.1 静态资源服务", "1.2.2 反向代理服务", "1.2.3 API服务"]}, {"title": "1.3 Nginx出现的历史背景", "content": "#### 1.3.1 产生原因\n\n1. **互联网数据量快速增长**\n\n   - 全球化和互联网发展导致接入设备数量激增\n   - 对硬件性能提出更高要求\n2. **摩尔定律在单核CPU上失效**\n\n   - CPU开始向多核方向发展\n   - 传统软件未做好多核架构准备\n3. **Apache架构低效**\n\n   - 一个进程同时只处理一个连接\n   - 进程间切换成本高\n   - 无法应对数百万并发连接\n\n#### 1.3.2 市场份额变化\n\n根据Netcraft 2017年12月数据，Nginx市场份额快速上升。虽然Apache仍占据第一，但新增Web服务器多数选择Nginx。\n\n```mermaid\ngraph LR\n    A[2004年10月] -->|首个版本发布| B[2009年]\n    B -->|支持Windows| C[2011年]\n    C -->|1.0正式版| D[2015年]\n    D -->|Stream四层代理| E[持续发展]\n  \n    style A fill:#e1f5ff\n    style C fill:#ffe1e1\n    style D fill:#e1ffe1\n```", "subs": ["1.3.1 产生原因", "1.3.2 市场份额变化"]}, {"title": "1.4 Nginx的五大优点", "content": "#### 1.4.1 高并发与高性能\n\n- **高并发**：32核64G内存服务器可轻松达到数千万并发连接\n- **高性能**：处理简单静态资源可达100万RPS\n- 并发连接数增加时，RPS不会急剧下降\n\n#### 1.4.2 可扩展性好\n\n- **模块化设计**：架构稳定，易于扩展\n- **丰富的生态圈**：大量第三方模块\n- **OpenResty生态**：在Nginx基础上形成新的生态系统\n\n#### 1.4.3 高可靠性\n\n- 可在服务器上持续运行数年不间断\n- 适合需要4个9、5个9甚至更高可用性的企业\n- 作为边缘节点，宕机时间一年可能只能以秒计\n\n#### 1.4.4 热部署\n\n- 不停止服务的情况下升级Nginx\n- 避免向客户端发送TCP Reset包\n- 对于百万级并发连接至关重要\n\n#### 1.4.5 BSD许可证\n\n- 开源免费\n- 可修改源代码用于商业场景\n- 合法安全的定制化需求支持", "subs": ["1.4.1 高并发与高性能", "1.4.2 可扩展性好", "1.4.3 高可靠性", "1.4.4 热部署", "1.4.5 BSD许可证"]}, {"title": "1.5 Nginx的四个主要组成部分", "content": "```mermaid\ngraph TD\n    A[Nginx二进制可执行文件] -->|提供功能| E[处理请求]\n    B[nginx.conf配置文件] -->|控制行为| E\n    E --> C[access.log访问日志]\n    E --> D[error.log错误日志]\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style C fill:#e1ffe1\n    style D fill:#fff5e1\n```\n\n1. **Nginx二进制可执行文件**\n\n   - 由框架、官方模块和第三方模块构建\n   - 类比：汽车本身\n2. **nginx.conf配置文件**\n\n   - 决定功能是否开启及行为方式\n   - 类比：驾驶员\n3. **access.log访问日志**\n\n   - 记录每条HTTP请求的信息和响应信息\n   - 类比：GPS轨迹\n4. **error.log错误日志**\n\n   - 记录错误和异常信息，用于问题定位\n   - 类比：黑匣子", "subs": []}, {"title": "1.6 Nginx版本发布历史", "content": "#### 1.6.1 版本类型\n\n- **Mainline版本**：主干版本，版本号为单数（如1.15.x），包含最新功能但不一定稳定\n- **Stable版本**：稳定版本，版本号为双数（如1.14.x），经过充分测试\n\n#### 1.6.2 重要时间节点\n\n- **2002年**：开始开发\n- **2004年10月4日**：发布第一个版本\n- **2005年**：大规模重构\n- **2009年**：支持Windows操作系统，Bug修复数量大幅减少\n- **2011年**：1.0正式版发布，Nginx Plus商业公司成立\n- **2015年**：发布Stream四层反向代理功能，可完全替代LVS\n\n#### 1.6.3 版本特性\n\n每个版本包含三类更新：\n\n- **Feature**：新增功能\n- **Bugfix**：修复的Bug\n- **Change**：小的重构", "subs": ["1.6.1 版本类型", "1.6.2 重要时间节点", "1.6.3 版本特性"]}, {"title": "1.7 选择合适的Nginx发行版本", "content": "#### 1.7.1 开源版 vs 商业版\n\n| 版本            | 优点                     | 缺点             | 适用场景      |\n| --------------- | ------------------------ | ---------------- | ------------- |\n| Nginx开源版     | 免费、开源、社区活跃     | 需自行整合模块   | 通用场景      |\n| Nginx Plus      | 整合第三方模块、技术支持 | 收费、不开源     | 企业级应用    |\n| OpenResty开源版 | Lua语言开发、高性能      | -                | API服务、WAF  |\n| OpenResty商业版 | 技术支持好               | 收费             | 企业级Lua应用 |\n| Tengine         | 阿里生态验证             | 无法同步官方升级 | 不推荐        |\n\n#### 1.7.2 推荐选择\n\n- **无特殊需求**：使用Nginx开源版（nginx.org）\n- **需要开发API服务或WAF**：使用OpenResty开源版（openresty.org）\n- **Tengine不推荐**：因修改了主干代码，无法跟随官方版本同步升级", "subs": ["1.7.1 开源版 vs 商业版", "1.7.2 推荐选择"]}, {"title": "1.8 编译安装Nginx", "content": "#### 1.8.1 编译流程\n\n```mermaid\ngraph TD\n    A[下载Nginx源码] --> B[解压并查看目录结构]\n    B --> C[执行configure脚本]\n    C --> D[生成中间文件]\n    D --> E[执行make编译]\n    E --> F[生成目标文件]\n    F --> G[执行make install]\n    G --> H[安装完成]\n  \n    style A fill:#e1f5ff\n    style C fill:#ffe1e1\n    style E fill:#e1ffe1\n    style G fill:#fff5e1\n```\n\n#### 1.8.2 源码目录结构\n\n```\nnginx-1.14.0/\n├── auto/           # 编译辅助文件\n│   ├── cc/        # 编译相关\n│   ├── lib/       # 库文件\n│   └── os/        # 操作系统判断\n├── CHANGES        # 版本更新日志（英文）\n├── CHANGES.ru     # 版本更新日志（俄文）\n├── conf/          # 配置文件示例\n├── configure      # 编译配置脚本\n├── contrib/       # 辅助脚本和vim工具\n├── html/          # 默认HTML文件\n├── man/           # 帮助文档\n└── src/           # 源代码\n```\n\n#### 1.8.3 configure参数说明\n\n**1. 目录参数**（指定文件路径）\n\n```bash\n--prefix=PATH              # 安装目录（其他目录默认在此下创建）\n--sbin-path=PATH          # 可执行文件路径\n--modules-path=PATH       # 动态模块路径\n--conf-path=PATH          # 配置文件路径\n--error-log-path=PATH     # 错误日志路径\n--pid-path=PATH           # PID文件路径\n--lock-path=PATH          # 锁文件路径\n```\n\n**2. 模块参数**（选择编译的模块）\n\n- `--with-*`：默认不编译，需主动添加（如 `--with-http_ssl_module`）\n- `--without-*`：默认编译，可选择移除（如 `--without-http_gzip_module`）\n\n**3. 特殊参数**\n\n```bash\n--with-cc-opt=OPTIONS     # GCC编译优化参数\n--with-debug              # 打印debug级别日志\n--add-module=PATH         # 添加第三方模块\n```\n\n#### 1.8.4 编译示例\n\n```bash\n# 1. 下载并解压\nwget http://nginx.org/download/nginx-1.14.0.tar.gz\ntar -xzf nginx-1.14.0.tar.gz\ncd nginx-1.14.0\n\n# 2. 配置编译参数\n./configure --prefix=/home/geek/nginx\n\n# 3. 编译\nmake\n\n# 4. 安装（首次安装）\nmake install\n\n# 5. 升级时只拷贝二进制文件\n# cp objs/nginx /home/geek/nginx/sbin/\n```\n\n#### 1.8.5 编译后的目录结构\n\n```\n/home/geek/nginx/\n├── sbin/          # 可执行文件\n│   └── nginx\n├── conf/          # 配置文件\n│   ├── nginx.conf\n│   ├── mime.types\n│   └── ...\n├── logs/          # 日志文件\n│   ├── access.log\n│   └── error.log\n└── html/          # 默认网页\n    ├── index.html\n    └── 50x.html\n```\n\n#### 1.8.6 中间文件说明\n\n执行configure后会生成 `objs`目录：\n\n- **ngx_modules.c**：决定哪些模块被编译进Nginx\n- **src/**：C语言编译的中间文件\n- **nginx**：最终的可执行文件（升级时从这里拷贝）\n- **\\*.so**：动态模块文件", "subs": ["1.8.1 编译流程", "1.8.2 源码目录结构", "1.8.3 configure参数说明", "1.8.4 编译示例", "1.8.5 编译后的目录结构", "1.8.6 中间文件说明"]}, {"title": "1.9 Nginx配置文件语法", "content": "#### 1.9.1 基本语法规则\n\nNginx配置文件是纯文本文件，由**指令（directive）**和**指令块（directive block）**组成。\n\n**核心规则：**\n\n1. **指令以分号结尾**\n\n```nginx\ninclude mime.types;\n```\n\n2. **指令与参数用空格分隔**\n\n```nginx\nlimit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;\n```\n\n3. **指令块用大括号组织**\n\n```nginx\nhttp {\n    server {\n        listen 80;\n        location / {\n            root html;\n        }\n    }\n}\n```\n\n4. **指令块可以有名字**\n\n```nginx\nupstream backend {\n    server 127.0.0.1:8080;\n}\n\nlocation /api {\n    proxy_pass http://backend;\n}\n```\n\n5. **include语句组合配置文件**\n\n```nginx\ninclude mime.types;\n```\n\n6. **井号添加注释**\n\n```nginx\n# 这是注释\nlisten 80;  # Nginx配置语法\n```\n\n7. **使用$符号引用变量**\n\n```nginx\nlimit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;\nproxy_cache_key $host$uri$is_args$args;\n```\n\n8. **部分指令支持正则表达式**\n\n```nginx\nlocation ~ \\.php$ {\n    # 处理PHP文件\n}\n```\n\n#### 1.9.2 时间单位\n\n| 后缀 | 含义 | 示例  |\n| ---- | ---- | ----- |\n| ms   | 毫秒 | 100ms |\n| s    | 秒   | 30s   |\n| m    | 分钟 | 5m    |\n| h    | 小时 | 2h    |\n| d    | 天   | 7d    |\n| w    | 周   | 2w    |\n| M    | 月   | 3M    |\n| y    | 年   | 1y    |\n\n```nginx\nexpires 3m;  # 3分钟后缓存刷新\n```\n\n#### 1.9.3 空间单位\n\n| 后缀 | 含义   | 示例 |\n| ---- | ------ | ---- |\n| 无   | 字节   | 1024 |\n| k/K  | 千字节 | 10k  |\n| m/M  | 兆字节 | 10m  |\n| g/G  | 吉字节 | 1g   |\n\n```nginx\nlimit_req_zone $binary_remote_addr zone=one:10m rate=1r/s;\n```\n\n#### 1.9.4 配置块层级关系\n\n```nginx\nhttp {                    # HTTP模块解析\n    upstream backend {    # 上游服务定义\n        server 127.0.0.1:8080;\n    }\n  \n    server {             # 对应一个或一组域名\n        listen 80;\n  \n        location / {     # URL表达式\n            root html;\n        }\n    }\n}\n```", "subs": ["1.9.1 基本语法规则", "1.9.2 时间单位", "1.9.3 空间单位", "1.9.4 配置块层级关系"]}, {"title": "1.10 Nginx命令行操作", "content": "#### 1.10.1 基本命令格式\n\n```bash\nnginx [选项] [参数]\n```\n\n#### 1.10.2 常用命令参数\n\n| 参数    | 说明               | 示例                                   |\n| ------- | ------------------ | -------------------------------------- |\n| -? / -h | 显示帮助信息       | `nginx -h`                           |\n| -v      | 显示版本信息       | `nginx -v`                           |\n| -V      | 显示版本和编译信息 | `nginx -V`                           |\n| -t      | 测试配置文件语法   | `nginx -t`                           |\n| -T      | 测试配置并打印     | `nginx -T`                           |\n| -c      | 指定配置文件       | `nginx -c /path/to/nginx.conf`       |\n| -g      | 设置全局指令       | `nginx -g \"pid /var/run/nginx.pid;\"` |\n| -p      | 指定运行目录       | `nginx -p /usr/local/nginx/`         |\n| -s      | 发送信号           | `nginx -s reload`                    |\n\n#### 1.10.3 信号控制\n\n```bash\n# 立即停止服务\nnginx -s stop\n\n# 优雅停止服务（处理完当前请求）\nnginx -s quit\n\n# 重新加载配置文件\nnginx -s reload\n\n# 重新打开日志文件\nnginx -s reopen\n```\n\n#### 1.10.4 重载配置文件（Reload）\n\n```mermaid\ngraph TD\n    A[修改nginx.conf] --> B[执行nginx -s reload]\n    B --> C[Master进程收到信号]\n    C --> D[Master验证新配置]\n    D --> E[启动新Worker进程]\n    E --> F[新Worker使用新配置]\n    F --> G[向老Worker发送退出信号]\n    G --> H[老Worker处理完现有请求后退出]\n    H --> I[完成配置重载]\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style E fill:#e1ffe1\n    style I fill:#fff5e1\n```\n\n**特点：**\n\n- 不中断服务\n- 新请求使用新配置\n- 老请求继续处理完成\n\n#### 1.10.5 热部署（Hot Upgrade）\n\n```mermaid\ngraph TD\n    A[备份旧nginx二进制文件] --> B[拷贝新nginx二进制文件]\n    B --> C[向老Master发送USR2信号]\n    C --> D[老Master启动新Master进程]\n    D --> E[新Master启动新Worker进程]\n    E --> F[新老Worker同时运行]\n    F --> G[向老Master发送WINCH信号]\n    G --> H[老Worker优雅退出]\n    H --> I{是否回退}\n    I -->|是| J[向老Master发送reload]\n    I -->|否| K[向老Master发送QUIT]\n    K --> L[热部署完成]\n  \n    style A fill:#e1f5ff\n    style C fill:#ffe1e1\n    style G fill:#fff5e1\n    style L fill:#e1ffe1\n```\n\n**操作步骤：**\n\n```bash\n# 1. 备份旧版本\ncp /usr/local/nginx/sbin/nginx /usr/local/nginx/sbin/nginx.old\n\n# 2. 拷贝新版本\ncp /path/to/new/nginx /usr/local/nginx/sbin/nginx\n\n# 3. 向老Master发送USR2信号\nkill -USR2 <老Master的PID>\n\n# 4. 查看进程状态\nps aux | grep nginx\n# 此时新老Master和Worker都在运行\n\n# 5. 向老Master发送WINCH信号，优雅关闭老Worker\nkill -WINCH <老Master的PID>\n\n# 6. 如果需要回退\nkill -HUP <老Master的PID>  # 重新拉起老Worker\nkill -QUIT <新Master的PID>  # 关闭新Master\n\n# 7. 确认无问题后，关闭老Master\nkill -QUIT <老Master的PID>\n```\n\n**特点：**\n\n- 完全不中断服务\n- 支持版本回退\n- 老Master保留用于回退\n\n#### 1.10.6 日志切割\n\n**方法一：手动切割**\n\n```bash\n# 1. 备份日志文件\nmv /usr/local/nginx/logs/access.log /usr/local/nginx/logs/access.log.bak\n\n# 2. 重新打开日志文件\nnginx -s reopen\n```\n\n**方法二：定时任务切割**\n\n创建切割脚本 `rotate.sh`：\n\n```bash\n#!/bin/bash\nLOGS_PATH=/usr/local/nginx/logs\nBACKUP_PATH=/data/nginx_logs_backup\n\n# 获取昨天的日期\nYESTERDAY=$(date -d \"yesterday\" +%Y%m%d)\n\n# 移动日志文件\nmv ${LOGS_PATH}/access.log ${BACKUP_PATH}/access_${YESTERDAY}.log\nmv ${LOGS_PATH}/error.log ${BACKUP_PATH}/error_${YESTERDAY}.log\n\n# 向Nginx主进程发送USR1信号，重新打开日志文件\nkill -USR1 $(cat /usr/local/nginx/logs/nginx.pid)\n```\n\n添加到crontab：\n\n```bash\n# 每天凌晨0点执行日志切割\n0 0 * * * /bin/bash /path/to/rotate.sh\n```", "subs": ["1.10.1 基本命令格式", "1.10.2 常用命令参数", "1.10.3 信号控制", "1.10.4 重载配置文件（Reload）", "1.10.5 热部署（Hot Upgrade）", "1.10.6 日志切割"]}, {"title": "1.11 搭建静态资源Web服务器", "content": "#### 1.11.1 基本配置\n\n```nginx\nserver {\n    listen 8080;\n  \n    location / {\n        alias /home/geek/nginx/dlib/;  # 使用alias而非root\n        # root会将location路径附加到文件路径\n        # alias直接映射到指定目录\n    }\n}\n```\n\n#### 1.11.2 启用Gzip压缩\n\n```nginx\nhttp {\n    # 开启gzip压缩\n    gzip on;\n  \n    # 小于1字节的文件不压缩（为了演示效果设为1）\n    gzip_min_length 1;\n  \n    # 压缩级别（1-9），级别越高压缩率越大但CPU消耗越多\n    gzip_comp_level 2;\n  \n    # 指定压缩的MIME类型\n    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;\n}\n```\n\n**效果对比：**\n\n- 未压缩：23.65KB\n- 压缩后：7.28KB（压缩率约70%）\n\n#### 1.11.3 启用autoindex模块\n\n显示目录结构，方便文件共享：\n\n```nginx\nlocation / {\n    alias /home/geek/nginx/dlib/;\n    autoindex on;              # 开启目录浏览\n    autoindex_exact_size off;  # 显示文件大小（可选）\n    autoindex_localtime on;    # 显示本地时间（可选）\n}\n```\n\n访问 `http://domain.com/dlib/` 会显示目录列表。\n\n#### 1.11.4 限制访问速度\n\n使用内置变量 `$limit_rate`限制传输速度：\n\n```nginx\nlocation / {\n    alias /home/geek/nginx/dlib/;\n    set $limit_rate 1k;  # 限制为每秒1KB\n}\n```\n\n**应用场景：**\n\n- 限制大文件下载速度\n- 保证小文件（CSS、JS）有足够带宽\n- 防止带宽被少数用户占用\n\n#### 1.11.5 配置access日志\n\n**定义日志格式：**\n\n```nginx\nhttp {\n    log_format main '$remote_addr - $remote_user [$time_local] \"$request\" '\n                    '$status $body_bytes_sent \"$http_referer\" '\n                    '\"$http_user_agent\" \"$http_x_forwarded_for\" '\n                    'gzip_ratio=$gzip_ratio';\n  \n    server {\n        access_log /home/geek/nginx/logs/access.log main;\n    }\n}\n```\n\n**常用变量：**\n\n- `$remote_addr`：客户端IP地址\n- `$time_local`：访问时间\n- `$request`：请求行\n- `$status`：HTTP状态码\n- `$body_bytes_sent`：发送的字节数\n- `$http_referer`：来源页面\n- `$http_user_agent`：用户代理\n- `$gzip_ratio`：gzip压缩比率", "subs": ["1.11.1 基本配置", "1.11.2 启用Gzip压缩", "1.11.3 启用autoindex模块", "1.11.4 限制访问速度", "1.11.5 配置access日志"]}, {"title": "1.12 搭建反向代理服务", "content": "#### 1.12.1 配置上游服务器\n\n首先将静态资源服务器改为只监听本地：\n\n```nginx\n# 上游服务器配置（nginx-1.14）\nserver {\n    listen 127.0.0.1:8080;  # 只允许本机访问\n  \n    location / {\n        alias /home/geek/nginx/dlib/;\n    }\n}\n```\n\n#### 1.12.2 配置反向代理\n\n```nginx\n# 反向代理服务器配置（OpenResty）\nhttp {\n    # 定义上游服务器组\n    upstream backend {\n        server 127.0.0.1:8080;\n        # server 127.0.0.1:8081;  # 可添加多台服务器\n        # server 127.0.0.1:8082;\n    }\n  \n    server {\n        listen 80;\n        server_name example.com;\n  \n        location / {\n            # 代理到上游服务器\n            proxy_pass http://backend;\n    \n            # 传递真实客户端IP\n            proxy_set_header X-Real-IP $remote_addr;\n            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n    \n            # 传递Host头\n            proxy_set_header Host $host;\n        }\n    }\n}\n```\n\n#### 1.12.3 反向代理架构图\n\n```mermaid\ngraph LR\n    A[客户端浏览器] -->|1. HTTP请求| B[Nginx反向代理]\n    B -->|2. 负载均衡| C[上游服务器1]\n    B -->|2. 负载均衡| D[上游服务器2]\n    B -->|2. 负载均衡| E[上游服务器N]\n    C -->|3. 响应| B\n    D -->|3. 响应| B\n    E -->|3. 响应| B\n    B -->|4. 返回响应| A\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style C fill:#e1ffe1\n    style D fill:#e1ffe1\n    style E fill:#e1ffe1\n```\n\n#### 1.12.4 配置缓存\n\n```nginx\nhttp {\n    # 定义缓存路径和参数\n    proxy_cache_path /tmp/nginx_cache \n                     levels=1:2 \n                     keys_zone=my_cache:10m \n                     max_size=1g \n                     inactive=60m;\n  \n    server {\n        location / {\n            proxy_pass http://backend;\n    \n            # 启用缓存\n            proxy_cache my_cache;\n    \n            # 定义缓存key\n            proxy_cache_key $host$uri$is_args$args;\n    \n            # 缓存状态码和时间\n            proxy_cache_valid 200 304 12h;\n            proxy_cache_valid any 10m;\n    \n            # 添加缓存状态头\n            add_header X-Cache-Status $upstream_cache_status;\n        }\n    }\n}\n```\n\n**缓存参数说明：**\n\n- `levels=1:2`：缓存目录层级\n- `keys_zone`：共享内存区域名称和大小\n- `max_size`：缓存最大容量\n- `inactive`：缓存过期时间\n\n**验证缓存：**\n停止上游服务器后，反向代理仍能返回缓存的内容。", "subs": ["1.12.1 配置上游服务器", "1.12.2 配置反向代理", "1.12.3 反向代理架构图", "1.12.4 配置缓存"]}, {"title": "1.13 使用GoAccess实时监控日志", "content": "#### 1.13.1 GoAccess简介\n\nGoAccess是一个实时Web日志分析工具，可以：\n\n- 图形化显示access日志\n- 通过WebSocket实时推送更新\n- 支持多种日志格式\n\n#### 1.13.2 安装GoAccess\n\n```bash\n# CentOS/RHEL\nyum install goaccess\n\n# Ubuntu/Debian\napt-get install goaccess\n\n# 或从源码编译\nwget https://tar.goaccess.io/goaccess-1.x.tar.gz\ntar -xzvf goaccess-1.x.tar.gz\ncd goaccess-1.x/\n./configure --enable-utf8 --enable-geoip=legacy\nmake && make install\n```\n\n#### 1.13.3 使用GoAccess\n\n```bash\ngoaccess /path/to/access.log \\\n    -o /path/to/report.html \\\n    --real-time-html \\\n    --time-format='%H:%M:%S' \\\n    --date-format='%d/%b/%Y' \\\n    --log-format=COMBINED\n```\n\n**参数说明：**\n\n- `-o`：输出HTML文件路径\n- `--real-time-html`：实时更新模式\n- `--log-format=COMBINED`：使用Nginx默认日志格式\n\n#### 1.13.4 配置Nginx访问报告\n\n```nginx\nlocation /report.html {\n    alias /path/to/report.html;\n}\n```\n\n访问 `http://domain.com/report.html` 即可查看实时统计。\n\n**统计内容包括：**\n\n- 总请求数和独立访客\n- 按时间分布的请求\n- 请求的URL排名\n- 静态资源请求\n- HTTP状态码分布\n- 操作系统和浏览器分布\n- 地理位置分布（需GeoIP支持）", "subs": ["1.13.1 GoAccess简介", "1.13.2 安装GoAccess", "1.13.3 使用GoAccess", "1.13.4 配置Nginx访问报告"]}, {"title": "1.14 SSL/TLS安全协议", "content": "#### 1.14.1 SSL/TLS发展历史\n\n```mermaid\ngantt\n  title SSL/TLS 协议发展历程\n  dateFormat  YYYY\n  axisFormat %Y\n  section 版本\n  SSL 1.0 未发布   :done, ssl10, 1995, 1d\n  SSL 2.0 网景公司 :done, ssl20, 1995, 1d\n  SSL 3.0          :done, ssl30, 1996, 1d\n  TLS 1.0 IETF 标准化 :done, tls10, 1999, 1d\n  TLS 1.1          :done, tls11, 2006, 1d\n  TLS 1.2          :done, tls12, 2008, 1d\n  TLS 1.3          :done, tls13, 2018, 1d\n```\n\n#### 1.14.2 TLS在OSI模型中的位置\n\n```\n应用层：HTTP\n表示层：TLS/SSL（加密、握手、密钥交换、报警）\n会话层：\n传输层：TCP\n网络层：IP\n数据链路层：\n物理层：\n```\n\n#### 1.14.3 安全密码套件组成\n\n一个完整的密码套件示例：\n\n```\nECDHE-RSA-AES128-GCM-SHA256\n```\n\n**组成部分：**\n\n| 部分     | 示例       | 作用                                 |\n| -------- | ---------- | ------------------------------------ |\n| 密钥交换 | ECDHE      | 椭圆曲线Diffie-Hellman，生成对称密钥 |\n| 身份验证 | RSA        | 非对称加密算法，验证身份             |\n| 对称加密 | AES128-GCM | AES算法，128位密钥，GCM分组模式      |\n| 摘要算法 | SHA256     | 生成固定长度的消息摘要               |", "subs": ["1.14.1 SSL/TLS发展历史", "1.14.2 TLS在OSI模型中的位置", "1.14.3 安全密码套件组成"]}, {"title": "1.15 对称加密与非对称加密", "content": "#### 1.15.1 对称加密\n\n**特点：**\n\n- 加密和解密使用同一把密钥\n- 性能好，速度快\n- 密钥分发困难\n\n**原理（异或操作）：**\n\n```\n密钥：1010\n明文：0110\n--------- XOR\n密文：1100\n\n密文：1100\n密钥：1010\n--------- XOR\n明文：0110\n```\n\n**常见算法：**\n\n- RC4（序列算法）\n- AES（分组算法）\n- DES/3DES\n\n#### 1.15.2 非对称加密\n\n**特点：**\n\n- 生成一对密钥：公钥和私钥\n- 公钥加密，私钥解密（加密通信）\n- 私钥加密，公钥解密（身份验证/数字签名）\n- 性能较差，速度慢\n\n**应用场景：**\n\n1. **加密通信**\n\n```mermaid\ngraph LR\n    A[Bob] -->|1. 获取Alice公钥| B[Alice公钥]\n    A -->|2. 用公钥加密| C[密文]\n    C -->|3. 发送| D[Alice]\n    D -->|4. 用私钥解密| E[明文]\n  \n    style A fill:#e1f5ff\n    style D fill:#ffe1e1\n```\n\n2. **身份验证**\n\n```mermaid\ngraph LR\n    A[Alice] -->|1. 用私钥加密| B[密文]\n    B -->|2. 发送| C[Bob]\n    C -->|3. 用Alice公钥解密| D[成功=身份确认]\n  \n    style A fill:#e1f5ff\n    style D fill:#e1ffe1\n```\n\n**常见算法：**\n\n- RSA\n- DSA\n- ECDSA（椭圆曲线）", "subs": ["1.15.1 对称加密", "1.15.2 非对称加密"]}, {"title": "1.16 SSL证书与公信力", "content": "#### 1.16.1 证书颁发流程\n\n```mermaid\ngraph TD\n    A[证书订阅人] -->|1. 申请证书| B[登记机构RA]\n    B -->|2. CSR请求| C[CA中心]\n    C -->|3. 生成公钥/私钥| D[证书]\n    D -->|4. 颁发证书| A\n    A -->|5. 部署到Web服务器| E[Nginx]\n    F[浏览器] -->|6. 请求证书| E\n    E -->|7. 发送公钥证书| F\n    F -->|8. 验证证书| G[OCSP/CRL]\n    G -->|9. 返回验证结果| F\n  \n    style A fill:#e1f5ff\n    style C fill:#ffe1e1\n    style E fill:#e1ffe1\n    style F fill:#fff5e1\n```\n\n#### 1.16.2 证书类型\n\n| 类型           | 验证内容           | 申请时间 | 价格      | 浏览器显示           |\n| -------------- | ------------------ | -------- | --------- | -------------------- |\n| DV（域名验证） | 域名归属           | 实时     | 免费/低价 | 普通锁               |\n| OV（组织验证） | 域名+组织信息      | 几天     | 中等      | 普通锁               |\n| EV（扩展验证） | 域名+组织+严格审查 | 较长     | 较高      | 绿色地址栏显示组织名 |\n\n#### 1.16.3 证书链结构\n\n```mermaid\ngraph TD\n    A[根证书Root CA] -->|签发| B[中间证书Intermediate CA]\n    B -->|签发| C[网站证书End-entity Certificate]\n  \n    D[操作系统/浏览器] -.->|内置| A\n    E[Nginx] -->|发送| C\n    E -->|发送| B\n  \n    style A fill:#ffe1e1\n    style B fill:#fff5e1\n    style C fill:#e1ffe1\n```\n\n**证书链说明：**\n\n- **根证书**：由操作系统或浏览器内置，更新频率低（年级别）\n- **中间证书**：由根证书签发，Nginx需要发送给浏览器\n- **网站证书**：网站的主证书，Nginx需要发送给浏览器\n\n**验证过程：**\n\n1. Nginx发送网站证书和中间证书\n2. 浏览器验证中间证书是否由可信根证书签发\n3. 浏览器验证网站证书是否由中间证书签发\n4. 检查证书是否过期（通过OCSP或CRL）\n\n#### 1.16.4 证书吊销机制\n\n- **CRL（证书吊销列表）**：性能差，包含所有过期证书\n- **OCSP（在线证书状态协议）**：实时查询单个证书状态\n- **OCSP Stapling**：Nginx主动查询并缓存OCSP响应，提升性能", "subs": ["1.16.1 证书颁发流程", "1.16.2 证书类型", "1.16.3 证书链结构", "1.16.4 证书吊销机制"]}, {"title": "1.17 TLS握手流程与性能优化", "content": "#### 1.17.1 TLS握手流程\n\n```mermaid\nsequenceDiagram\n    participant C as 客户端浏览器\n    participant S as Nginx服务器\n  \n    C->>S: 1. Client Hello (支持的加密套件)\n    S->>C: 2. Server Hello (选择的加密套件)\n    S->>C: 3. Certificate (公钥证书链)\n    S->>C: 4. Server Key Exchange (椭圆曲线参数)\n    S->>C: 5. Server Hello Done\n    C->>S: 6. Client Key Exchange (客户端公钥)\n    Note over C: 生成对称密钥\n    Note over S: 生成对称密钥\n    C->>S: 7. Change Cipher Spec\n    C->>S: 8. Finished\n    S->>C: 9. Change Cipher Spec\n    S->>C: 10. Finished\n    C->>S: 11. Application Data (加密通信)\n    S->>C: 12. Application Data (加密通信)\n```\n\n**握手目的：**\n\n1. 验证对方身份\n2. 协商安全套件\n3. 交换并生成密钥\n4. 加密数据通信\n\n#### 1.17.2 性能影响因素\n\n**小文件场景（主要影响：握手性能）**\n\n- 非对称加密算法性能：RSA、ECDHE\n- 优化方向：调整密钥强度、使用椭圆曲线算法\n\n**大文件场景（主要影响：加密性能）**\n\n- 对称加密算法性能：AES\n- 优化方向：选择高效的对称加密算法\n\n#### 1.17.3 算法性能对比\n\n| 算法类型   | 算法     | 相对性能 | 适用场景   |\n| ---------- | -------- | -------- | ---------- |\n| 非对称加密 | RSA-2048 | 中       | 小文件     |\n| 非对称加密 | ECDHE    | 高       | 小文件     |\n| 对称加密   | AES-128  | 高       | 大文件     |\n| 对称加密   | AES-256  | 中       | 高安全需求 |", "subs": ["1.17.1 TLS握手流程", "1.17.2 性能影响因素", "1.17.3 算法性能对比"]}, {"title": "1.18 使用Let's Encrypt配置HTTPS", "content": "#### 1.18.1 Let's Encrypt简介\n\n- 免费的DV证书\n- 自动化申请和续期\n- 有效期3个月\n- 支持通配符证书\n\n#### 1.18.2 使用Certbot申请证书\n\n**安装Certbot：**\n\n```bash\n# CentOS/RHEL\nyum install python2-certbot-nginx\n\n# Ubuntu/Debian\napt-get install python-certbot-nginx\n```\n\n**申请证书：**\n\n```bash\ncertbot --nginx \\\n    --nginx-server-root /path/to/nginx/conf \\\n    -d example.com \\\n    -d www.example.com\n```\n\n**参数说明：**\n\n- `--nginx`：自动配置Nginx\n- `--nginx-server-root`：指定Nginx配置文件路径\n- `-d`：指定域名\n\n#### 1.18.3 Certbot自动配置\n\nCertbot会自动在nginx.conf中添加：\n\n```nginx\nserver {\n    listen 80;\n    server_name example.com;\n  \n    # Certbot自动添加以下配置\n    listen 443 ssl;\n    ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;\n    include /etc/letsencrypt/options-ssl-nginx.conf;\n    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n}\n```\n\n#### 1.18.4 SSL配置详解\n\n查看 `/etc/letsencrypt/options-ssl-nginx.conf`：\n\n```nginx\n# Session缓存配置\nssl_session_cache shared:le_nginx_SSL:10m;  # 10MB约可缓存4万个连接\nssl_session_timeout 1440m;                  # 会话超时时间1天\n\n# 支持的TLS协议版本\nssl_protocols TLSv1.2 TLSv1.3;\n\n# 优先使用服务器端密码套件\nssl_prefer_server_ciphers on;\n\n# 密码套件列表（按优先级排序）\nssl_ciphers \"ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:...\";\n\n# DH参数文件（用于密钥交换）\nssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n```\n\n**优化建议：**\n\n1. 启用Session缓存减少握手次数\n2. 使用ECDHE密钥交换算法\n3. 优先使用AES-GCM对称加密\n4. 启用OCSP Stapling\n\n#### 1.18.5 配置OCSP Stapling\n\n```nginx\nserver {\n    listen 443 ssl;\n  \n    # OCSP Stapling配置\n    ssl_stapling on;\n    ssl_stapling_verify on;\n    ssl_trusted_certificate /etc/letsencrypt/live/example.com/chain.pem;\n    resolver 8.8.8.8 8.8.4.4 valid=300s;\n    resolver_timeout 5s;\n}\n```\n\n#### 1.18.6 自动续期\n\nLet's Encrypt证书有效期为90天，需要定期续期：\n\n```bash\n# 测试续期\ncertbot renew --dry-run\n\n# 添加到crontab自动续期\n0 0,12 * * * certbot renew --quiet\n```", "subs": ["1.18.1 Let's Encrypt简介", "1.18.2 使用Certbot申请证书", "1.18.3 Certbot自动配置", "1.18.4 SSL配置详解", "1.18.5 配置OCSP Stapling", "1.18.6 自动续期"]}, {"title": "1.19 使用OpenResty开发Lua服务", "content": "#### 1.19.1 OpenResty简介\n\n- 基于Nginx和LuaJIT的Web平台\n- 将Nginx事件驱动模型以同步方式提供给开发者\n- 兼具高性能和高开发效率\n- 适合开发API服务和WAF\n\n#### 1.19.2 下载和编译OpenResty\n\n```bash\n# 1. 下载\nwget https://openresty.org/download/openresty-1.13.6.2.tar.gz\ntar -xzf openresty-1.13.6.2.tar.gz\ncd openresty-1.13.6.2\n\n# 2. 查看目录结构\nls\n# bundle/  configure  COPYRIGHT  README.markdown  util/\n\n# 3. bundle目录包含\nls bundle/\n# nginx-1.13.6/          # Nginx源码\n# ngx_lua-0.10.13/       # Lua模块（C）\n# lua-resty-core/        # Lua库\n# lua-resty-redis/       # Redis客户端\n# ...\n\n# 4. 编译安装\n./configure --prefix=/usr/local/openresty\nmake\nmake install\n```\n\n#### 1.19.3 OpenResty目录结构\n\n```\n/usr/local/openresty/\n├── nginx/              # Nginx相关\n│   ├── sbin/nginx     # 可执行文件\n│   ├── conf/          # 配置文件\n│   └── logs/          # 日志文件\n├── luajit/            # LuaJIT\n├── lualib/            # Lua库\n└── site/              # 第三方Lua模块\n```\n\n#### 1.19.4 Lua代码示例\n\n```nginx\nserver {\n    listen 80;\n    server_name example.com;\n  \n    location /lua {\n        default_type text/html;\n  \n        content_by_lua_block {\n            -- 获取请求头\n            local headers = ngx.req.get_headers()\n            local user_agent = headers[\"User-Agent\"]\n    \n            -- 输出响应\n            ngx.say(\"<h1>Hello OpenResty!</h1>\")\n            ngx.say(\"<p>Your User-Agent: \", user_agent, \"</p>\")\n        }\n    }\n}\n```\n\n#### 1.19.5 OpenResty常用指令\n\n| 指令                       | 阶段          | 说明                 |\n| -------------------------- | ------------- | -------------------- |\n| init_by_lua_block          | 初始化        | Master进程启动时执行 |\n| init_worker_by_lua_block   | 初始化        | Worker进程启动时执行 |\n| set_by_lua_block           | Rewrite       | 设置变量             |\n| rewrite_by_lua_block       | Rewrite       | URL重写              |\n| access_by_lua_block        | Access        | 访问控制             |\n| content_by_lua_block       | Content       | 生成响应内容         |\n| header_filter_by_lua_block | Header Filter | 修改响应头           |\n| body_filter_by_lua_block   | Body Filter   | 修改响应体           |\n| log_by_lua_block           | Log           | 日志记录             |\n\n#### 1.19.6 OpenResty API示例\n\n**访问Redis：**\n\n```nginx\nlocation /redis {\n    content_by_lua_block {\n        local redis = require \"resty.redis\"\n        local red = redis:new()\n  \n        red:set_timeout(1000)\n        local ok, err = red:connect(\"127.0.0.1\", 6379)\n        if not ok then\n            ngx.say(\"failed to connect: \", err)\n            return\n        end\n  \n        local res, err = red:get(\"key\")\n        if not res then\n            ngx.say(\"failed to get key: \", err)\n            return\n        end\n  \n        ngx.say(\"key: \", res)\n    }\n}\n```\n\n**访问MySQL：**\n\n```nginx\nlocation /mysql {\n    content_by_lua_block {\n        local mysql = require \"resty.mysql\"\n        local db = mysql:new()\n  \n        local ok, err = db:connect{\n            host = \"127.0.0.1\",\n            port = 3306,\n            database = \"test\",\n            user = \"root\",\n            password = \"password\"\n        }\n  \n        if not ok then\n            ngx.say(\"failed to connect: \", err)\n            return\n        end\n  \n        local res, err = db:query(\"SELECT * FROM users LIMIT 10\")\n        if not res then\n            ngx.say(\"failed to query: \", err)\n            return\n        end\n  \n        ngx.say(require(\"cjson\").encode(res))\n    }\n}\n```\n\n#### 1.19.7 OpenResty应用场景\n\n1. **API网关**\n\n   - 请求路由\n   - 参数验证\n   - 协议转换\n2. **Web应用防火墙（WAF）**\n\n   - SQL注入防护\n   - XSS防护\n   - CC攻击防护\n3. **动态负载均衡**\n\n   - 基于业务逻辑的路由\n   - 灰度发布\n   - A/B测试\n4. **缓存服务**\n\n   - 热点数据缓存\n   - 接口聚合\n   - 降级处理\n\n---", "subs": ["1.19.1 OpenResty简介", "1.19.2 下载和编译OpenResty", "1.19.3 OpenResty目录结构", "1.19.4 Lua代码示例", "1.19.5 OpenResty常用指令", "1.19.6 OpenResty API示例", "1.19.7 OpenResty应用场景"]}]}, {"title": "第一部分总结", "sections": [{"title": "1.13 实战示例配置", "content": "通过第一部分的学习，我们了解了：\n\n1. **Nginx的核心优势**\n\n   - 高并发、高性能\n   - 可扩展性强\n   - 高可靠性\n   - 支持热部署\n   - BSD开源许可\n2. **Nginx的主要应用场景**\n\n   - 静态资源服务器\n   - 反向代理和负载均衡\n   - API服务\n3. **Nginx的基本操作**\n\n   - 编译安装\n   - 配置文件语法\n   - 命令行操作\n   - 日志管理\n4. **实战技能**\n\n   - 搭建静态Web服务器\n   - 配置反向代理和缓存\n   - 实时日志分析\n   - HTTPS站点配置\n   - OpenResty Lua开发\n\n\n#### 1.13.1 配置示例: store.conf (proxy_store缓存)\n\n**用途:** 演示proxy_store指令,将上游响应存储为本地文件\n\n**完整配置:**\n\n```nginx\nupstream proxyups {\n    server 127.0.0.1:8012 weight=1;\n}\n\nserver {\n    server_name store.taohui.tech;\n    error_log logs/myerror.log debug;\n    # root: 文件存储的根目录\n    root /tmp;\n  \n    location / {\n        proxy_pass http://proxyups;\n    \n        # proxy_store: 开启文件存储\n        # on: 将上游响应存储为本地文件\n        # 文件路径 = root + URI\n        proxy_store on;\n    \n        # proxy_store_access: 设置文件权限\n        # user:rw - 用户可读写\n        # group:rw - 组可读写\n        # all:r - 其他用户只读\n        proxy_store_access user:rw group:rw all:r;\n    }\n  \n    listen 80;\n}\n```\n\n**proxy_store工作原理:**\n\n1. 首次请求: 从上游获取,存储到本地\n2. 后续请求: 直接返回本地文件(如果存在)\n3. 适合静态资源的本地缓存\n\n**关键点:** proxy_store将代理响应存储为文件,适合CDN节点缓存。\n\n#### 1.13.2 配置示例: v2ex.conf (proxy_pass带URI测试)\n\n**用途:** 演示proxy_pass带URI和不带URI的区别\n\n**完整配置:**\n\n```nginx\n# 前端服务器: 接收客户端请求\nserver {\n    server_name v2ex.taohui.tech;\n  \n    # 测试1: proxy_pass带URI\n    # 客户端请求: /withurl/test\n    # 转发到上游: /remote/test (替换/withurl为/remote)\n    location /withurl {\n        proxy_pass http://v2exup.taohui.tech/remote;\n    }\n  \n    # 测试2: proxy_pass不带URI\n    # 客户端请求: /withouturl/test\n    # 转发到上游: /withouturl/test (保持原URI)\n    location /withouturl {\n        proxy_pass http://v2exup.taohui.tech;\n    }\n}\n\n# 后端服务器: 显示接收到的URI\nserver {\n    server_name v2exup.taohui.tech;\n  \n    location / {\n        return 200 '\nrequest_uri: $request_uri\n';\n    }\n}\n```\n\n**测试结果:**\n\n```bash\n# 测试1: 带URI\ncurl http://v2ex.taohui.tech/withurl/test\n# 输出: request_uri: /remote/test\n\n# 测试2: 不带URI\ncurl http://v2ex.taohui.tech/withouturl/test\n# 输出: request_uri: /withouturl/test\n```\n\n**proxy_pass URI规则:**\n\n- **带URI**: 替换location路径\n- **不带URI**: 保持原始URI\n- 正则location只能使用不带URI的形式\n\n**关键点:** proxy_pass带URI会替换location部分,不带URI则保持原URI。\n\n---\n\n接下来，我们将深入学习Nginx的架构基础，理解其高性能的实现原理。\n\n---", "subs": ["1.13.1 配置示例: store.conf (proxy_store缓存)", "1.13.2 配置示例: v2ex.conf (proxy_pass带URI测试)"]}]}, {"title": "第二部分：Nginx基础架构", "sections": [{"title": "2.1 Nginx请求处理流程", "content": "#### 2.1.1 为什么要了解架构基础\n\nNginx运行在企业内网的边缘节点，处理的流量是其他应用服务器的数倍甚至几个数量级。在不同数量级下，问题的解决方案完全不同。理解Nginx架构能帮助我们：\n\n- 理解Master-Worker架构模型的优势\n- 明白Worker进程数量为什么要与CPU核数匹配\n- 了解多个Worker进程间如何共享数据\n- 掌握TLS、限流限速等场景的实现方式\n\n#### 2.1.2 请求处理流程图\n\n```mermaid\ngraph TD\n    A[Web/Email/TCP请求] --> B{流量类型}\n    B -->|HTTP| C[HTTP状态机]\n    B -->|TCP/UDP| D[Stream四层状态机]\n    B -->|Email| E[Mail状态机]\n  \n    C --> F[事件驱动处理引擎Epoll]\n    D --> F\n    E --> F\n  \n    F -->|静态资源| G[磁盘文件系统]\n    F -->|反向代理缓存| G\n    F -->|阻塞磁盘IO| H[线程池]\n    H --> G\n  \n    F --> I[Access日志]\n    F --> J[Error日志]\n    I --> G\n    J --> G\n  \n    F -->|反向代理| K[上游服务器]\n    K -->|HTTP| L[Tomcat/Django等]\n    K -->|FastCGI| M[PHP-FPM]\n    K -->|uWSGI| N[Python应用]\n    K -->|SCGI| O[其他应用]\n  \n    style F fill:#e1f5ff\n    style G fill:#ffe1e1\n    style K fill:#e1ffe1\n```\n\n**流程说明：**\n\n1. **状态机处理**：三大状态机处理不同协议的流量\n\n   - HTTP状态机：处理Web请求\n   - Stream状态机：处理TCP/UDP四层流量\n   - Mail状态机：处理邮件协议\n2. **事件驱动引擎**：使用非阻塞的Epoll机制\n\n   - 异步处理所有网络事件\n   - 需要状态机正确识别和处理请求\n3. **静态资源处理**：\n\n   - 直接访问磁盘文件\n   - 当内存不足时，sendfile/AIO会退化为阻塞调用\n   - 使用线程池处理阻塞的磁盘IO\n4. **反向代理**：\n\n   - 支持多种上游协议（HTTP、FastCGI、uWSGI、SCGI等）\n   - 可以缓存上游响应到磁盘\n5. **日志记录**：\n\n   - Access日志：记录每个请求的详细信息\n   - Error日志：记录错误和异常\n   - 可通过Syslog协议记录到远程机器", "subs": ["2.1.1 为什么要了解架构基础", "2.1.2 请求处理流程图"]}, {"title": "2.2 Nginx进程结构", "content": "#### 2.2.1 单进程 vs 多进程\n\n| 特性     | 单进程结构 | 多进程结构 |\n| -------- | ---------- | ---------- |\n| 适用场景 | 开发调试   | 生产环境   |\n| 健壮性   | 低         | 高         |\n| 多核利用 | 否         | 是         |\n| 默认配置 | 否         | 是         |\n\n#### 2.2.2 多进程架构\n\n```mermaid\ngraph TD\n    A[Master Process父进程] --> B[Worker Process 1]\n    A --> C[Worker Process 2]\n    A --> D[Worker Process N]\n    A --> E[Cache Manager]\n    A --> F[Cache Loader]\n  \n    B -.共享内存.-> G[Shared Memory]\n    C -.共享内存.-> G\n    D -.共享内存.-> G\n    E -.共享内存.-> G\n    F -.共享内存.-> G\n  \n    style A fill:#ffe1e1\n    style B fill:#e1f5ff\n    style C fill:#e1f5ff\n    style D fill:#e1f5ff\n    style E fill:#fff5e1\n    style F fill:#fff5e1\n    style G fill:#e1ffe1\n```\n\n**进程角色：**\n\n1. **Master进程（父进程）**\n\n   - 不处理网络请求\n   - 负责管理Worker进程\n   - 监控Worker进程健康状态\n   - 处理配置重载和热部署\n   - 第三方模块通常不在此添加代码\n2. **Worker进程（工作进程）**\n\n   - 处理实际的网络请求\n   - 数量通常等于CPU核数\n   - 每个Worker绑定到特定CPU核\n   - 利用CPU缓存减少缓存失效\n3. **Cache Manager进程**\n\n   - 管理反向代理缓存\n   - 定期清理过期缓存\n4. **Cache Loader进程**\n\n   - 启动时加载缓存索引\n   - 加载完成后退出\n\n#### 2.2.3 为什么选择多进程而非多线程\n\n**多进程的优势：**\n\n- **高可用性**：一个Worker进程崩溃不影响其他进程\n- **地址空间隔离**：第三方模块的内存错误不会导致整个Nginx崩溃\n- **稳定性更好**：符合Nginx高可靠性的设计目标\n\n**Worker进程数量配置：**\n\n```nginx\n# 自动设置为CPU核数\nworker_processes auto;\n\n# 手动指定\nworker_processes 4;\n\n# 绑定Worker到特定CPU核\nworker_cpu_affinity 0001 0010 0100 1000;\n```", "subs": ["2.2.1 单进程 vs 多进程", "2.2.2 多进程架构", "2.2.3 为什么选择多进程而非多线程"]}, {"title": "2.3 进程管理与信号", "content": "#### 2.3.1 信号管理机制\n\n```mermaid\ngraph TD\n    A[nginx命令行] -->|发送信号| B[Master进程]\n    C[kill命令] -->|发送信号| B\n  \n    B -->|监听SIGCHLD| D[Worker进程异常退出]\n    D -->|自动重启| E[新Worker进程]\n  \n    B -->|TERM/INT| F[立即停止]\n    B -->|QUIT| G[优雅停止]\n    B -->|HUP| H[重载配置]\n    B -->|USR1| I[重新打开日志]\n    B -->|USR2| J[热升级]\n    B -->|WINCH| K[优雅关闭Worker]\n  \n    style B fill:#ffe1e1\n    style H fill:#e1f5ff\n    style J fill:#e1ffe1\n```\n\n#### 2.3.2 Master进程接收的信号\n\n| 信号     | 命令行等价          | 作用           | 说明                 |\n| -------- | ------------------- | -------------- | -------------------- |\n| TERM/INT | `nginx -s stop`   | 立即停止       | 强制终止所有进程     |\n| QUIT     | `nginx -s quit`   | 优雅停止       | 处理完当前请求后停止 |\n| HUP      | `nginx -s reload` | 重载配置       | 平滑重启Worker进程   |\n| USR1     | `nginx -s reopen` | 重新打开日志   | 用于日志切割         |\n| USR2     | 无                  | 热升级         | 启动新Master进程     |\n| WINCH    | 无                  | 优雅关闭Worker | 用于热升级流程       |\n\n#### 2.3.3 Worker进程接收的信号\n\n| 信号     | 作用         | 说明           |\n| -------- | ------------ | -------------- |\n| TERM/INT | 立即停止     | 不推荐直接发送 |\n| QUIT     | 优雅停止     | 不推荐直接发送 |\n| USR1     | 重新打开日志 | 不推荐直接发送 |\n| WINCH    | 优雅关闭     | 不推荐直接发送 |\n\n**注意：** 通常不直接向Worker进程发送信号，而是由Master进程统一管理。\n\n#### 2.3.4 nginx命令行与信号的对应关系\n\n```bash\n# 以下命令等价于向Master进程发送相应信号\n\n# nginx -s reload  ≈  kill -HUP <master_pid>\n# nginx -s reopen  ≈  kill -USR1 <master_pid>\n# nginx -s stop    ≈  kill -TERM <master_pid>\n# nginx -s quit    ≈  kill -QUIT <master_pid>\n\n# Master PID通常记录在\ncat /usr/local/nginx/logs/nginx.pid\n```", "subs": ["2.3.1 信号管理机制", "2.3.2 Master进程接收的信号", "2.3.3 Worker进程接收的信号", "2.3.4 nginx命令行与信号的对应关系"]}, {"title": "2.4 Reload重载配置文件", "content": "#### 2.4.1 Reload流程\n\n```mermaid\nsequenceDiagram\n    participant U as 用户\n    participant M as Master进程\n    participant OW as 老Worker进程\n    participant NW as 新Worker进程\n  \n    U->>M: 1. 发送HUP信号(nginx -s reload)\n    M->>M: 2. 检验配置文件语法\n    M->>M: 3. 打开新的监听端口\n    M->>NW: 4. 启动新Worker进程\n    M->>OW: 5. 发送QUIT信号\n    OW->>OW: 6. 关闭监听句柄\n    OW->>OW: 7. 处理完当前连接\n    OW->>M: 8. 退出进程\n  \n    Note over OW,NW: 新老Worker短暂并存\n```\n\n**详细步骤：**\n\n1. **发送HUP信号**\n\n   - 执行 `nginx -s reload`\n   - 或 `kill -HUP <master_pid>`\n2. **Master进程验证配置**\n\n   - 检查nginx.conf语法\n   - 验证失败则不继续\n3. **打开新监听端口**\n\n   - Master进程打开配置中的新端口\n   - 子进程会继承父进程的所有打开端口\n4. **启动新Worker进程**\n\n   - 使用新配置启动Worker\n   - 新Worker立即开始处理请求\n5. **向老Worker发送QUIT信号**\n\n   - 老Worker关闭监听句柄\n   - 新连接只会进入新Worker\n6. **老Worker优雅退出**\n\n   - 处理完已建立连接上的请求\n   - 关闭连接后退出进程\n\n#### 2.4.2 优雅退出的超时控制\n\n```nginx\n# 设置Worker进程优雅退出的最长等待时间\nworker_shutdown_timeout 30s;\n```\n\n**作用：**\n\n- 防止老Worker进程长时间不退出\n- 超时后强制关闭进程\n- 默认无限等待\n\n#### 2.4.3 Reload过程中的进程状态\n\n```\n初始状态：\nMaster (PID: 1000)\n├── Worker 1 (PID: 1001)\n├── Worker 2 (PID: 1002)\n├── Worker 3 (PID: 1003)\n└── Worker 4 (PID: 1004)\n\nReload后（短暂并存）：\nMaster (PID: 1000)\n├── Worker 1 (PID: 1001) [老，正在退出]\n├── Worker 2 (PID: 1002) [老，正在退出]\n├── Worker 3 (PID: 1003) [老，正在退出]\n├── Worker 4 (PID: 1004) [老，正在退出]\n├── Worker 5 (PID: 1005) [新，处理新请求]\n├── Worker 6 (PID: 1006) [新，处理新请求]\n├── Worker 7 (PID: 1007) [新，处理新请求]\n└── Worker 8 (PID: 1008) [新，处理新请求]\n\n最终状态：\nMaster (PID: 1000)\n├── Worker 5 (PID: 1005)\n├── Worker 6 (PID: 1006)\n├── Worker 7 (PID: 1007)\n└── Worker 8 (PID: 1008)\n```", "subs": ["2.4.1 Reload流程", "2.4.2 优雅退出的超时控制", "2.4.3 Reload过程中的进程状态"]}, {"title": "2.5 热升级完整流程", "content": "#### 2.5.1 热升级流程图\n\n```mermaid\nsequenceDiagram\n    participant U as 运维人员\n    participant OM as 老Master\n    participant OW as 老Worker\n    participant NM as 新Master\n    participant NW as 新Worker\n  \n    U->>U: 1. 备份旧nginx二进制\n    U->>U: 2. 拷贝新nginx二进制\n    U->>OM: 3. 发送USR2信号\n    OM->>OM: 4. 重命名PID文件(.oldbin)\n    OM->>NM: 5. 启动新Master进程\n    NM->>NW: 6. 启动新Worker进程\n    Note over OM,NW: 新老进程并存\n    U->>OM: 7. 发送WINCH信号\n    OM->>OW: 8. 优雅关闭老Worker\n    OW->>OW: 9. 处理完请求后退出\n    Note over OM: 老Master保留用于回退\n  \n    alt 确认无问题\n        U->>OM: 10a. 发送QUIT信号\n        OM->>OM: 11a. 退出\n    else 需要回退\n        U->>OM: 10b. 发送HUP信号\n        OM->>OW: 11b. 重新启动老Worker\n        U->>NM: 12b. 发送QUIT信号\n        NM->>NM: 13b. 退出\n    end\n```\n\n#### 2.5.2 热升级操作步骤\n\n```bash\n# 1. 备份旧版本\ncp /usr/local/nginx/sbin/nginx /usr/local/nginx/sbin/nginx.old\n\n# 2. 拷贝新版本（需要-f强制覆盖正在运行的文件）\ncp -f /path/to/new/nginx /usr/local/nginx/sbin/nginx\n\n# 3. 向老Master发送USR2信号\nkill -USR2 $(cat /usr/local/nginx/logs/nginx.pid)\n\n# 4. 查看进程状态（此时新老Master和Worker都在运行）\nps aux | grep nginx\n\n# 5. 向老Master发送WINCH信号，优雅关闭老Worker\nkill -WINCH <老Master的PID>\n\n# 6. 测试新版本是否正常\n\n# 7a. 确认无问题，关闭老Master\nkill -QUIT <老Master的PID>\n\n# 7b. 如需回退，重新拉起老Worker\nkill -HUP <老Master的PID>\n# 然后关闭新Master\nkill -QUIT <新Master的PID>\n```\n\n#### 2.5.3 热升级过程中的PID文件变化\n\n```\n初始状态：\nnginx.pid         -> 老Master PID\n\n发送USR2后：\nnginx.pid.oldbin  -> 老Master PID\nnginx.pid         -> 新Master PID\n\n完成后：\nnginx.pid         -> 新Master PID\n```\n\n#### 2.5.4 热升级的关键点\n\n1. **新Master是老Master的子进程**\n\n   - 通过fork创建\n   - 使用新的二进制文件启动\n2. **新老进程短暂并存**\n\n   - 保证服务不中断\n   - 支持版本回退\n3. **老Master不自动退出**\n\n   - 保留用于回退\n   - 需要手动发送QUIT信号\n4. **只替换二进制文件**\n\n   - 配置文件路径必须一致\n   - 日志路径必须一致\n   - 否则无法复用配置", "subs": ["2.5.1 热升级流程图", "2.5.2 热升级操作步骤", "2.5.3 热升级过程中的PID文件变化", "2.5.4 热升级的关键点"]}, {"title": "2.6 Worker进程优雅关闭", "content": "#### 2.6.1 优雅关闭流程\n\n```mermaid\ngraph TD\n    A[收到QUIT信号] --> B[设置worker_shutdown_timeout定时器]\n    B --> C[设置优雅关闭标志位]\n    C --> D[关闭监听句柄]\n    D --> E[关闭所有空闲连接]\n    E --> F{循环检查}\n    F -->|有活跃连接| G[等待请求处理完成]\n    G --> H[关闭该连接]\n    H --> F\n    F -->|无活跃连接| I[Worker进程退出]\n    F -->|超时| J[强制关闭所有连接]\n    J --> I\n  \n    style A fill:#ffe1e1\n    style D fill:#e1f5ff\n    style I fill:#e1ffe1\n```\n\n#### 2.6.2 优雅关闭的条件\n\n**可以优雅关闭的场景：**\n\n- HTTP请求：Nginx能识别请求边界\n- 短连接：请求处理完立即关闭\n\n**无法优雅关闭的场景：**\n\n- WebSocket：Nginx不解析Frame帧\n- TCP/UDP代理：无法识别请求边界\n- 长时间未响应的连接\n\n#### 2.6.3 配置优雅关闭超时\n\n```nginx\n# 设置Worker进程优雅关闭的超时时间\nworker_shutdown_timeout 30s;\n```\n\n**作用：**\n\n- 防止Worker进程长时间不退出\n- 超时后强制关闭所有连接\n- 平衡服务可用性和进程管理\n\n#### 2.6.4 立即停止 vs 优雅停止\n\n| 特性       | 立即停止(TERM/INT) | 优雅停止(QUIT)    |\n| ---------- | ------------------ | ----------------- |\n| 命令       | `nginx -s stop`  | `nginx -s quit` |\n| 信号       | TERM/INT           | QUIT              |\n| 处理方式   | 立即关闭所有连接   | 等待请求处理完成  |\n| 客户端影响 | 收到TCP Reset      | 正常关闭连接      |\n| 适用场景   | 紧急情况           | 正常维护          |", "subs": ["2.6.1 优雅关闭流程", "2.6.2 优雅关闭的条件", "2.6.3 配置优雅关闭超时", "2.6.4 立即停止 vs 优雅停止"]}, {"title": "2.7 网络事件与Nginx", "content": "#### 2.7.1 网络事件的本质\n\n每个TCP连接对应两个网络事件：\n\n- **读事件**：接收数据\n- **写事件**：发送数据\n\n#### 2.7.2 网络报文与事件的对应关系\n\n```mermaid\ngraph LR\n    A[客户端] -->|1. SYN| B[服务器]\n    B -->|2. SYN+ACK| A\n    A -->|3. ACK| B\n    B -.->|触发读事件| C[accept建立连接]\n  \n    A -->|4. HTTP请求| B\n    B -.->|触发读事件| D[read读取请求]\n  \n    B -->|5. HTTP响应| A\n    B -.->|触发写事件| E[write发送响应]\n  \n    A -->|6. FIN| B\n    B -.->|触发读事件| F[close关闭连接]\n  \n    style C fill:#e1f5ff\n    style D fill:#e1ffe1\n    style E fill:#fff5e1\n    style F fill:#ffe1e1\n```\n\n#### 2.7.3 TCP报文结构\n\n```\n+------------------+\n| 数据链路层头部    | <- MAC地址\n+------------------+\n| 网络层头部(IP)    | <- IP地址\n+------------------+\n| 传输层头部(TCP)   | <- 端口号\n+------------------+\n| 应用层数据(HTTP)  | <- HTTP协议\n+------------------+\n| 数据链路层尾部    |\n+------------------+\n```\n\n**各层作用：**\n\n- **数据链路层**：MAC地址，局域网内通信\n- **网络层**：IP地址，跨网络通信\n- **传输层**：端口号，进程间通信\n- **应用层**：HTTP等协议，应用数据\n\n#### 2.7.4 网络事件类型\n\n| 事件类型 | 触发条件         | Nginx操作 | 说明           |\n| -------- | ---------------- | --------- | -------------- |\n| 建立连接 | 收到SYN+ACK的ACK | accept()  | 三次握手完成   |\n| 可读     | 收到数据报文     | read()    | 读取HTTP请求   |\n| 可写     | 发送缓冲区可用   | write()   | 发送HTTP响应   |\n| 对端关闭 | 收到FIN          | close()   | 客户端主动断开 |\n\n#### 2.7.5 事件收集分发器\n\n```mermaid\ngraph TD\n    A[网络事件生产者] --> B[事件收集器]\n    B --> C{事件类型}\n    C -->|连接建立| D[Accept消费者]\n    C -->|可读| E[Read消费者]\n    C -->|可写| F[Write消费者]\n    C -->|定时器| G[Timer消费者]\n    C -->|AIO| H[AIO消费者]\n  \n    D --> I[HTTP模块处理]\n    E --> I\n    F --> I\n  \n    style B fill:#e1f5ff\n    style I fill:#e1ffe1\n```\n\n**事件驱动模型的优势：**\n\n- 生产者：网络自动产生事件\n- 消费者：模块定义处理逻辑\n- 解耦：事件产生和处理分离", "subs": ["2.7.1 网络事件的本质", "2.7.2 网络报文与事件的对应关系", "2.7.3 TCP报文结构", "2.7.4 网络事件类型", "2.7.5 事件收集分发器"]}, {"title": "2.8 Nginx事件驱动模型", "content": "#### 2.8.1 事件循环流程\n\n```mermaid\ngraph TD\n    A[等待事件epoll_wait] -->|阻塞等待| B[操作系统通知事件就绪]\n    B --> C[从事件队列获取事件]\n    C --> D{队列是否为空}\n    D -->|否| E[处理事件]\n    E --> F{处理过程中}\n    F -->|生成新事件| G[添加到事件队列]\n    F -->|处理完成| D\n    D -->|是| A\n  \n    style A fill:#e1f5ff\n    style E fill:#ffe1e1\n    style G fill:#fff5e1\n```\n\n#### 2.8.2 事件处理详解\n\n**等待事件（epoll_wait）：**\n\n- Worker进程进入Sleep状态\n- 不消耗CPU资源\n- 等待操作系统通知\n\n**获取事件：**\n\n- 操作系统准备好事件队列\n- Worker进程被唤醒\n- 从队列中取出事件\n\n**处理事件：**\n\n- 执行事件对应的回调函数\n- 可能生成新的事件（如超时定时器、写事件等）\n- 新事件加入队列等待下次处理\n\n#### 2.8.3 事件处理的性能影响\n\n**注意事项：**\n\n1. **避免长时间CPU计算**\n\n   - 会阻塞事件队列中的其他事件\n   - 导致大量连接超时\n   - 引发恶性循环\n2. **第三方模块的影响**\n\n   - 不能长时间占用CPU\n   - 应分段处理计算任务\n   - 如Gzip模块分段压缩\n3. **事件队列积压**\n\n   - 一个事件处理时间过长\n   - 后续事件得不到及时处理\n   - 可能导致连接超时", "subs": ["2.8.1 事件循环流程", "2.8.2 事件处理详解", "2.8.3 事件处理的性能影响"]}, {"title": "2.9 Epoll的优势与原理", "content": "#### 2.9.1 事件模型性能对比\n\n```mermaid\ngraph LR\n    A[并发连接数增加] --> B{事件模型}\n    B -->|Select/Poll| C[性能急剧下降]\n    B -->|Epoll/Kqueue| D[性能基本不变]\n  \n    style C fill:#ffe1e1\n    style D fill:#e1ffe1\n```\n\n**性能对比：**\n\n- **Select/Poll**：O(n)复杂度，每次需要遍历所有连接\n- **Epoll/Kqueue**：O(1)复杂度，只返回活跃连接\n\n#### 2.9.2 Select/Poll的问题\n\n```\n假设有100万个并发连接，但只有100个活跃连接\n\nSelect/Poll方式：\n1. 每次调用都要把100万个连接传给操作系统\n2. 操作系统遍历100万个连接\n3. 找出100个活跃连接返回\n4. 效率极低，O(n)复杂度\n```\n\n#### 2.9.3 Epoll的实现原理\n\n```mermaid\ngraph TD\n    A[Nginx] --> B[Epoll]\n    B --> C[红黑树RBTree]\n    B --> D[就绪链表Ready List]\n  \n    C -->|添加/删除/修改| E[事件管理O log n]\n    D -->|遍历| F[获取活跃事件O 1]\n  \n    G[网卡收到数据] -->|触发| D\n  \n    style B fill:#e1f5ff\n    style C fill:#ffe1e1\n    style D fill:#e1ffe1\n```\n\n**Epoll数据结构：**\n\n1. **红黑树（管理所有事件）**\n\n   - 存储所有监听的文件描述符\n   - 插入/删除/修改：O(log n)\n   - 高效的事件管理\n2. **就绪链表（只包含活跃事件）**\n\n   - 只包含有事件发生的连接\n   - 遍历：O(1)\n   - 高效的事件获取\n\n**Epoll操作：**\n\n```c\n// 创建epoll实例\nint epfd = epoll_create(1024);\n\n// 添加事件（插入红黑树）\nepoll_ctl(epfd, EPOLL_CTL_ADD, fd, &event);\n\n// 修改事件\nepoll_ctl(epfd, EPOLL_CTL_MOD, fd, &event);\n\n// 删除事件（从红黑树删除）\nepoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);\n\n// 等待事件（只遍历就绪链表）\nint n = epoll_wait(epfd, events, maxevents, timeout);\n```\n\n#### 2.9.4 Epoll的优势总结\n\n| 特性       | Select/Poll  | Epoll          |\n| ---------- | ------------ | -------------- |\n| 复杂度     | O(n)         | O(1)           |\n| 最大连接数 | 受限         | 无限制         |\n| 数据拷贝   | 每次都要拷贝 | 只拷贝活跃连接 |\n| 适用场景   | 少量连接     | 大量并发连接   |", "subs": ["2.9.1 事件模型性能对比", "2.9.2 Select/Poll的问题", "2.9.3 Epoll的实现原理", "2.9.4 Epoll的优势总结"]}, {"title": "2.10 Nginx的请求切换", "content": "#### 2.10.1 传统服务器的请求切换\n\n```mermaid\ngraph TD\n    A[Process 1: Request 1] -->|网络不满足| B[进程切换5微秒]\n    B --> C[Process 2: Request 2]\n    C -->|网络不满足| D[进程切换5微秒]\n    D --> E[Process 3: Request 3]\n    E -->|时间片用完| F[进程切换5微秒]\n    F --> A\n  \n    style B fill:#ffe1e1\n    style D fill:#ffe1e1\n    style F fill:#ffe1e1\n```\n\n**传统服务器（Apache/Tomcat）的问题：**\n\n- 一个进程同时只处理一个请求\n- 网络条件不满足时发生进程切换\n- 进程切换成本：约5微秒\n- 并发连接越多，切换越频繁\n- 性能损耗呈指数增长\n\n#### 2.10.2 Nginx的请求切换\n\n```mermaid\ngraph TD\n    A[Request 1处理] -->|网络不满足| B[用户态切换]\n    B --> C[Request 2处理]\n    C -->|网络不满足| D[用户态切换]\n    D --> E[Request 3处理]\n    E -->|继续处理| A\n  \n    style B fill:#e1ffe1\n    style D fill:#e1ffe1\n```\n\n**Nginx的优势：**\n\n- 在用户态直接切换请求\n- 无进程切换开销\n- 依赖Worker进程的时间片（5-800ms）\n- 提高Worker进程优先级获得更大时间片\n\n#### 2.10.3 优化Worker进程优先级\n\n```nginx\n# 设置Worker进程的优先级（-20到19，越小优先级越高）\nworker_priority -19;\n```\n\n**作用：**\n\n- 获得更大的CPU时间片\n- 减少操作系统切换Worker进程的频率\n- 在用户态完成更多请求切换\n\n#### 2.10.4 请求切换性能对比\n\n| 特性     | 传统服务器 | Nginx      |\n| -------- | ---------- | ---------- |\n| 切换方式 | 进程间切换 | 用户态切换 |\n| 切换成本 | 5微秒      | 几乎为0    |\n| 适用场景 | 数百连接   | 数百万连接 |\n| 性能损耗 | 指数增长   | 线性增长   |", "subs": ["2.10.1 传统服务器的请求切换", "2.10.2 Nginx的请求切换", "2.10.3 优化Worker进程优先级", "2.10.4 请求切换性能对比"]}, {"title": "2.11 同步、异步、阻塞、非阻塞", "content": "#### 2.11.1 概念区分\n\n**阻塞 vs 非阻塞（系统调用层面）：**\n\n- **阻塞**：调用方法时，条件不满足会导致进程进入Sleep状态\n- **非阻塞**：调用方法时，条件不满足立即返回错误码（EAGAIN）\n\n**同步 vs 异步（编程方式层面）：**\n\n- **同步**：代码按顺序执行，看起来是阻塞的\n- **异步**：通过回调函数处理结果，代码不连续\n\n#### 2.11.2 阻塞调用示例\n\n```c\n// 阻塞的accept调用\nint client_fd = accept(server_fd, ...);\n// 如果没有新连接，进程会进入Sleep状态\n// 直到有新连接到来或超时\n```\n\n**特点：**\n\n- Accept队列为空时阻塞\n- 进程主动切换\n- 可设置超时时间\n\n#### 2.11.3 非阻塞调用示例\n\n```c\n// 非阻塞的accept调用\nint client_fd = accept(server_fd, ...);\nif (client_fd == -1 && errno == EAGAIN) {\n    // Accept队列为空，立即返回EAGAIN\n    // 需要代码决定下一步操作\n}\n```\n\n**特点：**\n\n- 立即返回，不阻塞\n- 返回EAGAIN错误码\n- 需要代码处理错误情况\n\n#### 2.11.4 异步编程示例（Nginx C代码）\n\n```c\n// 异步读取请求Body\nngx_http_read_client_request_body(r, ngx_http_upstream_init);\n// 立即返回，不等待Body读取完成\n// Body读取完成后会回调ngx_http_upstream_init函数\n```\n\n**特点：**\n\n- 代码不连续\n- 通过回调函数处理结果\n- 难以理解和维护\n\n#### 2.11.5 同步编程示例（OpenResty Lua代码）\n\n```lua\n-- 同步方式连接Redis\nlocal red = redis:new()\nred:set_timeout(1000)\nlocal ok, err = red:connect(\"127.0.0.1\", 6379)\nif not ok then\n    ngx.say(\"failed to connect: \", err)\n    return\nend\n\n-- 代码连续，易于理解\n-- 但底层使用非阻塞方式实现\n```\n\n**特点：**\n\n- 代码连续，易于理解\n- 底层使用非阻塞实现\n- 兼顾开发效率和运行效率\n\n#### 2.11.6 四种组合方式\n\n| 组合       | 示例        | 适用场景   | 说明     |\n| ---------- | ----------- | ---------- | -------- |\n| 同步阻塞   | 传统CGI     | 简单应用   | 性能差   |\n| 同步非阻塞 | OpenResty   | 高并发应用 | 推荐     |\n| 异步阻塞   | 无          | 无意义     | 不使用   |\n| 异步非阻塞 | Nginx C模块 | 高性能需求 | 开发复杂 |", "subs": ["2.11.1 概念区分", "2.11.2 阻塞调用示例", "2.11.3 非阻塞调用示例", "2.11.4 异步编程示例（Nginx C代码）", "2.11.5 同步编程示例（OpenResty Lua代码）", "2.11.6 四种组合方式"]}, {"title": "2.12 Nginx模块系统", "content": "#### 2.12.1 模块的四个关键点\n\n理解一个Nginx模块需要了解：\n\n1. **是否编译进Nginx**\n\n   - 查看 `objs/ngx_modules.c`\n   - 确认模块是否在数组中\n2. **提供哪些配置项**\n\n   - 查看官方文档\n   - 查看源码中的 `ngx_command_t`结构\n3. **何时被使用**\n\n   - 默认使用 vs 需要配置\n   - 查看模块的回调方法\n4. **提供哪些变量**\n\n   - 查看文档的\"Embedded Variables\"\n   - 可用于日志、条件判断等\n\n#### 2.12.2 模块结构\n\n```c\n// 模块定义结构体\ntypedef struct {\n    ngx_str_t             name;        // 模块名称\n    void                 *ctx;         // 模块上下文\n    ngx_command_t        *commands;    // 配置指令数组\n    ngx_uint_t            type;        // 模块类型\n  \n    // 回调方法\n    ngx_int_t           (*init_master)(ngx_log_t *log);\n    ngx_int_t           (*init_module)(ngx_cycle_t *cycle);\n    ngx_int_t           (*init_process)(ngx_cycle_t *cycle);\n    ngx_int_t           (*init_thread)(ngx_cycle_t *cycle);\n    void                (*exit_thread)(ngx_cycle_t *cycle);\n    void                (*exit_process)(ngx_cycle_t *cycle);\n    void                (*exit_master)(ngx_cycle_t *cycle);\n} ngx_module_t;\n```\n\n#### 2.12.3 配置指令定义\n\n```c\n// 配置指令数组\nstatic ngx_command_t ngx_http_gzip_filter_commands[] = {\n    {\n        ngx_string(\"gzip\"),           // 指令名\n        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,\n        ngx_conf_set_flag_slot,       // 处理函数\n        NGX_HTTP_LOC_CONF_OFFSET,\n        offsetof(ngx_http_gzip_conf_t, enable),\n        NULL\n    },\n    // ... 更多指令\n    ngx_null_command\n};\n```\n\n#### 2.12.4 查看模块是否编译\n\n```bash\n# 查看编译进Nginx的所有模块\ncat objs/ngx_modules.c\n\n# 输出示例\nngx_module_t *ngx_modules[] = {\n    &ngx_core_module,\n    &ngx_errlog_module,\n    &ngx_conf_module,\n    &ngx_events_module,\n    &ngx_event_core_module,\n    &ngx_epoll_module,\n    &ngx_http_module,\n    &ngx_http_core_module,\n    &ngx_http_gzip_filter_module,\n    // ... 更多模块\n    NULL\n};\n```\n\n#### 2.12.5 模块的生命周期回调\n\n```mermaid\ngraph TD\n    A[Master进程启动] --> B[init_master]\n    B --> C[init_module]\n    C --> D[Worker进程启动]\n    D --> E[init_process]\n    E --> F[Worker进程运行]\n    F --> G[Worker进程退出]\n    G --> H[exit_process]\n    H --> I[Master进程退出]\n    I --> J[exit_master]\n  \n    style B fill:#e1f5ff\n    style E fill:#e1ffe1\n    style H fill:#fff5e1\n    style J fill:#ffe1e1\n```\n\n**回调时机：**\n\n- `init_master`：Master进程启动时\n- `init_module`：配置解析完成后\n- `init_process`：Worker进程启动时\n- `exit_process`：Worker进程退出时\n- `exit_master`：Master进程退出时", "subs": ["2.12.1 模块的四个关键点", "2.12.2 模块结构", "2.12.3 配置指令定义", "2.12.4 查看模块是否编译", "2.12.5 模块的生命周期回调"]}, {"title": "2.13 Nginx模块分类", "content": "#### 2.13.1 模块类型层次\n\n```mermaid\ngraph TD\n    A[ngx_module_t] --> B[核心模块ngx_core_module]\n    A --> C[配置模块ngx_conf_module]\n  \n    B --> D[Events模块]\n    B --> E[HTTP模块]\n    B --> F[Mail模块]\n    B --> G[Stream模块]\n  \n    D --> D1[事件核心模块event_core]\n    D --> D2[Epoll模块]\n    D --> D3[Kqueue模块]\n  \n    E --> E1[HTTP核心模块http_core]\n    E --> E2[请求处理模块]\n    E --> E3[响应过滤模块filter]\n    E --> E4[Upstream模块]\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style E fill:#e1ffe1\n```\n\n#### 2.13.2 核心模块类型\n\n| 模块类型          | 说明         | 示例                                              |\n| ----------------- | ------------ | ------------------------------------------------- |\n| NGX_CORE_MODULE   | 核心模块     | ngx_core_module, ngx_events_module                |\n| NGX_CONF_MODULE   | 配置解析模块 | ngx_conf_module                                   |\n| NGX_EVENT_MODULE  | 事件模块     | ngx_epoll_module, ngx_kqueue_module               |\n| NGX_HTTP_MODULE   | HTTP模块     | ngx_http_core_module, ngx_http_gzip_filter_module |\n| NGX_MAIL_MODULE   | 邮件模块     | ngx_mail_core_module                              |\n| NGX_STREAM_MODULE | Stream模块   | ngx_stream_core_module                            |\n\n#### 2.13.3 HTTP模块细分\n\n**1. HTTP核心模块（http_core）**\n\n- 定义HTTP模块的通用规则\n- 处理HTTP请求的基本流程\n- 必须存在的模块\n\n**2. 请求处理模块**\n\n- 生成HTTP响应\n- 如：index、autoindex、static等\n\n**3. 响应过滤模块（filter）**\n\n- 对响应做二次处理\n- 模块名包含\"filter\"关键字\n- 如：gzip_filter、image_filter等\n\n**4. Upstream模块**\n\n- 与上游服务交互\n- 模块名包含\"upstream\"关键字\n- 如：upstream_hash、upstream_ip_hash等\n\n#### 2.13.4 源码目录结构\n\n```\nnginx/src/\n├── core/              # 核心框架代码\n│   ├── ngx_core.h\n│   └── ngx_module.c\n├── event/             # 事件模块\n│   ├── ngx_event.c\n│   ├── modules/\n│   │   ├── ngx_epoll_module.c\n│   │   └── ngx_kqueue_module.c\n├── http/              # HTTP模块\n│   ├── ngx_http.c     # HTTP框架代码\n│   ├── ngx_http_core_module.c  # HTTP核心模块\n│   └── modules/       # HTTP子模块\n│       ├── ngx_http_gzip_filter_module.c\n│       ├── ngx_http_upstream_hash_module.c\n│       └── ...\n├── mail/              # 邮件模块\n└── stream/            # Stream模块\n```\n\n#### 2.13.5 模块顺序的重要性\n\n模块在 `ngx_modules`数组中的顺序很重要：\n\n- **先出现的模块优先级更高**\n- **可能阻碍后出现的模块**\n- **Core模块总是排在第一位**\n\n```c\n// 模块顺序示例\nngx_module_t *ngx_modules[] = {\n    &ngx_core_module,              // 1. 核心模块\n    &ngx_events_module,            // 2. 事件模块\n    &ngx_event_core_module,        // 3. 事件核心模块\n    &ngx_epoll_module,             // 4. Epoll模块\n    &ngx_http_module,              // 5. HTTP模块\n    &ngx_http_core_module,         // 6. HTTP核心模块\n    &ngx_http_gzip_filter_module,  // 7. Gzip过滤模块\n    // ...\n};\n```", "subs": ["2.13.1 模块类型层次", "2.13.2 核心模块类型", "2.13.3 HTTP模块细分", "2.13.4 源码目录结构", "2.13.5 模块顺序的重要性"]}, {"title": "2.14 连接池", "content": "#### 2.14.1 连接池结构\n\n```mermaid\ngraph TD\n    A[ngx_cycle_t] --> B[connections数组]\n    A --> C[read_events数组]\n    A --> D[write_events数组]\n  \n    B --> E[connection 0]\n    B --> F[connection 1]\n    B --> G[connection N]\n  \n    C --> H[read_event 0]\n    C --> I[read_event 1]\n    C --> J[read_event N]\n  \n    D --> K[write_event 0]\n    D --> L[write_event 1]\n    D --> M[write_event N]\n  \n    E -.对应.-> H\n    E -.对应.-> K\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style C fill:#e1ffe1\n    style D fill:#fff5e1\n```\n\n#### 2.14.2 配置连接数\n\n```nginx\nevents {\n    # 每个Worker进程的最大连接数\n    worker_connections 1024;  # 默认512，生产环境通常设置更大\n}\n```\n\n**注意事项：**\n\n1. **反向代理消耗双倍连接**\n\n   - 客户端连接：1个\n   - 上游服务器连接：1个\n   - 总计：2个连接\n2. **内存消耗计算**\n\n   ```\n   每个连接内存 = sizeof(ngx_connection_t) + 2 * sizeof(ngx_event_t)\n                = 232字节 + 2 * 96字节\n                = 424字节\n\n   总内存 = worker_connections * 424字节\n   ```\n3. **推荐配置**\n\n   ```nginx\n   # 根据服务器内存和CPU核数调整\n   worker_processes auto;\n   events {\n       worker_connections 10240;  # 或更大\n   }\n   ```\n\n#### 2.14.3 连接结构体\n\n```c\n// ngx_connection_t结构体（简化版）\ntypedef struct ngx_connection_s {\n    void               *data;           // 连接数据\n    ngx_event_t        *read;           // 读事件\n    ngx_event_t        *write;          // 写事件\n  \n    ngx_socket_t        fd;             // 套接字描述符\n  \n    ngx_recv_pt         recv;           // 接收方法\n    ngx_send_pt         send;           // 发送方法\n  \n    off_t               sent;           // 已发送字节数\n  \n    ngx_pool_t         *pool;           // 连接内存池\n  \n    // ... 更多成员\n} ngx_connection_t;  // 64位系统约232字节\n```\n\n#### 2.14.4 事件结构体\n\n```c\n// ngx_event_t结构体（简化版）\ntypedef struct ngx_event_s {\n    void               *data;           // 事件数据\n  \n    ngx_event_handler_pt  handler;      // 事件处理回调\n  \n    ngx_rbtree_node_t   timer;          // 定时器节点\n  \n    unsigned            active:1;       // 是否活跃\n    unsigned            ready:1;        // 是否就绪\n    unsigned            timedout:1;     // 是否超时\n  \n    // ... 更多成员\n} ngx_event_t;  // 约96字节\n```\n\n#### 2.14.5 超时配置\n\n```nginx\nhttp {\n    # 客户端请求头超时\n    client_header_timeout 60s;\n  \n    # 客户端请求体超时\n    client_body_timeout 60s;\n  \n    # 发送响应超时\n    send_timeout 60s;\n  \n    # Keepalive超时\n    keepalive_timeout 75s;\n}\n```\n\n#### 2.14.6 内置变量示例\n\n```nginx\nhttp {\n    log_format main '$remote_addr - $remote_user [$time_local] \"$request\" '\n                    '$status $body_bytes_sent \"$http_referer\" '\n                    '\"$http_user_agent\" $bytes_sent';\n  \n    server {\n        access_log /var/log/nginx/access.log main;\n    }\n}\n```\n\n**常用变量：**\n\n- `$bytes_sent`：发送给客户端的总字节数（对应connection->sent）\n- `$body_bytes_sent`：发送给客户端的响应体字节数\n- `$connection`：连接序号\n- `$connection_requests`：当前连接上处理的请求数", "subs": ["2.14.1 连接池结构", "2.14.2 配置连接数", "2.14.3 连接结构体", "2.14.4 事件结构体", "2.14.5 超时配置", "2.14.6 内置变量示例"]}, {"title": "2.15 内存池", "content": "#### 2.15.1 内存池的作用\n\n**为什么需要内存池：**\n\n1. **减少内存碎片**\n\n   - 预分配大块内存\n   - 小块内存连续分配\n   - 避免频繁malloc/free\n2. **简化内存管理**\n\n   - 第三方模块无需手动释放内存\n   - 请求结束自动释放请求内存池\n   - 连接关闭自动释放连接内存池\n3. **提升性能**\n\n   - 减少系统调用次数\n   - 减少内存分配开销\n\n#### 2.15.2 内存池类型\n\n```mermaid\ngraph TD\n    A[ngx_connection_t] --> B[连接内存池pool]\n    C[ngx_http_request_t] --> D[请求内存池pool]\n  \n    B --> E[生命周期: 连接建立到关闭]\n    D --> F[生命周期: 请求开始到结束]\n  \n    E --> G[适用: 跨请求的数据]\n    F --> H[适用: 单个请求的数据]\n  \n    style B fill:#e1f5ff\n    style D fill:#e1ffe1\n```\n\n#### 2.15.3 内存池配置\n\n```nginx\nhttp {\n    # 连接内存池大小（默认256或512，取决于系统位数）\n    connection_pool_size 512;\n  \n    # 请求内存池大小（默认4k）\n    request_pool_size 4k;\n}\n```\n\n**配置建议：**\n\n| 场景       | connection_pool_size | request_pool_size |\n| ---------- | -------------------- | ----------------- |\n| 默认       | 512                  | 4k                |\n| URL很长    | 512                  | 8k或更大          |\n| URL很短    | 256                  | 2k                |\n| 大量小请求 | 256                  | 2k                |\n\n#### 2.15.4 内存池工作原理\n\n```mermaid\ngraph LR\n    A[内存池] --> B[大块内存]\n    B --> C[小块1]\n    B --> D[小块2]\n    B --> E[小块3]\n    B --> F[未使用]\n  \n    C -.next.-> D\n    D -.next.-> E\n    E -.next.-> F\n  \n    G[新分配] --> F\n  \n    style A fill:#e1f5ff\n    style F fill:#e1ffe1\n```\n\n**分配策略：**\n\n1. **小块内存（< 页面大小）**\n\n   - 从预分配的内存块中分配\n   - 使用next指针连接\n   - 快速分配，无碎片\n2. **大块内存（≥ 页面大小）**\n\n   - 直接调用malloc分配\n   - 单独管理\n   - 释放时单独free\n\n#### 2.15.5 连接内存池 vs 请求内存池\n\n| 特性            | 连接内存池     | 请求内存池     |\n| --------------- | -------------- | -------------- |\n| 生命周期        | 连接建立到关闭 | 请求开始到结束 |\n| 默认大小        | 512字节        | 4KB            |\n| 适用数据        | 跨请求共享     | 单个请求专用   |\n| 释放时机        | 连接关闭       | 请求结束       |\n| HTTP Keep-Alive | 保持           | 每次请求重建   |\n\n**使用场景：**\n\n```c\n// 连接内存池：读取请求的缓冲区（跨请求复用）\nbuffer = ngx_palloc(c->pool, 1024);\n\n// 请求内存池：解析URL的临时数据（请求结束释放）\nuri = ngx_palloc(r->pool, r->uri.len + 1);\n```\n\n#### 2.15.6 内存池的性能影响\n\n**优点：**\n\n- 减少内存碎片\n- 减少系统调用\n- 简化内存管理\n\n**注意事项：**\n\n- 预分配过大浪费内存\n- 预分配过小频繁扩展\n- 第三方模块应正确选择内存池类型", "subs": ["2.15.1 内存池的作用", "2.15.2 内存池类型", "2.15.3 内存池配置", "2.15.4 内存池工作原理", "2.15.5 连接内存池 vs 请求内存池", "2.15.6 内存池的性能影响"]}, {"title": "2.16 共享内存", "content": "#### 2.16.1 进程间通信方式\n\nNginx多进程间通信主要有两种方式：\n\n1. **信号**：用于进程管理\n2. **共享内存**：用于数据同步\n\n#### 2.16.2 共享内存的必要性\n\n```mermaid\ngraph TD\n    A[Master进程] --> B[Worker 1]\n    A --> C[Worker 2]\n    A --> D[Worker N]\n  \n    B -.共享内存.-> E[Shared Memory]\n    C -.共享内存.-> E\n    D -.共享内存.-> E\n  \n    E --> F[限流限速数据]\n    E --> G[缓存数据]\n    E --> H[SSL Session]\n    E --> I[Lua共享字典]\n  \n    style E fill:#e1f5ff\n    style F fill:#ffe1e1\n    style G fill:#e1ffe1\n```\n\n**使用场景：**\n\n- 跨Worker进程的限流限速\n- 反向代理缓存\n- SSL Session缓存\n- OpenResty的lua_shared_dict\n\n#### 2.16.3 共享内存的挑战\n\n**1. 锁机制**\n\n```mermaid\ngraph LR\n    A[Worker 1] -->|尝试获取锁| B{锁状态}\n    B -->|已锁定| C[自旋等待]\n    B -->|未锁定| D[获取锁成功]\n    D --> E[操作共享内存]\n    E --> F[释放锁]\n    C --> B\n  \n    style C fill:#ffe1e1\n    style D fill:#e1ffe1\n```\n\n**锁的类型：**\n\n- **信号量（早期）**：会导致进程Sleep，性能差\n- **自旋锁（现代）**：不Sleep，持续尝试获取锁\n\n**自旋锁的要求：**\n\n- 快速获取锁\n- 快速释放锁\n- 不能长时间持有锁\n\n**2. 内存管理**\n\n需要Slab内存管理器来分配和管理共享内存。\n\n#### 2.16.4 使用共享内存的模块\n\n**官方模块：**\n\n| 模块          | 数据结构 | 用途            |\n| ------------- | -------- | --------------- |\n| limit_req     | 红黑树   | 请求限速        |\n| limit_conn    | 红黑树   | 连接限制        |\n| http_cache    | 红黑树   | 反向代理缓存    |\n| ssl           | 红黑树   | SSL Session缓存 |\n| upstream_zone | 链表     | 上游服务器共享  |\n\n**OpenResty模块：**\n\n```nginx\nhttp {\n    # 创建共享内存字典\n    lua_shared_dict dogs 10m;\n  \n    server {\n        location /set {\n            content_by_lua_block {\n                local dogs = ngx.shared.dogs\n                dogs:set(\"Jim\", 8)\n                ngx.say(\"stored\")\n            }\n        }\n  \n        location /get {\n            content_by_lua_block {\n                local dogs = ngx.shared.dogs\n                local value = dogs:get(\"Jim\")\n                ngx.say(value)\n            }\n        }\n    }\n}\n```\n\n#### 2.16.5 lua_shared_dict的实现\n\n```mermaid\ngraph TD\n    A[lua_shared_dict] --> B[红黑树RBTree]\n    A --> C[LRU链表]\n  \n    B --> D[存储Key-Value]\n    B --> E[快速查找O log n]\n  \n    C --> F[记录访问顺序]\n    C --> G[内存满时淘汰]\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style C fill:#e1ffe1\n```\n\n**特性：**\n\n- 使用红黑树存储数据\n- 使用LRU链表管理淘汰\n- 内存满时自动淘汰最久未使用的数据", "subs": ["2.16.1 进程间通信方式", "2.16.2 共享内存的必要性", "2.16.3 共享内存的挑战", "2.16.4 使用共享内存的模块", "2.16.5 lua_shared_dict的实现"]}, {"title": "2.17 Slab内存管理器", "content": "#### 2.17.1 Slab的作用\n\n将大块共享内存切分成小块，分配给不同的对象使用。\n\n#### 2.17.2 Slab内存结构\n\n```mermaid\ngraph TD\n    A[共享内存] --> B[Page 1: 4KB]\n    A --> C[Page 2: 4KB]\n    A --> D[Page N: 4KB]\n  \n    B --> E[Slot: 32字节]\n    B --> F[Slot: 32字节]\n    B --> G[Slot: 32字节]\n  \n    C --> H[Slot: 64字节]\n    C --> I[Slot: 64字节]\n  \n    D --> J[Slot: 128字节]\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style C fill:#e1ffe1\n    style D fill:#fff5e1\n```\n\n**分配策略：**\n\n1. **页面（Page）**\n\n   - 固定大小（通常4KB）\n   - 共享内存被切分为多个页面\n2. **槽位（Slot）**\n\n   - 每个页面切分为多个槽位\n   - 槽位大小以2的幂次增长（32、64、128、256...）\n3. **Best Fit分配**\n\n   - 51字节的对象分配到64字节的槽位\n   - 浪费13字节（最多浪费50%）\n\n#### 2.17.3 Slab的优缺点\n\n**优点：**\n\n- 适合小对象分配\n- 碎片少\n- 分配快速\n- 可复用已初始化的数据结构\n\n**缺点：**\n\n- 最多浪费50%内存\n- 只适合小于页面大小的对象\n\n#### 2.17.4 监控Slab使用情况\n\n**Tengine的slab_stat模块：**\n\n```nginx\nlocation /slab_stat {\n    slab_stat;\n}\n```\n\n**输出示例：**\n\n```\n* shared memory: dogs\ntotal:       10485760(10.00M) free:       10485200(10.00M) size:            8\npages:       10485200(10.00M) start:00007F8F8E8A5000 end:00007F8F8F8A5000\nslot:           8(  8) total:           0 used:           0 reqs:           0 fails:           0\nslot:          16( 16) total:           0 used:           0 reqs:           0 fails:           0\nslot:          32( 32) total:         127 used:           1 reqs:           1 fails:           0\nslot:          64( 64) total:           0 used:           0 reqs:           0 fails:           0\nslot:         128(128) total:          32 used:           2 reqs:           2 fails:           0\n```\n\n**字段说明：**\n\n- `total`：该槽位总数\n- `used`：已使用数量\n- `reqs`：请求次数\n- `fails`：失败次数", "subs": ["2.17.1 Slab的作用", "2.17.2 Slab内存结构", "2.17.3 Slab的优缺点", "2.17.4 监控Slab使用情况"]}, {"title": "2.18 哈希表", "content": "#### 2.18.1 Nginx哈希表的特点\n\n**与普通哈希表的区别：**\n\n1. **静态不变**\n\n   - 启动时确定所有元素\n   - 运行时不插入不删除\n   - 只用于查找\n2. **配置参数**\n\n   - `max_size`：最大元素数量\n   - `bucket_size`：每个桶的大小\n\n#### 2.18.2 哈希表结构\n\n```mermaid\ngraph TD\n    A[Hash Table] --> B[Bucket 0]\n    A --> C[Bucket 1]\n    A --> D[Bucket N]\n  \n    B --> E[Key-Value 1]\n    B --> F[Key-Value 2]\n  \n    C --> G[Key-Value 3]\n  \n    style A fill:#e1f5ff\n    style B fill:#ffe1e1\n    style C fill:#e1ffe1\n```\n\n#### 2.18.3 使用哈希表的模块\n\n| 模块           | 用途         | 配置                                                              |\n| -------------- | ------------ | ----------------------------------------------------------------- |\n| variables_hash | 存储所有变量 | -                                                                 |\n| map            | 变量映射     | `map_hash_max_size`, `map_hash_bucket_size`                   |\n| types          | MIME类型映射 | `types_hash_max_size`, `types_hash_bucket_size`               |\n| server_names   | 服务器名称   | `server_names_hash_max_size`, `server_names_hash_bucket_size` |\n\n#### 2.18.4 CPU Cache Line对齐\n\n```nginx\n# 哈希表bucket大小配置\nmap_hash_bucket_size 64;  # 默认值，与CPU Cache Line对齐\n```\n\n**为什么要对齐到64字节：**\n\n1. **CPU Cache Line大小**\n\n   - 现代CPU一次从内存读取64字节\n   - 称为一个Cache Line\n2. **未对齐的问题**\n\n   ```\n   假设bucket_size = 59字节\n\n   Bucket 1: [0-58]    需要读取1次（64字节）\n   Bucket 2: [59-117]  需要读取2次（第一个64字节的最后5字节 + 第二个64字节的前54字节）\n   ```\n3. **对齐的好处**\n\n   ```\n   bucket_size = 64字节\n\n   Bucket 1: [0-63]    需要读取1次\n   Bucket 2: [64-127]  需要读取1次\n   ```\n\n**配置建议：**\n\n- 尽量不超过64字节\n- 如果必须超过，会自动对齐到128字节\n- 减少CPU访问内存的次数", "subs": ["2.18.1 Nginx哈希表的特点", "2.18.2 哈希表结构", "2.18.3 使用哈希表的模块", "2.18.4 CPU Cache Line对齐"]}, {"title": "2.19 红黑树", "content": "#### 2.19.1 红黑树的特性\n\n```mermaid\ngraph TD\n    A[11] --> B[6]\n    A --> C[15]\n    B --> D[1]\n    B --> E[8]\n    C --> F[13]\n    C --> G[17]\n  \n    style A fill:#ffe1e1\n    style B fill:#e1f5ff\n    style C fill:#ffe1e1\n    style D fill:#e1f5ff\n    style E fill:#ffe1e1\n    style F fill:#e1f5ff\n    style G fill:#ffe1e1\n```\n\n**红黑树是：**\n\n1. **二叉树**：每个节点最多两个子节点\n2. **查找二叉树**：左子节点 < 父节点 < 右子节点\n3. **自平衡**：高度差不超过2倍\n\n**红黑树的优点：**\n\n| 特性 | 复杂度     | 说明      |\n| ---- | ---------- | --------- |\n| 高度 | ≤ 2log(n) | n为节点数 |\n| 插入 | O(log n)   | 自动平衡  |\n| 删除 | O(log n)   | 自动平衡  |\n| 查找 | O(log n)   | 二分查找  |\n| 遍历 | O(n)       | 中序遍历  |\n\n#### 2.19.2 红黑树数据结构\n\n```c\n// 红黑树结构\ntypedef struct {\n    ngx_rbtree_node_t  *root;      // 根节点\n    ngx_rbtree_node_t  *sentinel;  // 哨兵节点\n    ngx_rbtree_insert_pt insert;   // 插入方法\n} ngx_rbtree_t;\n\n// 红黑树节点\ntypedef struct ngx_rbtree_node_s {\n    ngx_rbtree_key_t       key;     // 键（整数）\n    struct ngx_rbtree_node_s  *left;   // 左子节点\n    struct ngx_rbtree_node_s  *right;  // 右子节点\n    struct ngx_rbtree_node_s  *parent; // 父节点\n    u_char                 color;   // 颜色（红/黑）\n    u_char                 data;    // 数据\n} ngx_rbtree_node_t;\n```\n\n#### 2.19.3 使用红黑树的模块\n\n**本地内存中的红黑树：**\n\n- `timer`：定时器管理\n- `ngx_conf_module`：配置解析\n\n**共享内存中的红黑树：**\n\n- `limit_req`：请求限速\n- `limit_conn`：连接限制\n- `http_cache`：反向代理缓存\n- `ssl`：SSL Session缓存\n- `lua_shared_dict`：Lua共享字典\n\n#### 2.19.4 红黑树的应用场景\n\n**1. 定时器管理**\n\n```mermaid\ngraph TD\n    A[定时器红黑树] --> B[最小节点=最早超时]\n    B --> C[快速找到超时事件]\n    C --> D[O log n 插入新定时器]\n  \n    style A fill:#e1f5ff\n    style B fill:#e1ffe1\n```\n\n**2. 限流限速**\n\n```\n红黑树存储：客户端IP -> 请求次数\n- 快速查找：O(log n)\n- 快速插入：O(log n)\n- 快速删除：O(log n)\n```\n\n**3. 缓存管理**\n\n```\n红黑树存储：缓存Key -> 缓存数据\n- 快速查找缓存\n- 快速插入新缓存\n- 快速删除过期缓存\n```", "subs": ["2.19.1 红黑树的特性", "2.19.2 红黑树数据结构", "2.19.3 使用红黑树的模块", "2.19.4 红黑树的应用场景"]}, {"title": "2.20 动态模块", "content": "#### 2.20.1 静态模块 vs 动态模块\n\n```mermaid\ngraph TD\n    A[静态模块] --> B[编译进二进制文件]\n    B --> C[升级需要重新编译所有模块]\n  \n    D[动态模块] --> E[编译为.so文件]\n    E --> F[升级只需替换.so文件]\n  \n    style A fill:#ffe1e1\n    style D fill:#e1ffe1\n```\n\n#### 2.20.2 动态模块的优势\n\n**静态模块的问题：**\n\n- 升级一个模块需要重新编译整个Nginx\n- 容易遗漏或错误配置其他模块\n- 编译参数复杂\n\n**动态模块的优势：**\n\n- 只需重新编译单个模块\n- 不影响Nginx主程序\n- 降低出错概率\n\n#### 2.20.3 编译动态模块\n\n```bash\n# 1. 配置时指定动态模块\n./configure --prefix=/usr/local/nginx \\\n            --with-http_image_filter_module=dynamic\n\n# 2. 编译\nmake\n\n# 3. 安装\nmake install\n\n# 4. 查看生成的动态库\nls /usr/local/nginx/modules/\n# ngx_http_image_filter_module.so\n```\n\n#### 2.20.4 使用动态模块\n\n```nginx\n# 在配置文件开头加载动态模块\nload_module modules/ngx_http_image_filter_module.so;\n\nhttp {\n    server {\n        location ~ \\.(jpg|png)$ {\n            # 使用image_filter模块的功能\n            image_filter resize 150 100;\n        }\n    }\n}\n```\n\n#### 2.20.5 动态模块工作流程\n\n```mermaid\nsequenceDiagram\n    participant N as Nginx\n    participant C as nginx.conf\n    participant M as 动态模块.so\n  \n    N->>N: 1. 启动Nginx\n    N->>C: 2. 读取配置文件\n    C->>C: 3. 发现load_module指令\n    N->>M: 4. 打开动态库\n    M->>N: 5. 加载模块到进程\n    N->>N: 6. 初始化模块\n    N->>N: 7. 正常运行\n```\n\n#### 2.20.6 支持动态模块的模块\n\n**查看支持动态模块的模块：**\n\n```bash\n./configure --help | grep \"=dynamic\"\n```\n\n**常见支持动态模块的模块：**\n\n- `--with-http_image_filter_module=dynamic`\n- `--with-http_xslt_module=dynamic`\n- `--with-http_geoip_module=dynamic`\n- `--with-stream=dynamic`\n- `--with-mail=dynamic`\n\n**注意：** 不是所有模块都支持动态加载。\n\n#### 2.20.7 动态模块的限制\n\n1. **不是所有模块都支持**\n\n   - 核心模块不支持\n   - 部分第三方模块不支持\n2. **性能影响**\n\n   - 动态加载有轻微性能损失\n   - 生产环境影响可忽略\n3. **版本兼容性**\n\n   - 动态模块需要与Nginx版本匹配\n   - 升级Nginx可能需要重新编译动态模块\n\n---", "subs": ["2.20.1 静态模块 vs 动态模块", "2.20.2 动态模块的优势", "2.20.3 编译动态模块", "2.20.4 使用动态模块", "2.20.5 动态模块工作流程", "2.20.6 支持动态模块的模块", "2.20.7 动态模块的限制"]}]}, {"title": "第二部分总结", "sections": [{"title": "核心概念", "content": "通过第二部分的学习，我们深入了解了Nginx的架构基础：\n\n\n1. **进程模型**\n\n   - Master-Worker多进程架构\n   - 进程间通过信号和共享内存通信\n   - Worker数量与CPU核数匹配\n2. **事件驱动**\n\n   - 基于Epoll的非阻塞事件模型\n   - 用户态请求切换，避免进程切换开销\n   - 支持百万级并发连接\n3. **内存管理**\n\n   - 连接池和内存池减少内存碎片\n   - 共享内存实现跨进程数据共享\n   - Slab管理器高效分配共享内存\n4. **数据结构**\n\n   - 哈希表：静态数据快速查找\n   - 红黑树：动态数据增删改查\n   - 链表：简单的数据组织\n5. **模块系统**\n\n   - 高内聚低耦合的模块设计\n   - 丰富的生命周期回调\n   - 支持静态和动态模块", "subs": []}, {"title": "关键技术", "content": "- **信号管理**：Reload、热升级、优雅关闭\n- **网络事件**：读写事件、定时器、AIO\n- **同步异步**：OpenResty实现同步编程方式\n- **性能优化**：CPU亲和性、内存池、连接池\n\n接下来，我们将学习HTTP模块的详细使用。\n\n---\n\n**待续：第三部分 - 详解HTTP模块**", "subs": ["信号管理：Reload、热升级、优雅关闭", "网络事件：读写事件、定时器、AIO", "同步异步：OpenResty实现同步编程方式", "性能优化：CPU亲和性、内存池、连接池"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

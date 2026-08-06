@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Docker 学习笔记 · 第二册：镜像、网络、存储与守护进程 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Docker 学习笔记 · 第二册：镜像、网络、存储与守护进程</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Docker 学习笔记 · 第二册：镜像、网络、存储与守护进程", "intro": "", "parts": [{"title": "第四章 镜像管理", "sections": [{"title": "4.1 镜像获取命令（pull/push）", "content": "本章介绍 Docker 镜像的管理命令，包括获取、查看、构建和删除等操作。\n\n\n#### docker pull：拉取镜像\n\n`docker pull` 命令用于**从镜像仓库拉取镜像到本地**。\n\n##### 语法格式\n\n```bash\ndocker pull [OPTIONS] NAME[:TAG|@DIGEST]\n```\n\n##### 常用选项\n\n| 选项                        | 说明                       |\n| --------------------------- | -------------------------- |\n| `-a, --all-tags`          | 拉取所有标签               |\n| `--platform`              | 指定平台（如 linux/amd64） |\n| `-q, --quiet`             | 静默输出                   |\n| `--disable-content-trust` | 跳过镜像验证               |\n\n##### 镜像名称格式\n\n```\n[registry/][repository/]name[:tag|@digest]\n```\n\n| 组件       | 说明     | 示例                             |\n| ---------- | -------- | -------------------------------- |\n| registry   | 仓库地址 | `docker.io`, `gcr.io`        |\n| repository | 命名空间 | `library`, `nginx`           |\n| name       | 镜像名   | `nginx`, `alpine`            |\n| tag        | 标签     | `latest`, `1.25`, `alpine` |\n| digest     | 摘要     | `sha256:abc123...`             |\n\n##### 实战示例\n\n**示例 1：拉取最新版本**\n\n```bash\n$ docker pull nginx\nUsing default tag: latest\nlatest: Pulling from library/nginx\n...\nStatus: Downloaded newer image for nginx:latest\ndocker.io/library/nginx:latest\n```\n\n**示例 2：拉取指定版本**\n\n```bash\ndocker pull nginx:1.25-alpine\ndocker pull redis:7.2\ndocker pull python:3.11-slim\n```\n\n**示例 3：拉取指定摘要（不可变）**\n\n```bash\ndocker pull nginx@sha256:abc123def456...\n```\n\n**示例 4：从私有仓库拉取**\n\n```bash\n# 先登录\n$ docker login registry.example.com\n\n# 拉取镜像\n$ docker pull registry.example.com/myapp:v1.0\n```\n\n**示例 5：指定平台**\n\n```bash\n# 拉取 ARM64 版本\n$ docker pull --platform linux/arm64 nginx\n\n# 拉取 AMD64 版本\n$ docker pull --platform linux/amd64 nginx\n```\n\n**示例 6：拉取所有标签**\n\n```bash\ndocker pull -a alpine\n```\n\n> ⚠️ **注意**：拉取所有标签可能需要大量磁盘空间。\n\n---\n\n#### docker push：推送镜像\n\n`docker push` 命令用于**将本地镜像推送到镜像仓库**。\n\n##### 语法格式\n\n```bash\ndocker push [OPTIONS] NAME[:TAG]\n```\n\n##### 常用选项\n\n| 选项                        | 说明         |\n| --------------------------- | ------------ |\n| `-a, --all-tags`          | 推送所有标签 |\n| `-q, --quiet`             | 静默输出     |\n| `--disable-content-trust` | 跳过镜像签名 |\n\n##### 推送前准备\n\n1. 登录目标仓库\n2. 为镜像打标签（包含仓库地址）\n\n##### 实战示例\n\n**示例 1：推送到 Docker Hub**\n\n```bash\n# 1. 登录\n$ docker login\n\n# 2. 为镜像打标签\n$ docker tag myapp:latest username/myapp:v1.0\n\n# 3. 推送\n$ docker push username/myapp:v1.0\n```\n\n**示例 2：推送到私有仓库**\n\n```bash\n# 1. 登录私有仓库\n$ docker login registry.example.com\n\n# 2. 打标签\n$ docker tag myapp:latest registry.example.com/team/myapp:v1.0\n\n# 3. 推送\n$ docker push registry.example.com/team/myapp:v1.0\n```\n\n**示例 3：推送所有标签**\n\n```bash\ndocker push -a username/myapp\n```\n\n---\n\n#### docker login / logout：登录登出\n\n##### docker login\n\n```bash\n# 交互式登录\n$ docker login\n\n# 指定仓库\n$ docker login registry.example.com\n\n# 非交互式（CI/CD）\n$ docker login -u $USER -p $PASSWORD registry.example.com\n\n# 使用 stdin 传递密码（更安全）\n$ echo $PASSWORD | docker login -u $USER --password-stdin\n```\n\n##### docker logout\n\n```bash\n# 登出 Docker Hub\n$ docker logout\n\n# 登出指定仓库\n$ docker logout registry.example.com\n```\n\n---\n\n#### docker search：搜索镜像\n\n`docker search` 命令用于**在 Docker Hub 搜索镜像**。\n\n```bash\n# 基本搜索\n$ docker search nginx\n\n# 限制结果数\n$ docker search --limit 5 nginx\n\n# 过滤官方镜像\n$ docker search --filter is-official=true nginx\n\n# 过滤星标数\n$ docker search --filter stars=100 nginx\n```\n\n##### 输出字段\n\n| 字段        | 说明         |\n| ----------- | ------------ |\n| NAME        | 镜像名称     |\n| DESCRIPTION | 描述         |\n| STARS       | 星标数       |\n| OFFICIAL    | 是否官方     |\n| AUTOMATED   | 是否自动构建 |\n\n---\n\n#### 镜像获取命令小结\n\n| 命令              | 作用     | 示例                        |\n| ----------------- | -------- | --------------------------- |\n| `docker pull`   | 拉取镜像 | `docker pull nginx:1.25`  |\n| `docker push`   | 推送镜像 | `docker push user/app:v1` |\n| `docker login`  | 登录仓库 | `docker login`            |\n| `docker logout` | 登出仓库 | `docker logout`           |\n| `docker search` | 搜索镜像 | `docker search nginx`     |\n\n---", "subs": ["docker pull", "docker push", "docker login / logout", "docker search", "镜像获取命令小结"]}, {"title": "4.2 镜像查看命令（ls/history/inspect）", "content": "#### docker images / docker image ls：列出镜像\n\n`docker images` 命令用于**列出本地镜像**。\n\n##### 语法格式\n\n```bash\ndocker images [OPTIONS] [REPOSITORY[:TAG]]\ndocker image ls [OPTIONS] [REPOSITORY[:TAG]]\n```\n\n##### 常用选项\n\n| 选项             | 说明                       |\n| ---------------- | -------------------------- |\n| `-a, --all`    | 显示所有镜像（包括中间层） |\n| `-q, --quiet`  | 只显示镜像 ID              |\n| `--digests`    | 显示摘要                   |\n| `--no-trunc`   | 不截断输出                 |\n| `-f, --filter` | 过滤条件                   |\n| `--format`     | 格式化输出                 |\n\n##### 实战示例\n\n**示例 1：列出所有镜像**\n\n```bash\n$ docker images\nREPOSITORY   TAG       IMAGE ID       CREATED        SIZE\nnginx        1.25      a8758716bb6a   2 weeks ago    187MB\nredis        7.2       7614ae9453d1   3 weeks ago    138MB\nalpine       latest    c059bfaa849c   4 weeks ago    7.73MB\n```\n\n**示例 2：只显示镜像 ID**\n\n```bash\n$ docker images -q\na8758716bb6a\n7614ae9453d1\nc059bfaa849c\n```\n\n**示例 3：按仓库过滤**\n\n```bash\n$ docker images nginx\nREPOSITORY   TAG          IMAGE ID       CREATED        SIZE\nnginx        1.25         a8758716bb6a   2 weeks ago    187MB\nnginx        alpine       d0a9baf36a14   2 weeks ago    43.3MB\n```\n\n**示例 4：使用过滤器**\n\n```bash\n# 悬空镜像（无标签）\n$ docker images -f dangling=true\n\n# 指定时间之前创建的镜像\n$ docker images -f before=nginx:1.25\n\n# 指定标签的镜像\n$ docker images -f label=maintainer=nginx\n```\n\n**示例 5：格式化输出**\n\n```bash\n# 自定义格式\n$ docker images --format \"{{.Repository}}:{{.Tag}} - {{.Size}}\"\nnginx:1.25 - 187MB\nredis:7.2 - 138MB\n\n# 表格格式\n$ docker images --format \"table {{.Repository}}\\t{{.Tag}}\\t{{.Size}}\"\n```\n\n##### 输出列说明\n\n| 列         | 说明          |\n| ---------- | ------------- |\n| REPOSITORY | 仓库名        |\n| TAG        | 标签          |\n| IMAGE ID   | 镜像 ID（短） |\n| CREATED    | 创建时间      |\n| SIZE       | 镜像大小      |\n\n---\n\n#### docker history：查看镜像历史\n\n`docker history` 命令用于**查看镜像的构建历史**。\n\n##### 语法格式\n\n```bash\ndocker history [OPTIONS] IMAGE\n```\n\n##### 常用选项\n\n| 选项            | 说明                 |\n| --------------- | -------------------- |\n| `-H, --human` | 人类可读格式（默认） |\n| `--no-trunc`  | 不截断输出           |\n| `-q, --quiet` | 只显示镜像 ID        |\n| `--format`    | 格式化输出           |\n\n##### 实战示例\n\n**示例 1：查看镜像历史**\n\n```bash\n$ docker history nginx:1.25\nIMAGE          CREATED       CREATED BY                                      SIZE\na8758716bb6a   2 weeks ago   CMD [\"nginx\" \"-g\" \"daemon off;\"]                0B\n<missing>      2 weeks ago   STOPSIGNAL SIGQUIT                              0B\n<missing>      2 weeks ago   EXPOSE 80                                       0B\n<missing>      2 weeks ago   ENTRYPOINT [\"/docker-entrypoint.sh\"]            0B\n...\n```\n\n**示例 2：显示完整命令**\n\n```bash\ndocker history --no-trunc nginx:1.25\n```\n\n**示例 3：格式化输出**\n\n```bash\ndocker history --format \"{{.CreatedBy}}\" nginx:1.25\n```\n\n##### 输出列说明\n\n| 列         | 说明           |\n| ---------- | -------------- |\n| IMAGE      | 层 ID          |\n| CREATED    | 创建时间       |\n| CREATED BY | 创建该层的命令 |\n| SIZE       | 该层大小       |\n| COMMENT    | 注释           |\n\n---\n\n#### docker inspect：查看详细信息\n\n`docker image inspect` 命令用于**查看镜像的详细元数据**。\n\n##### 语法格式\n\n```bash\ndocker image inspect [OPTIONS] IMAGE [IMAGE...]\n```\n\n##### 常用选项\n\n| 选项             | 说明                  |\n| ---------------- | --------------------- |\n| `-f, --format` | 格式化输出（Go 模板） |\n| `-s, --size`   | 显示文件大小          |\n\n##### 实战示例\n\n**示例 1：查看完整信息**\n\n```bash\n$ docker image inspect nginx:1.25\n[\n    {\n        \"Id\": \"sha256:a8758716bb6a...\",\n        \"RepoTags\": [\"nginx:1.25\"],\n        \"Created\": \"2024-01-15T12:00:00Z\",\n        ...\n    }\n]\n```\n\n**示例 2：提取特定字段**\n\n```bash\n# 获取镜像 ID\n$ docker image inspect -f '{{.Id}}' nginx:1.25\nsha256:a8758716bb6a...\n\n# 获取创建时间\n$ docker image inspect -f '{{.Created}}' nginx:1.25\n\n# 获取暴露端口\n$ docker image inspect -f '{{.Config.ExposedPorts}}' nginx:1.25\nmap[80/tcp:{}]\n\n# 获取环境变量\n$ docker image inspect -f '{{.Config.Env}}' nginx:1.25\n\n# 获取入口点\n$ docker image inspect -f '{{.Config.Entrypoint}}' nginx:1.25\n```\n\n**示例 3：获取镜像大小**\n\n```bash\n$ docker image inspect -f '{{.Size}}' nginx:1.25\n187654321\n```\n\n**示例 4：获取镜像层**\n\n```bash\ndocker image inspect -f '{{range .RootFS.Layers}}{{println .}}{{end}}' nginx:1.25\n```\n\n##### 常用 inspect 字段\n\n| 字段路径                 | 说明         |\n| ------------------------ | ------------ |\n| `.Id`                  | 镜像 ID      |\n| `.RepoTags`            | 标签列表     |\n| `.Created`             | 创建时间     |\n| `.Size`                | 大小（字节） |\n| `.Config.Env`          | 环境变量     |\n| `.Config.Cmd`          | 默认命令     |\n| `.Config.Entrypoint`   | 入口点       |\n| `.Config.ExposedPorts` | 暴露端口     |\n| `.Config.WorkingDir`   | 工作目录     |\n| `.RootFS.Layers`       | 层列表       |\n\n---\n\n#### 镜像查看命令小结\n\n| 命令                     | 作用     | 示例                           |\n| ------------------------ | -------- | ------------------------------ |\n| `docker images`        | 列出镜像 | `docker images -q`           |\n| `docker history`       | 查看历史 | `docker history nginx`       |\n| `docker image inspect` | 查看详情 | `docker image inspect nginx` |\n\n---", "subs": ["docker images / docker image ls", "docker history", "docker inspect", "镜像查看命令小结"]}, {"title": "4.3 镜像导入导出命令（save/load/import/export）", "content": "镜像导入导出用于在不同环境之间迁移镜像，特别是在无法访问仓库的离线环境中。\n\n#### docker save：导出镜像\n\n`docker save` 命令用于**将镜像保存为 tar 归档文件**。\n\n##### 语法格式\n\n```bash\ndocker save [OPTIONS] IMAGE [IMAGE...]\n```\n\n##### 常用选项\n\n| 选项             | 说明       |\n| ---------------- | ---------- |\n| `-o, --output` | 输出到文件 |\n\n##### 实战示例\n\n**示例 1：导出单个镜像**\n\n```bash\ndocker save -o nginx.tar nginx:1.25\n```\n\n**示例 2：使用重定向**\n\n```bash\ndocker save nginx:1.25 > nginx.tar\n```\n\n**示例 3：导出多个镜像**\n\n```bash\ndocker save -o images.tar nginx:1.25 redis:7.2 alpine:latest\n```\n\n**示例 4：压缩导出**\n\n```bash\ndocker save nginx:1.25 | gzip > nginx.tar.gz\n```\n\n**示例 5：导出所有镜像**\n\n```bash\ndocker save -o all-images.tar $(docker images -q)\n```\n\n---\n\n#### docker load：导入镜像\n\n`docker load` 命令用于**从 tar 归档文件加载镜像**。\n\n##### 语法格式\n\n```bash\ndocker load [OPTIONS]\n```\n\n##### 常用选项\n\n| 选项            | 说明       |\n| --------------- | ---------- |\n| `-i, --input` | 从文件读取 |\n| `-q, --quiet` | 静默输出   |\n\n##### 实战示例\n\n**示例 1：导入镜像**\n\n```bash\n$ docker load -i nginx.tar\nLoaded image: nginx:1.25\n```\n\n**示例 2：使用重定向**\n\n```bash\ndocker load < nginx.tar\n```\n\n**示例 3：导入压缩文件**\n\n```bash\ngunzip -c nginx.tar.gz | docker load\n```\n\n**示例 4：从远程 URL 导入**\n\n```bash\ncurl -sL https://example.com/images/nginx.tar | docker load\n```\n\n---\n\n#### docker export：导出容器\n\n`docker export` 命令用于**将容器的文件系统导出为 tar 归档**。\n\n> ⚠️ **注意**：`export` 导出的是容器的文件系统，不包含镜像的历史和元数据。\n\n##### 语法格式\n\n```bash\ndocker export [OPTIONS] CONTAINER\n```\n\n##### 常用选项\n\n| 选项             | 说明       |\n| ---------------- | ---------- |\n| `-o, --output` | 输出到文件 |\n\n##### 实战示例\n\n```bash\n# 导出容器\n$ docker export -o mycontainer.tar mycontainer\n\n# 使用重定向\n$ docker export mycontainer > mycontainer.tar\n```\n\n---\n\n#### docker import：从归档创建镜像\n\n`docker import` 命令用于**从 tar 归档创建新镜像**。\n\n##### 语法格式\n\n```bash\ndocker import [OPTIONS] file|URL|- [REPOSITORY[:TAG]]\n```\n\n##### 常用选项\n\n| 选项              | 说明                 |\n| ----------------- | -------------------- |\n| `-c, --change`  | 应用 Dockerfile 指令 |\n| `-m, --message` | 提交信息             |\n\n##### 实战示例\n\n**示例 1：从文件导入**\n\n```bash\ndocker import mycontainer.tar myimage:v1\n```\n\n**示例 2：从 URL 导入**\n\n```bash\ndocker import https://example.com/rootfs.tar myimage:v1\n```\n\n**示例 3：添加元数据**\n\n```bash\ndocker import -c 'CMD [\"nginx\"]' -c 'EXPOSE 80' mycontainer.tar nginx:custom\n```\n\n---\n\n#### save/load vs export/import\n\n| 特性       | save/load | export/import |\n| ---------- | --------- | ------------- |\n| 对象       | 镜像      | 容器          |\n| 保留历史   | ✅ 是     | ❌ 否         |\n| 保留元数据 | ✅ 是     | ❌ 否         |\n| 保留层结构 | ✅ 是     | ❌ 否（单层） |\n| 文件大小   | 较大      | 较小          |\n| 用途       | 镜像迁移  | 快照、备份    |\n\n---\n\n#### 实战场景\n\n##### 场景 1：离线环境部署\n\n```bash\n# 在有网环境\n$ docker pull nginx:1.25\n$ docker save -o nginx.tar nginx:1.25\n\n# 拷贝到离线环境\n$ scp nginx.tar user@offline-server:/tmp/\n\n# 在离线环境加载\n$ docker load -i /tmp/nginx.tar\n```\n\n##### 场景 2：批量迁移镜像\n\n```bash\n# 导出所有镜像\n$ docker save -o all-images.tar $(docker images --format \"{{.Repository}}:{{.Tag}}\" | grep -v \"<none>\")\n\n# 导入所有镜像\n$ docker load -i all-images.tar\n```\n\n##### 场景 3：创建自定义基础镜像\n\n```bash\n# 创建并配置容器\n$ docker run -it --name mybase alpine sh\n# ... 安装软件、配置环境 ...\n\n# 导出容器\n$ docker export -o mybase.tar mybase\n\n# 创建镜像\n$ docker import mybase.tar mybase:v1\n```\n\n---\n\n#### 镜像导入导出命令小结\n\n| 命令              | 作用           | 示例                               |\n| ----------------- | -------------- | ---------------------------------- |\n| `docker save`   | 导出镜像       | `docker save -o nginx.tar nginx` |\n| `docker load`   | 导入镜像       | `docker load -i nginx.tar`       |\n| `docker export` | 导出容器       | `docker export -o app.tar app`   |\n| `docker import` | 从归档创建镜像 | `docker import app.tar myapp:v1` |\n\n---", "subs": ["docker save", "docker load", "docker export", "docker import", "save/load vs export/import", "实战场景", "镜像导入导出命令小结"]}, {"title": "4.4 镜像维护命令（tag/rm/prune）", "content": "镜像维护命令用于管理本地镜像，包括重命名、删除和清理操作。\n\n#### docker tag：镜像标签\n\n`docker tag` 命令用于**为镜像创建新的标签**。\n\n##### 语法格式\n\n```bash\ndocker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]\n```\n\n##### 实战示例\n\n**示例 1：创建新标签**\n\n```bash\ndocker tag nginx:1.25 nginx:latest\n```\n\n**示例 2：准备推送到私有仓库**\n\n```bash\ndocker tag myapp:v1 registry.example.com/team/myapp:v1\n```\n\n**示例 3：创建版本标签**\n\n```bash\ndocker tag myapp:latest myapp:v1.0.0\ndocker tag myapp:latest myapp:v1.0\ndocker tag myapp:latest myapp:v1\n```\n\n**示例 4：使用镜像 ID**\n\n```bash\ndocker tag a8758716bb6a myapp:v2\n```\n\n> 💡 `docker tag` 不会复制镜像，只是创建一个指向同一镜像的新引用。\n\n---\n\n#### docker rmi / docker image rm：删除镜像\n\n`docker rmi` 命令用于**删除本地镜像**。\n\n##### 语法格式\n\n```bash\ndocker rmi [OPTIONS] IMAGE [IMAGE...]\ndocker image rm [OPTIONS] IMAGE [IMAGE...]\n```\n\n##### 常用选项\n\n| 选项            | 说明                 |\n| --------------- | -------------------- |\n| `-f, --force` | 强制删除             |\n| `--no-prune`  | 不删除未标记的父镜像 |\n\n##### 实战示例\n\n**示例 1：删除单个镜像**\n\n```bash\n$ docker rmi nginx:1.25\nUntagged: nginx:1.25\nDeleted: sha256:a8758716bb6a...\n```\n\n**示例 2：删除多个镜像**\n\n```bash\ndocker rmi nginx:1.25 redis:7.2 alpine:latest\n```\n\n**示例 3：强制删除（有容器使用时）**\n\n```bash\ndocker rmi -f nginx:1.25\n```\n\n**示例 4：使用镜像 ID 删除**\n\n```bash\ndocker rmi a8758716bb6a\n```\n\n**示例 5：删除所有镜像**\n\n```bash\ndocker rmi $(docker images -q)\n```\n\n**示例 6：删除悬空镜像**\n\n```bash\ndocker rmi $(docker images -f dangling=true -q)\n```\n\n##### 删除失败的常见原因\n\n| 错误                             | 原因           | 解决方案                   |\n| -------------------------------- | -------------- | -------------------------- |\n| image is being used              | 有容器使用     | 先停止/删除容器            |\n| image has dependent child images | 有子镜像依赖   | 先删除子镜像               |\n| conflict: unable to delete       | 镜像有多个标签 | 使用 `-f` 或删除所有标签 |\n\n---\n\n#### docker image prune：清理镜像\n\n`docker image prune` 命令用于**清理未使用的镜像**。\n\n##### 语法格式\n\n```bash\ndocker image prune [OPTIONS]\n```\n\n##### 常用选项\n\n| 选项            | 说明                             |\n| --------------- | -------------------------------- |\n| `-a, --all`   | 删除所有未使用镜像，不仅是悬空的 |\n| `-f, --force` | 不提示确认                       |\n| `--filter`    | 过滤条件                         |\n\n##### 实战示例\n\n**示例 1：清理悬空镜像**\n\n```bash\n$ docker image prune\nWARNING! This will remove all dangling images.\nAre you sure you want to continue? [y/N] y\nTotal reclaimed space: 1.2GB\n```\n\n**示例 2：清理所有未使用镜像**\n\n```bash\ndocker image prune -a\n```\n\n**示例 3：强制清理（不提示）**\n\n```bash\ndocker image prune -f\n```\n\n**示例 4：按时间过滤**\n\n```bash\n# 清理 24 小时前创建的镜像\n$ docker image prune -a --filter \"until=24h\"\n\n# 清理 7 天前的镜像\n$ docker image prune -a --filter \"until=168h\"\n```\n\n**示例 5：按标签过滤**\n\n```bash\n# 清理没有特定标签的镜像\n$ docker image prune -a --filter \"label!=keep\"\n```\n\n---\n\n#### docker system prune：系统清理\n\n`docker system prune` 命令用于**清理所有未使用的 Docker 资源**。\n\n```bash\n# 清理未使用的容器、网络、悬空镜像\n$ docker system prune\n\n# 清理所有未使用资源（包括未使用的镜像和卷）\n$ docker system prune -a --volumes\n\n# 查看磁盘使用情况\n$ docker system df\n```\n\n##### docker system df 输出示例\n\n```\nTYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE\nImages          15        3         8.2GB     5.8GB (70%)\nContainers      5         2         120MB     80MB (66%)\nLocal Volumes   8         4         2.1GB     1.2GB (57%)\nBuild Cache     25        0         1.5GB     1.5GB (100%)\n```\n\n---\n\n#### 镜像维护命令小结\n\n| 命令                    | 作用     | 示例                                   |\n| ----------------------- | -------- | -------------------------------------- |\n| `docker tag`          | 创建标签 | `docker tag nginx:1.25 nginx:latest` |\n| `docker rmi`          | 删除镜像 | `docker rmi nginx:1.25`              |\n| `docker image prune`  | 清理镜像 | `docker image prune -a`              |\n| `docker system prune` | 系统清理 | `docker system prune -a`             |\n| `docker system df`    | 查看磁盘 | `docker system df`                   |\n\n##### 清理策略建议\n\n```bash\n# 定期清理脚本\n#!/bin/bash\n\n# 清理已停止的容器\ndocker container prune -f\n\n# 清理悬空镜像\ndocker image prune -f\n\n# 清理未使用的网络\ndocker network prune -f\n\n# 清理 7 天前的构建缓存\ndocker builder prune -f --filter \"until=168h\"\n\necho \"清理完成！\"\ndocker system df\n```\n\n---\n\n---", "subs": ["docker tag", "docker rmi / docker image rm", "docker image prune", "docker system prune", "镜像维护命令小结"]}]}, {"title": "第五章 镜像构建", "sections": [{"title": "5.1 docker build 命令详解", "content": "本章介绍如何使用 Docker 构建自定义镜像，包括 Dockerfile 编写和构建命令详解。\n\n\n`docker build` 命令用于**从 Dockerfile 构建镜像**。\n\n#### 语法格式\n\n```bash\ndocker build [OPTIONS] PATH | URL | -\n```\n\n- `PATH`：构建上下文路径（通常是 `.`）\n- `URL`：Git 仓库 URL\n- `-`：从标准输入读取 Dockerfile\n\n#### 常用选项\n\n| 选项            | 说明                       |\n| --------------- | -------------------------- |\n| `-t, --tag`   | 镜像名称和标签             |\n| `-f, --file`  | 指定 Dockerfile 路径       |\n| `--build-arg` | 设置构建参数               |\n| `--no-cache`  | 不使用缓存                 |\n| `--target`    | 多阶段构建目标             |\n| `--platform`  | 目标平台                   |\n| `--pull`      | 始终拉取基础镜像           |\n| `--push`      | 构建后推送（需 buildx）    |\n| `-q, --quiet` | 静默输出                   |\n| `--progress`  | 输出格式（auto/plain/tty） |\n\n---\n\n#### 基本用法\n\n**示例 1：基本构建**\n\n```bash\n# 在当前目录构建\n$ docker build -t myapp:v1 .\n```\n\n**示例 2：指定 Dockerfile**\n\n```bash\ndocker build -t myapp:v1 -f Dockerfile.prod .\n```\n\n**示例 3：从 URL 构建**\n\n```bash\ndocker build -t myapp:v1 https://github.com/user/repo.git\n```\n\n**示例 4：从标准输入构建**\n\n```bash\ndocker build -t myapp:v1 - < Dockerfile\n```\n\n---\n\n#### 构建参数（--build-arg）\n\n`--build-arg` 用于在构建时传递变量。\n\n##### Dockerfile 中定义 ARG\n\n```dockerfile\nARG VERSION=latest\nARG BASE_IMAGE=alpine\n\nFROM ${BASE_IMAGE}:${VERSION}\n```\n\n##### 构建时传递参数\n\n```bash\n$ docker build \\\n  --build-arg VERSION=3.18 \\\n  --build-arg BASE_IMAGE=ubuntu \\\n  -t myapp:v1 .\n```\n\n> 💡 `ARG` 仅在构建阶段有效，运行时使用 `ENV`。\n\n---\n\n#### 多阶段构建（--target）\n\n多阶段构建用于**减小最终镜像体积**。\n\n##### 多阶段 Dockerfile 示例\n\n```dockerfile\n# 阶段 1：构建\nFROM golang:1.21 AS builder\nWORKDIR /app\nCOPY . .\nRUN go build -o myapp\n\n# 阶段 2：运行\nFROM alpine:3.18 AS production\nCOPY --from=builder /app/myapp /usr/local/bin/\nCMD [\"myapp\"]\n\n# 阶段 3：开发（包含调试工具）\nFROM builder AS development\nRUN go install github.com/go-delve/delve/cmd/dlv@latest\nCMD [\"dlv\", \"debug\"]\n```\n\n##### 构建特定阶段\n\n```bash\n# 构建生产镜像\n$ docker build --target production -t myapp:prod .\n\n# 构建开发镜像\n$ docker build --target development -t myapp:dev .\n\n# 只构建 builder 阶段\n$ docker build --target builder -t myapp:builder .\n```\n\n---\n\n#### 缓存控制\n\n##### 不使用缓存\n\n```bash\ndocker build --no-cache -t myapp:v1 .\n```\n\n##### 始终拉取基础镜像\n\n```bash\ndocker build --pull -t myapp:v1 .\n```\n\n##### 查看构建缓存\n\n```bash\ndocker builder du\n```\n\n##### 清理构建缓存\n\n```bash\ndocker builder prune\ndocker builder prune -a  # 清理所有\n```\n\n---\n\n#### 跨平台构建（--platform）\n\n使用 `--platform` 构建不同架构的镜像。\n\n```bash\n# 构建 ARM64 镜像\n$ docker build --platform linux/arm64 -t myapp:arm64 .\n\n# 构建 AMD64 镜像\n$ docker build --platform linux/amd64 -t myapp:amd64 .\n```\n\n> 💡 跨平台构建需要 QEMU 模拟器或 buildx。\n\n---\n\n#### docker buildx（高级构建）\n\n`docker buildx` 是 Docker 的扩展构建工具，支持更多功能。\n\n##### 创建构建器\n\n```bash\ndocker buildx create --name mybuilder --use\ndocker buildx inspect --bootstrap\n```\n\n##### 多平台构建\n\n```bash\n$ docker buildx build \\\n  --platform linux/amd64,linux/arm64 \\\n  -t username/myapp:v1 \\\n  --push \\\n  .\n```\n\n##### 构建并推送\n\n```bash\n$ docker buildx build \\\n  -t username/myapp:v1 \\\n  --push \\\n  .\n```\n\n##### 构建并加载到本地\n\n```bash\n$ docker buildx build \\\n  -t myapp:v1 \\\n  --load \\\n  .\n```\n\n---", "subs": ["语法格式", "常用选项", "基本用法", "构建参数（--build-arg）", "多阶段构建（", "缓存控制", "跨平台构建（", "docker buildx（高级构建）"]}, {"title": "5.2 Dockerfile 指令详解", "content": "Dockerfile 是构建镜像的蓝图，包含一系列指令。\n\n#### 常用指令一览\n\n| 指令            | 说明                        |\n| --------------- | --------------------------- |\n| `FROM`        | 基础镜像                    |\n| `RUN`         | 执行命令                    |\n| `COPY`        | 复制文件                    |\n| `ADD`         | 复制文件（支持 URL 和解压） |\n| `WORKDIR`     | 工作目录                    |\n| `ENV`         | 环境变量                    |\n| `ARG`         | 构建参数                    |\n| `EXPOSE`      | 暴露端口                    |\n| `CMD`         | 默认命令                    |\n| `ENTRYPOINT`  | 入口点                      |\n| `USER`        | 运行用户                    |\n| `VOLUME`      | 挂载点                      |\n| `LABEL`       | 元数据标签                  |\n| `HEALTHCHECK` | 健康检查                    |\n\n---\n\n#### FROM：基础镜像\n\n```dockerfile\n# 基本用法\nFROM ubuntu:22.04\n\n# 使用别名（多阶段构建）\nFROM golang:1.21 AS builder\n\n# 使用 ARG\nARG BASE_IMAGE=alpine:3.18\nFROM ${BASE_IMAGE}\n\n# scratch（空镜像）\nFROM scratch\n```\n\n---\n\n#### RUN：执行命令\n\n```dockerfile\n# Shell 格式\nRUN apt-get update && apt-get install -y nginx\n\n# Exec 格式\nRUN [\"apt-get\", \"update\"]\n\n# 多行命令（推荐）\nRUN apt-get update && \\\n    apt-get install -y --no-install-recommends \\\n        nginx \\\n        curl \\\n    && rm -rf /var/lib/apt/lists/*\n```\n\n---\n\n#### COPY vs ADD\n\n```dockerfile\n# COPY：简单复制\nCOPY src/ /app/src/\nCOPY package*.json ./\n\n# ADD：支持 URL 和自动解压\nADD https://example.com/file.tar.gz /tmp/\nADD archive.tar.gz /app/\n```\n\n> 💡 推荐使用 `COPY`，更明确且可预测。\n\n---\n\n#### WORKDIR：工作目录\n\n```dockerfile\nWORKDIR /app\nCOPY . .\nRUN npm install\n```\n\n---\n\n#### ENV vs ARG\n\n```dockerfile\n# ARG：构建时变量\nARG VERSION=1.0\n\n# ENV：运行时环境变量\nENV APP_ENV=production\nENV NODE_ENV=production\n\n# ARG 转 ENV\nARG VERSION\nENV APP_VERSION=${VERSION}\n```\n\n---\n\n#### CMD vs ENTRYPOINT\n\n```dockerfile\n# CMD：默认命令（可被覆盖）\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n\n# ENTRYPOINT：入口点（不易覆盖）\nENTRYPOINT [\"nginx\"]\nCMD [\"-g\", \"daemon off;\"]\n\n# Shell 格式\nCMD nginx -g 'daemon off;'\n```\n\n##### CMD 与 ENTRYPOINT 组合\n\n| ENTRYPOINT          | CMD                       | 结果                     |\n| ------------------- | ------------------------- | ------------------------ |\n| 无                  | `[\"nginx\"]`             | `nginx`                |\n| `[\"nginx\"]`       | `[\"-g\", \"daemon off;\"]` | `nginx -g daemon off;` |\n| `[\"nginx\", \"-g\"]` | `[\"daemon off;\"]`       | `nginx -g daemon off;` |\n\n---\n\n#### USER：运行用户\n\n```dockerfile\n# 创建用户\nRUN addgroup --system app && adduser --system --group app\n\n# 切换用户\nUSER app\n\n# 或使用 UID\nUSER 1000:1000\n```\n\n---\n\n#### HEALTHCHECK：健康检查\n\n```dockerfile\nHEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=5s \\\n  CMD curl -f http://localhost/ || exit 1\n\n# 禁用健康检查\nHEALTHCHECK NONE\n```\n\n---", "subs": ["常用指令一览", "FROM：基础镜像", "RUN：执行命令", "COPY vs ADD", "WORKDIR", "ENV vs ARG", "CMD vs ENTRYPOINT", "USER：运行用户", "HEALTHCHECK"]}, {"title": "5.3 Dockerfile 最佳实践", "content": "#### 减小镜像体积\n\n```dockerfile\n# 使用小基础镜像\nFROM alpine:3.18\n\n# 多阶段构建\nFROM golang:1.21 AS builder\nRUN go build -o app\n\nFROM alpine:3.18\nCOPY --from=builder /app/app /usr/local/bin/\n\n# 清理缓存\nRUN apt-get update && apt-get install -y nginx \\\n    && rm -rf /var/lib/apt/lists/*\n```\n\n#### 利用构建缓存\n\n```dockerfile\n# 先复制依赖文件\nCOPY package*.json ./\nRUN npm install\n\n# 再复制源码（变化频繁）\nCOPY . .\n```\n\n#### 安全最佳实践\n\n```dockerfile\n# 使用非 root 用户\nRUN adduser --system --no-create-home appuser\nUSER appuser\n\n# 固定版本\nFROM nginx:1.25.3-alpine\n\n# 扫描漏洞\n# docker scout cves myapp:v1\n```\n\n#### 标准 Dockerfile 模板\n\n```dockerfile\n# syntax=docker/dockerfile:1.4\n\n# ============ 构建阶段 ============\nFROM node:20-alpine AS builder\n\nWORKDIR /app\n\n# 依赖安装（利用缓存）\nCOPY package*.json ./\nRUN npm ci --only=production\n\n# 复制源码\nCOPY . .\n\n# 构建\nRUN npm run build\n\n# ============ 生产阶段 ============\nFROM node:20-alpine AS production\n\n# 安全：创建非 root 用户\nRUN addgroup --system app && adduser --system --group app\n\nWORKDIR /app\n\n# 复制构建产物\nCOPY --from=builder --chown=app:app /app/dist ./dist\nCOPY --from=builder --chown=app:app /app/node_modules ./node_modules\n\n# 切换用户\nUSER app\n\n# 暴露端口\nEXPOSE 3000\n\n# 健康检查\nHEALTHCHECK --interval=30s --timeout=10s --retries=3 \\\n  CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1\n\n# 启动命令\nCMD [\"node\", \"dist/main.js\"]\n```\n\n---", "subs": ["减小镜像体积", "利用构建缓存", "安全最佳实践", "标准 Dockerfile 模板"]}, {"title": "5.4 构建命令小结", "content": "| 命令                     | 作用     | 示例                                                                |\n| ------------------------ | -------- | ------------------------------------------------------------------- |\n| `docker build`         | 构建镜像 | `docker build -t myapp:v1 .`                                      |\n| `docker buildx build`  | 高级构建 | `docker buildx build --platform linux/amd64,linux/arm64 --push .` |\n| `docker builder prune` | 清理缓存 | `docker builder prune -a`                                         |\n\n---\n\n---", "subs": []}]}, {"title": "第六章 网络管理", "sections": [{"title": "6.1 Docker 网络概述", "content": "本章介绍 Docker 网络的管理命令，包括创建、删除、连接和查看等操作。\n\n\nDocker 提供多种网络驱动，用于容器间通信。\n\n#### 网络驱动类型\n\n| 驱动        | 说明                           | 使用场景         |\n| ----------- | ------------------------------ | ---------------- |\n| `bridge`  | 默认网络，容器通过虚拟网桥通信 | 单机容器通信     |\n| `host`    | 容器使用宿主机网络栈           | 高性能场景       |\n| `none`    | 无网络                         | 安全隔离         |\n| `overlay` | 跨主机容器通信                 | Swarm/K8s 集群   |\n| `macvlan` | 容器拥有独立 MAC 地址          | 直接接入物理网络 |\n| `ipvlan`  | 类似 macvlan，共享 MAC         | 特殊网络需求     |\n\n---", "subs": ["网络驱动类型"]}, {"title": "6.2 网络创建与删除命令（create/rm/prune）", "content": "#### docker network create：创建网络\n\n`docker network create` 命令用于**创建自定义网络**。\n\n##### 语法格式\n\n```bash\ndocker network create [OPTIONS] NETWORK\n```\n\n##### 常用选项\n\n| 选项             | 说明                    |\n| ---------------- | ----------------------- |\n| `-d, --driver` | 网络驱动（默认 bridge） |\n| `--subnet`     | 子网（CIDR 格式）       |\n| `--gateway`    | 网关地址                |\n| `--ip-range`   | IP 分配范围             |\n| `--internal`   | 内部网络（无外部访问）  |\n| `--attachable` | 允许手动附加容器        |\n| `-o, --opt`    | 驱动选项                |\n| `--label`      | 网络标签                |\n\n##### 实战示例\n\n**示例 1：创建默认 bridge 网络**\n\n```bash\ndocker network create mynet\n```\n\n**示例 2：指定子网和网关**\n\n```bash\n$ docker network create \\\n  --subnet 172.20.0.0/16 \\\n  --gateway 172.20.0.1 \\\n  mynet\n```\n\n**示例 3：创建内部网络**\n\n```bash\ndocker network create --internal backend-net\n```\n\n**示例 4：创建 overlay 网络（Swarm）**\n\n```bash\ndocker network create -d overlay --attachable app-net\n```\n\n**示例 5：创建 macvlan 网络**\n\n```bash\n$ docker network create -d macvlan \\\n  --subnet 192.168.1.0/24 \\\n  --gateway 192.168.1.1 \\\n  -o parent=eth0 \\\n  macvlan-net\n```\n\n**示例 6：指定 IP 范围**\n\n```bash\n$ docker network create \\\n  --subnet 10.0.0.0/16 \\\n  --ip-range 10.0.1.0/24 \\\n  --gateway 10.0.0.1 \\\n  custom-net\n```\n\n---\n\n#### docker network rm：删除网络\n\n`docker network rm` 命令用于**删除网络**。\n\n##### 语法格式\n\n```bash\ndocker network rm NETWORK [NETWORK...]\n```\n\n##### 实战示例\n\n```bash\n# 删除单个网络\n$ docker network rm mynet\n\n# 删除多个网络\n$ docker network rm net1 net2 net3\n\n# 使用 ID 删除\n$ docker network rm abc123\n```\n\n> ⚠️ **注意**：无法删除正在使用的网络，需先断开所有容器。\n\n---\n\n#### docker network prune：清理网络\n\n`docker network prune` 命令用于**清理未使用的网络**。\n\n##### 语法格式\n\n```bash\ndocker network prune [OPTIONS]\n```\n\n##### 常用选项\n\n| 选项            | 说明       |\n| --------------- | ---------- |\n| `-f, --force` | 不提示确认 |\n| `--filter`    | 过滤条件   |\n\n##### 实战示例\n\n```bash\n# 清理未使用的网络\n$ docker network prune\nWARNING! This will remove all custom networks not used by at least one container.\nAre you sure you want to continue? [y/N] y\n\n# 强制清理\n$ docker network prune -f\n\n# 按时间过滤\n$ docker network prune --filter \"until=24h\"\n```\n\n---", "subs": ["docker network create", "docker network rm", "docker network prune"]}, {"title": "6.3 网络查看命令（ls/inspect）", "content": "#### docker network ls：列出网络\n\n```bash\n# 列出所有网络\n$ docker network ls\nNETWORK ID     NAME      DRIVER    SCOPE\nabc123def456   bridge    bridge    local\ndef456ghi789   host      host      local\nghi789jkl012   none      null      local\n\n# 过滤网络\n$ docker network ls -f driver=bridge\n$ docker network ls -f name=mynet\n\n# 静默模式\n$ docker network ls -q\n```\n\n---\n\n#### docker network inspect：查看网络详情\n\n```bash\n# 查看网络详情\n$ docker network inspect mynet\n\n# 提取特定字段\n$ docker network inspect -f '{{.IPAM.Config}}' mynet\n$ docker network inspect -f '{{range .Containers}}{{.Name}}{{end}}' mynet\n```\n\n##### 常用 inspect 字段\n\n| 字段路径         | 说明       |\n| ---------------- | ---------- |\n| `.Name`        | 网络名称   |\n| `.Driver`      | 驱动类型   |\n| `.Scope`       | 作用域     |\n| `.IPAM.Config` | IP 配置    |\n| `.Containers`  | 连接的容器 |\n| `.Options`     | 驱动选项   |\n\n---", "subs": ["docker network ls", "docker network inspect"]}, {"title": "6.4 网络连接命令（connect/disconnect）", "content": "#### docker network connect：连接容器到网络\n\n```bash\n# 连接容器到网络\n$ docker network connect mynet mycontainer\n\n# 指定 IP 地址\n$ docker network connect --ip 172.20.0.10 mynet mycontainer\n\n# 指定别名\n$ docker network connect --alias db mynet mysql-container\n```\n\n---\n\n#### docker network disconnect：断开容器网络\n\n```bash\n# 断开连接\n$ docker network disconnect mynet mycontainer\n\n# 强制断开\n$ docker network disconnect -f mynet mycontainer\n```\n\n---", "subs": ["docker network connect", "docker network disconnect"]}, {"title": "6.5 网络实战场景", "content": "#### 场景 1：多容器应用网络\n\n```bash\n# 创建应用网络\n$ docker network create app-network\n\n# 启动数据库（指定网络）\n$ docker run -d --name db \\\n  --network app-network \\\n  -e MYSQL_ROOT_PASSWORD=secret \\\n  mysql:8.0\n\n# 启动应用（同一网络）\n$ docker run -d --name app \\\n  --network app-network \\\n  -e DB_HOST=db \\\n  myapp:v1\n```\n\n#### 场景 2：前后端分离网络\n\n```bash\n# 创建前端网络\n$ docker network create frontend\n\n# 创建后端网络（内部）\n$ docker network create --internal backend\n\n# API 网关连接两个网络\n$ docker run -d --name api-gateway \\\n  --network frontend \\\n  api-gateway:v1\n\n$ docker network connect backend api-gateway\n```\n\n#### 场景 3：固定容器 IP\n\n```bash\n# 创建指定子网的网络\n$ docker network create \\\n  --subnet 172.28.0.0/16 \\\n  fixed-ip-net\n\n# 启动容器并指定 IP\n$ docker run -d --name web \\\n  --network fixed-ip-net \\\n  --ip 172.28.0.100 \\\n  nginx\n```\n\n---", "subs": ["场景 1：多容器应用网络", "场景 2：前后端分离网络", "场景 3：固定容器 IP"]}, {"title": "6.6 网络命令小结", "content": "| 命令                          | 作用     | 示例                                    |\n| ----------------------------- | -------- | --------------------------------------- |\n| `docker network create`     | 创建网络 | `docker network create mynet`         |\n| `docker network rm`         | 删除网络 | `docker network rm mynet`             |\n| `docker network prune`      | 清理网络 | `docker network prune -f`             |\n| `docker network ls`         | 列出网络 | `docker network ls`                   |\n| `docker network inspect`    | 查看详情 | `docker network inspect mynet`        |\n| `docker network connect`    | 连接容器 | `docker network connect mynet app`    |\n| `docker network disconnect` | 断开容器 | `docker network disconnect mynet app` |\n\n---\n\n---", "subs": []}]}, {"title": "第七章 存储管理", "sections": [{"title": "7.1 Docker 存储概述", "content": "本章介绍 Docker 存储卷的管理命令，包括创建、查看、删除和挂载等操作。\n\n\nDocker 提供多种数据持久化方式。\n\n#### 存储类型对比\n\n| 类型       | 说明                | 管理方式          | 适用场景           |\n| ---------- | ------------------- | ----------------- | ------------------ |\n| Volume     | Docker 管理的数据卷 | `docker volume` | 生产环境首选       |\n| Bind Mount | 挂载宿主机目录      | 绝对路径          | 开发环境、配置文件 |\n| tmpfs      | 内存文件系统        | `--tmpfs`       | 敏感数据、临时文件 |\n\n#### 存储驱动\n\n| 驱动      | 说明                   |\n| --------- | ---------------------- |\n| `local` | 默认驱动，存储在宿主机 |\n| `nfs`   | NFS 网络存储           |\n| `cifs`  | Windows 共享存储       |\n\n---", "subs": ["存储类型对比", "存储驱动"]}, {"title": "7.2 存储卷命令（create/ls/prune）", "content": "#### docker volume create：创建卷\n\n`docker volume create` 命令用于**创建数据卷**。\n\n##### 语法格式\n\n```bash\ndocker volume create [OPTIONS] [VOLUME]\n```\n\n##### 常用选项\n\n| 选项             | 说明                 |\n| ---------------- | -------------------- |\n| `-d, --driver` | 卷驱动（默认 local） |\n| `--label`      | 卷标签               |\n| `-o, --opt`    | 驱动选项             |\n\n##### 实战示例\n\n**示例 1：创建默认卷**\n\n```bash\n$ docker volume create mydata\nmydata\n```\n\n**示例 2：创建带标签的卷**\n\n```bash\ndocker volume create --label env=prod --label app=mysql mysql-data\n```\n\n**示例 3：使用 NFS 驱动**\n\n```bash\n$ docker volume create \\\n  --driver local \\\n  --opt type=nfs \\\n  --opt o=addr=192.168.1.100,rw \\\n  --opt device=:/exports/data \\\n  nfs-data\n```\n\n**示例 4：指定本地路径**\n\n```bash\n$ docker volume create \\\n  --driver local \\\n  --opt type=none \\\n  --opt device=/data/myapp \\\n  --opt o=bind \\\n  myapp-data\n```\n\n---\n\n#### docker volume ls：列出卷\n\n`docker volume ls` 命令用于**列出所有数据卷**。\n\n##### 语法格式\n\n```bash\ndocker volume ls [OPTIONS]\n```\n\n##### 常用选项\n\n| 选项             | 说明       |\n| ---------------- | ---------- |\n| `-f, --filter` | 过滤条件   |\n| `-q, --quiet`  | 只显示卷名 |\n| `--format`     | 格式化输出 |\n\n##### 实战示例\n\n```bash\n# 列出所有卷\n$ docker volume ls\nDRIVER    VOLUME NAME\nlocal     mydata\nlocal     mysql-data\nlocal     nginx-config\n\n# 只显示卷名\n$ docker volume ls -q\n\n# 按标签过滤\n$ docker volume ls -f label=env=prod\n\n# 过滤悬空卷\n$ docker volume ls -f dangling=true\n\n# 格式化输出\n$ docker volume ls --format \"{{.Name}}: {{.Driver}}\"\n```\n\n---\n\n#### docker volume inspect：查看卷详情\n\n```bash\n# 查看卷详情\n$ docker volume inspect mydata\n[\n    {\n        \"CreatedAt\": \"2024-01-15T12:00:00Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {},\n        \"Mountpoint\": \"/var/lib/docker/volumes/mydata/_data\",\n        \"Name\": \"mydata\",\n        \"Options\": {},\n        \"Scope\": \"local\"\n    }\n]\n\n# 提取特定字段\n$ docker volume inspect -f '{{.Mountpoint}}' mydata\n/var/lib/docker/volumes/mydata/_data\n```\n\n##### 常用 inspect 字段\n\n| 字段            | 说明       |\n| --------------- | ---------- |\n| `.Name`       | 卷名称     |\n| `.Driver`     | 驱动       |\n| `.Mountpoint` | 挂载点路径 |\n| `.CreatedAt`  | 创建时间   |\n| `.Labels`     | 标签       |\n| `.Options`    | 选项       |\n\n---\n\n#### docker volume rm：删除卷\n\n```bash\n# 删除单个卷\n$ docker volume rm mydata\n\n# 删除多个卷\n$ docker volume rm vol1 vol2 vol3\n\n# 强制删除（跳过确认）\n$ docker volume rm -f mydata\n```\n\n> ⚠️ **注意**：无法删除正在使用的卷，需先停止/删除使用该卷的容器。\n\n---\n\n#### docker volume prune：清理卷\n\n`docker volume prune` 命令用于**清理未使用的数据卷**。\n\n```bash\n# 清理未使用的卷\n$ docker volume prune\nWARNING! This will remove all local volumes not used by at least one container.\nAre you sure you want to continue? [y/N] y\n\n# 强制清理\n$ docker volume prune -f\n\n# 按标签过滤\n$ docker volume prune --filter label=temp\n```\n\n> ⚠️ **警告**：此操作会永久删除数据，请谨慎操作！\n\n---", "subs": ["docker volume create", "docker volume ls", "docker volume inspect", "docker volume rm", "docker volume prune"]}, {"title": "7.3 卷的使用方式", "content": "#### 使用 -v 挂载卷\n\n```bash\n# 具名卷\n$ docker run -d -v mydata:/app/data nginx\n\n# 匿名卷\n$ docker run -d -v /app/data nginx\n\n# Bind Mount\n$ docker run -d -v /host/path:/container/path nginx\n```\n\n#### 使用 --mount 挂载卷（推荐）\n\n```bash\n# 挂载卷\n$ docker run -d \\\n  --mount type=volume,source=mydata,target=/app/data \\\n  nginx\n\n# 只读挂载\n$ docker run -d \\\n  --mount type=volume,source=mydata,target=/app/data,readonly \\\n  nginx\n\n# Bind Mount\n$ docker run -d \\\n  --mount type=bind,source=/host/path,target=/app/data \\\n  nginx\n```\n\n#### --mount 选项详解\n\n| 选项           | 说明                          |\n| -------------- | ----------------------------- |\n| `type`       | 挂载类型（volume/bind/tmpfs） |\n| `source`     | 卷名或宿主机路径              |\n| `target`     | 容器内挂载点                  |\n| `readonly`   | 只读模式                      |\n| `volume-opt` | 卷选项                        |\n\n---", "subs": ["使用 -v 挂载卷", "使用 --mount 挂载卷（推荐）", "--mount 选项详解"]}, {"title": "7.4 存储实战场景", "content": "#### 场景 1：数据库持久化\n\n```bash\n# 创建数据卷\n$ docker volume create mysql-data\n\n# 启动 MySQL\n$ docker run -d \\\n  --name mysql \\\n  -e MYSQL_ROOT_PASSWORD=secret \\\n  --mount type=volume,source=mysql-data,target=/var/lib/mysql \\\n  mysql:8.0\n```\n\n#### 场景 2：配置文件挂载\n\n```bash\n# 挂载 Nginx 配置\n$ docker run -d \\\n  --name nginx \\\n  --mount type=bind,source=/etc/nginx/nginx.conf,target=/etc/nginx/nginx.conf,readonly \\\n  --mount type=bind,source=/var/www/html,target=/usr/share/nginx/html \\\n  nginx\n```\n\n#### 场景 3：多容器共享卷\n\n```bash\n# 创建共享卷\n$ docker volume create shared-data\n\n# 容器 1：写入数据\n$ docker run -d --name writer \\\n  --mount type=volume,source=shared-data,target=/data \\\n  alpine sh -c \"while true; do date >> /data/log.txt; sleep 5; done\"\n\n# 容器 2：读取数据\n$ docker run -it --name reader \\\n  --mount type=volume,source=shared-data,target=/data,readonly \\\n  alpine cat /data/log.txt\n```\n\n#### 场景 4：卷备份与恢复\n\n```bash\n# 备份卷\n$ docker run --rm \\\n  --mount type=volume,source=mydata,target=/data \\\n  -v $(pwd):/backup \\\n  alpine tar czf /backup/mydata-backup.tar.gz -C /data .\n\n# 恢复卷\n$ docker run --rm \\\n  --mount type=volume,source=mydata-restore,target=/data \\\n  -v $(pwd):/backup \\\n  alpine tar xzf /backup/mydata-backup.tar.gz -C /data\n```\n\n---", "subs": ["场景 1：数据库持久化", "场景 2：配置文件挂载", "场景 3：多容器共享卷", "场景 4：卷备份与恢复"]}, {"title": "7.5 存储命令小结", "content": "| 命令                      | 作用     | 示例                             |\n| ------------------------- | -------- | -------------------------------- |\n| `docker volume create`  | 创建卷   | `docker volume create mydata`  |\n| `docker volume ls`      | 列出卷   | `docker volume ls -q`          |\n| `docker volume inspect` | 查看详情 | `docker volume inspect mydata` |\n| `docker volume rm`      | 删除卷   | `docker volume rm mydata`      |\n| `docker volume prune`   | 清理卷   | `docker volume prune -f`       |\n\n---\n\n---", "subs": []}]}, {"title": "第八章 Docker 守护进程配置", "sections": [{"title": "8.1 dockerd 概述", "content": "本章介绍 Docker 守护进程（dockerd）的配置和管理。\n\n\n`dockerd` 是 Docker 守护进程，负责管理容器、镜像、网络和存储。\n\n#### 架构组件\n\n```\n┌─────────────────────────────────────────────────┐\n│                   Docker Client                  │\n│               (docker CLI / API)                 │\n└─────────────────────┬───────────────────────────┘\n                      │ REST API\n┌─────────────────────▼───────────────────────────┐\n│                    dockerd                       │\n│               (Docker Daemon)                    │\n├─────────────────────┬───────────────────────────┤\n│     containerd      │       buildkit            │\n├─────────────────────┼───────────────────────────┤\n│        runc         │     容器运行时             │\n└─────────────────────┴───────────────────────────┘\n```\n\n---", "subs": ["架构组件"]}, {"title": "8.2 daemon.json 配置文件", "content": "Docker 守护进程的主要配置文件是 `/etc/docker/daemon.json`。\n\n#### 配置文件位置\n\n| 系统                   | 路径                                         |\n| ---------------------- | -------------------------------------------- |\n| Linux                  | `/etc/docker/daemon.json`                  |\n| Windows                | `C:\\ProgramData\\docker\\config\\daemon.json` |\n| macOS (Docker Desktop) | `~/.docker/daemon.json`                    |\n\n#### 常用配置项\n\n```json\n{\n  \"data-root\": \"/var/lib/docker\",\n  \"storage-driver\": \"overlay2\",\n  \"log-driver\": \"json-file\",\n  \"log-opts\": {\n    \"max-size\": \"100m\",\n    \"max-file\": \"3\"\n  },\n  \"registry-mirrors\": [\n    \"https://mirror.ccs.tencentyun.com\",\n    \"https://registry.docker-cn.com\"\n  ],\n  \"insecure-registries\": [\n    \"registry.example.com:5000\"\n  ],\n  \"dns\": [\"8.8.8.8\", \"8.8.4.4\"],\n  \"bip\": \"172.17.0.1/16\",\n  \"default-address-pools\": [\n    {\"base\": \"172.18.0.0/16\", \"size\": 24}\n  ],\n  \"live-restore\": true,\n  \"debug\": false,\n  \"tls\": true,\n  \"tlscacert\": \"/etc/docker/ca.pem\",\n  \"tlscert\": \"/etc/docker/server-cert.pem\",\n  \"tlskey\": \"/etc/docker/server-key.pem\"\n}\n```\n\n#### 配置项详解\n\n| 配置项                  | 说明                       |\n| ----------------------- | -------------------------- |\n| `data-root`           | Docker 数据目录            |\n| `storage-driver`      | 存储驱动（overlay2 推荐）  |\n| `log-driver`          | 日志驱动                   |\n| `log-opts`            | 日志选项                   |\n| `registry-mirrors`    | 镜像加速器                 |\n| `insecure-registries` | 非安全仓库                 |\n| `dns`                 | DNS 服务器                 |\n| `bip`                 | docker0 网桥 IP            |\n| `live-restore`        | 守护进程重启时保持容器运行 |\n| `debug`               | 调试模式                   |\n\n---", "subs": ["配置文件位置", "常用配置项", "配置项详解"]}, {"title": "8.3 常用配置场景", "content": "#### 场景 1：配置镜像加速器\n\n```json\n{\n  \"registry-mirrors\": [\n    \"https://mirror.ccs.tencentyun.com\",\n    \"https://registry.docker-cn.com\",\n    \"https://docker.mirrors.ustc.edu.cn\"\n  ]\n}\n```\n\n#### 场景 2：配置日志轮转\n\n```json\n{\n  \"log-driver\": \"json-file\",\n  \"log-opts\": {\n    \"max-size\": \"100m\",\n    \"max-file\": \"5\",\n    \"compress\": \"true\"\n  }\n}\n```\n\n#### 场景 3：配置私有仓库\n\n```json\n{\n  \"insecure-registries\": [\n    \"192.168.1.100:5000\",\n    \"registry.local:5000\"\n  ]\n}\n```\n\n#### 场景 4：更改数据目录\n\n```json\n{\n  \"data-root\": \"/data/docker\"\n}\n```\n\n#### 场景 5：配置网络\n\n```json\n{\n  \"bip\": \"10.200.0.1/16\",\n  \"dns\": [\"10.0.0.2\", \"8.8.8.8\"],\n  \"default-address-pools\": [\n    {\"base\": \"10.201.0.0/16\", \"size\": 24},\n    {\"base\": \"10.202.0.0/16\", \"size\": 24}\n  ]\n}\n```\n\n---", "subs": ["场景 1：配置镜像加速器", "场景 2：配置日志轮转", "场景 3：配置私有仓库", "场景 4：更改数据目录", "场景 5：配置网络"]}, {"title": "8.4 远程访问配置", "content": "#### 启用 TCP 远程访问\n\n> ⚠️ **警告**：开放 TCP 访问存在安全风险，生产环境必须启用 TLS。\n\n##### 方式 1：修改 daemon.json\n\n```json\n{\n  \"hosts\": [\"unix:///var/run/docker.sock\", \"tcp://0.0.0.0:2375\"]\n}\n```\n\n##### 方式 2：修改 systemd 配置\n\n```bash\n# 创建 override 文件\n$ sudo mkdir -p /etc/systemd/system/docker.service.d\n$ sudo cat > /etc/systemd/system/docker.service.d/override.conf << EOF\n[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2375\nEOF\n\n# 重载配置\n$ sudo systemctl daemon-reload\n$ sudo systemctl restart docker\n```\n\n##### 客户端连接远程 Docker\n\n```bash\n# 使用环境变量\n$ export DOCKER_HOST=tcp://192.168.1.100:2375\n$ docker ps\n\n# 使用 -H 参数\n$ docker -H tcp://192.168.1.100:2375 ps\n```\n\n---", "subs": ["启用 TCP 远程访问"]}, {"title": "8.5 TLS 安全配置", "content": "#### 生成证书\n\n```bash\n# 创建 CA 证书\n$ openssl genrsa -aes256 -out ca-key.pem 4096\n$ openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem\n\n# 创建服务器证书\n$ openssl genrsa -out server-key.pem 4096\n$ openssl req -subj \"/CN=docker-server\" -sha256 -new -key server-key.pem -out server.csr\n$ echo subjectAltName = DNS:docker-server,IP:192.168.1.100 >> extfile.cnf\n$ openssl x509 -req -days 365 -sha256 -in server.csr -CA ca.pem -CAkey ca-key.pem \\\n  -CAcreateserial -out server-cert.pem -extfile extfile.cnf\n\n# 创建客户端证书\n$ openssl genrsa -out key.pem 4096\n$ openssl req -subj '/CN=client' -new -key key.pem -out client.csr\n$ echo extendedKeyUsage = clientAuth > extfile-client.cnf\n$ openssl x509 -req -days 365 -sha256 -in client.csr -CA ca.pem -CAkey ca-key.pem \\\n  -CAcreateserial -out cert.pem -extfile extfile-client.cnf\n```\n\n#### 服务端配置\n\n```json\n{\n  \"hosts\": [\"unix:///var/run/docker.sock\", \"tcp://0.0.0.0:2376\"],\n  \"tls\": true,\n  \"tlsverify\": true,\n  \"tlscacert\": \"/etc/docker/ca.pem\",\n  \"tlscert\": \"/etc/docker/server-cert.pem\",\n  \"tlskey\": \"/etc/docker/server-key.pem\"\n}\n```\n\n#### 客户端连接\n\n```bash\n$ docker --tlsverify \\\n  --tlscacert=ca.pem \\\n  --tlscert=cert.pem \\\n  --tlskey=key.pem \\\n  -H=tcp://192.168.1.100:2376 \\\n  ps\n```\n\n---", "subs": ["生成证书", "服务端配置", "客户端连接"]}, {"title": "8.6 dockerd 命令行选项", "content": "#### 常用选项\n\n| 选项                    | 说明         |\n| ----------------------- | ------------ |\n| `-H, --host`          | 监听地址     |\n| `-D, --debug`         | 调试模式     |\n| `--data-root`         | 数据目录     |\n| `--storage-driver`    | 存储驱动     |\n| `--log-driver`        | 日志驱动     |\n| `--registry-mirror`   | 镜像加速器   |\n| `--insecure-registry` | 非安全仓库   |\n| `--live-restore`      | 保持容器运行 |\n\n#### 示例\n\n```bash\n# 调试模式启动\n$ dockerd --debug\n\n# 指定数据目录\n$ dockerd --data-root /data/docker\n\n# 多个监听地址\n$ dockerd -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\n```\n\n---", "subs": ["常用选项", "示例"]}, {"title": "8.7 服务管理", "content": "#### systemctl 管理\n\n```bash\n# 启动 Docker\n$ sudo systemctl start docker\n\n# 停止 Docker\n$ sudo systemctl stop docker\n\n# 重启 Docker\n$ sudo systemctl restart docker\n\n# 查看状态\n$ sudo systemctl status docker\n\n# 开机自启\n$ sudo systemctl enable docker\n\n# 禁用开机自启\n$ sudo systemctl disable docker\n```\n\n#### 重载配置\n\n```bash\n# 修改 daemon.json 后\n$ sudo systemctl daemon-reload\n$ sudo systemctl restart docker\n```\n\n---", "subs": ["systemctl 管理", "重载配置"]}, {"title": "8.8 docker info / docker version", "content": "#### docker version\n\n```bash\n$ docker version\nClient:\n Version:           24.0.7\n API version:       1.43\n Go version:        go1.21.3\n Git commit:        afdd53b\n Built:             Thu Oct 26 09:08:17 2023\n OS/Arch:           linux/amd64\n Context:           default\n\nServer:\n Engine:\n  Version:          24.0.7\n  API version:      1.43 (minimum version 1.12)\n  Go version:       go1.21.3\n  Git commit:       311b9ff\n  Built:            Thu Oct 26 09:08:17 2023\n  OS/Arch:          linux/amd64\n```\n\n#### docker info\n\n```bash\n$ docker info\nClient:\n Context:    default\n Debug Mode: false\n\nServer:\n Containers: 5\n  Running: 3\n  Paused: 0\n  Stopped: 2\n Images: 15\n Server Version: 24.0.7\n Storage Driver: overlay2\n Logging Driver: json-file\n Cgroup Driver: systemd\n Default Runtime: runc\n Docker Root Dir: /var/lib/docker\n Registry: https://index.docker.io/v1/\n Live Restore Enabled: true\n```\n\n---", "subs": ["docker version", "docker info"]}, {"title": "8.9 守护进程配置小结", "content": "| 配置方式    | 文件/命令                                 | 优先级 |\n| ----------- | ----------------------------------------- | ------ |\n| daemon.json | `/etc/docker/daemon.json`               | 推荐   |\n| systemd     | `/etc/systemd/system/docker.service.d/` | 覆盖   |\n| 命令行      | `dockerd [OPTIONS]`                     | 临时   |\n\n#### 生产环境推荐配置\n\n```json\n{\n  \"data-root\": \"/var/lib/docker\",\n  \"storage-driver\": \"overlay2\",\n  \"log-driver\": \"json-file\",\n  \"log-opts\": {\n    \"max-size\": \"100m\",\n    \"max-file\": \"3\"\n  },\n  \"registry-mirrors\": [\"https://mirror.example.com\"],\n  \"live-restore\": true,\n  \"default-ulimits\": {\n    \"nofile\": {\n      \"Name\": \"nofile\",\n      \"Hard\": 65535,\n      \"Soft\": 65535\n    }\n  },\n  \"exec-opts\": [\"native.cgroupdriver=systemd\"]\n}\n```\n\n---", "subs": ["生产环境推荐配置"]}, {"title": "8.10 daemon.json 完整配置示例", "content": "以下是一个包含所有可用配置项的完整 daemon.json 示例：\n\n```json\n{\n  \"allow-direct-routing\": false,\n  \"authorization-plugins\": [],\n  \"bip\": \"\",\n  \"bip6\": \"\",\n  \"bridge\": \"\",\n  \"bridge-accept-fwmark\": \"\",\n  \"builder\": {\n    \"gc\": {\n      \"enabled\": true,\n      \"defaultReservedSpace\": \"10GB\",\n      \"policy\": [\n        { \"maxUsedSpace\": \"512MB\", \"keepDuration\": \"48h\", \"filter\": [ \"type=source.local\" ] },\n        { \"reservedSpace\": \"10GB\", \"maxUsedSpace\": \"100GB\", \"keepDuration\": \"1440h\" },\n        { \"reservedSpace\": \"50GB\", \"minFreeSpace\": \"20GB\", \"maxUsedSpace\": \"200GB\", \"all\": true }\n      ]\n    }\n  },\n  \"cgroup-parent\": \"\",\n  \"containerd\": \"/run/containerd/containerd.sock\",\n  \"containerd-namespace\": \"docker\",\n  \"containerd-plugins-namespace\": \"docker-plugins\",\n  \"data-root\": \"\",\n  \"debug\": true,\n  \"default-address-pools\": [\n    { \"base\": \"172.30.0.0/16\", \"size\": 24 },\n    { \"base\": \"172.31.0.0/16\", \"size\": 24 }\n  ],\n  \"default-cgroupns-mode\": \"private\",\n  \"default-gateway\": \"\",\n  \"default-gateway-v6\": \"\",\n  \"default-network-opts\": {},\n  \"default-runtime\": \"runc\",\n  \"default-shm-size\": \"64M\",\n  \"default-ulimits\": {\n    \"nofile\": { \"Hard\": 64000, \"Name\": \"nofile\", \"Soft\": 64000 }\n  },\n  \"dns\": [],\n  \"dns-opts\": [],\n  \"dns-search\": [],\n  \"exec-opts\": [],\n  \"exec-root\": \"\",\n  \"experimental\": false,\n  \"features\": {\n    \"cdi\": true,\n    \"containerd-snapshotter\": true\n  },\n  \"firewall-backend\": \"\",\n  \"fixed-cidr\": \"\",\n  \"fixed-cidr-v6\": \"\",\n  \"group\": \"\",\n  \"host-gateway-ip\": \"\",\n  \"hosts\": [],\n  \"proxies\": {\n    \"http-proxy\": \"http://proxy.example.com:80\",\n    \"https-proxy\": \"https://proxy.example.com:443\",\n    \"no-proxy\": \"*.test.example.com,.example.org\"\n  },\n  \"icc\": false,\n  \"init\": false,\n  \"init-path\": \"/usr/libexec/docker-init\",\n  \"insecure-registries\": [],\n  \"ip\": \"0.0.0.0\",\n  \"ip-forward\": false,\n  \"ip-masq\": false,\n  \"iptables\": false,\n  \"ip6tables\": false,\n  \"ipv6\": false,\n  \"labels\": [],\n  \"live-restore\": true,\n  \"log-driver\": \"json-file\",\n  \"log-format\": \"text\",\n  \"log-level\": \"\",\n  \"log-opts\": {\n    \"cache-disabled\": \"false\",\n    \"cache-max-file\": \"5\",\n    \"cache-max-size\": \"20m\",\n    \"cache-compress\": \"true\",\n    \"env\": \"os,customer\",\n    \"labels\": \"somelabel\",\n    \"max-file\": \"5\",\n    \"max-size\": \"10m\"\n  },\n  \"max-concurrent-downloads\": 3,\n  \"max-concurrent-uploads\": 5,\n  \"max-download-attempts\": 5,\n  \"mtu\": 0,\n  \"no-new-privileges\": false,\n  \"node-generic-resources\": [\n    \"NVIDIA-GPU=UUID1\",\n    \"NVIDIA-GPU=UUID2\"\n  ],\n  \"pidfile\": \"\",\n  \"raw-logs\": false,\n  \"registry-mirrors\": [],\n  \"runtimes\": {\n    \"cc-runtime\": {\n      \"path\": \"/usr/bin/cc-runtime\"\n    },\n    \"custom\": {\n      \"path\": \"/usr/local/bin/my-runc-replacement\",\n      \"runtimeArgs\": [\"--debug\"]\n    }\n  },\n  \"seccomp-profile\": \"\",\n  \"selinux-enabled\": false,\n  \"shutdown-timeout\": 15,\n  \"storage-driver\": \"\",\n  \"storage-opts\": [],\n  \"swarm-default-advertise-addr\": \"\",\n  \"tls\": true,\n  \"tlscacert\": \"\",\n  \"tlscert\": \"\",\n  \"tlskey\": \"\",\n  \"tlsverify\": true,\n  \"userland-proxy\": false,\n  \"userland-proxy-path\": \"/usr/libexec/docker-proxy\",\n  \"userns-remap\": \"\"\n}\n```\n\n#### 配置项分类说明\n\n##### 基础配置\n\n| 配置项           | 类型   | 说明                                            |\n| ---------------- | ------ | ----------------------------------------------- |\n| `data-root`    | string | Docker 数据存储目录（默认 `/var/lib/docker`） |\n| `exec-root`    | string | 执行状态文件目录                                |\n| `pidfile`      | string | PID 文件路径                                    |\n| `debug`        | bool   | 启用调试模式                                    |\n| `experimental` | bool   | 启用实验性功能                                  |\n| `group`        | string | Unix socket 所属组                              |\n\n##### 存储配置\n\n| 配置项             | 类型     | 说明                                 |\n| ------------------ | -------- | ------------------------------------ |\n| `storage-driver` | string   | 存储驱动（overlay2, aufs, btrfs 等） |\n| `storage-opts`   | []string | 存储驱动选项                         |\n\n##### 网络配置\n\n| 配置项                    | 类型     | 说明                                    |\n| ------------------------- | -------- | --------------------------------------- |\n| `bip`                   | string   | docker0 网桥 IP（如 `172.17.0.1/16`） |\n| `bip6`                  | string   | docker0 网桥 IPv6 地址                  |\n| `bridge`                | string   | 自定义网桥名称                          |\n| `fixed-cidr`            | string   | 固定 IPv4 子网                          |\n| `fixed-cidr-v6`         | string   | 固定 IPv6 子网                          |\n| `default-gateway`       | string   | 默认 IPv4 网关                          |\n| `default-gateway-v6`    | string   | 默认 IPv6 网关                          |\n| `default-address-pools` | []object | 默认地址池（base + size）               |\n| `dns`                   | []string | DNS 服务器                              |\n| `dns-opts`              | []string | DNS 选项                                |\n| `dns-search`            | []string | DNS 搜索域                              |\n| `mtu`                   | int      | 网络 MTU 值                             |\n| `ipv6`                  | bool     | 启用 IPv6                               |\n| `ip-forward`            | bool     | 启用 IP 转发                            |\n| `ip-masq`               | bool     | 启用 IP 伪装                            |\n| `iptables`              | bool     | 启用 iptables 规则管理                  |\n| `ip6tables`             | bool     | 启用 ip6tables 规则管理                 |\n| `icc`                   | bool     | 启用容器间通信                          |\n| `userland-proxy`        | bool     | 使用用户态代理                          |\n\n##### 日志配置\n\n| 配置项         | 类型   | 说明                                       |\n| -------------- | ------ | ------------------------------------------ |\n| `log-driver` | string | 日志驱动（json-file, syslog, journald 等） |\n| `log-level`  | string | 日志级别（debug, info, warn, error）       |\n| `log-format` | string | 日志格式（text, json）                     |\n| `log-opts`   | object | 日志驱动选项                               |\n| `raw-logs`   | bool   | 输出原始日志（无 ANSI 颜色）               |\n\n##### 镜像仓库配置\n\n| 配置项                       | 类型     | 说明                   |\n| ---------------------------- | -------- | ---------------------- |\n| `registry-mirrors`         | []string | 镜像加速器列表         |\n| `insecure-registries`      | []string | 非安全仓库列表（HTTP） |\n| `max-concurrent-downloads` | int      | 最大并发下载数         |\n| `max-concurrent-uploads`   | int      | 最大并发上传数         |\n| `max-download-attempts`    | int      | 最大下载重试次数       |\n\n##### 代理配置\n\n| 配置项                  | 类型   | 说明             |\n| ----------------------- | ------ | ---------------- |\n| `proxies.http-proxy`  | string | HTTP 代理地址    |\n| `proxies.https-proxy` | string | HTTPS 代理地址   |\n| `proxies.no-proxy`    | string | 不使用代理的地址 |\n\n##### TLS 配置\n\n| 配置项        | 类型     | 说明           |\n| ------------- | -------- | -------------- |\n| `tls`       | bool     | 启用 TLS       |\n| `tlsverify` | bool     | 启用 TLS 验证  |\n| `tlscacert` | string   | CA 证书路径    |\n| `tlscert`   | string   | 服务器证书路径 |\n| `tlskey`    | string   | 服务器私钥路径 |\n| `hosts`     | []string | 监听地址列表   |\n\n##### 运行时配置\n\n| 配置项                    | 类型   | 说明                                |\n| ------------------------- | ------ | ----------------------------------- |\n| `default-runtime`       | string | 默认运行时（runc）                  |\n| `runtimes`              | object | 自定义运行时配置                    |\n| `containerd`            | string | containerd socket 路径              |\n| `init`                  | bool   | 默认启用 init 进程                  |\n| `init-path`             | string | init 程序路径                       |\n| `cgroup-parent`         | string | 默认 cgroup 父路径                  |\n| `default-cgroupns-mode` | string | cgroup 命名空间模式（private/host） |\n\n##### 安全配置\n\n| 配置项                    | 类型     | 说明                  |\n| ------------------------- | -------- | --------------------- |\n| `seccomp-profile`       | string   | 默认 seccomp 配置文件 |\n| `selinux-enabled`       | bool     | 启用 SELinux          |\n| `no-new-privileges`     | bool     | 禁止获取新权限        |\n| `userns-remap`          | string   | 用户命名空间映射      |\n| `authorization-plugins` | []string | 授权插件列表          |\n\n##### 容器默认配置\n\n| 配置项               | 类型     | 说明               |\n| -------------------- | -------- | ------------------ |\n| `default-ulimits`  | object   | 默认 ulimits 限制  |\n| `default-shm-size` | string   | 默认 /dev/shm 大小 |\n| `labels`           | []string | 守护进程标签       |\n\n##### 构建器配置\n\n| 配置项                              | 类型     | 说明                 |\n| ----------------------------------- | -------- | -------------------- |\n| `builder.gc.enabled`              | bool     | 启用构建缓存垃圾回收 |\n| `builder.gc.defaultReservedSpace` | string   | 默认保留空间         |\n| `builder.gc.policy`               | []object | GC 策略规则          |\n\n##### 功能开关\n\n| 配置项                              | 类型 | 说明                        |\n| ----------------------------------- | ---- | --------------------------- |\n| `features.cdi`                    | bool | 启用 CDI（容器设备接口）    |\n| `features.containerd-snapshotter` | bool | 使用 containerd snapshotter |\n\n##### 其他配置\n\n| 配置项                           | 类型     | 说明                       |\n| -------------------------------- | -------- | -------------------------- |\n| `live-restore`                 | bool     | 守护进程重启时保持容器运行 |\n| `shutdown-timeout`             | int      | 关闭超时时间（秒）         |\n| `node-generic-resources`       | []string | 通用资源（如 GPU）         |\n| `swarm-default-advertise-addr` | string   | Swarm 默认广播地址         |\n\n---\n\n---", "subs": ["配置项分类说明"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

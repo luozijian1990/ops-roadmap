@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Nginx 学习笔记 · 第三册：反向代理与负载均衡 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nginx 学习笔记 · 第三册：反向代理与负载均衡</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Nginx 学习笔记 · 第三册：反向代理与负载均衡", "intro": "", "parts": [{"title": "第四部分：反向代理与负载均衡", "sections": [{"title": "4.1 反向代理与负载均衡概述", "content": "#### 4.1.1 核心概念\n\n**反向代理(Reverse Proxy)**\n\n将客户端请求转发到后端服务器,并将响应返回给客户端。Nginx作为反向代理服务器,可以:\n\n- 隐藏后端服务器的真实IP\n- 实现负载均衡\n- 提供缓存加速\n- 进行SSL终止\n- 压缩响应内容\n\n**负载均衡(Load Balancing)**\n\n将请求分发到多台服务器,提升系统的:\n\n- **可用性** - 单台服务器故障不影响整体服务\n- **可扩展性** - 水平扩展,增加服务器提升处理能力\n- **性能** - 分散请求压力,提升响应速度\n\n#### 4.1.2 AKF扩展立方体\n\n```mermaid\ngraph TD\n    A[AKF扩展立方体] --> B[X轴: 水平扩展]\n    A --> C[Y轴: 功能拆分]\n    A --> D[Z轴: 数据分片]\n  \n    B --> B1[无状态服务复制]\n    B --> B2[Round-Robin负载均衡]\n    B --> B3[成本最低,优先使用]\n  \n    C --> C1[按功能拆分服务]\n    C --> C2[不同API不同服务器]\n    C --> C3[需要重构代码]\n  \n    D --> D1[按用户/地域分片]\n    D --> D2[Hash算法路由]\n    D --> D3[CDN就是Z轴扩展]\n```\n\n**X轴扩展(水平扩展)**\n\n- 服务无状态,多台服务器功能完全相同\n- 使用Round-Robin、Least Connections算法\n- 成本最低,应优先采用\n\n**Y轴扩展(功能拆分)**\n\n- 按业务功能拆分服务\n- 不同URL路由到不同服务集群\n- 通过location配置实现\n\n**Z轴扩展(数据分片)**\n\n- 按用户信息(IP、用户名)分片\n- 使用Hash算法保证同一用户路由到同一服务器\n- 适用于有状态服务或缓存场景\n\n#### 4.1.3 反向代理分类\n\n**四层反向代理(TCP/UDP)**\n\n```\n客户端 → Nginx(Stream模块) → 上游服务器\n  TCP/UDP              TCP/UDP\n```\n\n- 基于IP和端口转发\n- 不解析应用层协议\n- 性能更高,但功能有限\n\n**七层反向代理(HTTP)**\n\n```\n客户端 → Nginx(HTTP模块) → 上游服务器\n  HTTP              HTTP/FastCGI/uWSGI/gRPC/Memcached\n```\n\n- 可以解析HTTP协议\n- 根据URL、Header等信息路由\n- 支持多种上游协议转换\n\n#### 4.1.4 缓存类型\n\n**时间缓存**\n\n```mermaid\nsequenceDiagram\n    participant C1 as 客户端1\n    participant N as Nginx\n    participant B as 后端服务器\n  \n    C1->>N: 请求 /index.html\n    N->>B: 转发请求(缓存未命中)\n    B->>N: 返回响应\n    N->>N: 缓存到磁盘\n    N->>C1: 返回响应\n  \n    participant C2 as 客户端2\n    C2->>N: 请求 /index.html\n    N->>N: 缓存命中\n    N->>C2: 直接返回缓存(不访问后端)\n```\n\n**空间缓存**\n\n预读取后续可能需要的内容,减少延迟。", "subs": ["4.1.1 核心概念", "4.1.2 AKF扩展立方体", "4.1.3 反向代理分类", "4.1.4 缓存类型"]}, {"title": "4.2 Upstream模块与负载均衡算法", "content": "#### 4.2.1 Upstream基本配置\n\n```nginx\nhttp {\n    upstream backend {\n        # 定义上游服务器\n        server 192.168.1.10:8080;\n        server 192.168.1.11:8080;\n        server 192.168.1.12:8080;\n  \n        # 通用参数\n        server 192.168.1.13:8080 weight=2;      # 权重\n        server 192.168.1.14:8080 max_fails=3 fail_timeout=30s;\n        server 192.168.1.15:8080 backup;        # 备份服务器\n        server 192.168.1.16:8080 down;          # 标记为下线\n    }\n  \n    server {\n        location / {\n            proxy_pass http://backend;\n        }\n    }\n}\n```\n\n**server指令参数:**\n\n| 参数                  | 说明                                |\n| --------------------- | ----------------------------------- |\n| `weight=n`          | 权重,默认1                          |\n| `max_fails=n`       | 最大失败次数,默认1                  |\n| `fail_timeout=time` | 失败超时时间,默认10s                |\n| `backup`            | 备份服务器,主服务器全部失败时才使用 |\n| `down`              | 标记服务器下线                      |\n| `max_conns=n`       | 最大并发连接数,默认0(不限制)        |\n\n#### 4.2.2 负载均衡算法\n\n**1. Round-Robin(轮询)**\n\n```nginx\nupstream backend {\n    server 192.168.1.10:8080 weight=1;\n    server 192.168.1.11:8080 weight=2;  # 权重2,处理2倍请求\n    server 192.168.1.12:8080 weight=1;\n}\n```\n\n**特点:**\n\n- 默认算法,无需额外配置\n- 按权重依次轮询\n- 适用于无状态服务\n\n**请求分配示例:**\n\n```\n请求1 → server1 (weight=1)\n请求2 → server2 (weight=2)\n请求3 → server2 (weight=2)\n请求4 → server3 (weight=1)\n请求5 → server1 (weight=1)\n...\n```\n\n**2. IP Hash**\n\n```nginx\nupstream backend {\n    ip_hash;  # 基于客户端IP的Hash\n  \n    server 192.168.1.10:8080;\n    server 192.168.1.11:8080;\n    server 192.168.1.12:8080;\n}\n```\n\n**特点:**\n\n- 基于客户端IP地址(IPv4前3字节,IPv6完整地址)\n- 同一IP的请求总是路由到同一服务器\n- 适用于有状态服务(如Session)\n- 可配合realip模块获取真实IP\n\n**注意事项:**\n\n- 服务器数量变化会导致大量请求重新路由\n- 不支持weight参数\n- backup参数仍然有效\n\n**3. Hash(通用Hash)**\n\n```nginx\nupstream backend {\n    hash $request_uri;  # 基于请求URI\n    # hash $request_uri consistent;  # 一致性Hash\n  \n    server 192.168.1.10:8080;\n    server 192.168.1.11:8080;\n    server 192.168.1.12:8080;\n}\n```\n\n**Hash Key可以是:**\n\n```nginx\n# 基于URL参数\nhash $arg_user_id;\n\n# 基于Cookie\nhash $cookie_session_id;\n\n# 基于请求头\nhash $http_x_forwarded_for;\n\n# 组合多个变量\nhash \"$remote_addr$request_uri\";\n```\n\n**特点:**\n\n- 可基于任意变量或字符串\n- 灵活性高,适用于各种场景\n- 同样面临服务器数量变化的问题\n\n**4. 一致性Hash(Consistent Hash)**\n\n```nginx\nupstream backend {\n    hash $request_uri consistent;  # 添加consistent参数\n  \n    server 192.168.1.10:8080;\n    server 192.168.1.11:8080;\n    server 192.168.1.12:8080;\n}\n```\n\n**原理:**\n\n```mermaid\ngraph TD\n    A[Hash环 0 到 2^32-1] --> B[均匀分布服务器节点]\n    B --> C[请求Hash后落在环上]\n    C --> D[顺时针找到最近的服务器]\n  \n    E[增加服务器] --> F[只影响相邻节点]\n    G[删除服务器] --> H[只影响该节点的请求]\n```\n\n**优点:**\n\n- 服务器增减时,只影响部分请求\n- 缓存失效范围小\n- 适用于有缓存的场景\n\n**对比普通Hash:**\n\n| 场景              | 普通Hash        | 一致性Hash      |\n| ----------------- | --------------- | --------------- |\n| 5台服务器,删除1台 | 80%请求重新路由 | 20%请求重新路由 |\n| 缓存失效率        | 高              | 低              |\n| 性能影响          | 大              | 小              |\n\n**5. Least Connections(最少连接)**\n\n```nginx\nupstream backend {\n    least_conn;  # 最少连接算法\n  \n    server 192.168.1.10:8080;\n    server 192.168.1.11:8080;\n    server 192.168.1.12:8080;\n}\n```\n\n**特点:**\n\n- 优先选择当前连接数最少的服务器\n- 适用于请求处理时间差异大的场景\n- 多个服务器连接数相同时,退化为Round-Robin\n\n**工作原理:**\n\n```\nServer1: 5个连接\nServer2: 3个连接  ← 新请求路由到这里\nServer3: 7个连接\n```\n\n#### 4.2.3 Keepalive连接复用\n\n**对上游使用Keepalive:**\n\n```nginx\nupstream backend {\n    server 192.168.1.10:8080;\n    server 192.168.1.11:8080;\n  \n    # Keepalive配置\n    keepalive 32;              # 保持32个空闲连接\n    keepalive_requests 100;    # 每个连接最多100个请求(1.15.3+)\n    keepalive_timeout 60s;     # 空闲连接超时时间(1.15.3+)\n}\n\nserver {\n    location / {\n        proxy_pass http://backend;\n  \n        # 必须配置,否则Keepalive不生效\n        proxy_http_version 1.1;\n        proxy_set_header Connection \"\";\n    }\n}\n```\n\n**优点:**\n\n1. 减少TCP握手次数\n2. 降低延迟\n3. 提升吞吐量\n4. 减少TIME_WAIT状态的连接\n\n**注意事项:**\n\n- HTTP/1.0不支持Keepalive,必须使用HTTP/1.1\n- 必须清空Connection头部(默认为\"close\")\n- keepalive数量要根据并发量合理设置\n\n#### 4.2.4 Upstream Zone(共享内存)\n\n```nginx\nupstream backend {\n    zone backend_zone 10m;  # 分配10MB共享内存\n  \n    server 192.168.1.10:8080;\n    server 192.168.1.11:8080;\n}\n```\n\n**功能:**\n\n- 将upstream配置和状态信息存储在共享内存中\n- 所有Worker进程共享负载均衡状态\n- 支持动态配置(Nginx Plus)\n\n**作用:**\n\n- 使least_conn算法跨Worker进程生效\n- 统计信息更准确\n- 为动态配置提供基础\n\n#### 4.2.5 DNS解析\n\n```nginx\nupstream backend {\n    server backend.example.com resolve;\n  \n    resolver 8.8.8.8 valid=30s;  # DNS服务器和缓存时间\n}\n```\n\n**功能:**\n\n- 动态解析域名\n- 支持DNS轮询\n- 适用于云环境中IP经常变化的场景\n\n#### 4.2.6 Upstream变量\n\nNginx提供了丰富的upstream变量用于监控和调试:\n\n| 变量                          | 说明                 |\n| ----------------------------- | -------------------- |\n| `$upstream_addr`            | 上游服务器的IP:端口  |\n| `$upstream_connect_time`    | 建立连接耗时(秒)     |\n| `$upstream_header_time`     | 接收响应头耗时(秒)   |\n| `$upstream_response_time`   | 接收完整响应耗时(秒) |\n| `$upstream_status`          | 上游响应状态码       |\n| `$upstream_bytes_received`  | 从上游接收的字节数   |\n| `$upstream_response_length` | 上游响应body长度     |\n| `$upstream_http_name`       | 上游响应头部         |\n| `$upstream_cookie_name`     | 上游Set-Cookie中的值 |\n| `$upstream_trailer_name`    | 上游响应trailer      |\n\n**日志示例:**\n\n```nginx\nlog_format upstream '$remote_addr - [$time_local] \"$request\" '\n                    'status=$status '\n                    'upstream=$upstream_addr '\n                    'connect_time=$upstream_connect_time '\n                    'header_time=$upstream_header_time '\n                    'response_time=$upstream_response_time';\n\naccess_log /var/log/nginx/upstream.log upstream;\n```\n\n#### 4.2.6 配置示例: upserver.conf (上游服务器)\n\n**用途:** 定义测试用的上游服务器,模拟不同的响应场景\n\n**完整配置:**\n\n```nginx\n# 上游服务器1: 慢速响应(limit_rate=1字节/秒)\nserver {\n    listen 127.0.0.1:8011;\n    default_type text/plain;\n    limit_rate 1;  # 限速测试\n    return 200 '8011 server response.\\n';\n}\n\n# 上游服务器2: 错误响应(500)\nserver {\n    listen 8013;\n    default_type text/plain;\n    return 500 '8013 Server Internal Error.\\n';\n}\n\n# 上游服务器3: 正常响应\nserver {\n    listen 8012;\n    default_type text/plain;\n    root html;\n    location /test {\n        return 200 '8012 server response.\nuri: $uri\nmethod: $request_method\nrequest: $request\nhttp_name: $http_name\ncurtime: $time_local\n\\n';\n    }\n}\n```\n\n**关键点:** 提供不同响应特性的上游服务器,用于测试负载均衡和故障转移。\n\n#### 4.2.7 配置示例: roundrobin.conf (轮询负载均衡)\n\n**用途:** 演示加权轮询负载均衡算法和upstream keepalive\n\n**完整配置:**\n\n```nginx\nupstream rrups {\n    # server参数详解:\n    # weight: 权重,默认1,weight=2表示处理2倍请求\n    # max_conns: 最大并发连接数,超过则跳过该服务器\n    # max_fails: 最大失败次数,默认1\n    # fail_timeout: 失败超时时间,默认10s\n    server 127.0.0.1:8011 weight=2 max_conns=2 max_fails=2 fail_timeout=5;\n    server 127.0.0.1:8012;\n  \n    # keepalive: 保持的空闲连接数\n    # 注意: 这是每个worker进程的连接数\n    keepalive 32;\n}\n\nserver {\n    server_name rrups.taohui.tech;\n    error_log myerror.log info;\n  \n    location / {\n        proxy_pass http://rrups;\n        # 启用HTTP/1.1和keepalive\n        proxy_http_version 1.1;\n        proxy_set_header Connection \"\";  # 清空Connection头\n    }\n}\n```\n\n**关键点:** weight控制权重,keepalive复用连接,需配合HTTP/1.1使用。\n\n#### 4.2.8 配置示例: iphash.conf (Hash负载均衡)\n\n**用途:** 演示IP Hash和通用Hash算法,实现会话保持\n\n**完整配置:**\n\n```nginx\n# 自定义日志格式,记录upstream变量\nlog_format varups '$upstream_addr $upstream_connect_time $upstream_header_time $upstream_response_time '\n                  '$upstream_response_length $upstream_bytes_received '\n                  '$upstream_status $upstream_http_server $upstream_cache_status';\n\nupstream iphashups {\n    # ip_hash: 基于客户端IP的Hash算法\n    # 同一IP总是分配到同一台服务器\n    # ip_hash;\n  \n    # hash: 通用Hash算法,可自定义Hash key\n    # 这里基于username参数进行Hash\n    hash user_$arg_username;\n  \n    server 127.0.0.1:8011 weight=2 max_conns=2 max_fails=2 fail_timeout=5;\n    server 127.0.0.1:8012 weight=1;\n}\n\nserver {\n    # realip模块: 获取真实客户端IP(用于ip_hash)\n    set_real_ip_from 116.62.160.193;\n    real_ip_recursive on;\n    real_ip_header X-Forwarded-For;\n  \n    server_name iphash.taohui.tech;\n    error_log myerror.log info;\n    access_log logs/upstream_access.log varups;\n  \n    location / {\n        proxy_pass http://iphashups;\n        proxy_http_version 1.1;\n        proxy_set_header Connection \"\";\n    }\n}\n```\n\n**关键点:** ip_hash基于IP,hash可自定义key,实现会话保持。\n\n#### 4.2.9 配置示例: upskeepalive.conf (Upstream Keepalive)\n\n**用途:** 演示upstream keepalive连接复用,提升性能\n\n**完整配置:**\n\n```nginx\nupstream upskeepalive {\n    server 127.0.0.1:8011;\n    # keepalive: 每个worker保持的空闲连接数\n    # 32: 最多保持32个空闲连接\n    # 连接池大小,不是最大连接数\n    keepalive 32;\n}\n\nserver {\n    server_name rrups.taohui.tech;\n    error_log myerror.log info;\n  \n    location / {\n        proxy_pass http://upskeepalive;\n        # 必须配置HTTP/1.1\n        proxy_http_version 1.1;\n        # 必须清空Connection头(默认是close)\n        proxy_set_header Connection \"\";\n    }\n}\n```\n\n**关键点:** keepalive复用连接,减少TCP握手开销,需HTTP/1.1支持。\n\n#### 4.2.10 配置示例: varups.conf (Upstream变量)\n\n**用途:** 演示upstream相关变量的使用和日志记录\n\n**完整配置:**\n\n```nginx\nupstream iphashups {\n    server 127.0.0.1:8011 weight=2 max_conns=2 max_fails=2 fail_timeout=5;\n    server 127.0.0.1:8012 weight=1;\n}\n\nserver {\n    server_name varups.taohui.tech;\n    error_log myerror.log info;\n  \n    # 定义upstream变量日志格式\n    log_format varups '$upstream_addr $upstream_connect_time $upstream_header_time $upstream_response_time '\n                      '$upstream_response_length $upstream_bytes_received'\n                      '$upstream_status $upstream_http_server $upstream_cache_status';\n  \n    access_log logs/upstream_access.log;\n  \n    location / {\n        proxy_pass http://iphashups;\n        proxy_http_version 1.1;\n        proxy_set_header Connection \"\";\n    }\n}\n```\n\n**Upstream变量说明:**\n\n- `$upstream_addr`: 上游服务器地址\n- `$upstream_connect_time`: 连接建立时间\n- `$upstream_header_time`: 接收响应头时间\n- `$upstream_response_time`: 接收完整响应时间\n- `$upstream_status`: 上游响应状态码\n- `$upstream_cache_status`: 缓存状态(HIT/MISS/BYPASS等)\n\n#### 4.2.11 配置示例: nextups.conf (失败重试)\n\n**用途:** 演示proxy_next_upstream失败重试机制\n\n**完整配置:**\n\n```nginx\nupstream nextups {\n    server 127.0.0.1:8013;  # 故障服务器(返回500)\n    server 127.0.0.1:8011;  # 正常服务器\n}\n\nserver {\n    server_name nextups.taohui.tech;\n    error_log logs/myerror.log debug;\n    default_type text/plain;\n  \n    # 500错误时使用的错误页面\n    error_page 500 /test1.txt;\n  \n    # 默认行为: 不重试\n    location / {\n        proxy_pass http://nextups;\n    }\n  \n    location /test {\n    }\n  \n    # 连接错误时重试\n    location /error {\n        proxy_pass http://nextups;\n        proxy_connect_timeout 1s;\n        # error: 连接失败、超时、读写错误时重试\n        proxy_next_upstream error;\n    }\n  \n    # 拦截上游错误,使用本地error_page\n    location /intercept {\n        # proxy_intercept_errors: 拦截上游4xx/5xx错误\n        # on: 使用本地error_page处理\n        # off(默认): 直接返回上游错误\n        proxy_intercept_errors on;\n        proxy_pass http://127.0.0.1:8013;\n    }\n  \n    # HTTP 500错误时重试\n    location /httperr {\n        # http_500: 上游返回500时重试下一台服务器\n        # 可选值: error, timeout, invalid_header, http_500, http_502, http_503, http_504, http_403, http_404, http_429, non_idempotent, off\n        proxy_next_upstream http_500;\n        proxy_pass http://nextups;\n    }\n}\n```\n\n**proxy_next_upstream参数:**\n\n- `error`: 连接/读写/超时错误\n- `timeout`: 超时\n- `http_500/502/503/504`: HTTP错误码\n- `non_idempotent`: 允许非幂等请求重试\n- `off`: 禁用重试", "subs": ["4.2.1 Upstream基本配置", "4.2.2 负载均衡算法", "4.2.3 Keepalive连接复用", "4.2.4 Upstream Zone(共享内存)", "4.2.5 DNS解析", "4.2.6 Upstream变量", "4.2.6 配置示例: upserver.conf (上游服务器)", "4.2.7 配置示例: roundrobin.conf (轮询负载均衡)", "4.2.8 配置示例: iphash.conf (Hash负载均衡)", "4.2.9 配置示例: upskeepalive.conf (Upstream Ke", "4.2.10 配置示例: varups.conf (Upstream变量)", "4.2.11 配置示例: nextups.conf (失败重试)"]}, {"title": "4.3 HTTP Proxy模块", "content": "#### 4.3.1 Proxy处理流程\n\n```mermaid\ngraph TD\n    A[Content阶段: proxy_pass] --> B{缓存命中?}\n    B -->|是| Z[发送响应]\n    B -->|否| C[生成上游请求头和Body]\n    C --> D{proxy_request_buffering}\n    D -->|on 默认| E[读取完整请求Body]\n    D -->|off| F[边读边转发]\n    E --> G[负载均衡选择服务器]\n    F --> G\n    G --> H[建立连接]\n    H --> I[发送请求]\n    I --> J[接收响应头]\n    J --> K[处理响应头]\n    K --> L{proxy_buffering}\n    L -->|on 默认| M[接收完整响应Body]\n    L -->|off| N[边接收边发送]\n    M --> O{缓存?}\n    N --> O\n    O -->|是| P[写入缓存]\n    O -->|否| Q[关闭/复用连接]\n    P --> Q\n    Q --> Z\n```\n\n**关键配置点:**\n\n1. **proxy_request_buffering** - 控制请求Body处理\n\n   - `on`(默认): 先完整接收客户端Body,再转发(保护上游)\n   - `off`: 边接收边转发(降低延迟)\n2. **proxy_buffering** - 控制响应Body处理\n\n   - `on`(默认): 先完整接收上游响应,再发送(适应慢速客户端)\n   - `off`: 边接收边发送(降低内存使用)\n\n#### 4.3.2 proxy_pass指令详解\n\n**基本语法:**\n\n```nginx\nlocation /api {\n    proxy_pass http://backend;\n}\n```\n\n**URL处理规则:**\n\n```nginx\n# 规则1: 不带URI\nlocation /api {\n    proxy_pass http://backend;\n    # 访问 /api/test → 转发 /api/test (原封不动)\n}\n\n# 规则2: 带URI\nlocation /api {\n    proxy_pass http://backend/v1;\n    # 访问 /api/test → 转发 /v1/test (替换/api为/v1)\n}\n\n# 规则3: 带URI(根路径)\nlocation /api {\n    proxy_pass http://backend/;\n    # 访问 /api/test → 转发 /test (去除/api)\n}\n\n# 规则4: 正则location(只能不带URI)\nlocation ~ ^/api/(.+)$ {\n    proxy_pass http://backend;  # 正确\n    # proxy_pass http://backend/v1;  # 错误!\n}\n\n# 规则5: 使用变量\nlocation /api {\n    set $backend_uri /v1$request_uri;\n    proxy_pass http://backend$backend_uri;\n}\n\n# 规则6: 配合rewrite\nlocation /api {\n    rewrite ^/api/(.*)$ /$1 break;\n    proxy_pass http://backend;\n}\n```\n\n**重要提示:**\n\n- 是否带URI会导致完全不同的转发行为\n- 正则location和@命名location只能使用不带URI的形式\n- 使用变量时,必须包含完整URL(含协议和主机名)\n\n#### 4.3.3 修改上游请求\n\n**1. 请求行**\n\n```nginx\nlocation / {\n    # 修改请求方法\n    proxy_method POST;\n  \n    # 修改HTTP版本(Keepalive需要1.1)\n    proxy_http_version 1.1;\n  \n    proxy_pass http://backend;\n}\n```\n\n**2. 请求头**\n\n```nginx\nlocation / {\n    # 设置/修改请求头\n    proxy_set_header Host $proxy_host;\n    proxy_set_header X-Real-IP $remote_addr;\n    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n    proxy_set_header X-Forwarded-Proto $scheme;\n  \n    # 删除请求头(设置为空字符串)\n    proxy_set_header Accept-Encoding \"\";\n  \n    # 不转发客户端请求头\n    proxy_pass_request_headers off;\n  \n    proxy_pass http://backend;\n}\n```\n\n**默认行为:**\n\n- `Host` → `$proxy_host` (upstream中的主机名)\n- `Connection` → `close`\n- 其他头部原封不动转发\n\n**常用头部设置:**\n\n```nginx\n# 标准配置\nproxy_set_header Host $host;  # 使用客户端请求的Host\nproxy_set_header X-Real-IP $remote_addr;\nproxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\nproxy_set_header X-Forwarded-Proto $scheme;\n\n# Keepalive配置\nproxy_http_version 1.1;\nproxy_set_header Connection \"\";\n\n# WebSocket配置\nproxy_http_version 1.1;\nproxy_set_header Upgrade $http_upgrade;\nproxy_set_header Connection \"upgrade\";\n```\n\n**3. 请求Body**\n\n```nginx\nlocation / {\n    # 转发请求Body(默认on)\n    proxy_pass_request_body on;\n  \n    # 自定义请求Body\n    proxy_set_body \"custom body content\";\n  \n    proxy_pass http://backend;\n}\n```\n\n#### 4.3.4 接收客户端请求Body\n\n```nginx\nhttp {\n    # 请求Body缓冲区大小\n    client_body_buffer_size 16k;\n  \n    # 请求Body最大大小\n    client_max_body_size 10m;\n  \n    # 请求Body临时文件路径\n    client_body_temp_path /var/cache/nginx/client_temp 1 2;\n  \n    # 是否缓冲请求Body\n    proxy_request_buffering on;  # 默认on\n  \n    # 强制将Body存储到文件\n    client_body_in_file_only off;  # off/on/clean\n  \n    # 单个文件写入大小\n    client_body_in_single_buffer off;\n}\n```\n\n**处理流程:**\n\n```\n1. Body ≤ client_body_buffer_size → 存储在内存\n2. Body > client_body_buffer_size → 存储在临时文件\n3. proxy_request_buffering on → 完整接收后转发\n4. proxy_request_buffering off → 边接收边转发\n```\n\n#### 4.3.5 建立上游连接\n\n```nginx\nlocation / {\n    # 连接超时\n    proxy_connect_timeout 60s;\n  \n    # 发送超时\n    proxy_send_timeout 60s;\n  \n    # 接收超时\n    proxy_read_timeout 60s;\n  \n    # TCP相关\n    proxy_socket_keepalive on;  # TCP Keepalive\n    proxy_bind $remote_addr transparent;  # 绑定源地址\n  \n    # SSL连接\n    proxy_ssl_protocols TLSv1.2 TLSv1.3;\n    proxy_ssl_ciphers HIGH:!aNULL:!MD5;\n    proxy_ssl_verify on;\n    proxy_ssl_trusted_certificate /path/to/ca.crt;\n  \n    proxy_pass http://backend;\n}\n```\n\n#### 4.3.6 接收上游响应\n\n**1. 接收响应头**\n\n```nginx\nlocation / {\n    # 响应头缓冲区\n    proxy_buffer_size 4k;  # 默认一个内存页(4k/8k)\n  \n    # 响应头超时\n    proxy_read_timeout 60s;\n  \n    proxy_pass http://backend;\n}\n```\n\n**2. 处理响应头**\n\n```nginx\nlocation / {\n    # 隐藏上游响应头\n    proxy_hide_header X-Powered-By;\n    proxy_hide_header Server;\n  \n    # 传递上游响应头\n    proxy_pass_header X-Custom-Header;\n  \n    # 忽略上游某些响应头\n    proxy_ignore_headers X-Accel-Expires Expires Cache-Control;\n  \n    # 拦截上游错误\n    proxy_intercept_errors on;  # 使用error_page处理上游错误\n  \n    proxy_pass http://backend;\n}\n```\n\n**3. 接收响应Body**\n\n```nginx\nlocation / {\n    # 是否缓冲响应Body\n    proxy_buffering on;  # 默认on\n  \n    # 响应Body缓冲区\n    proxy_buffers 8 4k;  # 8个4k缓冲区\n    proxy_busy_buffers_size 8k;\n  \n    # 临时文件\n    proxy_temp_path /var/cache/nginx/proxy_temp 1 2;\n    proxy_max_temp_file_size 1024m;\n    proxy_temp_file_write_size 8k;\n  \n    proxy_pass http://backend;\n}\n```\n\n**缓冲机制:**\n\n```\nproxy_buffering on:\n  1. 快速从上游接收响应(内网速度快)\n  2. 缓存到内存/磁盘\n  3. 慢速发送给客户端(公网速度慢)\n  4. 快速释放上游连接\n\nproxy_buffering off:\n  1. 边接收边转发\n  2. 节省内存\n  3. 上游连接保持时间长\n  4. 适用于流式传输\n```\n\n#### 4.3.7 上游失败与容错\n\n```nginx\nupstream backend {\n    server 192.168.1.10:8080 max_fails=3 fail_timeout=30s;\n    server 192.168.1.11:8080 max_fails=3 fail_timeout=30s;\n    server 192.168.1.12:8080 backup;\n}\n\nlocation / {\n    # 定义失败条件\n    proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;\n  \n    # 重试次数\n    proxy_next_upstream_tries 3;\n  \n    # 重试超时\n    proxy_next_upstream_timeout 10s;\n  \n    # 非幂等请求是否重试\n    proxy_next_upstream_non_idempotent off;  # 默认off(POST不重试)\n  \n    proxy_pass http://backend;\n}\n```\n\n**proxy_next_upstream参数:**\n\n| 参数               | 说明               |\n| ------------------ | ------------------ |\n| `error`          | 连接/发送/接收错误 |\n| `timeout`        | 连接/发送/接收超时 |\n| `invalid_header` | 响应头无效         |\n| `http_500`       | 上游返回500        |\n| `http_502`       | 上游返回502        |\n| `http_503`       | 上游返回503        |\n| `http_504`       | 上游返回504        |\n| `http_403`       | 上游返回403        |\n| `http_404`       | 上游返回404        |\n| `http_429`       | 上游返回429        |\n| `non_idempotent` | 允许非幂等请求重试 |\n| `off`            | 禁用重试           |\n\n**注意事项:**\n\n- 默认只对GET/HEAD等幂等请求重试\n- POST等非幂等请求需要显式启用 `non_idempotent`\n- 重试会增加响应时间,需要合理配置\n\n#### 4.3.7 配置示例: proxy.conf (反向代理综合配置)\n\n**用途:** 演示proxy模块的头部处理、SSL配置等高级功能\n\n**完整配置:**\n\n```nginx\nupstream proxyupstream {\n    server 127.0.0.1:8012 weight=1;\n}\n\nserver {\n    server_name proxy.taohui.tech;\n    error_log logs/myerror.log debug;\n  \n    location / {\n        proxy_pass http://proxyupstream;\n    \n        # proxy_method: 修改请求方法\n        # proxy_method POST;\n    \n        # 头部处理:\n        # proxy_hide_header: 隐藏上游响应头(不发送给客户端)\n        proxy_hide_header aaa;\n        # proxy_pass_header: 强制传递被隐藏的头部\n        proxy_pass_header server;\n        # proxy_ignore_headers: 忽略上游响应头(不处理)\n        proxy_ignore_headers X-Accel-Limit-Rate;\n    \n        # 请求处理:\n        # proxy_pass_request_headers: 是否传递客户端请求头\n        # proxy_pass_request_headers off;\n        # proxy_pass_request_body: 是否传递客户端请求体\n        # proxy_pass_request_body off;\n        # proxy_set_body: 自定义请求体\n        # proxy_set_body 'hello world!';\n        # proxy_set_header: 设置请求头\n        # proxy_set_header name '';\n    \n        # Keepalive配置\n        proxy_http_version 1.1;\n        proxy_set_header Connection \"\";\n    }\n  \n    # HTTP和HTTPS双监听\n    listen 80;\n    listen 443 ssl;\n  \n    # SSL证书配置(Let's Encrypt)\n    ssl_certificate /etc/letsencrypt/live/proxy.taohui.tech/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/proxy.taohui.tech/privkey.pem;\n    include /etc/letsencrypt/options-ssl-nginx.conf;\n    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n}\n```\n\n**关键点:**\n\n- proxy_hide_header隐藏响应头\n- proxy_pass_header强制传递头部\n- proxy_ignore_headers忽略特定头部\n- SSL双向认证配置", "subs": ["4.3.1 Proxy处理流程", "4.3.2 proxy_pass指令详解", "4.3.3 修改上游请求", "4.3.4 接收客户端请求Body", "4.3.5 建立上游连接", "4.3.6 接收上游响应", "4.3.7 上游失败与容错", "4.3.7 配置示例: proxy.conf (反向代理综合配置)"]}, {"title": "4.4 HTTP缓存", "content": "#### 4.4.1 缓存基础\n\n**缓存路径配置:**\n\n```nginx\nhttp {\n    # 定义缓存路径\n    proxy_cache_path /var/cache/nginx/proxy \n                     levels=1:2 \n                     keys_zone=my_cache:10m \n                     max_size=10g \n                     inactive=60m \n                     use_temp_path=off;\n  \n    server {\n        location / {\n            # 启用缓存\n            proxy_cache my_cache;\n      \n            # 缓存Key\n            proxy_cache_key \"$scheme$proxy_host$request_uri\";\n      \n            # 缓存有效期\n            proxy_cache_valid 200 302 10m;\n            proxy_cache_valid 404 1m;\n            proxy_cache_valid any 1m;\n      \n            # 缓存条件\n            proxy_cache_methods GET HEAD;\n            proxy_cache_min_uses 1;\n      \n            # 添加缓存状态头\n            add_header X-Cache-Status $upstream_cache_status;\n      \n            proxy_pass http://backend;\n        }\n    }\n}\n```\n\n**proxy_cache_path参数:**\n\n| 参数                    | 说明                            |\n| ----------------------- | ------------------------------- |\n| `levels=1:2`          | 目录层级(1级1个字符,2级2个字符) |\n| `keys_zone=name:size` | 共享内存区域名称和大小          |\n| `max_size=size`       | 缓存最大大小                    |\n| `inactive=time`       | 缓存不活跃时间,超过则删除       |\n| `use_temp_path=off`   | 不使用临时路径(性能更好)        |\n\n**$upstream_cache_status值:**\n\n| 值              | 说明         |\n| --------------- | ------------ |\n| `MISS`        | 缓存未命中   |\n| `HIT`         | 缓存命中     |\n| `EXPIRED`     | 缓存过期     |\n| `STALE`       | 使用过期缓存 |\n| `UPDATING`    | 正在更新缓存 |\n| `REVALIDATED` | 重新验证有效 |\n| `BYPASS`      | 绕过缓存     |\n\n#### 4.4.2 缓存控制\n\n```nginx\nlocation / {\n    proxy_cache my_cache;\n  \n    # 不缓存的条件\n    proxy_no_cache $cookie_nocache $arg_nocache $arg_comment;\n    proxy_no_cache $http_pragma $http_authorization;\n  \n    # 绕过缓存的条件\n    proxy_cache_bypass $cookie_nocache $arg_nocache $arg_comment;\n  \n    # 忽略客户端缓存控制\n    proxy_ignore_headers Cache-Control Expires;\n  \n    # 使用过期缓存\n    proxy_cache_use_stale error timeout updating http_500 http_502 http_503;\n  \n    # 后台更新\n    proxy_cache_background_update on;\n  \n    # 缓存锁\n    proxy_cache_lock on;\n    proxy_cache_lock_timeout 5s;\n  \n    proxy_pass http://backend;\n}\n```\n\n**缓存控制指令:**\n\n- `proxy_no_cache` - 满足条件时不写入缓存\n- `proxy_cache_bypass` - 满足条件时不从缓存读取\n- `proxy_cache_use_stale` - 何时使用过期缓存\n- `proxy_cache_background_update` - 后台更新过期缓存\n- `proxy_cache_lock` - 防止缓存击穿(同时只有一个请求更新缓存)\n\n#### 4.4.3 缓存清理\n\n**1. 手动清理(Nginx Plus)**\n\n```nginx\nlocation ~ /purge(/.*) {\n    allow 127.0.0.1;\n    deny all;\n    proxy_cache_purge my_cache \"$scheme$proxy_host$1\";\n}\n```\n\n**2. 第三方模块(ngx_cache_purge)**\n\n```nginx\nlocation ~ /purge(/.*) {\n    allow 127.0.0.1;\n    deny all;\n    proxy_cache_purge my_cache \"$scheme$proxy_host$1\";\n}\n```\n\n**3. 定时清理**\n\n```bash\n# 使用find命令清理\nfind /var/cache/nginx/proxy -type f -mtime +7 -delete\n```\n\n#### 4.4.4 分片缓存(Slice)\n\n```nginx\nlocation / {\n    # 启用分片\n    slice 1m;  # 每片1MB\n  \n    proxy_cache my_cache;\n    proxy_cache_key \"$uri$is_args$args$slice_range\";\n  \n    # 必须设置Range头\n    proxy_set_header Range $slice_range;\n  \n    # 缓存206响应\n    proxy_cache_valid 200 206 1h;\n  \n    proxy_pass http://backend;\n}\n```\n\n**优点:**\n\n- 大文件分片缓存,提高命中率\n- 支持断点续传\n- 减少内存占用\n\n**编译:** `--with-http_slice_module`", "subs": ["4.4.1 缓存基础", "4.4.2 缓存控制", "4.4.3 缓存清理", "4.4.4 分片缓存(Slice)"]}, {"title": "4.5 其他反向代理协议", "content": "#### 4.5.1 FastCGI\n\n```nginx\nlocation ~ \\.php$ {\n    fastcgi_pass 127.0.0.1:9000;\n    # fastcgi_pass unix:/var/run/php-fpm.sock;\n  \n    fastcgi_index index.php;\n    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n    include fastcgi_params;\n  \n    # 缓存配置\n    fastcgi_cache my_cache;\n    fastcgi_cache_key \"$scheme$request_method$host$request_uri\";\n    fastcgi_cache_valid 200 60m;\n}\n```\n\n#### 4.5.2 uWSGI\n\n```nginx\nlocation / {\n    uwsgi_pass 127.0.0.1:8000;\n    # uwsgi_pass unix:/var/run/uwsgi.sock;\n  \n    include uwsgi_params;\n  \n    # 超时配置\n    uwsgi_connect_timeout 60s;\n    uwsgi_send_timeout 60s;\n    uwsgi_read_timeout 60s;\n}\n```\n\n#### 4.5.3 gRPC\n\n```nginx\nlocation / {\n    grpc_pass grpc://backend:50051;\n    # grpc_pass grpcs://backend:50051;  # gRPC over TLS\n  \n    # 超时配置\n    grpc_connect_timeout 60s;\n    grpc_send_timeout 60s;\n    grpc_read_timeout 60s;\n  \n    # 错误处理\n    error_page 502 = /error502grpc;\n}\n\nlocation = /error502grpc {\n    internal;\n    default_type application/grpc;\n    add_header grpc-status 14;\n    add_header grpc-message \"unavailable\";\n    return 204;\n}\n```\n\n**编译:** `--with-http_v2_module` (gRPC基于HTTP/2)\n\n#### 4.5.4 Memcached\n\n```nginx\nlocation / {\n    set $memcached_key \"$uri?$args\";\n    memcached_pass 127.0.0.1:11211;\n  \n    # 未命中时的处理\n    error_page 404 = @fallback;\n}\n\nlocation @fallback {\n    proxy_pass http://backend;\n}\n```\n\n#### 4.5.5 WebSocket\n\n```nginx\nmap $http_upgrade $connection_upgrade {\n    default upgrade;\n    '' close;\n}\n\nupstream websocket {\n    server 192.168.1.10:8080;\n}\n\nserver {\n    location /ws {\n        proxy_pass http://websocket;\n  \n        # WebSocket必需配置\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection $connection_upgrade;\n  \n        # 超时配置(WebSocket连接可能很长)\n        proxy_read_timeout 3600s;\n        proxy_send_timeout 3600s;\n    }\n}\n```\n\n#### 4.5.4 配置示例: cache.conf (HTTP缓存综合配置)\n\n**用途:** 演示proxy_cache的完整配置,包括缓存路径、缓存控制、SSL变量等\n\n**完整配置:**\n\n```nginx\n# 定义缓存路径\nproxy_cache_path /data/nginx/tmpcache \n                 levels=2:2              # 两级目录结构\n                 keys_zone=two:10m       # 共享内存区域名称和大小\n                 loader_threshold=300    # 缓存加载器阈值\n                 loader_files=200        # 每次加载的文件数\n                 max_size=200m           # 最大缓存大小\n                 inactive=1m;            # 1分钟未访问则删除\n\nserver {\n    server_name cache.taohui.tech;\n    root html/;\n    error_log logs/cacherr.log debug;\n  \n    # 缓存清理location(需要ngx_cache_purge模块)\n    location ~ /purge(/.*) {\n        proxy_cache_purge two $scheme$1;\n    }\n  \n    location / {\n        # 启用缓存\n        proxy_cache two;\n        # 200状态码缓存1分钟\n        proxy_cache_valid 200 1m;\n        # 添加缓存状态头(HIT/MISS/BYPASS等)\n        add_header X-Cache-Status $upstream_cache_status;\n    \n        # 缓存控制(注释掉的高级选项):\n        # proxy_cache_use_stale: 何时使用过期缓存\n        # proxy_cache_key: 自定义缓存key\n        # proxy_cache_revalidate: 使用If-Modified-Since重新验证\n        # proxy_cache_background_update: 后台更新过期缓存\n    \n        proxy_cache_key $scheme$uri;\n        proxy_pass http://localhost:8012;\n    }\n  \n    # HTTPS配置\n    listen 443 ssl;\n    ssl_certificate examples/cert/a.crt;\n    ssl_certificate_key examples/cert/a.key;\n  \n    # SSL客户端证书验证\n    ssl_verify_client optional;\n    ssl_verify_depth 2;\n    ssl_client_certificate examples/cert/ca.crt;\n  \n    # SSL变量测试location\n    location /test {\n        default_type text/plain;\n        return 200 '\nssl_client_escaped_cert: $ssl_client_escaped_cert\nssl_cipher: $ssl_cipher\nssl_protocol: $ssl_protocol\nssl_session_id: $ssl_session_id\nssl_session_reused: $ssl_session_reused\n';\n    }\n  \n    listen 80;\n}\n```\n\n**关键点:** proxy_cache_path定义缓存,proxy_cache启用,add_header显示缓存状态。\n\n#### 4.5.5 配置示例: slice.conf (分片缓存)\n\n**用途:** 演示slice模块,实现大文件的分片缓存\n\n**完整配置:**\n\n```nginx\nproxy_cache_path /data/nginx/tmpcache3 \n                 levels=2:2 \n                 keys_zone=three:10m \n                 loader_threshold=300 \n                 loader_files=200 \n                 max_size=200m \n                 inactive=1m;\n\nserver {\n    server_name slice.taohui.tech;\n    error_log logs/cacherr.log debug;\n  \n    # 缓存清理\n    location ~ /purge(/.*) {\n        # 注意: slice缓存的key包含$slice_range\n        proxy_cache_purge three $1$is_args$args$slice_range;\n    }\n  \n    location / {\n        proxy_cache three;\n    \n        # slice: 分片大小(1MB)\n        # 大文件会被切分成多个1MB的片段分别缓存\n        slice 1m;\n    \n        # 缓存key必须包含$slice_range\n        proxy_cache_key $uri$is_args$args$slice_range;\n        # 设置Range头,请求对应的分片\n        proxy_set_header Range $slice_range;\n    \n        # 缓存200和206状态码\n        proxy_cache_valid 200 206 1m;\n        add_header X-Cache-Status $upstream_cache_status;\n    \n        proxy_pass http://localhost:8012;\n    }\n}\n```\n\n**关键点:** slice指令启用分片,缓存key必须包含$slice_range,支持断点续传。\n\n#### 4.5.6 配置示例: memcached.conf (Memcached代理)\n\n**用途:** 演示memcached_pass,直接从Memcached读取缓存数据\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name memcached.taohui.tech;\n    default_type text/plain;\n  \n    location /get {\n        # 从URL参数获取key\n        set $memcached_key \"$arg_key\";\n    \n        # memcached_gzip_flag: Gzip标志位\n        # memcached_gzip_flag 2;\n    \n        # 直接从Memcached读取\n        # 如果key不存在,返回404\n        memcached_pass localhost:11211;\n    }\n}\n```\n\n**使用示例:**\n\n```bash\n# 1. 向Memcached写入数据\necho \"set mykey 0 0 5\\r\\nhello\\r\\n\" | nc localhost 11211\n\n# 2. 通过Nginx读取\ncurl http://memcached.taohui.tech/get?key=mykey\n# 输出: hello\n```\n\n**关键点:** memcached_pass直接读取Memcached,适合缓存API响应。\n\n#### 4.5.7 配置示例: grpc.conf (gRPC反向代理)\n\n**用途:** 演示grpc_pass指令,实现gRPC协议的反向代理\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name http2.taohui.tech;\n    root html;\n  \n    location / {\n        # grpc_pass: gRPC反向代理\n        # 注意: 不需要http://前缀,直接写地址\n        # gRPC基于HTTP/2,必须启用SSL\n        grpc_pass localhost:50051;\n    }\n  \n    # gRPC必须使用HTTP/2\n    listen 4431 http2;\n  \n    # SSL配置(gRPC要求HTTPS)\n    ssl_certificate /etc/letsencrypt/live/http2.taohui.tech/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/http2.taohui.tech/privkey.pem;\n    include /etc/letsencrypt/options-ssl-nginx.conf;\n    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n}\n```\n\n**关键点:** grpc_pass用于gRPC代理,必须启用HTTP/2和SSL。\n\n#### 4.5.8 配置示例: websocket.conf (WebSocket代理)\n\n**用途:** 演示WebSocket协议的反向代理配置\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name websocket.taohui.tech;\n    default_type text/plain;\n    access_log logs/ws.log;\n  \n    location / {\n        # WebSocket必需配置:\n        # 1. HTTP/1.1协议\n        proxy_http_version 1.1;\n    \n        # 2. Upgrade头: 协议升级\n        # $http_upgrade: 客户端的Upgrade头值\n        proxy_set_header Upgrade $http_upgrade;\n    \n        # 3. Connection头: 设置为\"upgrade\"\n        # 告诉上游服务器进行协议升级\n        proxy_set_header Connection \"upgrade\";\n    \n        # WebSocket后端服务器\n        proxy_pass http://echo.websocket.org;\n    }\n  \n    # HTTP和HTTPS双监听\n    listen 80;\n    listen 443 ssl;\n  \n    # SSL配置\n    ssl_certificate /etc/letsencrypt/live/websocket.taohui.tech/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/websocket.taohui.tech/privkey.pem;\n    include /etc/letsencrypt/options-ssl-nginx.conf;\n    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n}\n```\n\n**关键点:** WebSocket需要HTTP/1.1、Upgrade和Connection头。", "subs": ["4.5.1 FastCGI", "4.5.2 uWSGI", "4.5.3 gRPC", "4.5.4 Memcached", "4.5.5 WebSocket", "4.5.4 配置示例: cache.conf (HTTP缓存综合配置)", "4.5.5 配置示例: slice.conf (分片缓存)", "4.5.6 配置示例: memcached.conf (Memcached代理)", "4.5.7 配置示例: grpc.conf (gRPC反向代理)", "4.5.8 配置示例: websocket.conf (WebSocket代理)"]}, {"title": "4.6 HTTP/2", "content": "#### 4.6.1 启用HTTP/2\n\n```nginx\nserver {\n    listen 443 ssl http2;  # 启用HTTP/2\n  \n    ssl_certificate /path/to/cert.pem;\n    ssl_certificate_key /path/to/key.pem;\n  \n    # HTTP/2配置\n    http2_push_preload on;  # 支持Link头部的preload\n    http2_max_concurrent_streams 128;\n    http2_max_field_size 4k;\n    http2_max_header_size 16k;\n  \n    location / {\n        root /var/www/html;\n    }\n}\n```\n\n**编译:** `--with-http_v2_module`\n\n#### 4.6.2 Server Push\n\n```nginx\nlocation / {\n    root /var/www/html;\n  \n    # 主动推送资源\n    http2_push /style.css;\n    http2_push /script.js;\n  \n    # 或通过Link头部\n    add_header Link \"</style.css>; rel=preload; as=style\";\n    add_header Link \"</script.js>; rel=preload; as=script\";\n}\n```\n\n#### 4.6.3 配置示例: http2.conf (HTTP/2 Server Push)\n\n**用途:** 演示HTTP/2的Server Push功能,主动推送资源\n\n**完整配置:**\n\n```nginx\nserver {\n    server_name http2.taohui.tech;\n    root html;\n  \n    location / {\n        # http2_push: 主动推送资源\n        # 当客户端请求/时,自动推送这些资源\n        # 无需客户端再次请求,减少往返时间\n        http2_push /mirror.txt;\n        http2_push /video.mp4;\n    }\n  \n    location /test {\n        # http2_push_preload: 根据Link头推送\n        # Link头格式: </path>; as=type; rel=preload\n        add_header Link \"</style.css>; as=style; rel=preload\";\n        http2_push_preload on;\n    }\n  \n    # 启用HTTP/2: listen指令添加http2参数\n    # 注意: HTTP/2必须配合SSL使用\n    listen 4430 ssl http2;\n  \n    # SSL证书配置\n    ssl_certificate /etc/letsencrypt/live/http2.taohui.tech/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/http2.taohui.tech/privkey.pem;\n    include /etc/letsencrypt/options-ssl-nginx.conf;\n    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;\n}\n```\n\n**HTTP/2 Server Push优势:**\n\n- 减少往返时间(RTT)\n- 提前推送关键资源(CSS/JS/图片)\n- 提升首屏加载速度\n\n**关键点:** http2_push主动推送,http2_push_preload根据Link头推送。", "subs": ["4.6.1 启用HTTP/2", "4.6.2 Server Push", "4.6.3 配置示例: http2.conf (HTTP/2 Server Push"]}, {"title": "4.7 Stream四层反向代理", "content": "#### 4.7.1 基本配置\n\n```nginx\nstream {\n    upstream backend {\n        server 192.168.1.10:3306;\n        server 192.168.1.11:3306;\n    }\n  \n    server {\n        listen 3306;\n        proxy_pass backend;\n  \n        # 超时配置\n        proxy_connect_timeout 1s;\n        proxy_timeout 3s;\n    }\n}\n```\n\n**编译:** `--with-stream` (默认不编译)\n\n#### 4.7.2 Stream处理阶段\n\n```mermaid\ngraph LR\n    A[POST_ACCEPT] --> B[PREACCESS]\n    B --> C[ACCESS]\n    C --> D[SSL]\n    D --> E[PREREAD]\n    E --> F[CONTENT]\n    F --> G[LOG]\n```\n\n**各阶段模块:**\n\n| 阶段        | 模块         | 功能       |\n| ----------- | ------------ | ---------- |\n| POST_ACCEPT | realip       | 获取真实IP |\n| PREACCESS   | limit_conn   | 限制连接数 |\n| ACCESS      | access       | IP访问控制 |\n| SSL         | ssl_preread  | SSL预读取  |\n| PREREAD     | preread      | 协议预读取 |\n| CONTENT     | proxy/return | 内容处理   |\n| LOG         | log          | 记录日志   |\n\n#### 4.7.3 TCP/UDP负载均衡\n\n```nginx\nstream {\n    # TCP负载均衡\n    upstream tcp_backend {\n        least_conn;\n        server 192.168.1.10:3306 weight=2;\n        server 192.168.1.11:3306;\n        server 192.168.1.12:3306 backup;\n    }\n  \n    server {\n        listen 3306;\n        proxy_pass tcp_backend;\n    }\n  \n    # UDP负载均衡\n    upstream dns_backend {\n        server 8.8.8.8:53;\n        server 8.8.4.4:53;\n    }\n  \n    server {\n        listen 53 udp;\n        proxy_pass dns_backend;\n        proxy_responses 1;  # 期望的响应数量\n    }\n}\n```\n\n#### 4.7.4 SSL/TLS终止\n\n```nginx\nstream {\n    upstream backend {\n        server 192.168.1.10:80;\n    }\n  \n    server {\n        listen 443 ssl;\n  \n        ssl_certificate /path/to/cert.pem;\n        ssl_certificate_key /path/to/key.pem;\n        ssl_protocols TLSv1.2 TLSv1.3;\n  \n        proxy_pass backend;\n    }\n}\n```\n\n#### 4.7.5 SSL预读取(SNI路由)\n\n```nginx\nstream {\n    map $ssl_preread_server_name $backend {\n        example.com backend1;\n        api.example.com backend2;\n        default backend1;\n    }\n  \n    upstream backend1 {\n        server 192.168.1.10:443;\n    }\n  \n    upstream backend2 {\n        server 192.168.1.20:443;\n    }\n  \n    server {\n        listen 443;\n        proxy_pass $backend;\n        ssl_preread on;  # 启用SSL预读取\n    }\n}\n```\n\n**编译:** `--with-stream_ssl_preread_module`\n\n#### 4.7.6 Proxy Protocol\n\n**功能:** 在TCP层传递客户端真实IP\n\n```nginx\nstream {\n    server {\n        listen 80 proxy_protocol;  # 接收Proxy Protocol\n  \n        set_real_ip_from 192.168.1.0/24;\n  \n        proxy_pass backend;\n        proxy_protocol on;  # 转发时也使用Proxy Protocol\n    }\n}\n```\n\n**Proxy Protocol格式:**\n\n```\nPROXY TCP4 192.168.1.100 192.168.1.10 54321 80\\r\\n\n```\n\n#### 4.7.7 Stream变量\n\n| 变量                            | 说明               |\n| ------------------------------- | ------------------ |\n| `$remote_addr`                | 客户端IP           |\n| `$remote_port`                | 客户端端口         |\n| `$server_addr`                | 服务器IP           |\n| `$server_port`                | 服务器端口         |\n| `$protocol`                   | 协议(TCP/UDP)      |\n| `$bytes_sent`                 | 发送字节数         |\n| `$bytes_received`             | 接收字节数         |\n| `$session_time`               | 会话时间           |\n| `$upstream_addr`              | 上游服务器地址     |\n| `$upstream_bytes_sent`        | 发送到上游的字节数 |\n| `$upstream_bytes_received`    | 从上游接收的字节数 |\n| `$upstream_connect_time`      | 连接上游耗时       |\n| `$ssl_preread_server_name`    | SNI服务器名        |\n| `$ssl_preread_alpn_protocols` | ALPN协议           |", "subs": ["4.7.1 基本配置", "4.7.2 Stream处理阶段", "4.7.3 TCP/UDP负载均衡", "4.7.4 SSL/TLS终止", "4.7.5 SSL预读取(SNI路由)", "4.7.6 Proxy Protocol", "4.7.7 Stream变量"]}, {"title": "4.8 性能优化", "content": "#### 4.8.1 Open File Cache\n\n```nginx\nhttp {\n    # 打开文件缓存\n    open_file_cache max=1000 inactive=20s;\n    open_file_cache_valid 30s;\n    open_file_cache_min_uses 2;\n    open_file_cache_errors on;\n}\n```\n\n**参数说明:**\n\n- `max` - 缓存最大文件数\n- `inactive` - 不活跃时间\n- `valid` - 检查文件是否变化的时间间隔\n- `min_uses` - 在inactive时间内最少使用次数\n- `errors` - 是否缓存文件不存在的错误\n\n#### 4.7.8 配置示例: stream.conf (Stream基础)\n\n**用途:** 演示Stream模块的基本TCP代理功能\n\n**完整配置:**\n\n```nginx\nstream {\n    server {\n        # 监听TCP 10001端口\n        listen 10001;\n    \n        # return: 直接返回内容(不转发)\n        # $remote_addr: 客户端IP地址\n        return 'hello, $remote_addr!\\n';\n    }\n}\n```\n\n**关键点:** Stream模块用于TCP/UDP四层代理,配置在stream块中。\n\n#### 4.7.9 配置示例: streamups.conf (Stream高级功能)\n\n**用途:** 演示Stream的日志、Proxy Protocol、变量等高级功能\n\n**完整配置:**\n\n```nginx\nstream {\n    # 自定义日志格式\n    log_format basic '$remote_addr [$time_local] '\n                     '$protocol $status $bytes_sent $bytes_received '\n                     '$session_time';\n  \n    error_log logs/stream_error.log debug;\n    access_log logs/stream_access.log basic;\n  \n    # Server 1: Proxy Protocol监听\n    server {\n        # proxy_protocol: 接收Proxy Protocol\n        # 可以获取客户端真实IP\n        listen 10002 proxy_protocol;\n        return '10002 server get ip: $remote_addr!\\n';\n    }\n  \n    # Server 2: 另一个Proxy Protocol服务器\n    server {\n        listen 10003 proxy_protocol;\n        return '10003 server get ip: $remote_addr!\\n';\n    }\n  \n    # Server 3: 访问控制和变量演示\n    server {\n        listen 10004 proxy_protocol;\n    \n        # set_real_ip_from: 信任的代理IP\n        set_real_ip_from 127.0.0.1;\n    \n        # 访问控制\n        allow 202.112.144.236;\n        deny all;\n    \n        # 返回Stream变量\n        return '10004 vars:\nbytes_received: $bytes_received\nbytes_sent: $bytes_sent\nproxy_protocol_addr: $proxy_protocol_addr\nproxy_protocol_port: $proxy_protocol_port\nremote_addr: $remote_addr\nremote_port: $remote_port\nrealip_remote_addr: $realip_remote_addr\nrealip_remote_port: $realip_remote_port\nserver_addr: $server_addr\nserver_port: $server_port\nsession_time: $session_time\nstatus: $status\nprotocol: $protocol\n';\n    }\n}\n```\n\n**Stream变量说明:**\n\n- `$remote_addr/$remote_port`: 客户端地址/端口\n- `$server_addr/$server_port`: 服务器地址/端口\n- `$bytes_sent/$bytes_received`: 发送/接收字节数\n- `$session_time`: 会话持续时间\n- `$protocol`: 协议(TCP/UDP)\n- `$proxy_protocol_addr`: Proxy Protocol中的真实IP\n\n**关键点:** Stream支持Proxy Protocol、访问控制、自定义日志。\n\n#### 4.8.2 连接优化\n\n```nginx\nhttp {\n    # 客户端连接\n    keepalive_timeout 65;\n    keepalive_requests 100;\n  \n    # 上游连接\n    upstream backend {\n        keepalive 32;\n        keepalive_requests 100;\n        keepalive_timeout 60s;\n    }\n}\n```\n\n#### 4.8.3 缓冲优化\n\n```nginx\nhttp {\n    # 客户端请求\n    client_body_buffer_size 16k;\n    client_header_buffer_size 1k;\n    large_client_header_buffers 4 8k;\n  \n    # 上游响应\n    proxy_buffer_size 4k;\n    proxy_buffers 8 4k;\n    proxy_busy_buffers_size 8k;\n}\n```\n\n---\n\n**第四部分总结:**\n\n反向代理与负载均衡是Nginx的核心功能之一,本部分详细介绍了:\n\n1. **负载均衡算法** - Round-Robin、IP Hash、Hash、一致性Hash、Least Connections\n2. **Upstream模块** - 服务器配置、Keepalive连接复用、共享内存、变量\n3. **HTTP Proxy** - 请求处理流程、proxy_pass详解、请求/响应修改、容错机制\n4. **HTTP缓存** - 缓存配置、缓存控制、缓存清理、分片缓存\n5. **其他协议** - FastCGI、uWSGI、gRPC、Memcached、WebSocket\n6. **HTTP/2** - 启用配置、Server Push\n7. **Stream模块** - TCP/UDP代理、SSL终止、Proxy Protocol\n8. **性能优化** - 文件缓存、连接优化、缓冲优化\n\n#### 4.8.7 配置示例: openfilecache.conf (文件缓存优化)\n\n**用途:** 演示open_file_cache文件描述符缓存,提升静态文件性能\n\n**完整配置:**\n\n```nginx\nserver {\n    listen 8092;\n    root html;\n  \n    location / {\n        # open_file_cache: 文件描述符缓存\n        # max=10: 最多缓存10个文件描述符\n        # inactive=60s: 60秒内未访问则删除\n        open_file_cache max=10 inactive=60s;\n    \n        # open_file_cache_min_uses: 最少使用次数\n        # 在inactive时间内至少使用1次才缓存\n        open_file_cache_min_uses 1;\n    \n        # open_file_cache_valid: 检查文件是否变化的时间间隔\n        # 每60秒检查一次文件是否被修改\n        open_file_cache_valid 60s;\n    \n        # open_file_cache_errors: 是否缓存文件不存在的错误\n        # on: 缓存404错误,避免重复查找不存在的文件\n        open_file_cache_errors on;\n    }\n}\n```\n\n**open_file_cache优化效果:**\n\n- 减少open/stat系统调用\n- 提升静态文件访问性能\n- 降低磁盘I/O压力\n- 适合大量小文件场景\n\n**关键点:** open_file_cache缓存文件描述符,显著提升静态文件性能。\n\n---\n\n通过本部分的学习,你应该能够:\n\n- 配置各种负载均衡策略\n- 理解反向代理的完整处理流程\n- 使用缓存提升性能\n- 配置四层和七层反向代理\n- 优化Nginx性能\n\n接下来,我们将学习Nginx的系统层性能优化。\n\n---\n\n**待续:第五部分 - Nginx的系统层性能优化**", "subs": ["4.8.1 Open File Cache", "4.7.8 配置示例: stream.conf (Stream基础)", "4.7.9 配置示例: streamups.conf (Stream高级功能)", "4.8.2 连接优化", "4.8.3 缓冲优化", "4.8.7 配置示例: openfilecache.conf (文件缓存优化)"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>VictoriaMetrics PromQL 学习笔记 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>VictoriaMetrics PromQL 学习笔记</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "VictoriaMetrics PromQL 学习笔记", "intro": "> 📘 **文档说明**  \n> 本文档基于 VictoriaMetrics 官方文档整理，旨在提供详细的中文学习笔记，帮助快速查询和理解 VictoriaMetrics 查询函数的使用场景。\n\n---", "parts": [{"title": "📑 目录", "sections": [{"title": "概述", "content": "- [第一章：PromQL 概述](#第一章promql-概述)\n- [第二章：基础概念](#第二章基础概念)\n- [第三章：Rollup 函数](#第三章rollup-函数)\n- [第四章：Label 操作函数](#第四章label-操作函数)\n- [第五章：聚合函数](#第五章聚合函数)\n- [第六章：转换函数](#第六章转换函数)\n- [第七章：函数速查索引](#第七章函数速查索引)\n- [附录：VictoriaMetrics vs Prometheus](#附录victoriametrics-vs-prometheus)\n\n---", "subs": ["第一章：PromQL 概述", "第二章：基础概念", "第三章：Rollup 函数", "第四章：Label 操作函数", "第五章：聚合函数", "第六章：转换函数"]}]}, {"title": "🏷️ 标注规范", "sections": [{"title": "概述", "content": "本文档使用以下标记来标注函数的兼容性：\n\n| 标记 | 说明 |\n|------|------|\n| ✅ | **Prometheus 原生支持** - 该函数在 Prometheus 中原生可用 |\n| 🔵 | **VictoriaMetrics 独有** - 该函数仅在 VictoriaMetrics 中可用 |\n| ⚠️ | **VictoriaMetrics 扩展** - Prometheus 有类似功能，但参数或行为有所不同 |\n\n---", "subs": []}]}, {"title": "第一章：PromQL 概述", "sections": [{"title": "1.1 什么是 PromQL", "content": "> 📝 **内容来源**: `promql.txt`\n\n\nPromQL 是 **Prometheus 系统的查询语言**。它是为绘图、告警或派生时间序列（通过 recording rules）场景而设计的强大且简单的语言。\n\n**设计特点**：\n\n- 从零开始设计，专为时间序列数据库（TSDB）优化\n- 与其他查询语言（如 TimescaleDB 的 SQL、InfluxQL 或 Flux）没有共同之处\n- 语法清晰简洁，查询表达能力强\n\n**学习曲线**：初学者通常需要花费几个小时阅读官方文档才能理解其工作原理，本文旨在简化和缩短学习曲线。\n\n---", "subs": ["从零开始设计", "与其他查询语言（如 TimescaleDB 的 SQL、InfluxQL 或 Flu", "语法清晰简洁"]}, {"title": "1.2 基础查询", "content": "#### 1.2.1 查询时间序列\n\n选择时间序列非常简单，只需写入时间序列名称：\n\n```promql\nnode_network_receive_bytes_total\n```\n\n这个查询会返回所有名为 `node_network_receive_bytes_total` 的时间序列。由于同一指标可能有不同的标签组合，可能返回多条结果：\n\n```promql\nnode_network_receive_bytes_total{device=\"eth0\"}\nnode_network_receive_bytes_total{device=\"eth1\"}\nnode_network_receive_bytes_total{device=\"eth2\"}\n```\n\n**相比 SQL 的优势**：PromQL 自动处理时间范围和采样降采样机制（通过 `/query_range` 接口的 `start`、`end` 和 `step` 参数），无需在查询中显式声明。\n\n---", "subs": ["1.2.1 查询时间序列"]}, {"title": "1.3 Label 过滤", "content": "#### 1.3.1 精确匹配\n\n使用 `=` 进行精确匹配：\n\n```promql\nnode_network_receive_bytes_total{device=\"eth1\"}\n```\n\n使用 `!=` 排除特定值：\n\n```promql\nnode_network_receive_bytes_total{device!=\"eth1\"}\n```\n\n#### 1.3.2 正则表达式匹配\n\n使用 `=~` 进行正则匹配（支持 Go RE2 语法）：\n\n```promql\n# 匹配 device 以 eth 开头的所有时间序列\nnode_network_receive_bytes_total{device=~\"eth.+\"}\n```\n\n使用 `!~` 进行正则否定匹配：\n\n```promql\n# 排除 device 以 eth 开头的时间序列\nnode_network_receive_bytes_total{device!~\"eth.+\"}\n```\n\n#### 1.3.3 多标签过滤（AND 逻辑）\n\n多个标签过滤器之间是 **与（AND）** 关系：\n\n```promql\nnode_network_receive_bytes_total{instance=\"node42:9100\", device=~\"eth.+\"}\n```\n\n#### 1.3.4 OR 逻辑实现\n\nPromQL 原生不支持 OR 运算符于标签过滤，但可通过正则表达式实现：\n\n```promql\n# 匹配 device 为 eth1 或 lo 的时间序列\nnode_network_receive_bytes_total{device=~\"eth1|lo\"}\n```\n\n#### 1.3.5 对指标名称使用正则\n\n指标名称本质上是标签 `__name__` 的值，可以使用正则匹配多个指标：\n\n```promql\n{__name__=~\"node_network_(receive|transmit)_bytes_total\"}\n```\n\n---", "subs": ["1.3.1 精确匹配", "1.3.2 正则表达式匹配", "1.3.3 多标签过滤（AND 逻辑）", "1.3.4 OR 逻辑实现", "1.3.5 对指标名称使用正则"]}, {"title": "1.4 时间偏移查询", "content": "#### 1.4.1 查询历史数据\n\n使用 `offset` 关键字查询历史数据：\n\n```promql\n# 查询一周前的数据\nnode_network_receive_bytes_total offset 7d\n```\n\n#### 1.4.2 对比历史与当前\n\n```promql\n# 返回当前 GC 开销比一小时前大 1.5 倍的数据点\ngo_memstats_gc_cpu_fraction > 1.5 * (go_memstats_gc_cpu_fraction offset 1h)\n```\n\n---", "subs": ["1.4.1 查询历史数据", "1.4.2 对比历史与当前"]}, {"title": "1.5 计算速率（Rate）", "content": "#### 1.5.1 为什么需要 Rate\n\nCounter 类型的指标（如网络累计接收字节数）是持续递增的，直接绘图没有实用价值。我们需要计算每秒速率（如 MB/s）。\n\n#### 1.5.2 Rate 函数\n\n`rate()` 函数计算所有匹配时间序列的每秒平均速率：\n\n```promql\nrate(node_network_receive_bytes_total[5m])\n```\n\n**时间窗口说明**：\n\n- `[5m]` 表示 5 分钟的回看窗口\n- 计算公式：`(Vcurr - Vprev) / (Tcurr - Tprev)`，其中 `Tprev = Tcurr - 5m`\n- **窗口越大**，曲线越平滑\n- **窗口越小**，曲线越抖动\n\n#### 🔵 VictoriaMetrics 扩展\n\nVictoriaMetrics 允许省略时间窗口，默认使用 2 个数据点之间的间隔（`step` 参数，默认 5m）：\n\n```promql\nrate(node_network_receive_bytes_total)\n```\n\n#### 1.5.3 Rate 使用注意事项\n\n> [!WARNING]\n> **Rate 函数的限制**\n>\n> 1. **只用于 Counter**：不要对可能上下波动的 Gauge 使用 Rate\n> 2. **避免使用 irate**：`irate` 不能捕捉尖峰，且性能优势不明显\n> 3. **结果不保留指标名称**：Rate 结果会删除 Metric 名称，但保留所有标签\n\n---", "subs": ["1.5.1 为什么需要 Rate", "1.5.2 Rate 函数", "🔵 VictoriaMetrics 扩展", "1.5.3 Rate 使用注意事项"]}, {"title": "1.6 算术运算", "content": "#### 1.6.1 支持的运算符\n\nPromQL 支持所有基础算术运算：\n\n| 运算符 | 说明 |\n|--------|------|\n| `+` | 加法 |\n| `-` | 减法 |\n| `*` | 乘法 |\n| `/` | 除法 |\n| `%` | 取模 |\n| `^` | 指数 |\n\n#### 1.6.2 单位转换示例\n\n```promql\n# 将 bytes/s 转换为 bits/s\nrate(node_network_receive_bytes_total[5m]) * 8\n```\n\n#### 1.6.3 跨指标运算\n\n```promql\nco2 * (((temp_c + 273.15) * 1013.25) / (pressure * 298.15))\n```\n\n#### 1.6.4 匹配规则\n\n多个时间序列进行算术运算时的匹配规则：\n\n1. PromQL 引擎从运算两侧的时间序列中剥离指标名称，但保留标签\n2. 对于左侧的每个时间序列，搜索右侧具有 **相同标签集** 的时间序列\n3. 对每个数据点应用运算，返回相同标签集的结果\n4. 如果没有找到匹配的标签集，该时间序列会被丢弃\n\n> [!NOTE]\n> 匹配规则可通过 `ignoring`、`on`、`group_left` 和 `group_right` 修饰符增强，但逻辑复杂，大多数场景用不上。\n\n---", "subs": ["1.6.1 支持的运算符", "1.6.2 单位转换示例", "1.6.3 跨指标运算", "1.6.4 匹配规则"]}, {"title": "1.7 比较运算", "content": "#### 1.7.1 支持的比较运算符\n\n| 运算符 | 说明 |\n|--------|------|\n| `==` | 等于 |\n| `!=` | 不等于 |\n| `>` | 大于 |\n| `>=` | 大于等于 |\n| `<` | 小于 |\n| `<=` | 小于等于 |\n\n#### 1.7.2 过滤数据点\n\n```promql\n# 只返回小于 2300 字节/秒的带宽\nrate(node_network_receive_bytes_total[5m]) < 2300\n```\n\n#### 1.7.3 Bool 修饰符\n\n使用 `bool` 修饰符将结果转换为 0（false）或 1（true）：\n\n```promql\nrate(node_network_receive_bytes_total[5m]) < bool 2300\n```\n\n---", "subs": ["1.7.1 支持的比较运算符", "1.7.2 过滤数据点", "1.7.3 Bool 修饰符"]}, {"title": "1.8 聚合函数", "content": "PromQL 支持对时间序列进行分组聚合。时间序列按给定标签集分组，然后对每组应用聚合函数。\n\n**示例**：按实例分组计算所有网络接口的入口流量总和\n\n```promql\nsum(rate(node_network_receive_bytes_total[5m])) by (instance)\n```\n\n---", "subs": []}, {"title": "1.9 处理 Gauge 指标", "content": "#### 1.9.1 Gauge 特点\n\nGauge 是随时可能上下波动的时间序列（如内存使用量、温度、压力）。\n\n#### 1.9.2 常用函数\n\n| 函数 | 说明 |\n|------|------|\n| `min_over_time` | 时间窗口内的最小值 |\n| `max_over_time` | 时间窗口内的最大值 |\n| `avg_over_time` | 时间窗口内的平均值 |\n| `quantile_over_time` | 时间窗口内的分位数 |\n\n**示例**：\n\n```promql\n# 绘制可用内存的最小值\nmin_over_time(node_memory_MemFree_bytes[5m])\n```\n\n#### 🔵 VictoriaMetrics 扩展\n\nVictoriaMetrics 提供了 `rollup_*` 函数，自动返回 min、max 和 avg 值：\n\n```promql\nrollup(node_memory_MemFree_bytes)\n```\n\n---", "subs": ["1.9.1 Gauge 特点", "1.9.2 常用函数", "🔵 VictoriaMetrics 扩展"]}, {"title": "1.10 Label 操作", "content": "#### 1.10.1 ✅ Prometheus 原生函数\n\n| 函数 | 说明 |\n|------|------|\n| `label_replace` | 替换标签值 |\n| `label_join` | 合并多个标签 |\n\n#### 1.10.2 🔵 VictoriaMetrics 扩展函数\n\nVictoriaMetrics 提供了更丰富便捷的 Label 操作函数：\n\n| 函数 | 说明 |\n|------|------|\n| `label_set` | 为时间序列添加标签 |\n| `label_del` | 删除指定标签 |\n| `label_keep` | 保留指定标签，删除其他标签 |\n| `label_copy` | 复制标签值到新标签 |\n| `label_move` | 重命名标签 |\n| `label_transform` | 使用正则替换标签值 |\n| `label_value` | 将标签值转换为数字 |\n\n---", "subs": ["1.10.1 ✅ Prometheus 原生函数", "1.10.2 🔵 VictoriaMetrics 扩展函数"]}, {"title": "1.11 组合多个查询结果", "content": "#### 1.11.1 ✅ Prometheus OR 运算符\n\n使用 `or` 运算符返回多个时间序列：\n\n```promql\nmetric1 or metric2 or metric3\n```\n\n> [!CAUTION]\n> **OR 运算符陷阱**  \n> 具有重复标签集的结果将被跳过。例如：\n>\n> ```promql\n> sum(a) or sum(b)  # sum(b) 会被跳过，因为两者标签集相同\n> ```\n\n#### 1.11.2 🔵 VictoriaMetrics 简化语法\n\nVictoriaMetrics 简化了语法，只需用括号包围：\n\n```promql\n(metric1, metric2, metric3)\n```\n\n> [!NOTE]\n> 括号内可以放置任何 PromQL 表达式，不仅仅是指标名称。\n\n---", "subs": ["1.11.1 ✅ Prometheus OR 运算符", "1.11.2 🔵 VictoriaMetrics 简化语法"]}, {"title": "1.12 VictoriaMetrics vs Prometheus", "content": "#### 1.12.1 主要扩展特性\n\n| 特性 | Prometheus | VictoriaMetrics |\n|------|------------|-----------------|\n| Rate 时间窗口 | 必须指定 | 可省略，默认 step |\n| Rollup 函数 | 需分别调用 min/max/avg | `rollup()` 自动返回 |\n| Label 操作 | 仅 2 个函数 | 7 个增强函数 |\n| OR 语法 | `a or b or c` | `(a, b, c)` |\n\n---", "subs": ["1.12.1 主要扩展特性"]}, {"title": "1.13 总结", "content": "PromQL 是一种 **简单但功能强大** 的时间序列数据库查询语言：\n\n✅ **优势**：\n\n- 语法简洁清晰，相比 SQL/InfluxQL/Flux 更易读\n- 自动处理时间范围和降采样\n- 强大的聚合和转换能力\n\n⚠️ **局限**：\n\n- 不支持某些 SQL 特性（但实际场景中很少需要）\n- 匹配规则需要深入理解才能避免错误\n\n🔵 **VictoriaMetrics 增强**：\n\n- 简化语法（如可省略 rate 时间窗口）\n- 增强 Label 操作能力\n- 提供更便捷的 Rollup 函数\n\n---", "subs": ["语法简洁清晰", "自动处理时间范围和降采样", "强大的聚合和转换能力", "不支持某些 SQL 特性（但实际场景中很少需要）", "匹配规则需要深入理解才能避免错误", "简化语法（如可省略 rate 时间窗口）"]}]}, {"title": "第二章：基础概念", "sections": [{"title": "2.1 过滤器（Filters）", "content": "> 📝 **内容来源**: `basic.txt`\n\n\n#### 2.1.1 基本查询\n\n使用 MetricsQL/PromQL 获取指标数据非常简单，只需写入指标名称：\n\n```promql\nfoo_bar\n```\n\n一个简单的指标名称可能会返回拥有不同标签集的多个时间序列：\n\n```promql\nrequests_total{path=\"/\", code=\"200\"} \nrequests_total{path=\"/\", code=\"403\"}\n```\n\n#### 2.1.2 标签过滤\n\n要选择具有特定标签的时间序列，需要在花括号 `{}` 中指定匹配标签的过滤器：\n\n```promql\nrequests_total{code=\"200\"}\n```\n\n**过滤器运算符**：\n\n| 运算符 | 说明 | 示例 |\n|--------|------|------|\n| `=` | 精确匹配 | `{code=\"200\"}` |\n| `!=` | 反向匹配 | `{code!=\"200\"}` |\n| `=~` | 正则匹配 | `{code=~\"2.*\"}` |\n| `!~` | 正则反向匹配 | `{code!~\"2.*\"}` |\n\n**示例**：\n\n```promql\n# 正则匹配以 2 开头的状态码\nrequests_total{code=~\"2.*\"}\n```\n\n#### 2.1.3 组合过滤器\n\n多个过滤器可以组合使用（AND 逻辑）：\n\n```promql\nrequests_total{code=\"200\", path=\"/home\"}\n```\n\n上述查询返回所有名为 `requests_total`，同时带有 `code=\"200\"` 和 `path=\"/home\"` 标签的时间序列。\n\n---", "subs": ["2.1.1 基本查询", "2.1.2 标签过滤", "2.1.3 组合过滤器"]}, {"title": "2.2 使用指标名称过滤", "content": "如数据模型中提到的，指标名称本质上是标签 `__name__` 的值。可以使用正则表达式过滤多个指标：\n\n```promql\n{__name__=~\"requests_(error|success)_total\"}\n```\n\n上述查询会返回两个指标的时间序列：\n\n- `requests_error_total`\n- `requests_success_total`\n\n---", "subs": ["requests_error_total", "requests_success_total"]}, {"title": "2.3 🔵 多个过滤器的 OR 逻辑", "content": "#### 2.3.1 VictoriaMetrics 扩展\n\nMetricsQL 支持在花括号内使用 `or` 分隔多个过滤器，查询至少满足其中一个过滤器的时间序列：\n\n```promql\n{job=\"app1\",env=\"prod\" or job=\"app2\",env=\"dev\"}\n```\n\n过滤器个数没有限制。此功能可直接对查询到的 series 应用 rollup 函数，无需使用子查询：\n\n```promql\nrate({job=\"app1\",env=\"prod\" or job=\"app2\",env=\"dev\"}[5m])\n```\n\n> [!TIP]\n> **性能优化建议**  \n> 如果需要对同一标签使用多个过滤器，从性能角度考虑，最好使用正则表达式：\n>\n> - ✅ 推荐：`{label=~\"value1|...|valueN\"}`\n> - ⚠️ 避免：`{label=\"value1\" or ... or label=\"valueN\"}`\n\n---", "subs": ["2.3.1 VictoriaMetrics 扩展"]}, {"title": "2.4 算术运算", "content": "#### 2.4.1 ✅ 支持的运算符\n\nMetricsQL 支持所有基础算术运算：\n\n| 运算符 | 说明 |\n|--------|------|\n| `+` | 加法 |\n| `-` | 减法 |\n| `*` | 乘法 |\n| `/` | 除法 |\n| `%` | 取模 |\n| `^` | 指数 |\n\n#### 2.4.2 跨指标计算\n\n可以在多个指标之间进行各种计算。例如，计算错误请求率：\n\n```promql\n(requests_error_total / (requests_error_total + requests_success_total)) * 100\n```\n\n---", "subs": ["2.4.1 ✅ 支持的运算符", "2.4.2 跨指标计算"]}, {"title": "2.5 合并多个时间序列", "content": "#### 2.5.1 匹配规则\n\n要使用算术运算合并多个时间序列，需要了解匹配规则。否则，查询可能出错或给出错误结果。\n\n**匹配规则逻辑**：\n\n1. **去除指标名称**：MetricsQL 引擎从运算左右两侧的所有时间序列中去除指标名称，但保留标签\n2. **查找匹配**：对于左侧的每个时间序列，在右侧搜索具有 **相同标签集** 的时间序列\n3. **执行运算**：对每个数据点执行运算操作，返回具有相同标签集的结果时间序列\n4. **删除无匹配项**：如果没有匹配项，该结果时间序列将从结果中删除\n\n#### 2.5.2 匹配修饰符\n\n匹配规则可以通过以下运算符扩展（高级用法）：\n\n- `ignoring` - 忽略指定标签\n- `on` - 只使用指定标签进行匹配\n- `group_left` - 左侧多对一匹配\n- `group_right` - 右侧多对一匹配\n\n---", "subs": ["2.5.1 匹配规则", "2.5.2 匹配修饰符"]}, {"title": "2.6 比较运算", "content": "#### 2.6.1 ✅ 支持的比较运算符\n\n| 运算符 | 说明 |\n|--------|------|\n| `==` | 等于 |\n| `!=` | 不等于 |\n| `>` | 大于 |\n| `>=` | 大于等于 |\n| `<` | 小于 |\n| `<=` | 小于等于 |\n\n#### 2.6.2 过滤示例\n\n这些运算符可以像算术运算符一样应用于任意 MetricsQL 表达式。比较运算的结果是只包含匹配成功的时间序列。\n\n**示例**：仅返回内存使用超过 100MB 的进程列表\n\n```promql\nprocess_resident_memory_bytes > 100*1024*1024\n```\n\n---", "subs": ["2.6.1 ✅ 支持的比较运算符", "2.6.2 过滤示例"]}, {"title": "2.7 聚合与分组函数", "content": "#### 2.7.1 基本概念\n\nMetricsQL 支持对时间序列进行分组聚合：\n\n1. 使用指定的一组标签对时间序列进行分组\n2. 对每组时间序列的值应用聚合函数\n\n#### 2.7.2 示例\n\n**按 job 分组计算内存使用量总和**：\n\n```promql\nsum(process_resident_memory_bytes) by (job)\n```\n\n> [!NOTE]\n> 更多聚合函数请参见本文档第五章《聚合函数》。\n\n---", "subs": ["2.7.1 基本概念", "2.7.2 示例"]}, {"title": "2.8 计算速率（Rate）", "content": "#### 2.8.1 Rate 函数基础\n\n`rate` 是对 Counter 类型指标使用最广泛的函数，它对每个时间序列独立计算每秒的平均增长率。\n\n**示例**：返回每个 node_exporter 实例监控到的每秒平均入流量\n\n```promql\nrate(node_network_receive_bytes_total)\n```\n\n#### 2.8.2 🔵 VictoriaMetrics 默认行为\n\n默认情况下，无论是 Instant Query 还是 Range Query，VictoriaMetrics 都使用 `step` 参数指定的作用范围对样本执行 rate 计算。\n\n#### 2.8.3 指定回溯窗口\n\nRate 需要计算的时间间隔可以在中括号中指定：\n\n```promql\nrate(node_network_receive_bytes_total[5m])\n```\n\n在此例中，VictoriaMetrics 使用指定的回溯窗口 `5m`（5分钟）来计算平均每秒增长。\n\n**窗口大小的影响**：\n\n- **窗口越大** → 曲线越平滑\n- **窗口越小** → 曲线越抖动\n\n> [!WARNING]\n> **Rate 使用限制**  \n> `rate()` 能且只能用于 Counter 类指标。对 Gauge 类型指标应用 rate 是没有意义的。\n\n#### 2.8.4 Rate 结果的标签处理\n\n`rate` 会保留时间序列中除了指标名称之外的所有标签。如果需要保留指标名称，需要使用 `keep_metric_names` 修饰符。\n\n---", "subs": ["2.8.1 Rate 函数基础", "2.8.2 🔵 VictoriaMetrics 默认行为", "2.8.3 指定回溯窗口", "2.8.4 Rate 结果的标签处理"]}, {"title": "2.9 🔵 keep_metric_names 修饰符", "content": "#### 2.9.1 为什么需要此修饰符\n\n默认情况下，指标名称会在应用函数或算术运算后被丢弃，因为它们已经失去了原始指标的含义。\n\n当函数作用于多个名称不同的时间序列时，可能会导致 **`duplicate time series` 错误**。\n\n#### 2.9.2 使用方法\n\n使用 `keep_metric_names` 修饰符可以保留指标名称：\n\n```promql\n# 计算 rate 后保留指标名称\nrate(node_network_receive_bytes_total) keep_metric_names\n```\n\n#### 2.9.3 应用场景\n\n**场景 1：对多个指标应用函数**\n\n```promql\n# 保留 foo 和 bar 指标名称\nrate({__name__=~\"foo|bar\"}) keep_metric_names\n```\n\n**场景 2：算术运算后保留指标名称**\n\n```promql\n# 除以 10 后仍保留 foo 和 bar 指标名称\n({__name__=~\"foo|bar\"} / 10) keep_metric_names\n```\n\n---", "subs": ["2.9.1 为什么需要此修饰符", "2.9.2 使用方法", "2.9.3 应用场景"]}, {"title": "2.10 章节总结", "content": "#### 2.10.1 核心概念回顾\n\n| 概念 | 关键点 |\n|------|--------|\n| **过滤器** | 支持精确匹配、正则匹配、组合过滤 |\n| **算术运算** | 支持 +、-、*、/、%、^ 六种运算符 |\n| **匹配规则** | 基于相同标签集进行匹配和合并 |\n| **比较运算** | 支持 ==、!=、>、>=、<、<= 六种比较符 |\n| **聚合函数** | 按标签分组后进行聚合计算 |\n| **Rate 函数** | 仅用于 Counter，计算每秒平均增长率 |\n\n#### 2.10.2 🔵 VictoriaMetrics 特有功能\n\n| 功能 | 说明 |\n|------|------|\n| 过滤器 OR 逻辑 | 支持在花括号内使用 `or` 分隔多个过滤器 |\n| Rate 默认窗口 | 默认使用 `step` 参数，无需显式指定 |\n| keep_metric_names | 修饰符用于保留指标名称，避免重复错误 |\n\n---", "subs": ["2.10.1 核心概念回顾", "2.10.2 🔵 VictoriaMetrics 特有功能"]}]}, {"title": "第三章：Rollup 函数", "sections": [{"title": "3.1  Rollup 函数概述", "content": "> 📝 **内容来源**: `func_rollup.txt`\n\n\n#### 3.1.1 什么是 Rollup 函数\n\nRollup 函数（也称为 **范围函数** 或 **窗口函数**）在所选时间序列的给定回溯窗口上对原始样本进行汇总计算。\n\n**示例**：\n\n```promql\navg_over_time(temperature[24h])\n```\n\n计算过去 24 小时内所有原始样本的平均温度值。\n\n---\n\n#### 3.1.2 重要特性\n\n**图表绘制**：\n\n- 在 Grafana 中使用 rollup 函数构建图形时，每个点上的 rollup 都是独立计算的\n- 例如，`avg_over_time(temperature[24h])` 图表中的每个点显示截止到该时间点的过去 24 小时内的平均温度\n- 点之间的间隔由 Grafana 传递给 `/api/v1/query_range` 接口的 `step` 查询参数设置\n\n**独立计算**：\n\n- 如果查询返回多个时间序列，则每个序列都会单独计算汇总\n\n**自动回溯窗口**：\n\n- 如果方括号中的回溯窗口缺失，MetricsQL 会自动将window设置为图表上点之间的间隔\n- 例如：`rate(http_requests_total)` 等同于 `rate(http_requests_total[$__interval])` 或 `rate(http_requests_total[1i])`\n\n**自动包装**：\n\n- 每个 MetricsQL 中的序列选择器都必须包装在 rollup 函数中\n- 否则会自动被包装成 `default_rollup`\n- 例如：`foo{bar=\"baz\"}` 自动转换为 `default_rollup(foo{bar=\"baz\"}[1i])`\n\n**修饰符支持**：\n\n- 所有汇总函数都接受可选的 `keep_metric_names` 修饰符\n- 如果设置该修饰符，函数将在结果中保留指标名称\n\n> [!NOTE]\n> VictoriaMetrics 的部分 Rollup 函数与 Prometheus 的实现逻辑有一定差异，这些差异会在函数说明中特别标注。\n\n---", "subs": ["3.1.1 什么是 Rollup 函数", "3.1.2 重要特性"]}, {"title": "3.2 函数速查表", "content": "#### 3.2.1 按功能分类\n\n| 分类 | 函数列表 |\n|------|----------|\n| **基础统计** | `avg_over_time`, `min_over_time`, `max_over_time`, `sum_over_time`, `count_over_time` |\n| **分位数** | `quantile_over_time`, `quantiles_over_time`, `median_over_time` |\n| **变化检测** | `changes`, `changes_prometheus`, `increases_over_time`, `decreases_over_time` |\n| **增长率** | `rate`, `irate`, `increase`, `increase_prometheus`, `increase_pure` |\n| **导数** | `deriv`, `deriv_fast`, `ideriv` |\n| **差值计算** | `delta`, `delta_prometheus`, `idelta`, `range_over_time` |\n| **条件计数** | `count_eq_over_time`, `count_gt_over_time`, `count_le_over_time`, `count_ne_over_time` |\n| **条件求和** | `sum_eq_over_time`, `sum_gt_over_time`, `sum_le_over_时` |\n| **比例计算** | `share_eq_over_time`, `share_gt_over_time`, `share_le_over_time` |\n| **高度追踪** | `ascent_over_time`, `descent_over_time` |\n| **时间相关** | `timestamp`, `timestamp_with_name`, `tfirst_over_time`, `tlast_over_time`, `tmax_over_time`, `tmin_over_time` |\n| **异常检测** | `outlier_iqr_over_time`, `zscore_over_time`, `mad_over_time` |\n| **高级汇总** | `rollup`, `rollup_candlestick`, `rollup_delta`, `rollup_deriv`, `rollup_increase`, `rollup_rate`, `rollup_scrape_interval` |\n| **其他** | `present_over_time`, `absent_over_time`, `resets`, `lifetime`, `lag`, `duration_over_time` |\n\n#### 3.2.2 Prometheus 兼容性对照表\n\n| 函数 | 兼容性 | 说明 |\n|------|--------|------|\n| `avg_over_time` | ✅ | Prometheus 原生支持 |\n| `min_over_time` | ✅ | Prometheus 原生支持 |\n| `max_over_time` | ✅ | Prometheus 原生支持 |\n| `sum_over_time` | ✅ | Prometheus 原生支持 |\n| `count_over_time` | ✅ | Prometheus 原生支持 |\n| `quantile_over_time` | ✅ | Prometheus 原生支持 |\n| `stddev_over_time` | ✅ | Prometheus 原生支持 |\n| `stdvar_over_time` | ✅ | Prometheus 原生支持 |\n| `absent_over_time` | ✅ | Prometheus 原生支持 |\n| `present_over_time` | ✅ | Prometheus 原生支持 |\n| `last_over_time` | ✅ | Prometheus 原生支持 |\n| `rate` | ✅ | Prometheus 原生支持 |\n| `irate` | ✅ | Prometheus 原生支持 |\n| `increase` | ⚠️ | VictoriaMetrics 扩展版本，考虑窗口前的最后一个样本 |\n| `delta` | ⚠️ | VictoriaMetrics 扩展版本 |\n| `changes` | ⚠️ | VictoriaMetrics 扩展版本，考虑窗口末尾的变化 |\n| `deriv` | ✅ | Prometheus 原生支持 |\n| `holt_winters` | ✅ | Prometheus 原生支持 |\n| `idelta` | ✅ | Prometheus 原生支持 |\n| `predict_linear` | ✅ | Prometheus 原生支持 |\n| `resets` | ✅ | Prometheus 原生支持 |\n| `timestamp` | ✅ | Prometheus 原生支持 |\n| `aggr_over_time` | 🔵 | VictoriaMetrics 独有 |\n| `ascent_over_time` | 🔵 | VictoriaMetrics 独有 |\n| `descent_over_time` | 🔵 | VictoriaMetrics 独有 |\n| `changes_prometheus` | 🔵 | VictoriaMetrics 独有，兼容 Prometheus 逻辑 |\n| `delta_prometheus` | 🔵 | VictoriaMetrics 独有，兼容 Prometheus 逻辑 |\n| `increase_prometheus` | 🔵 | VictoriaMetrics 独有，兼容 Prometheus 逻辑 |\n| `increase_pure` | 🔵 | VictoriaMetrics 独有 |\n| `count_*_over_time` 系列 | 🔵 | VictoriaMetrics 独有（除 count_over_time 外）|\n| `sum_*_over_time` 系列 | 🔵 | VictoriaMetrics 独有（除 sum_over_time 外）|\n| `share_*_over_time` 系列 | 🔵 | VictoriaMetrics 独有 |\n| `rollup*` 系列 | 🔵 | VictoriaMetrics 独有 |\n| 所有其他函数 | 🔵 | VictoriaMetrics 独有 |\n\n---", "subs": ["3.2.1 按功能分类", "3.2.2 Prometheus 兼容性对照表"]}, {"title": "3.3 函数详细说明", "content": "#### 3.3.1 ✅ absent_over_time\n\n```promql\nabsent_over_time(series_selector[d])\n```\n\n**功能**：如果给定的回溯窗口 `d` 不包含原始样本，则返回 1，否则返回空结果。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`present_over_time`\n\n---\n\n#### 3.3.2 🔵 aggr_over_time\n\n```promql\naggr_over_time((\"rollup_func1\", \"rollup_func2\", ...), series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 上所有列出的 `rollup_func*` 对原始样本进行汇总。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**示例**：\n\n```promql\naggr_over_time((\"min_over_time\", \"max_over_time\", \"rate\"), m[d])\n```\n\n对 `m[d]` 同时计算 min_over_time、max_over_time 和 rate。\n\n---\n\n#### 3.3.3 🔵 ascent_over_time\n\n```promql\nascent_over_time(series_selector[d])\n```\n\n**功能**：计算给定时间窗口 `d` 上原始样本值的上升。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：GPS 跟踪中跟踪高度增益\n\n**注意**：指标名称将从计算结果中剥离，可使用 `keep_metric_names` 修饰符保留。\n\n**参见**：`descent_over_time`\n\n---\n\n#### 3.3.4 ✅ avg_over_time\n\n```promql\navg_over_time(series_selector[d])\n```\n\n**功能**：计算给定时间窗口 `d` 上原始样本值的平均值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**使用场景**：计算时间段内的平均值\n\n**参见**：`median_over_time`\n\n---\n\n#### 3.3.5 ⚠️ changes\n\n```promql\nchanges(series_selector[d])\n```\n\n**功能**：计算给定时间窗口 `d` 上原始样本值的变化。\n\n**兼容性**：⚠️ VictoriaMetrics 扩展\n\n**与 Prometheus 的差异**：考虑给定时间窗口 `d` 中最后一个样本的变化。\n\n**注意**：指标名称将从计算结果中剥离。\n\n**参见**：`changes_prometheus`\n\n---\n\n#### 3.3.6 🔵 changes_prometheus\n\n```promql\nchanges_prometheus(series_selector[d])\n```\n\n**功能**：计算时间窗口 `d` 中原始样本值变化的次数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**与 Prometheus 的一致性**：不考虑时间窗口 `d` 之前的最后一个样本值的变化，与 Prometheus 逻辑一致。\n\n**参见**：`changes`\n\n---\n\n#### 3.3.7 🔵 count_eq_over_time\n\n```promql\ncount_eq_over_time(series_selector[d], eq)\n```\n\n**功能**：计算时间窗口 `d` 中原始样本值等于 `eq` 的个数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`count_over_time`, `count_gt_over_time`, `count_le_over_time`, `count_ne_over_time`\n\n---\n\n#### 3.3.8 🔵 count_gt_over_time\n\n```promql\ncount_gt_over_time(series_selector[d], gt)\n```\n\n**功能**：计算时间窗口 `d` 中原始样本值大于 `gt` 的个数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 3.3.9 🔵 count_le_over_time\n\n```promql\ncount_le_over_time(series_selector[d], le)\n```\n\n**功能**：计算时间窗口 `d` 中原始样本值小于或等于 `le` 的个数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 3.3.10 🔵 count_ne_over_time\n\n```promql\ncount_ne_over_time(series_selector[d], ne)\n```\n\n**功能**：计算时间窗口 `d` 中原始样本值不等于 `ne` 的个数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 3.3.11 ✅ count_over_time\n\n```promql\ncount_over_time(series_selector[d])\n```\n\n**功能**：计算时间窗口 `d` 中原始样本值的个数。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 3.3.12 🔵 decreases_over_time\n\n```promql\ndecreases_over_time(series_selector[d])\n```\n\n**功能**：计算给定时间窗口 `d` 上原始样本值的下降值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`increases_over_time`\n\n---\n\n#### 3.3.13 🔵 default_rollup\n\n```promql\ndefault_rollup(series_selector[d])\n```\n\n**功能**：返回给定时间窗口 `d` 中最后一个原始样本。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 3.3.14 ⚠️ delta\n\n```promql\ndelta(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 之前的最后一个样本和该窗口的最后一个样本的差异。\n\n**兼容性**：⚠️ VictoriaMetrics 扩展\n\n**与 Prometheus 的差异**：计算逻辑存在轻微差异。\n\n**参见**：`delta_prometheus`, `increase`\n\n---\n\n#### 3.3.15 🔵 delta_prometheus\n\n```promql\ndelta_prometheus(series_selector[d])\n```\n\n**功能**：计算回溯窗口中第一个样本和最后一个样本的差异。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**与 Prometheus 的一致性**：计算逻辑与 Prometheus delta() 一致。\n\n**参见**：`delta`\n\n---\n\n#### 3.3.16 ✅ deriv\n\n```promql\nderiv(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 中时序数据的每秒导数，使用线性回归计算。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`deriv_fast`\n\n---\n\n#### 3.3.17 🔵 deriv_fast\n\n```promql\nderiv_fast(series_selector[d])\n```\n\n**功能**：使用给定回溯窗口 `d` 中第一个和最后一个原始样本来计算每秒导数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`deriv`\n\n---\n\n#### 3.3.18 🔵 descent_over_time\n\n```promql\ndescent_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 中原始样本值的下降量。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：GPS 定位中的海拔高度损失追踪。\n\n**参见**：`ascent_over_time`\n\n---\n\n#### 3.3.19 🔵 distinct_over_time\n\n```promql\ndistinct_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 中原始样本值的种类数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`count_values_over_time`\n\n---\n\n#### 3.3.20 🔵 duration_over_time\n\n```promql\nduration_over_time(series_selector[d], max_interval)\n```\n\n**功能**：返回时间序列在给定回溯窗口 `d` 内存在的持续时间（秒），相邻样本间隔不超过 `max_interval`。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`lifetime`, `lag`\n\n---\n\n#### 3.3.21 🔵 first_over_time\n\n```promql\nfirst_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口`d` 内的第一个原始样本值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`last_over_time`, `tfirst_over_time`\n\n---\n\n#### 3.3.22 🔵 geomean_over_time\n\n```promql\ngeomean_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本值的几何平均值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.23 🔵 histogram_over_time\n\n```promql\nhistogram_over_time(series_selector[d])\n```\n\n**功能**：对给定回溯窗口 `d` 中的原始样本计算 VictoriaMetrics histogram。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：计算出的 histograms 可传递给 `histogram_quantile`，用于计算多个 gauge 指标的分位值。\n\n**示例**：\n\n```promql\nhistogram_quantile(0.5, sum(histogram_over_time(temperature[24h])) by (vmrange,country))\n```\n\n计算每个国家过去 24 小时的温度中位数。\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.24 ✅ holt_winters\n\n```promql\nholt_winters(series_selector[d], sf, tf)\n```\n\n**功能**：使用平滑因子 `sf` 和趋势因子 `tf` 对给定回溯窗口 `d` 中的原始样本计算 Holt-Winters 值（double exponential smoothing）。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参数范围**：`sf` 和 `tf` 的取值范围必须是 [0...1]\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`range_linear_regression`\n\n---\n\n#### 3.3.25 ✅ idelta\n\n```promql\nidelta(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内最后 2 个原始样本值的差异。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`delta`\n\n---\n\n#### 3.3.26 🔵 ideriv\n\n```promql\nideriv(series_selector[d])\n```\n\n**功能**：基于给定回溯窗口 `d` 中最后五个原始样本计算秒级导数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`deriv`\n\n---\n\n#### 3.3.27 ⚠️ increase\n\n```promql\nincrease(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内样本值的增量。\n\n**兼容性**：⚠️ VictoriaMetrics 扩展\n\n**与 Prometheus 的差异**：考虑回溯窗口 `d` 之前的最后一个原始样本值。\n\n**适用类型**：通常应用于 Counter 指标\n\n**参见**：`increase_pure`, `increase_prometheus`, `delta`\n\n---\n\n#### 3.3.28 🔵 increase_prometheus\n\n```promql\nincrease_prometheus(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内样本值的增量。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**与 Prometheus 的一致性**：不考虑回溯窗口 `d` 之前的最后一个原始样本值，与 Prometheus 逻辑一致。\n\n**适用类型**：通常应用于 Counter 指标\n\n**参见**：`increase_pure`, `increase`\n\n---\n\n#### 3.3.29 🔵 increase_pure\n\n```promql\nincrease_pure(series_selector[d])\n```\n\n**功能**：工作机制和 `increase` 一样，但假定 Counter 总是从 0 开始计数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**与 increase 的差异**：`increase` 在第一个值过大时会忽略它，而 `increase_pure` 不会。\n\n**适用类型**：通常应用于 Counter 指标\n\n**参见**：`increase`, `increase_prometheus`\n\n---\n\n#### 3.3.30 🔵 increases_over_time\n\n```promql\nincreases_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内出现增加的原始样本值的数量。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`decreases_over_time`\n\n---\n\n#### 3.3.31 🔵 integrate\n\n```promql\nintegrate(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的积分。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.32 ✅ irate\n\n```promql\nirate(series_selector[d])\n```\n\n**功能**：使用给定回溯窗口 `d` 内最后 2 个原始样本计算每秒增量。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**适用类型**：通常应用于 Counter 指标\n\n**参见**：`rate`, `rollup_rate`\n\n---\n\n#### 3.3.33 🔵 lag\n\n```promql\nlag(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 内最后一个样本的时间与当前时间的间隔（秒）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`lifetime`, `duration_over_time`\n\n---\n\n#### 3.3.34 ✅ last_over_time\n\n```promql\nlast_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 内最后 1 个原始样本。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`first_over_time`\n\n---\n\n#### 3.3.35 🔵 lifetime\n\n```promql\nlifetime(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 内第一个和最后一个原始样本的时间间隔（秒）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`duration_over_time`\n\n---\n\n#### 3.3.36 🔵 mad_over_time\n\n```promql\nmad_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的 median absolute deviation（中位数绝对偏差）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`mad`, `range_mad`, `outlier_iqr_over_time`\n\n---\n\n#### 3.3.37 ✅ max_over_time\n\n```promql\nmax_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的最大值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`tmax_over_time`, `min_over_time`\n\n---\n\n#### 3.3.38 🔵 median_over_time\n\n```promql\nmedian_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的中位数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`avg_over_time`\n\n---\n\n#### 3.3.39 ✅ min_over_time\n\n```promql\nmin_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的最小值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`tmin_over_time`, `max_over_time`\n\n---\n\n#### 3.3.40 🔵 mode_over_time\n\n```promql\nmode_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的高频值（众数）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**假定**：原始样本值都是离散的\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.41 🔵 outlier_iqr_over_time\n\n```promql\noutlier_iqr_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 中的最后一个样本，如果它的值小于 `q25-1.5*iqr` 或大于 `q75+1.5*iqr`。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：基于 Gauge 指标的历史数据检测异常。\n\n**示例**：\n\n```promql\noutlier_iqr_over_time(memory_usage_bytes[1h])\n```\n\n当 `memory_usage_bytes` 指标突然超出过去一小时的平均值时触发。\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`outliers_iqr`\n\n---\n\n#### 3.3.42 ✅ predict_linear\n\n```promql\npredict_linear(series_selector[d], t)\n```\n\n**功能**：使用回溯窗口 `d` 中的原始样本值，使用线性回归计算在未来 `t` 秒后的指标值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`range_linear_regression`\n\n---\n\n#### 3.3.43 ✅ present_over_time\n\n```promql\npresent_over_time(series_selector[d])\n```\n\n**功能**：如果给定回溯窗口 `d` 中至少包含一个原始样本，则返回 1，否则返回空。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 3.3.44 ✅ quantile_over_time\n\n```promql\nquantile_over_time(phi, series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的 phi 分位值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参数范围**：`phi` 值的取值范围必须是 [0...1]\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`quantiles_over_time`\n\n---\n\n#### 3.3.45 🔵 quantiles_over_time\n\n```promql\nquantiles_over_time(\"phiLabel\", phi1, ..., phiN, series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的 phi*分位值，为每个 phi* 返回一个带有 `{phiLabel=\"phi*\"}` 标签的独立序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参数范围**：phi* 的取值范围必须是 [0...1]\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`quantile_over_time`\n\n---\n\n#### 3.3.46 🔵 range_over_time\n\n```promql\nrange_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的取值范围（最大值 - 最小值）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**等价于**：`max_over_time(series_selector[d]) - min_over_time(series_selector[d])`\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.47 ✅ rate\n\n```promql\nrate(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本的平均每秒增长值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**自动窗口**：如果未指定回溯窗口大小，则自动使用 `max(step, scrape_interval)`，避免图表出现非预期断点。\n\n**适用类型**：通常应用于 Counter 指标\n\n**参见**：`irate`, `rollup_rate`\n\n---\n\n#### 3.3.48 🔵 rate_over_sum\n\n```promql\nrate_over_sum(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 中原始样本总和的每秒增量。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.49 ✅ resets\n\n```promql\nresets(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 内原始样本中出现 Counter 重置的次数。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**适用类型**：通常应用于 Counter 指标\n\n**使用场景**：Counter 重置通常代表服务发生了重启\n\n---\n\n#### 3.3.50 🔵 rollup\n\n```promql\nrollup(series_selector[d])\nrollup(series_selector[d], \"min|max|avg\")\n```\n\n**功能**：对给定回溯窗口 `d` 中的原始样本计算最小值、最大值和平均值，并在返回的时序数据中带上 `rollup=\"min\"`, `rollup=\"max\"` 和 `rollup=\"avg\"` 标签。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**可选参数**：可传入 \"min\"、\"max\" 或 \"avg\" 代表只计算一种值且不追加额外的 rollup 标签。\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`rollup_rate`, `label_match`\n\n---\n\n#### 3.3.51 🔵 rollup_candlestick\n\n```promql\nrollup_candlestick(series_selector[d])\nrollup_candlestick(series_selector[d], \"open|high|low|close\")\n```\n\n**功能**：对给定回溯窗口 `d` 中的原始样本使用 OHLC 计算 open、high、low 和 close，并在返回的时序数据中带上相应标签。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**可选参数**：可传入 \"open\"、\"high\"、\"low\" 或 \"close\" 代表只计算一种值。\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.52 🔵 rollup_delta\n\n```promql\nrollup_delta(series_selector[d])\nrollup_delta(series_selector[d], \"min|max|avg\")\n```\n\n**功能**：计算给定回溯窗口 `d` 上相邻原始样本之间的差异，并返回计算出的差异的最小值、最大值和平均值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`rollup_increase`\n\n---\n\n#### 3.3.53 🔵 rollup_deriv\n\n```promql\nrollup_deriv(series_selector[d])\nrollup_deriv(series_selector[d], \"min|max|avg\")\n```\n\n**功能**：计算给定回溯窗口 `d` 上相邻原始样本之间的每秒导数，并返回计算出的导数的最小值、最大值和平均值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`rollup`, `rollup_rate`\n\n---\n\n#### 3.3.54 🔵 rollup_increase\n\n```promql\nrollup_increase(series_selector[d])\nrollup_increase(series_selector[d], \"min|max|avg\")\n```\n\n**功能**：计算给定回溯窗口 `d` 上相邻原始样本之间的增加值，并返回计算出的增加值的最小值、最大值和平均值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Counter 指标\n\n**参见**：`rollup_delta`, `rollup`, `rollup_rate`\n\n---\n\n#### 3.3.55 🔵 rollup_rate\n\n```promql\nrollup_rate(series_selector[d])\nrollup_rate(series_selector[d], \"min|max|avg\")\n```\n\n**功能**：计算给定回溯窗口 `d` 上相邻原始样本之间的每秒变化量，并返回计算出的变化量的最小值、最大值和平均值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Counter 指标\n\n**参见**：`rollup`, `rollup_increase`\n\n---\n\n#### 3.3.56 🔵 rollup_scrape_interval\n\n```promql\nrollup_scrape_interval(series_selector[d])\nrollup_scrape_interval(series_selector[d], \"min|max|avg\")\n```\n\n**功能**：计算给定回溯窗口 `d` 上相邻原始样本之间的间隔秒数（通常是数据的采集间隔），并返回最小值、最大值和平均值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`scrape_interval`\n\n---\n\n#### 3.3.57 🔵 scrape_interval\n\n```promql\nscrape_interval(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 上相邻原始样本之间的间隔的平均秒数（通常是数据的采集间隔）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`rollup_scrape_interval`\n\n---\n\n#### 3.3.58 🔵 share_gt_over_time\n\n```promql\nshare_gt_over_time(series_selector[d], gt)\n```\n\n**功能**：返回给定回溯窗口 `d` 上大于 `gt` 的原始样本的比例（范围在 [0...1] 之间）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：计算 SLI 和 SLO\n\n**示例**：\n\n```promql\nshare_gt_over_time(up[24h], 0)\n```\n\n返回过去 24 小时的服务可用性。\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`share_le_over_time`, `count_gt_over_time`\n\n---\n\n#### 3.3.59 🔵 share_le_over_time\n\n```promql\nshare_le_over_time(series_selector[d], le)\n```\n\n**功能**：返回给定回溯窗口 `d` 上小于或等于 `le` 的原始样本的比例（范围在 [0...1] 之间）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：计算 SLI 和 SLO\n\n**示例**：\n\n```promql\nshare_le_over_time(memory_usage_bytes[24h], 100*1024*1024)\n```\n\n返回过去 24 小时内存使用率小于等于 100MB 的时间占比。\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`share_gt_over_time`, `count_le_over_time`\n\n---\n\n#### 3.3.60 🔵 share_eq_over_time\n\n```promql\nshare_eq_over_time(series_selector[d], eq)\n```\n\n**功能**：返回给定回溯窗口 `d` 上等于 `eq` 的原始样本的比例（范围在 [0...1] 之间）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`count_eq_over_time`\n\n---\n\n#### 3.3.61 ✅ stddev_over_time\n\n```promql\nstddev_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 上原始样本的标准差。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`stdvar_over_time`\n\n---\n\n#### 3.3.62 ✅ stdvar_over_time\n\n```promql\nstdvar_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 上原始样本的方差。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`stddev_over_time`\n\n---\n\n#### 3.3.63 🔵 sum_eq_over_time\n\n```promql\nsum_eq_over_time(series_selector[d], eq)\n```\n\n**功能**：计算给定回溯窗口 `d` 上等于 `eq` 的原始样本值的总和。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`sum_over_time`, `count_eq_over_time`\n\n---\n\n#### 3.3.64 🔵 sum_gt_over_time\n\n```promql\nsum_gt_over_time(series_selector[d], gt)\n```\n\n**功能**：计算给定回溯窗口 `d` 上大于 `gt` 的原始样本值的总和。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`sum_over_time`, `count_gt_over_time`\n\n---\n\n#### 3.3.65 🔵 sum_le_over_time\n\n```promql\nsum_le_over_time(series_selector[d], le)\n```\n\n**功能**：计算给定回溯窗口 `d` 上小于或等于 `le` 的原始样本值的总和。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n**参见**：`sum_over_time`, `count_le_over_time`\n\n---\n\n#### 3.3.66 ✅ sum_over_time\n\n```promql\nsum_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 上原始样本值的总和。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.67 🔵 sum2_over_time\n\n```promql\nsum2_over_time(series_selector[d])\n```\n\n**功能**：计算给定回溯窗口 `d` 上原始样本值的平方和。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n---\n\n#### 3.3.68 ✅ timestamp\n\n```promql\ntimestamp(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 上最后一个原始样本的时间戳（以秒为单位，精确到毫秒）。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`time`, `now`, `timestamp_with_name`\n\n---\n\n#### 3.3.69 🔵 timestamp_with_name\n\n```promql\ntimestamp_with_name(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 上最后一个原始样本的时间戳（以秒为单位，精确到毫秒）并保留指标名称。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**与 timestamp 的区别**：在汇总结果中保留了 Metric 名称。\n\n**参见**：`timestamp`, `keep_metric_names` 修饰符\n\n---\n\n#### 3.3.70 🔵 tfirst_over_time\n\n```promql\ntfirst_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 上第一个原始样本的时间戳（以秒为单位，精确到毫秒）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`first_over_time`\n\n---\n\n#### 3.3.71 🔵 tlast_change_over_time\n\n```promql\ntlast_change_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 上最后一次变化的时间戳（以秒为单位，精确到毫秒）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`last_over_time`\n\n---\n\n#### 3.3.72 🔵 tlast_over_time\n\n`tlast_over_time` 是 `timestamp` 函数的别名。\n\n**参见**：`tlast_change_over_time`\n\n---\n\n#### 3.3.73 🔵 tmax_over_time\n\n```promql\ntmax_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 上具有最大值的原始样本的时间戳（以秒为单位，精确到毫秒）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`max_over_time`\n\n---\n\n#### 3.3.74 🔵 tmin_over_time\n\n```promql\ntmin_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 上具有最小值的原始样本的时间戳（以秒为单位，精确到毫秒）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`min_over_time`\n\n---\n\n#### 3.3.75 🔵 zscore_over_time\n\n```promql\nzscore_over_time(series_selector[d])\n```\n\n**功能**：返回给定回溯窗口 `d` 上原始样本的 z-score。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**适用类型**：通常应用于 Gauge 指标\n\n---", "subs": ["3.3.1 ✅ absent_over_time", "3.3.2 🔵 aggr_over_time", "3.3.3 🔵 ascent_over_time", "3.3.4 ✅ avg_over_time", "3.3.5 ⚠️ changes", "3.3.6 🔵 changes_prometheus", "3.3.7 🔵 count_eq_over_time", "3.3.8 🔵 count_gt_over_time", "3.3.9 🔵 count_le_over_time", "3.3.10 🔵 count_ne_over_time", "3.3.11 ✅ count_over_time", "3.3.12 🔵 decreases_over_time", "3.3.13 🔵 default_rollup", "3.3.14 ⚠️ delta", "3.3.15 🔵 delta_prometheus", "3.3.16 ✅ deriv", "3.3.17 🔵 deriv_fast", "3.3.18 🔵 descent_over_time", "3.3.19 🔵 distinct_over_time", "3.3.20 🔵 duration_over_time", "3.3.21 🔵 first_over_time", "3.3.22 🔵 geomean_over_time", "3.3.23 🔵 histogram_over_time", "3.3.24 ✅ holt_winters", "3.3.25 ✅ idelta", "3.3.26 🔵 ideriv", "3.3.27 ⚠️ increase", "3.3.28 🔵 increase_prometheus", "3.3.29 🔵 increase_pure", "3.3.30 🔵 increases_over_time", "3.3.31 🔵 integrate", "3.3.32 ✅ irate", "3.3.33 🔵 lag", "3.3.34 ✅ last_over_time", "3.3.35 🔵 lifetime", "3.3.36 🔵 mad_over_time", "3.3.37 ✅ max_over_time", "3.3.38 🔵 median_over_time", "3.3.39 ✅ min_over_time", "3.3.40 🔵 mode_over_time", "3.3.41 🔵 outlier_iqr_over_time", "3.3.42 ✅ predict_linear", "3.3.43 ✅ present_over_time", "3.3.44 ✅ quantile_over_time", "3.3.45 🔵 quantiles_over_time", "3.3.46 🔵 range_over_time", "3.3.47 ✅ rate", "3.3.48 🔵 rate_over_sum", "3.3.49 ✅ resets", "3.3.50 🔵 rollup", "3.3.51 🔵 rollup_candlestick", "3.3.52 🔵 rollup_delta", "3.3.53 🔵 rollup_deriv", "3.3.54 🔵 rollup_increase", "3.3.55 🔵 rollup_rate", "3.3.56 🔵 rollup_scrape_interval", "3.3.57 🔵 scrape_interval", "3.3.58 🔵 share_gt_over_time", "3.3.59 🔵 share_le_over_time", "3.3.60 🔵 share_eq_over_time", "3.3.61 ✅ stddev_over_time", "3.3.62 ✅ stdvar_over_time", "3.3.63 🔵 sum_eq_over_time", "3.3.64 🔵 sum_gt_over_time", "3.3.65 🔵 sum_le_over_time", "3.3.66 ✅ sum_over_time", "3.3.67 🔵 sum2_over_time", "3.3.68 ✅ timestamp", "3.3.69 🔵 timestamp_with_name", "3.3.70 🔵 tfirst_over_time", "3.3.71 🔵 tlast_change_over_time", "3.3.72 🔵 tlast_over_time", "3.3.73 🔵 tmax_over_time", "3.3.74 🔵 tmin_over_time", "3.3.75 🔵 zscore_over_time"]}, {"title": "3.4 章节总结", "content": "#### 3.4.1 Rollup 函数统计\n\n- **总函数数量**：约 75+ 个\n- **Prometheus 原生支持**：约 20 个\n- **VictoriaMetrics 独有**：约 50+ 个\n- **VictoriaMetrics 扩展**：约 5 个\n\n#### 3.4.2 核心要点\n\n1. **自动窗口**：如果未指定回溯窗口，MetricsQL 会自动使用 step 参数\n2. **独立计算**：每个时间序列都会独立计算 Rollup\n3. **指标名称处理**：大多数函数会删除指标名称，可使用 `keep_metric_names` 修饰符保留\n4. **适用类型**：区分 Counter 和 Gauge 指标的适用函数\n5. **兼容性差异**：部分函数与 Prometheus 行为不同，VictoriaMetrics 提供了对应的 `*_prometheus` 版本\n\n---", "subs": ["3.4.1 Rollup 函数统计", "3.4.2 核心要点"]}]}, {"title": "第四章：Label 操作函数", "sections": [{"title": "4.1 Label 函数概述", "content": "> 📝 **内容来源**: `func_label.txt`\n\n\nLabel 操作函数对选定的 Rollup 计算结果进行 Label 转换。\n\n#### 4.1.1 自动 Rollup 转换\n\n如果 Label 操作函数直接应用于 `series_selector`，那么在执行 Label 转换之前，会自动应用 `default_rollup` 函数。\n\n**示例**：\n\n```promql\nalias(temperature, \"foo\")\n```\n\n会被隐式转换为：\n\n```promql\nalias(default_rollup(temperature), \"foo\")\n```\n\n---", "subs": ["4.1.1 自动 Rollup 转换"]}, {"title": "4.2 函数列表", "content": "#### 4.2.1 🔵 alias\n\n```promql\nalias(q, \"name\")\n```\n\n**功能**：将 `q` 返回的所有时间序列重命名为 `name`。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**示例**：\n\n```promql\nalias(up, \"foobar\")\n```\n\n将 `up` 序列重命名为 `foobar` 序列。\n\n---\n\n#### 4.2.2 🔵 drop_common_labels\n\n```promql\ndrop_common_labels(q1, ...., qN)\n```\n\n**功能**：删除 `q1, ..., qN` 返回的时间序列中共有的 `label=\"value\"`。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：简化查询结果，删除冗余标签\n\n---\n\n#### 4.2.3 🔵 label_copy\n\n```promql\nlabel_copy(q, \"src_label1\", \"dst_label1\", ..., \"src_labelN\", \"dst_labelN\")\n```\n\n**功能**：将 `src_label*` 的标签值复制到 `q` 返回的所有时间序列的 `dst_label*`。如果 `src_label` 为空，则相应的 `dst_label` 保持不变。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 4.2.4 🔵 label_del\n\n```promql\nlabel_del(q, \"label1\", ..., \"labelN\")\n```\n\n**功能**：删除 `q` 返回的所有时间序列中名为 `label*` 的所有标签。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 4.2.5 ✅ label_join\n\n```promql\nlabel_join(q, \"dst_label\", \"separator\", \"src_label1\", ..., \"src_labelN\")\n```\n\n**功能**：将 `src_label*` 的值用给定的 `separator` 连接起来，并将结果存储在 `dst_label` 中。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**示例**：\n\n```promql\nlabel_join(up{instance=\"xxx\",job=\"yyy\"}, \"foo\", \"-\", \"instance\", \"job\")\n```\n\n将 `xxx-yyy` 标签值存储到 `foo` 标签中。\n\n---\n\n#### 4.2.6 🔵 label_keep\n\n```promql\nlabel_keep(q, \"label1\", ..., \"labelN\")\n```\n\n**功能**：删除 `q` 返回的所有时间序列中除列出的 `label*` 标签之外的其他所有标签。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 4.2.7 🔵 label_lowercase\n\n```promql\nlabel_lowercase(q, \"label1\", ..., \"labelN\")\n```\n\n**功能**：将 `q` 返回的所有时间序列中名为 `label*` 的标签值转换成小写字母。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`label_uppercase`\n\n---\n\n#### 4.2.8 🔵 label_map\n\n```promql\nlabel_map(q, \"label\", \"src_value1\", \"dst_value1\", ..., \"src_valueN\", \"dst_valueN\")\n```\n\n**功能**：遍历 `q` 返回的所有时间序列，将所有标签值是 `src_value*` 的标签值替换为对应的 `dst_value*`。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：标签值映射转换\n\n---\n\n#### 4.2.9 🔵 label_match\n\n```promql\nlabel_match(q, \"label\", \"regexp\")\n```\n\n**功能**：删除 `q` 中 label 值不匹配给定正则表达式 `regexp` 的时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：此函数在类 rollup 函数之后会比较有用，因为这些类 rollup 函数可能会为每个输入序列返回多个时间序列。\n\n**参见**：`label_mismatch`, `labels_equal`\n\n---\n\n#### 4.2.10 🔵 label_mismatch\n\n```promql\nlabel_mismatch(q, \"label\", \"regexp\")\n```\n\n**功能**：删除 `q` 中 label 值匹配给定正则表达式 `regexp` 的时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`label_match`, `labels_equal`\n\n---\n\n#### 4.2.11 🔵 label_move\n\n```promql\nlabel_move(q, \"src_label1\", \"dst_label1\", ..., \"src_labelN\", \"dst_labelN\")\n```\n\n**功能**：将 `src_label*` 的标签值移动到 `q` 返回的所有时间序列的 `dst_label*`。如果 `src_label` 为空，则相应的 `dst_label` 保持不变。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**与 label_copy 的区别**：`label_move` 会删除原标签，而 `label_copy` 保留原标签。\n\n---\n\n#### 4.2.12 ✅ label_replace\n\n```promql\nlabel_replace(q, \"dst_label\", \"replacement\", \"src_label\", \"regex\")\n```\n\n**功能**：将给定的正则表达式 `regex` 应用于 `src_label`，如果匹配成功，则将替换内容存储在 `dst_label` 中。替换内容可以包含对正则表达式捕获组的引用（如 `$1`、`$2` 等）。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**示例**：\n\n```promql\nlabel_replace(up{job=\"node-exporter\"}, \"foo\", \"bar-$1\", \"job\", \"node-(.+)\")\n```\n\n将 `bar-exporter` 标签值存储到 `foo` 标签中。\n\n---\n\n#### 4.2.13 🔵 label_set\n\n```promql\nlabel_set(q, \"label1\", \"value1\", ..., \"labelN\", \"valueN\")\n```\n\n**功能**：将 `{label1=\"value1\", ..., labelN=\"valueN\"}` 这些标签添加到 `q` 返回的每条时间序列数据里。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 4.2.14 🔵 label_transform\n\n```promql\nlabel_transform(q, \"label\", \"regexp\", \"replacement\")\n```\n\n**功能**：将给定 `label` 中所有匹配正则表达式 `regexp` 的部分替换为指定的 `replacement`。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 4.2.15 🔵 label_uppercase\n\n```promql\nlabel_uppercase(q, \"label1\", ..., \"labelN\")\n```\n\n**功能**：将 `q` 返回的所有时间序列中名为 `label*` 的标签值转换成大写字母。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`label_lowercase`\n\n---\n\n#### 4.2.16 🔵 label_value\n\n```promql\nlabel_value(q, \"label\")\n```\n\n**功能**：将 `q` 返回的每条时间序列中的给定 `label` 的值作为指标 value 返回（原指标 value 被忽略）。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**示例**：\n\n如果 `label_value(foo, \"bar\")` 应用于 `foo{bar=\"1.234\"}`，则返回值为 1.234 的时间序列 `foo{bar=\"1.234\"}`。对于标签值是非数值类型的情况，该函数不返回数据。\n\n---\n\n#### 4.2.17 🔵 labels_equal\n\n```promql\nlabels_equal(q, \"label1\", \"label2\", ...)\n```\n\n**功能**：在 `q` 返回的每条时间序列里，寻找 \"label1\"、\"label2\" 值相等的时间序列并返回。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：过滤具有相同标签值的时间序列\n\n---\n\n#### 4.2.18 🔵 sort_by_label\n\n```promql\nsort_by_label(q, \"label1\", ... \"labelN\")\n```\n\n**功能**：根据给定的一组标签按升序排序序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**示例**：\n\n```promql\nsort_by_label(foo, \"bar\")\n```\n\n根据这些序列中标签 `bar` 的值对 `foo` 序列进行排序。\n\n**参见**：`sort_by_label_desc`, `sort_by_label_numeric`\n\n---\n\n#### 4.2.19 🔵 sort_by_label_desc\n\n**功能**：`sort_by_label` 的反向操作，即降序排列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 4.2.20 🔵 sort_by_label_numeric\n\n```promql\nsort_by_label_numeric(q, \"label1\", ... \"labelN\")\n```\n\n**功能**：根据给定的一组标签使用数值排序，按升序排序序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**示例**：\n\n如果 `foo` 序列的 `bar` 标签值为 1、101、15 和 2，那么 `sort_by_label_numeric(foo, \"bar\")` 会按 `bar` 标签值的以下顺序返回序列：**1、2、15、101**。\n\n**与 sort_by_label 的区别**：字符串排序会得到 1、101、15、2，而数值排序得到 1、2、15、101。\n\n---\n\n#### 4.2.21 🔵 sort_by_label_numeric_desc\n\n**功能**：`sort_by_label_numeric` 的反向操作，即降序排列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---", "subs": ["4.2.1 🔵 alias", "4.2.2 🔵 drop_common_labels", "4.2.3 🔵 label_copy", "4.2.4 🔵 label_del", "4.2.5 ✅ label_join", "4.2.6 🔵 label_keep", "4.2.7 🔵 label_lowercase", "4.2.8 🔵 label_map", "4.2.9 🔵 label_match", "4.2.10 🔵 label_mismatch", "4.2.11 🔵 label_move", "4.2.12 ✅ label_replace", "4.2.13 🔵 label_set", "4.2.14 🔵 label_transform", "4.2.15 🔵 label_uppercase", "4.2.16 🔵 label_value", "4.2.17 🔵 labels_equal", "4.2.18 🔵 sort_by_label", "4.2.19 🔵 sort_by_label_desc", "4.2.20 🔵 sort_by_label_numeric", "4.2.21 🔵 sort_by_label_numeric_desc"]}, {"title": "4.3 章节总结", "content": "#### 4.3.1 函数统计\n\n- **总函数数量**：21 个\n- **Prometheus 原生支持**：2 个（`label_join`, `label_replace`）\n- **VictoriaMetrics 独有**：19 个\n\n#### 4.3.2 Prometheus 兼容性对照表\n\n| 函数 | 兼容性 |\n|------|--------|\n| `label_join` | ✅ Prometheus 原生支持 |\n| `label_replace` | ✅ Prometheus 原生支持 |\n| 其他所有函数 | 🔵 VictoriaMetrics 独有 |\n\n#### 4.3.3 主要功能分类\n\n| 分类 | 函数列表 |\n|------|----------|\n| **标签增删** | `label_set`, `label_del`, `label_keep` |\n| **标签复制/移动** | `label_copy`, `label_move` |\n| **标签转换** | `label_replace`, `label_transform`, `label_join` |\n| **大小写转换** | `label_lowercase`, `label_uppercase` |\n| **标签映射** | `label_map` |\n| **标签过滤** | `label_match`, `label_mismatch`, `labels_equal` |\n| **排序** | `sort_by_label`, `sort_by_label_desc`, `sort_by_label_numeric`, `sort_by_label_numeric_desc` |\n| **其他** | `alias`, `drop_common_labels`, `label_value` |\n\n---", "subs": ["4.3.1 函数统计", "4.3.2 Prometheus 兼容性对照表", "4.3.3 主要功能分类"]}]}, {"title": "第五章：聚合函数", "sections": [{"title": "5.1 聚合函数概述", "content": "> 📝 **内容来源**: `func_aggregation.txt`\n\n\n聚合函数对 Rollup 结果中的多个时间序列进行合并聚合计算。\n\n#### 5.1.1 分组聚合\n\n**默认行为**：将所有时间序列聚合到一组里（即聚合后得到一个时间序列）。\n\n**分组修饰符**：\n\n- `by` 修饰符：指定分组标签\n\n```promql\ncount(up) by (job)\n```\n\n按 `job` 标签值对汇总结果进行分组，并对每个组独立进行 count 计算。\n\n- `without` 修饰符：排除特定标签\n\n```promql\ncount(up) without (instance)\n```\n\n在计算 count 聚合之前，按除 `instance` 之外的所有标签对汇总结果进行分组。\n\n#### 5.1.2 多参数支持\n\n聚合函数可以接受任意数量的参数。\n\n**示例**：\n\n```promql\navg(q1, q2, q3)\n```\n\n将 `q1`、`q2` 和 `q3` 返回的时间序列合并在一块计算平均值。\n\n#### 5.1.3 Limit N 后缀\n\n聚合函数支持 `limit N` 后缀，可用于限制输出时间序列数量。\n\n**示例**：\n\n```promql\nsum(x) by (y) limit 3\n```\n\n将聚合的时间序列数量限制为 3。所有其他时间序列将被忽略。\n\n> [!NOTE]\n> `limit N` 并不会改善查询性能，前面的聚合语句还是会对所有数据做全量查询和计算，只是在最终返回结果时只取 N 个结果。常见的场景是用于缓解 Grafana 的渲染压力。\n\n#### 5.1.4 自动 Rollup 转换\n\n如果聚合函数直接应用于 `series_selector`，则在计算聚合之前会自动应用 `default_rollup()` 函数。\n\n**示例**：\n\n```promql\ncount(up)\n```\n\n会被隐式转换为：\n\n```promql\ncount(default_rollup(up))\n```\n\n---", "subs": ["5.1.1 分组聚合", "5.1.2 多参数支持", "5.1.3 Limit N 后缀", "5.1.4 自动 Rollup 转换"]}, {"title": "5.2 函数列表", "content": "#### 5.2.1 🔵 any\n\n```promql\nany(q) by (group_labels)\n```\n\n**功能**：从 `q` 返回的时间序列中，根据 `group_labels` 返回任意一个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`group`\n\n---\n\n#### 5.2.2 ✅ avg\n\n```promql\navg(q) by (group_labels)\n```\n\n**功能**：根据 `group_labels` 返回时间序列的平均值。聚合是针对每组具有相同时间戳的数据点单独计算的。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.3 ✅ bottomk\n\n```promql\nbottomk(k, q)\n```\n\n**功能**：返回 `q` 返回的所有时间序列中值最小的 `k` 个时间序列。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`topk`\n\n---\n\n#### 5.2.4 🔵 bottomk_avg\n\n```promql\nbottomk_avg(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中平均值最小的 `k` 个时间序列。如果设置了可选参数 `other_label=other_value`，则返回具有给定标签的剩余时间序列总和。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**示例**：\n\n```promql\nbottomk_avg(3, sum(process_resident_memory_bytes) by (job), \"job=other\")\n```\n\n返回最多 3 条平均值最小的时间序列，加上一个带有 `{job=\"other\"}` 标签的时间序列，该序列包含剩余序列的总和（如果有的话）。\n\n---\n\n#### 5.2.5 🔵 bottomk_last\n\n```promql\nbottomk_last(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中最后值最小的 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.6 🔵 bottomk_max\n\n```promql\nbottomk_max(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中最大值最小的 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.7 🔵 bottomk_median\n\n```promql\nbottomk_median(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中中位数最小的最多 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.8 🔵 bottomk_min\n\n```promql\nbottomk_min(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中最小值最小的最多 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.9 ✅ count\n\n```promql\ncount(q) by (group_labels)\n```\n\n**功能**：返回 `q` 返回的时间序列中每个 `group_labels` 的非空点的数量。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.10 ✅ count_values\n\n```promql\ncount_values(\"label\", q)\n```\n\n**功能**：计算具有相同值的点的数量，并将计数存储在一个带有额外 label 的时间序列中，该标签包含每个初始值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.11 🔵 distinct\n\n```promql\ndistinct(q)\n```\n\n**功能**：计算每组具有相同时间戳的点的唯一值的数量。类似于 SQL 中的 `COUNT(DISTINCT(value))`。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`distinct_over_time`\n\n---\n\n#### 5.2.12 🔵 geomean\n\n```promql\ngeomean(q)\n```\n\n**功能**：计算每组具有相同时间戳的点的几何平均值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.13 ✅ group\n\n```promql\ngroup(q) by (group_labels)\n```\n\n**功能**：为 `q` 返回的时间序列中每个 `group_labels` 返回值恒为 1 的时间序列。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`any`\n\n---\n\n#### 5.2.14 🔵 histogram\n\n```promql\nhistogram(q)\n```\n\n**功能**：计算每组具有相同时间戳的点的 VictoriaMetrics 直方图。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：对于通过热图可视化大量时间序列时非常有用。\n\n**参见**：`histogram_over_time`, `histogram_quantile`\n\n---\n\n#### 5.2.15 🔵 limitk\n\n```promql\nlimitk(k, q) by (group_labels)\n```\n\n**功能**：从 `q` 返回的时间序列中为每个 `group_labels` 挑选最多 `k` 个时间序列返回。返回的时间序列集在多次调用中保持不变。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`limit_offset`\n\n---\n\n#### 5.2.16 🔵 mad\n\n```promql\nmad(q) by (group_labels)\n```\n\n**功能**：计算 `q` 返回的所有时间序列中每个 `group_labels` 的中位数绝对偏差。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**参见**：`range_mad`, `mad_over_time`, `outliers_mad`, `stddev`\n\n---\n\n#### 5.2.17 ✅ max\n\n```promql\nmax(q) by (group_labels)\n```\n\n**功能**：为 `q` 返回的所有时间序列中每个 `group_labels` 统计出最大值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.18 🔵 median\n\n```promql\nmedian(q) by (group_labels)\n```\n\n**功能**：为 `q` 返回的所有时间序列中每个 `group_labels` 统计出中位数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.19 ✅ min\n\n```promql\nmin(q) by (group_labels)\n```\n\n**功能**：为 `q` 返回的所有时间序列中每个 `group_labels` 统计出最小值。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.20 🔵 mode\n\n```promql\nmode(q) by (group_labels)\n```\n\n**功能**：为 `q` 返回的所有时间序列中每个 `group_labels` 计算出众数。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.21 ✅ quantile\n\n```promql\nquantile(phi, q) by (group_labels)\n```\n\n**功能**：计算 `q` 返回的所有时间序列中每个 `group_labels` 的 phi 分位数。`phi` 必须在 [0...1] 范围内。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`quantiles`, `histogram_quantile`\n\n---\n\n#### 5.2.22 🔵 quantiles\n\n```promql\nquantiles(\"phiLabel\", phi1, ..., phiN, q)\n```\n\n**功能**：计算 `q` 返回的所有时间序列中的 phi* 分位数，并将它们返回在带有 `{phiLabel=\"phi*\"}` 标签的时间序列中。`phi*` 必须在 [0...1] 范围内。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.23 🔵 share\n\n```promql\nshare(q) by (group_labels)\n```\n\n**功能**：返回 `q` 返回的每个时间戳的每个非负点的份额，范围为 [0..1]，结果中每个 `group_labels` 的份额总和等于 1。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：将直方图桶份额归一化到 [0..1] 范围内。\n\n**示例**：\n\n```promql\nshare(\n  sum(\n    rate(http_request_duration_seconds_bucket[5m])\n  ) by (le, vmrange)\n)\n```\n\n---\n\n#### 5.2.24 ✅ stddev\n\n```promql\nstddev(q) by (group_labels)\n```\n\n**功能**：计算 `q` 返回的所有时间序列中每个 `group_labels` 的标准偏差。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.25 ✅ stdvar\n\n```promql\nstdvar(q) by (group_labels)\n```\n\n**功能**：计算 `q` 返回的所有时间序列中每个 `group_labels` 的标准方差。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.26 ✅ sum\n\n```promql\nsum(q) by (group_labels)\n```\n\n**功能**：返回 `q` 返回的所有时间序列中每个 `group_labels` 的总和。\n\n**兼容性**：✅ Prometheus 原生支持\n\n---\n\n#### 5.2.27 🔵 sum2\n\n```promql\nsum2(q) by (group_labels)\n```\n\n**功能**：计算 `q` 返回的所有时间序列中每个 `group_labels` 的平方和。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.28 ✅ topk\n\n```promql\ntopk(k, q)\n```\n\n**功能**：返回 `q` 返回的所有时间序列中值最大的前 `k` 个点。\n\n**兼容性**：✅ Prometheus 原生支持\n\n**参见**：`bottomk`\n\n---\n\n#### 5.2.29 🔵 topk_avg\n\n```promql\ntopk_avg(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中平均值最大的前 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.30 🔵 topk_last\n\n```promql\ntopk_last(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中最后值最大的前 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.31 🔵 topk_max\n\n```promql\ntopk_max(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中最大值最大的前 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.32 🔵 topk_median\n\n```promql\ntopk_median(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中中位数最大的前 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.33 🔵 topk_min\n\n```promql\ntopk_min(k, q, \"other_label=other_value\")\n```\n\n**功能**：返回 `q` 中最小值最大的前 `k` 个时间序列。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n---\n\n#### 5.2.34 🔵 zscore\n\n```promql\nzscore(q) by (group_labels)\n```\n\n**功能**：返回 `q` 返回的所有时间序列中每个 `group_labels` 的 z-score 值。\n\n**兼容性**：🔵 VictoriaMetrics 独有\n\n**使用场景**：检测相关时间序列组中的异常值。\n\n---", "subs": ["5.2.1 🔵 any", "5.2.2 ✅ avg", "5.2.3 ✅ bottomk", "5.2.4 🔵 bottomk_avg", "5.2.5 🔵 bottomk_last", "5.2.6 🔵 bottomk_max", "5.2.7 🔵 bottomk_median", "5.2.8 🔵 bottomk_min", "5.2.9 ✅ count", "5.2.10 ✅ count_values", "5.2.11 🔵 distinct", "5.2.12 🔵 geomean", "5.2.13 ✅ group", "5.2.14 🔵 histogram", "5.2.15 🔵 limitk", "5.2.16 🔵 mad", "5.2.17 ✅ max", "5.2.18 🔵 median", "5.2.19 ✅ min", "5.2.20 🔵 mode", "5.2.21 ✅ quantile", "5.2.22 🔵 quantiles", "5.2.23 🔵 share", "5.2.24 ✅ stddev", "5.2.25 ✅ stdvar", "5.2.26 ✅ sum", "5.2.27 🔵 sum2", "5.2.28 ✅ topk", "5.2.29 🔵 topk_avg", "5.2.30 🔵 topk_last", "5.2.31 🔵 topk_max", "5.2.32 🔵 topk_median", "5.2.33 🔵 topk_min", "5.2.34 🔵 zscore"]}, {"title": "5.3 章节总结", "content": "#### 5.3.1 函数统计\n\n- **总函数数量**：34 个\n- **Prometheus 原生支持**：11 个\n- **VictoriaMetrics 独有**：23 个\n\n#### 5.3.2 Prometheus 兼容性对照表\n\n| 函数 | 兼容性 |\n|------|--------|\n| `avg` | ✅ Prometheus 原生支持 |\n| `bottomk` | ✅ Prometheus 原生支持 |\n| `count` | ✅ Prometheus 原生支持 |\n| `count_values` | ✅ Prometheus 原生支持 |\n| `group` | ✅ Prometheus 原生支持 |\n| `max` | ✅ Prometheus 原生支持 |\n| `min` | ✅ Prometheus 原生支持 |\n| `quantile` | ✅ Prometheus 原生支持 |\n| `stddev` | ✅ Prometheus 原生支持 |\n| `stdvar` | ✅ Prometheus 原生支持 |\n| `sum` | ✅ Prometheus 原生支持 |\n| `topk` | ✅ Prometheus 原生支持 |\n| 其他所有函数 | 🔵 VictoriaMetrics 独有 |\n\n#### 5.3.3 主要功能分类\n\n| 分类 | 函数列表 |\n|------|----------|\n| **基础统计** | `avg`, `min`, `max`, `sum`, `count` |\n| **分位数** | `quantile`, `quantiles`, `median` |\n| **Top/Bottom K** | `topk`, `bottomk`, `topk_*`, `bottomk_*` 系列 |\n| **离散度** | `stddev`, `stdvar`, `mad`, `zscore` |\n| **其他** | `group`, `any`, `distinct`, `geomean`, `histogram`, `limitk`, `share`, `mode`, `count_values`, `sum2` |\n\n---", "subs": ["5.3.1 函数统计", "5.3.2 Prometheus 兼容性对照表", "5.3.3 主要功能分类"]}]}, {"title": "第六章：转换函数", "sections": [{"title": "6.1 转换函数概述", "content": "> 📝 **内容来源**: `func_transmit.txt`\n\n\nTransform 函数对 rollup 结果做数值转换。例如，`abs(delta(temperature[24h]))` 计算从 `delta(temperature[24h])` 返回的每条时间序列的每个数据点的绝对值。\n\n#### 6.1.1 自动 Rollup 转换\n\n如果 transform 函数直接应用于 series selector，则在计算转换之前会自动应用 `default_rollup()` 函数。\n\n**示例**：\n\n```promql\nabs(temperature)\n```\n\n会被隐式转换为：\n\n```promql\nabs(default_rollup(temperature))\n```\n\n#### 6.1.2 keep_metric_names 修饰符\n\n所有 transform 函数都可使用 `keep_metric_names` 修饰符。如果使用了，则函数不会从结果时间序列中删除 Metric 名称。\n\n---", "subs": ["6.1.1 自动 Rollup 转换", "6.1.2 keep_metric_names 修饰符"]}, {"title": "6.2 函数分类速查表", "content": "由于转换函数数量众多（80+ 个），以下按功能分类提供速查表。\n\n#### 6.2.1 内置数学函数\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `pi()` | ✅ | 返回圆周率 π |\n| `now()` | 🔵 | 返回当前时间戳（浮点数，单位秒）|\n| `rand(seed)` | 🔵 | 返回 [0...1] 范围的随机数 |\n| `rand_exponential(seed)` | 🔵 | 返回指数分布的随机数 |\n| `rand_normal(seed)` | 🔵 | 返回正态分布的随机数 |\n\n---\n\n#### 6.2.2 单值数值转换\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `abs(q)` | ✅ | 计算绝对值 |\n| `ceil(q)` | ✅ | 向上取整 |\n| `floor(q)` | ✅ | 向下取整 |\n| `round(q, nearest)` | ✅ | 四舍五入到 nearest 的倍数 |\n| `clamp(q, min, max)` | ✅ | 限制在 [min, max] 范围内 |\n| `clamp_max(q, max)` | ✅ | 限制最大值为 max |\n| `clamp_min(q, min)` | ✅ | 限制最小值为 min |\n| `deg(q)` | ✅ | 弧度转角度 |\n| `rad(q)` | ✅ | 角度转弧度 |\n| `exp(q)` | ✅ | 计算 e^v |\n| `sqrt(q)` | ✅ | 计算平方根 |\n| `sgn(q)` | ✅ | 符号函数：>0返回1，<0返回-1，=0返回0 |\n\n---\n\n#### 6.2.3 位运算函数\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `bitmap_and(q, mask)` | 🔵 | 按位与运算 v & mask |\n| `bitmap_or(q, mask)` | 🔵 | 按位或运算 v \\| mask |\n| `bitmap_xor(q, mask)` | 🔵 | 按位异或运算 v ^ mask |\n\n---\n\n#### 6.2.4 直方图（Histogram）函数\n\n| 函数 | 兼容性 | 功能描述 | 使用场景 |\n|------|--------|----------|----------|\n| `histogram_quantile(phi, buckets)` | ✅ | 计算 phi 分位数 | SLO/SLI 计算 |\n| `histogram_quantiles(\"phiLabel\", phi1...phiN, buckets)` | 🔵 | 计算多个分位数 | 性能分析 |\n| `histogram_avg(buckets)` | 🔵 | 计算平均值 | 性能统计 |\n| `histogram_stddev(buckets)` | 🔵 | 计算标准偏差 | 性能波动分析 |\n| `histogram_stdvar(buckets)` | 🔵 | 计算标准方差 | 性能波动分析 |\n| `histogram_share(le, buckets)` | 🔵 | 计算落在 le 以下的份额 | SLI/SLO 计算 |\n| `buckets_limit(limit, buckets)` | 🔵 | 限制直方图桶数量 | 性能优化 |\n| `prometheus_buckets(buckets)` | 🔵 | 转换为 Prometheus 格式 | Grafana 热图 |\n\n**示例**：\n\n```promql\n# 计算过去 5 分钟所有请求的中位响应时间\nhistogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))\n```\n\n---\n\n#### 6.2.5 滑动函数（Running）\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `running_avg(q)` | 🔵 | 计算滑动平均值 |\n| `running_max(q)` | 🔵 | 计算滑动最大值 |\n| `running_min(q)` | 🔵 | 计算滑动最小值 |\n| `running_sum(q)` | 🔵 | 计算滑动求和 |\n\n**说明**：对于序列中的第 i 个数值，计算第 [1...i] 共 i 个数据点的聚合结果。\n\n---\n\n#### 6.2.6 排序函数\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `sort(q)` | ✅ | 按最后一个数据点升序排序 |\n| `sort_desc(q)` | ✅ | 按最后一个数据点降序排序 |\n\n**参见**：第四章的 `sort_by_label` 系列函数\n\n---\n\n#### 6.2.7 对数函数\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `ln(q)` | ✅ | 自然对数 ln(v) |\n| `log2(q)` | ✅ | 以 2 为底的对数 |\n| `log10(q)` | ✅ | 以 10 为底的对数 |\n\n**参见**：`exp(q)` 函数\n\n---\n\n#### 6.2.8 三角函数\n\n| 分类 | 函数 | 兼容性 |\n|------|------|--------|\n| **基础三角** | `sin(q)`, `cos(q)`, `tan(q)` | ✅ |\n| **反三角** | `asin(q)`, `acos(q)`, `atan(q)` | ✅ |\n| **双曲三角** | `sinh(q)`, `cosh(q)`, `tanh(q)` | ✅ |\n| **反双曲三角** | `asinh(q)`, `acosh(q)`, `atanh(q)` | ✅ |\n\n---\n\n#### 6.2.9 时间函数\n\n| 函数 | 兼容性 | 功能描述 | 返回值范围 |\n|------|--------|----------|------------|\n| `time()` | ✅ | 返回 Unix 时间戳（秒）| - |\n| `start()` | 🔵 | 返回查询开始时间戳 | - |\n| `end()` | 🔵 | 返回查询结束时间戳 | - |\n| `step()` | 🔵 | 返回数据点间隔（秒）| - |\n| `day_of_month(q)` | ✅ | 计算是月份中的第几天 | [1...31] |\n| `day_of_week(q)` | ✅ | 计算是一周中的第几天 | [1...7] |\n| `day_of_year(q)` | ✅ | 计算是一年中的第几天 | [1...366] |\n| `days_in_month(q)` | ✅ | 计算该月总天数 | [28...31] |\n| `hour(q)` | ✅ | 提取小时位 | [0...23] |\n| `minute(q)` | ✅ | 提取分钟位 | [0...59] |\n| `month(q)` | ✅ | 提取月份 | [1...12] |\n| `year(q)` | ✅ | 提取年份 | - |\n| `timezone_offset(tz)` | 🔵 | 返回时区偏移（秒）| - |\n\n**示例**：\n\n```promql\n# 返回 America/Los_Angeles 时区的星期几\nday_of_week(time() + timezone_offset(\"America/Los_Angeles\"))\n```\n\n---\n\n#### 6.2.10 向量计算函数（Range）\n\n| 函数 | 兼容性 | 功能描述 | 使用场景 |\n|------|--------|----------|----------|\n| `range_avg(q)` | 🔵 | 计算各点平均值 | 趋势分析 |\n| `range_max(q)` | 🔵 | 计算各点最大值 | 峰值识别 |\n| `range_min(q)` | 🔵 | 计算各点最小值 | 谷值识别 |\n| `range_sum(q)` | 🔵 | 计算各点总和 | 累计统计 |\n| `range_median(q)` | 🔵 | 计算各点中位数 | 中心趋势 |\n| `range_quantile(phi, q)` | 🔵 | 计算各点分位数 | 分布分析 |\n| `range_first(q)` | 🔵 | 返回第一个值 | 基线对比 |\n| `range_last(q)` | 🔵 | 返回最后一个值 | 当前值 |\n| `range_stddev(q)` | 🔵 | 计算标准偏差 | 波动性分析 |\n| `range_stdvar(q)` | 🔵 | 计算方差 | 波动性分析 |\n| `range_mad(q)` | 🔵 | 计算中位数绝对偏差 | 异常检测 |\n| `range_linear_regression(q)` | 🔵 | 计算线性回归 | 容量规划 |\n| `range_normalize(q1, ...)` | 🔵 | 归一化到 [0...1] | 数据对比 |\n| `range_trim_outliers(k, q)` | 🔵 | 删除离群值 | 数据清洗 |\n| `range_trim_spikes(phi, q)` | 🔵 | 删除最大 phi% 尖峰 | 数据平滑 |\n| `range_trim_zscore(z, q)` | 🔵 | 删除超过 z 标准差的点 | 异常过滤 |\n| `range_zscore(q)` | 🔵 | 计算 z-score | 标准化 |\n\n**示例**：\n\n```promql\n# 容量规划：计算选定时间范围内的线性回归\nrange_linear_regression(disk_usage_bytes)\n```\n\n---\n\n#### 6.2.11 智能预测函数\n\n| 函数 | 兼容性 | 功能描述 | 使用场景 |\n|------|--------|----------|----------|\n| `smooth_exponential(q, sf)` | 🔵 | 指数移动平均平滑 | 数据平滑 |\n| `ru(free, max)` | 🔵 | 计算资源利用率 [0%...100%] | 资源监控 |\n| `ttf(free)` | 🔵 | 估算资源耗尽所需时间（秒）| 容量规划 |\n\n**示例**：\n\n```promql\n# 计算内存利用率\nru(node_memory_MemFree_bytes, node_memory_MemTotal_bytes)\n\n# 估算存储空间耗尽时间\nttf(node_filesystem_avail_bytes)\n```\n\n---\n\n#### 6.2.12 空值处理函数\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `absent(q)` | ✅ | 无数据返回 1，否则返回空 |\n| `scalar(q)` | ✅ | 如果 q 包含一个时间序列则返回，否则返回空 |\n| `vector(q)` | ✅ | 返回 q（兼容性函数）|\n| `union(q1, ..., qN)` | 🔵 | 返回时间序列的并集 |\n| `interpolate(q)` | 🔵 | 线性插值填充空缺 |\n| `keep_last_value(q)` | 🔵 | 用前一个非空值填充空缺 |\n| `keep_next_value(q)` | 🔵 | 用后一个非空值填充空缺 |\n| `drop_empty_series(q)` | 🔵 | 删除没有数值的时间序列 |\n| `remove_resets(q)` | 🔵 | 纠正 Counter 重置数据点 |\n\n**使用场景**：\n\n- `absent(q)` - 告警规则：当指标不存在时触发\n- `interpolate(q)` - 填补数据空隙\n- `keep_last_value(q)` - 保持最后已知值\n- `drop_empty_series(q)` - 配合 default 使用\n\n**示例**：\n\n```promql\n# 只对非空序列使用 default\ndrop_empty_series(temperature < 30) default 42\n```\n\n---\n\n#### 6.2.13 其他函数\n\n| 函数 | 兼容性 | 功能描述 |\n|------|--------|----------|\n| `limit_offset(limit, offset, q)` | 🔵 | 跳过 offset 个序列，返回最多 limit 个序列（分页）|\n\n---", "subs": ["6.2.1 内置数学函数", "6.2.2 单值数值转换", "6.2.3 位运算函数", "6.2.4 直方图（Histogram）函数", "6.2.5 滑动函数（Running）", "6.2.6 排序函数", "6.2.7 对数函数", "6.2.8 三角函数", "6.2.9 时间函数", "6.2.10 向量计算函数（Range）", "6.2.11 智能预测函数", "6.2.12 空值处理函数", "6.2.13 其他函数"]}, {"title": "6.3 章节总结", "content": "#### 6.3.1 函数统计\n\n- **总函数数量**：80+ 个\n- **Prometheus 原生支持**：约 40 个\n- **VictoriaMetrics 独有**：约 45 个\n\n#### 6.3.2 Prometheus 兼容性总览\n\n| 分类 | Prometheus 原生 | VictoriaMetrics 独有 |\n|------|-----------------|----------------------|\n| 数学函数 | ✅ | 随机数系列 |\n| 数值转换 | ✅ 全部 | - |\n| 位运算 | - | 🔵 全部 |\n| 直方图 | `histogram_quantile` | 其他扩展函数 |\n| 滑动函数 | - | 🔵 全部 |\n| 排序 | ✅ | - |\n| 对数/三角 | ✅ 全部 | - |\n| 时间函数 | 部分 | `start`, `end`, `step`, `timezone_offset` |\n| 向量计算 | - | 🔵 全部 |\n| 预测函数 | - | 🔵 全部 |\n| 空值处理 | `absent`, `scalar`, `vector` | 其他扩展函数 |\n\n#### 6.3.3 使用建议\n\n**按场景分类**：\n\n1. **单位换算**：`abs`, `clamp`, `round` 等数值转换函数\n2. **SLO/SLI 计算**：`histogram_quantile`, `histogram_share`\n3. **时间过滤**：`hour`, `day_of_week`, `timezone_offset`\n4. **容量规划**：`range_linear_regression`, `ttf`, `ru`\n5. **趋势分析**：`smooth_exponential`, `running_avg`, `range_*` 系列\n6. **数据清洗**：`range_trim_*` 系列, `drop_empty_series`\n7. **告警优化**：`absent`, `keep_last_value`, `interpolate`\n8. **性能分析**：直方图系列函数\n9. **异常检测**：`range_mad`, `range_zscore`, `outlier_*` 系列\n\n> [!TIP]\n> **性能提示**  \n>\n> - 向量计算函数（`range_*`）会处理整个时间范围的数据，适合做总体分析\n> - 直方图函数适合百分位数计算，比 `quantile_over_time` 更准确\n> - 空值处理函数可以提高查询的稳定性，避免告警误报\n\n---", "subs": ["6.3.1 函数统计", "6.3.2 Prometheus 兼容性总览", "6.3.3 使用建议"]}]}, {"title": "第七章：函数速查索引", "sections": [{"title": "7.1 按字母排序的完整函数列表", "content": "本索引包含所有 200+ 个函数，按字母顺序排列，方便快速查找。\n\n#### A\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `absent(q)` | Transform | ✅ | 6.2.12 |\n| `absent_over_time(series_selector[d])` | Rollup | ✅ | 3.3.1 |\n| `abs(q)` | Transform | ✅ | 6.2.2 |\n| `acos(q)` | Transform | ✅ | 6.2.8 |\n| `acosh(q)` | Transform | ✅ | 6.2.8 |\n| `aggr_over_time(...)` | Rollup | 🔵 | 3.3.2 |\n| `alias(q, \"name\")` | Label | 🔵 | 4.2.1 |\n| `any(q) by (...)` | Aggregation | 🔵 | 5.2.1 |\n| `ascent_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.3 |\n| `asin(q)` | Transform | ✅ | 6.2.8 |\n| `asinh(q)` | Transform | ✅ | 6.2.8 |\n| `atan(q)` | Transform | ✅ | 6.2.8 |\n| `atanh(q)` | Transform | ✅ | 6.2.8 |\n| `avg(q) by (...)` | Aggregation | ✅ | 5.2.2 |\n| `avg_over_time(series_selector[d])` | Rollup | ✅ | 3.3.4 |\n\n#### B\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `bitmap_and(q, mask)` | Transform | 🔵 | 6.2.3 |\n| `bitmap_or(q, mask)` | Transform | 🔵 | 6.2.3 |\n| `bitmap_xor(q, mask)` | Transform | 🔵 | 6.2.3 |\n| `bottomk(k, q)` | Aggregation | ✅ | 5.2.3 |\n| `bottomk_avg(k, q, ...)` | Aggregation | 🔵 | 5.2.4 |\n| `bottomk_last(k, q, ...)` | Aggregation | 🔵 | 5.2.5 |\n| `bottomk_max(k, q, ...)` | Aggregation | 🔵 | 5.2.6 |\n| `bottomk_median(k, q, ...)` | Aggregation | 🔵 | 5.2.7 |\n| `bottomk_min(k, q, ...)` | Aggregation | 🔵 | 5.2.8 |\n| `buckets_limit(limit, buckets)` | Transform | 🔵 | 6.2.4 |\n\n#### C\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `ceil(q)` | Transform | ✅ | 6.2.2 |\n| `changes(series_selector[d])` | Rollup | ⚠️ | 3.3.5 |\n| `changes_prometheus(series_selector[d])` | Rollup | 🔵 | 3.3.6 |\n| `clamp(q, min, max)` | Transform | ✅ | 6.2.2 |\n| `clamp_max(q, max)` | Transform | ✅ | 6.2.2 |\n| `clamp_min(q, min)` | Transform | ✅ | 6.2.2 |\n| `cos(q)` | Transform | ✅ | 6.2.8 |\n| `cosh(q)` | Transform | ✅ | 6.2.8 |\n| `count(q) by (...)` | Aggregation | ✅ | 5.2.9 |\n| `count_eq_over_time(series_selector[d], eq)` | Rollup | 🔵 | 3.3.7 |\n| `count_gt_over_time(series_selector[d], gt)` | Rollup | 🔵 | 3.3.8 |\n| `count_le_over_time(series_selector[d], le)` | Rollup | 🔵 | 3.3.9 |\n| `count_ne_over_time(series_selector[d], ne)` | Rollup | 🔵 | 3.3.10 |\n| `count_over_time(series_selector[d])` | Rollup | ✅ | 3.3.11 |\n| `count_values(\"label\", q)` | Aggregation | ✅ | 5.2.10 |\n\n#### D\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `day_of_month(q)` | Transform | ✅ | 6.2.9 |\n| `day_of_week(q)` | Transform | ✅ | 6.2.9 |\n| `day_of_year(q)` | Transform | ✅ | 6.2.9 |\n| `days_in_month(q)` | Transform | ✅ | 6.2.9 |\n| `decreases_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.12 |\n| `default_rollup(series_selector[d])` | Rollup | 🔵 | 3.3.13 |\n| `deg(q)` | Transform | ✅ | 6.2.2 |\n| `delta(series_selector[d])` | Rollup | ⚠️ | 3.3.14 |\n| `delta_prometheus(series_selector[d])` | Rollup | 🔵 | 3.3.15 |\n| `deriv(series_selector[d])` | Rollup | ✅ | 3.3.16 |\n| `deriv_fast(series_selector[d])` | Rollup | 🔵 | 3.3.17 |\n| `descent_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.18 |\n| `distinct(q)` | Aggregation | 🔵 | 5.2.11 |\n| `distinct_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.19 |\n| `drop_common_labels(q1, ..., qN)` | Label | 🔵 | 4.2.2 |\n| `drop_empty_series(q)` | Transform | 🔵 | 6.2.12 |\n| `duration_over_time(series_selector[d], max_interval)` | Rollup | 🔵 | 3.3.20 |\n\n#### E\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `end()` | Transform | 🔵 | 6.2.9 |\n| `exp(q)` | Transform | ✅ | 6.2.2 |\n\n#### F\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `first_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.21 |\n| `floor(q)` | Transform | ✅ | 6.2.2 |\n\n#### G\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `geomean(q)` | Aggregation | 🔵 | 5.2.12 |\n| `geomean_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.22 |\n| `group(q) by (...)` | Aggregation | ✅ | 5.2.13 |\n\n#### H\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `histogram(q)` | Aggregation | 🔵 | 5.2.14 |\n| `histogram_avg(buckets)` | Transform | 🔵 | 6.2.4 |\n| `histogram_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.23 |\n| `histogram_quantile(phi, buckets)` | Transform | ✅ | 6.2.4 |\n| `histogram_quantiles(...)` | Transform | 🔵 | 6.2.4 |\n| `histogram_share(le, buckets)` | Transform | 🔵 | 6.2.4 |\n| `histogram_stddev(buckets)` | Transform | 🔵 | 6.2.4 |\n| `histogram_stdvar(buckets)` | Transform | 🔵 | 6.2.4 |\n| `holt_winters(series_selector[d], sf, tf)` | Rollup | ✅ | 3.3.24 |\n| `hour(q)` | Transform | ✅ | 6.2.9 |\n\n#### I\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `idelta(series_selector[d])` | Rollup | ✅ | 3.3.25 |\n| `ideriv(series_selector[d])` | Rollup | 🔵 | 3.3.26 |\n| `increase(series_selector[d])` | Rollup | ⚠️ | 3.3.27 |\n| `increase_prometheus(series_selector[d])` | Rollup | 🔵 | 3.3.28 |\n| `increase_pure(series_selector[d])` | Rollup | 🔵 | 3.3.29 |\n| `increases_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.30 |\n| `integrate(series_selector[d])` | Rollup | 🔵 | 3.3.31 |\n| `interpolate(q)` | Transform | 🔵 | 6.2.12 |\n| `irate(series_selector[d])` | Rollup | ✅ | 3.3.32 |\n\n#### K\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `keep_last_value(q)` | Transform | 🔵 | 6.2.12 |\n| `keep_next_value(q)` | Transform | 🔵 | 6.2.12 |\n\n#### L\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `label_copy(q, ...)` | Label | 🔵 | 4.2.3 |\n| `label_del(q, ...)` | Label | 🔵 | 4.2.4 |\n| `label_join(q, ...)` | Label | ✅ | 4.2.5 |\n| `label_keep(q, ...)` | Label | 🔵 | 4.2.6 |\n| `label_lowercase(q, ...)` | Label | 🔵 | 4.2.7 |\n| `label_map(q, ...)` | Label | 🔵 | 4.2.8 |\n| `label_match(q, \"label\", \"regexp\")` | Label | 🔵 | 4.2.9 |\n| `label_mismatch(q, \"label\", \"regexp\")` | Label | 🔵 | 4.2.10 |\n| `label_move(q, ...)` | Label | 🔵 | 4.2.11 |\n| `label_replace(q, ...)` | Label | ✅ | 4.2.12 |\n| `label_set(q, ...)` | Label | 🔵 | 4.2.13 |\n| `label_transform(q, ...)` | Label | 🔵 | 4.2.14 |\n| `label_uppercase(q, ...)` | Label | 🔵 | 4.2.15 |\n| `label_value(q, \"label\")` | Label | 🔵 | 4.2.16 |\n| `labels_equal(q, ...)` | Label | 🔵 | 4.2.17 |\n| `lag(series_selector[d])` | Rollup | 🔵 | 3.3.33 |\n| `last_over_time(series_selector[d])` | Rollup | ✅ | 3.3.34 |\n| `lifetime(series_selector[d])` | Rollup | 🔵 | 3.3.35 |\n| `limit_offset(limit, offset, q)` | Transform | 🔵 | 6.2.13 |\n| `limitk(k, q) by (...)` | Aggregation | 🔵 | 5.2.15 |\n| `ln(q)` | Transform | ✅ | 6.2.7 |\n| `log2(q)` | Transform | ✅ | 6.2.7 |\n| `log10(q)` | Transform | ✅ | 6.2.7 |\n\n#### M\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `mad(q) by (...)` | Aggregation | 🔵 | 5.2.16 |\n| `mad_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.36 |\n| `max(q) by (...)` | Aggregation | ✅ | 5.2.17 |\n| `max_over_time(series_selector[d])` | Rollup | ✅ | 3.3.37 |\n| `median(q) by (...)` | Aggregation | 🔵 | 5.2.18 |\n| `median_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.38 |\n| `min(q) by (...)` | Aggregation | ✅ | 5.2.19 |\n| `min_over_time(series_selector[d])` | Rollup | ✅ | 3.3.39 |\n| `minute(q)` | Transform | ✅ | 6.2.9 |\n| `mode(q) by (...)` | Aggregation | 🔵 | 5.2.20 |\n| `mode_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.40 |\n| `month(q)` | Transform | ✅ | 6.2.9 |\n\n#### N\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `now()` | Transform | 🔵 | 6.2.1 |\n\n#### O\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `outlier_iqr_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.41 |\n\n#### P\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `pi()` | Transform | ✅ | 6.2.1 |\n| `predict_linear(series_selector[d], t)` | Rollup | ✅ | 3.3.42 |\n| `present_over_time(series_selector[d])` | Rollup | ✅ | 3.3.43 |\n| `prometheus_buckets(buckets)` | Transform | 🔵 | 6.2.4 |\n\n#### Q\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `quantile(phi, q) by (...)` | Aggregation | ✅ | 5.2.21 |\n| `quantile_over_time(phi, series_selector[d])` | Rollup | ✅ | 3.3.44 |\n| `quantiles(...)` | Aggregation | 🔵 | 5.2.22 |\n| `quantiles_over_time(...)` | Rollup | 🔵 | 3.3.45 |\n\n#### R\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `rad(q)` | Transform | ✅ | 6.2.2 |\n| `rand(seed)` | Transform | 🔵 | 6.2.1 |\n| `rand_exponential(seed)` | Transform | 🔵 | 6.2.1 |\n| `rand_normal(seed)` | Transform | 🔵 | 6.2.1 |\n| `range_*` 系列 | Transform | 🔵 | 6.2.10 |\n| `rate(series_selector[d])` | Rollup | ✅ | 3.3.47 |\n| `rate_over_sum(series_selector[d])` | Rollup | 🔵 | 3.3.48 |\n| `remove_resets(q)` | Transform | 🔵 | 6.2.12 |\n| `resets(series_selector[d])` | Rollup | ✅ | 3.3.49 |\n| `rollup*` 系列 | Rollup | 🔵 | 3.3.50-56 |\n| `round(q, nearest)` | Transform | ✅ | 6.2.2 |\n| `ru(free, max)` | Transform | 🔵 | 6.2.11 |\n| `running_*` 系列 | Transform | 🔵 | 6.2.5 |\n\n#### S\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `scalar(q)` | Transform | ✅ | 6.2.12 |\n| `scrape_interval(series_selector[d])` | Rollup | 🔵 | 3.3.57 |\n| `sgn(q)` | Transform | ✅ | 6.2.2 |\n| `share(q) by (...)` | Aggregation | 🔵 | 5.2.23 |\n| `share_*_over_time` 系列 | Rollup | 🔵 | 3.3.58-60 |\n| `sin(q)` | Transform | ✅ | 6.2.8 |\n| `sinh(q)` | Transform | ✅ | 6.2.8 |\n| `smooth_exponential(q, sf)` | Transform | 🔵 | 6.2.11 |\n| `sort(q)` | Transform | ✅ | 6.2.6 |\n| `sort_by_label*` 系列 | Label | 🔵 | 4.2.18-21 |\n| `sort_desc(q)` | Transform | ✅ | 6.2.6 |\n| `sqrt(q)` | Transform | ✅ | 6.2.2 |\n| `start()` | Transform | 🔵 | 6.2.9 |\n| `stddev(q) by (...)` | Aggregation | ✅ | 5.2.24 |\n| `stddev_over_time(series_selector[d])` | Rollup | ✅ | 3.3.61 |\n| `stdvar(q) by (...)` | Aggregation | ✅ | 5.2.25 |\n| `stdvar_over_time(series_selector[d])` | Rollup | ✅ | 3.3.62 |\n| `step()` | Transform | 🔵 | 6.2.9 |\n| `sum(q) by (...)` | Aggregation | ✅ | 5.2.26 |\n| `sum2(q) by (...)` | Aggregation | 🔵 | 5.2.27 |\n| `sum2_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.67 |\n| `sum_*_over_time` 系列 | Rollup | 🔵 | 3.3.63-66 |\n\n#### T\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `tan(q)` | Transform | ✅ | 6.2.8 |\n| `tanh(q)` | Transform | ✅ | 6.2.8 |\n| `t*_over_time` 系列 | Rollup | 🔵 | 3.3.70-74 |\n| `time()` | Transform | ✅ | 6.2.9 |\n| `timestamp(series_selector[d])` | Rollup | ✅ | 3.3.68 |\n| `timestamp_with_name(series_selector[d])` | Rollup | 🔵 | 3.3.69 |\n| `timezone_offset(tz)` | Transform | 🔵 | 6.2.9 |\n| `topk(k, q)` | Aggregation | ✅ | 5.2.28 |\n| `topk_*` 系列 | Aggregation | 🔵 | 5.2.29-33 |\n| `ttf(free)` | Transform | 🔵 | 6.2.11 |\n\n#### U\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `union(q1, ..., qN)` | Transform | 🔵 | 6.2.12 |\n\n#### V\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `vector(q)` | Transform | ✅ | 6.2.12 |\n\n#### Y\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `year(q)` | Transform | ✅ | 6.2.9 |\n\n#### Z\n\n| 函数 | 类型 | 兼容性 | 章节 |\n|------|------|--------|------|\n| `zscore(q) by (...)` | Aggregation | 🔵 | 5.2.34 |\n| `zscore_over_time(series_selector[d])` | Rollup | 🔵 | 3.3.75 |\n\n---", "subs": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "Y", "Z"]}, {"title": "7.2 VictoriaMetrics 独有函数列表", "content": "以下函数仅在 VictoriaMetrics 中可用（标注为 🔵）：\n\n#### Rollup 函数（50+）\n\n`aggr_over_time`, `ascent_over_time`, `changes_prometheus`, `count_eq_over_time`, `count_gt_over_time`, `count_le_over_time`, `count_ne_over_time`, `decreases_over_time`, `default_rollup`, `delta_prometheus`, `deriv_fast`, `descent_over_time`, `distinct_over_time`, `duration_over_time`, `first_over_time`, `geomean_over_time`, `histogram_over_time`, `ideriv`, `increase_prometheus`, `increase_pure`, `increases_over_time`, `integrate`, `lag`, `lifetime`, `mad_over_time`, `median_over_time`, `mode_over_time`, `outlier_iqr_over_time`, `quantiles_over_time`, `range_over_time`, `rate_over_sum`, `rollup*` 系列, `scrape_interval`, `share_eq_over_time`, `share_gt_over_time`, `share_le_over_time`, `sum_eq_over_time`, `sum_gt_over_time`, `sum_le_over_time`, `sum2_over_time`, `tfirst_over_time`, `timestamp_with_name`, `tlast_change_over_time`, `tmax_over_time`, `tmin_over_time`, `zscore_over_time`\n\n#### Label 函数（19）\n\n`alias`, `drop_common_labels`, `label_copy`, `label_del`, `label_keep`, `label_lowercase`, `label_map`, `label_match`, `label_mismatch`, `label_move`, `label_set`, `label_transform`, `label_uppercase`, `label_value`, `labels_equal`, `sort_by_label`, `sort_by_label_desc`, `sort_by_label_numeric`, `sort_by_label_numeric_desc`\n\n#### Aggregation 函数（23）\n\n`any`, `bottomk_avg`, `bottomk_last`, `bottomk_max`, `bottomk_median`, `bottomk_min`, `distinct`, `geomean`, `histogram`, `limitk`, `mad`, `median`, `mode`, `quantiles`, `share`, `sum2`, `topk_avg`, `topk_last`, `topk_max`, `topk_median`, `topk_min`, `zscore`\n\n#### Transform 函数（45）\n\n`bitmap_and`, `bitmap_or`, `bitmap_xor`, `buckets_limit`, `drop_empty_series`, `end`, `histogram_avg`, `histogram_quantiles`, `histogram_share`, `histogram_stddev`, `histogram_stdvar`, `interpolate`, `keep_last_value`, `keep_next_value`, `limit_offset`, `now`, `prometheus_buckets`, `rand`, `rand_exponential`, `rand_normal`, `range_*` 系列, `remove_resets`, `ru`, `running_*` 系列, `smooth_exponential`, `start`, `step`, `timezone_offset`, `ttf`, `union`\n\n---", "subs": ["Rollup 函数（50+）", "Label 函数（19）", "Aggregation 函数（23）", "Transform 函数（45）"]}, {"title": "7.3 按使用场景分类", "content": "#### 监控场景\n\n**基础指标监控**：\n\n- `rate`, `irate` - Counter 速率计算\n- `avg_over_time`, `max_over_time`, `min_over_time` - Gauge 聚合\n- `histogram_quantile` - 延迟百分位数\n\n**资源监控**：\n\n- `ru` - 资源利用率计算\n- `clamp`, `clamp_max` - 值范围限制\n- `running_sum`, `running_avg` - 滑动统计\n\n#### 告警场景\n\n**告警触发**：\n\n- `absent` - 指标缺失检测\n- `changes` - 变化次数检测\n- `resets` - Counter 重置检测（服务重启）\n- `outlier_iqr_over_time` - 异常值检测\n\n**告警优化**：\n\n- `keep_last_value` - 避免数据空隙导致误报\n- `drop_empty_series` - 过滤空序列\n- `interpolate` - 数据插值\n\n**SLI/SLO 计算**：\n\n- `histogram_quantile` - P99/P95 计算\n- `histogram_share` - SLO 达标率\n- `share_gt_over_time`, `share_le_over_time` - 可用性百分比\n\n#### 性能分析场景\n\n**延迟分析**：\n\n- `histogram_quantile` - 请求延迟分位数\n- `histogram_avg` - 平均延迟\n- `histogram_stddev` - 延迟波动\n\n**趋势分析**：\n\n- `range_linear_regression` - 线性趋势\n- `smooth_exponential` - 平滑曲线\n- `deriv` - 变化率\n\n**Top N 分析**：\n\n- `topk`, `bottomk` - 最大/最小 K 个值\n- `topk_avg`, `bottomk_avg` - 按平均值排序\n- `sort`, `sort_desc` - 排序\n\n#### 容量规划场景\n\n**容量预测**：\n\n- `ttf` - 资源耗尽时间预测\n- `predict_linear` - 线性预测\n- `range_linear_regression` - 趋势回归\n\n**资源分析**：\n\n- `ru` - 当前资源利用率\n- `range_max`, `range_min` - 峰值/谷值识别\n- `rate_over_sum` - 增长率分析\n\n#### 数据处理场景\n\n**数据清洗**：\n\n- `range_trim_outliers` - 删除离群值\n- `range_trim_spikes` - 删除尖峰\n- `range_trim_zscore` - Z-score 过滤\n\n**数据转换**：\n\n- `abs`, `round`, `ceil`, `floor` - 数值转换\n- `label_replace`, `label_transform` - 标签转换\n- `range_normalize` - 归一化\n\n**数据填充**：\n\n- `interpolate` - 线性插值\n- `keep_last_value` - 前向填充\n- `keep_next_value` - 后向填充\n\n#### 时间相关场景\n\n**时间过滤**：\n\n- `hour`, `day_of_week`, `month` - 时间提取\n- `timezone_offset` - 时区处理\n\n**时间聚合**：\n\n- `*_over_time` 系列 - 时间窗口聚合\n- `rollup*` 系列 - 多维度汇总\n\n---", "subs": ["监控场景", "告警场景", "性能分析场景", "容量规划场景", "数据处理场景", "时间相关场景"]}, {"title": "7.4 快速查询指南", "content": "#### 我想\n\n**计算 Counter 速率** → `rate`, `irate`  \n**计算 Gauge 平均值** → `avg_over_time`  \n**计算 P99 延迟** → `histogram_quantile(0.99, ...)`  \n**检测指标缺失** → `absent`  \n**检测异常值** → `outlier_iqr_over_time`, `range_zscore`  \n**预测资源耗尽时间** → `ttf`  \n**计算资源利用率** → `ru`  \n**填充数据空隙** → `interpolate`, `keep_last_value`  \n**删除离群值** → `range_trim_outliers`  \n**按标签排序** → `sort_by_label`  \n**重命名指标** → `alias`  \n**计算 Top 10** → `topk(10, ...)`  \n**计算服务可用性** → `share_gt_over_time(up[24h], 0)`  \n**检测服务重启** → `resets`  \n**平滑数据曲线** → `smooth_exponential`, `running_avg`\n\n---", "subs": ["我想"]}]}, {"title": "附录：VictoriaMetrics vs Prometheus", "sections": [{"title": "A.1 语法差异总结", "content": "#### A.1.1 核心差异\n\n| 特性 | Prometheus | VictoriaMetrics |\n|------|-----------|-----------------|\n| **查询语言** | PromQL | MetricsQL（PromQL 超集）|\n| **函数总数** | ~70 个 | 200+ 个 |\n| **OR 语法** | `{label=~\"value1\\\\|value2\"}` | `{label=~\"value1\\\\|value2\"}` 或 `{label=\"value1\"} or {label=\"value2\"}` |\n| **默认 rate 窗口** | 需显式指定 | 自动使用 `[5m]` 或2倍抓取间隔 |\n| **keep_metric_names** | 部分函数支持 | 所有函数支持 |\n\n#### A.1.2 行为差异\n\n**1. increase/delta 函数**\n\n```promql\n# Prometheus: 可能返回小数\nincrease(http_requests[5m])\n\n# VictoriaMetrics: 返回整数增量（更准确）\nincrease(http_requests[5m])\n\n# VictoriaMetrics 提供了完全兼容版本\nincrease_prometheus(http_requests[5m])\n```\n\n**2. changes 函数**\n\n```promql\n# Prometheus: 返回值变化次数（不计算首个点）\nchanges(temperature[1h])\n\n# VictoriaMetrics: 默认计算首个点，更符合直觉\nchanges(temperature[1h])\n\n# 完全兼容版本\nchanges_prometheus(temperature[1h])\n```\n\n**3. 自动 Rollup 转换**\n\n```promql\n# Prometheus: 必须显式使用 _over_time\nmax(up)  # 错误\n\n# VictoriaMetrics: 自动转换\nmax(up)  # 自动转换为 max(default_rollup(up))\n```\n\n---", "subs": ["A.1.1 核心差异", "A.1.2 行为差异"]}, {"title": "A.2 性能优化特性", "content": "#### A.2.1 VictoriaMetrics 独有优化\n\n**1. 更高效的查询执行**\n\n- **并行查询**：自动并行处理多个时间序列\n- **智能采样**：对于大时间范围查询自动降采样\n- **查询缓存**：缓存常见查询结果\n\n**2. 内存优化**\n\n```promql\n# 传统计数方式（内存密集）\ncount(up)\n\n# VictoriaMetrics 优化的计数\ncount(up)  # 内部优化，低内存消耗\n```\n\n**3. 磁盘 I/O 优化**\n\n- **列式存储**：减少磁盘读取\n- **压缩存储**：平均 70% 压缩率\n- **智能索引**：快速标签查询\n\n#### A.2.2 查询优化建议\n\n**使用 VictoriaMetrics 特定函数**：\n\n```promql\n# 优化前：使用通用聚合\navg_over_time(\n  sum(rate(http_requests[5m])) by (path)\n[1h:5m])\n\n# 优化后：使用 rollup_rate\nrollup_rate(\n  sum(http_requests) by (path)\n[1h:5m])\n```\n\n**利用自动窗口**：\n\n```promql\n# 无需显式指定 [5m]\nrate(http_requests)  # VictoriaMetrics 自动使用合适窗口\n\n# Prometheus 必须显式指定\nrate(http_requests[5m])\n```\n\n---", "subs": ["A.2.1 VictoriaMetrics 独有优化", "A.2.2 查询优化建议"]}, {"title": "A.3 迁移注意事项", "content": "#### A.3.1 从 Prometheus 迁移到 VictoriaMetrics\n\n**✅ 完全兼容（无需修改）**：\n\n1. 所有基础 PromQL 查询\n2. 标准聚合函数（`sum`, `avg`, `max`, `min`, `count`）\n3. 标准 Rollup 函数（`rate`, `irate`, `increase`, `avg_over_time` 等）\n4. Label 过滤和匹配\n5. 运算符（`+`, `-`, `*`, `/`, `and`, `or`, `unless`）\n\n**⚠️ 需要关注（行为可能不同）**：\n\n1. **increase/delta 计算**\n   - VictoriaMetrics 默认返回整数\n   - 如需完全兼容，使用 `*_prometheus` 版本\n\n2. **changes 函数**\n   - 计算逻辑略有不同\n   - 建议测试验证结果\n\n3. **自动 Rollup**\n   - VictoriaMetrics 会自动转换\n   - Prometheus 会报错\n\n**🔵 可选优化（利用新特性）**：\n\n1. **使用 VictoriaMetrics 独有函数**\n\n   ```promql\n   # 资源利用率\n   ru(node_memory_MemFree_bytes, node_memory_MemTotal_bytes)\n   \n   # 资源耗尽预测\n   ttf(node_filesystem_avail_bytes)\n   \n   # 异常检测\n   outlier_iqr_over_time(response_time[1h])\n   ```\n\n2. **简化查询**\n\n   ```promql\n   # 优化前\n   rate(http_requests[5m])\n   \n   # 优化后（省略窗口）\n   rate(http_requests)\n   ```\n\n3. **使用高级聚合**\n\n   ```promql\n   # Top K 按平均值\n   topk_avg(10, http_request_duration_seconds)\n   \n   # 中位数聚合\n   median(response_time) by (endpoint)\n   ```\n\n#### A.3.2 迁移检查清单\n\n**步骤 1：兼容性检查**\n\n- [ ] 检查所有告警规则\n- [ ] 检查所有 Grafana 查询\n- [ ] 检查自定义查询脚本\n- [ ] 验证 `increase`/`delta`/`changes` 函数结果\n\n**步骤 2：功能测试**\n\n- [ ] 对比相同查询在两个系统的结果\n- [ ] 验证告警触发逻辑\n- [ ] 测试 Dashboard 显示\n- [ ] 检查数据准确性\n\n**步骤 3：性能优化**\n\n- [ ] 识别可以优化的查询\n- [ ] 使用 VictoriaMetrics 独有函数\n- [ ] 优化大时间范围查询\n- [ ] 配置查询缓存\n\n**步骤 4：监控迁移**\n\n- [ ] 监控查询响应时间\n- [ ] 监控资源使用（CPU/内存/磁盘）\n- [ ] 设置告警阈值\n- [ ] 验证数据完整性\n\n#### A.3.3 常见问题解决\n\n**Q1: 查询结果与 Prometheus 不一致**\n\n```promql\n# 检查是否是 increase/delta/changes 差异\n# 使用 *_prometheus 版本验证\nincrease_prometheus(metric[5m])\ndelta_prometheus(metric[5m])\nchanges_prometheus(metric[5m])\n```\n\n**Q2: 告警误报**\n\n```promql\n# 可能是自动 Rollup 导致\n# 显式指定 Rollup 函数\navg_over_time(metric[5m])  # 而不是 avg(metric)\n```\n\n**Q3: 性能不如预期**\n\n- 检查是否启用了查询缓存\n- 优化标签基数\n- 使用更高效的聚合函数\n- 考虑使用 `rollup*` 系列函数\n\n---", "subs": ["A.3.1 从 Prometheus 迁移到 VictoriaMetrics", "A.3.2 迁移检查清单", "A.3.3 常见问题解决"]}, {"title": "A.4 最佳实践", "content": "#### A.4.1 查询编写建议\n\n**1. 明确指定时间窗口**（推荐）\n\n虽然 VictoriaMetrics 支持自动窗口，但为了可移植性：\n\n```promql\n# 推荐：显式指定\nrate(http_requests[5m])\n\n# 可用但不推荐：依赖自动窗口\nrate(http_requests)\n```\n\n**2. 使用 keep_metric_names**\n\n保留指标名称以提高可读性：\n\n```promql\nrate(http_requests[5m])\n  keep_metric_names\n```\n\n**3. 利用标签操作函数**\n\n```promql\n# 重命名指标\nalias(complex_metric_name, \"simple_name\")\n\n# 添加上下文标签\nlabel_set(metric, \"env\", \"prod\", \"team\", \"platform\")\n```\n\n#### A.4.2 性能优化建议\n\n**1. 减少标签基数**\n\n```promql\n# 避免：高基数标签\nsum(rate(http_requests[5m])) by (user_id)  # user_id 可能有百万级\n\n# 推荐：低基数标签\nsum(rate(http_requests[5m])) by (endpoint, method)\n```\n\n**2. 使用预聚合**\n\n```promql\n# 避免：实时聚合大量序列\nsum(rate(http_requests[5m])) by (endpoint)\n\n# 推荐：记录规则预聚合\n# 在 recording rule 中预先计算\n```\n\n**3. 限制查询范围**\n\n```promql\n# 使用 limit 减少返回序列\ntopk(10, http_requests)\n\n# 使用时间范围限制\nrate(http_requests{job=\"api\"}[5m])\n```\n\n#### A.4.3 告警规则建议\n\n**1. 使用空值处理**\n\n```promql\n# 避免数据空隙导致误报\n(rate(http_errors[5m]) / rate(http_requests[5m]))\n  keep_last_value\n> 0.05\n```\n\n**2. 使用 absent 检测缺失指标**\n\n```promql\n# 检测服务是否上报指标\nabsent(up{job=\"critical-service\"})\n```\n\n**3. 组合多个条件**\n\n```promql\n# 综合判断服务状态\n(\n  up{job=\"api\"} == 0\n  or\n  rate(http_errors{job=\"api\"}[5m]) > 10\n)\n```\n\n---", "subs": ["A.4.1 查询编写建议", "A.4.2 性能优化建议", "A.4.3 告警规则建议"]}]}, {"title": "📚 参考资源", "sections": [{"title": "概述", "content": "- [VictoriaMetrics 官方文档](https://docs.victoriametrics.com/)\n- [Prometheus 官方文档](https://prometheus.io/docs/)\n\n---\n\n**文档版本**: v1.0  \n**最后更新**: 2025-11-25  \n**维护者**: @luozijian", "subs": ["VictoriaMetrics 官方文档", "Prometheus 官方文档"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

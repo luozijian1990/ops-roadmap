@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Linux 底层原理学习笔记 · 第三册：内存管理 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Linux 底层原理学习笔记 · 第三册：内存管理</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Linux 底层原理学习笔记 · 第三册：内存管理", "intro": "", "parts": [{"title": "第4章 内存管理（一）：虚拟地址空间", "sections": [{"title": "4.1 为什么需要虚拟内存", "content": "> **核心思想**：内存管理是Linux内核的核心子系统，实现了从虚拟地址到物理地址的映射，以及内存的分配与回收。\n\n#### 内存管理整体架构图\n\n```mermaid\ngraph TD\n    subgraph 用户进程视角[\"👤 用户进程视角\"]\n        MALLOC[malloc/new<br/>用户态分配]\n        MMAP[mmap<br/>文件映射]\n    end\n    \n    subgraph 虚拟内存层[\"🗺️ 虚拟内存层\"]\n        VMA[vm_area_struct<br/>VMA链表/红黑树]\n        MM[mm_struct<br/>进程内存描述符]\n        PGD[页表 PGD/PUD/PMD/PTE<br/>多级页表映射]\n    end\n    \n    subgraph 物理内存管理[\"💾 物理内存管理层\"]\n        direction TB\n        NODE[NUMA节点 pg_data_t]\n        ZONE[内存区域<br/>ZONE_DMA/NORMAL/HIGHMEM]\n        BUDDY[伙伴系统 Buddy System<br/>按2^n页分配]\n    end\n    \n    subgraph 小对象分配[\"🔧 小对象分配器\"]\n        SLAB[Slab分配器<br/>对象缓存池]\n        KMALLOC[kmalloc<br/>通用小对象]\n        KMEM[kmem_cache<br/>专用对象缓存]\n    end\n    \n    subgraph 特殊内存[\"⚡ 特殊内存区域\"]\n        VMALLOC[vmalloc<br/>虚拟连续/物理不连续]\n        IOREMAP[ioremap<br/>设备内存映射]\n    end\n    \n    subgraph 页面回收[\"♻️ 页面回收机制\"]\n        LRU[LRU链表<br/>活跃/非活跃页面]\n        KSWAPD[kswapd线程<br/>后台回收]\n        SWAP[Swap交换<br/>匿名页换出]\n    end\n    \n    subgraph 物理内存[\"🎫 物理RAM\"]\n        PAGE[物理页面 struct page<br/>4KB页帧]\n    end\n    \n    %% 数据流向\n    MALLOC --> MM\n    MMAP --> VMA\n    MM --> VMA\n    VMA --> PGD\n    PGD -.缺页异常.-> BUDDY\n    \n    NODE --> ZONE\n    ZONE --> BUDDY\n    BUDDY --> PAGE\n    BUDDY --> SLAB\n    SLAB --> KMALLOC\n    SLAB --> KMEM\n    \n    BUDDY -.大块虚拟连续.-> VMALLOC\n    VMALLOC --> PAGE\n    IOREMAP --> PAGE\n    \n    PAGE -.内存不足.-> LRU\n    LRU --> KSWAPD\n    KSWAPD --> SWAP\n    SWAP -.释放.-> PAGE\n    \n    %% 样式\n    style MM fill:#e1f5fe,stroke:#01579b,stroke-width:2px\n    style BUDDY fill:#fff3e0,stroke:#e65100,stroke-width:3px\n    style SLAB fill:#f3e5f5,stroke:#4a148c,stroke-width:2px\n    style PAGE fill:#ffebee,stroke:#b71c1c,stroke-width:2px\n    style PGD fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px\n    style LRU fill:#fce4ec,stroke:#880e4f,stroke-width:2px\n```\n\n**架构要点**：\n\n1. **三层体系**：\n   - 虚拟内存层（进程视角）：mm_struct + VMA + 页表\n   - 物理内存管理（内核视角）：NUMA节点 → ZONE → 伙伴系统\n   - 小对象分配（优化层）：Slab缓存\n\n2. **核心数据结构**：\n   - `mm_struct`：进程内存空间描述符\n   - `vm_area_struct`：虚拟内存区域（VMA）\n   - `struct page`：物理页面描述符\n   - `pg_data_t`：NUMA节点\n   - `zone`：内存区域（DMA/NORMAL/HIGHMEM）\n\n3. **分配路径**：\n   - 用户态：malloc → brk/mmap → VMA → 缺页异常 → 伙伴系统\n   - 内核小对象：kmalloc → Slab → 伙伴系统\n   - 内核大块：vmalloc → 伙伴系统（虚拟连续）\n\n4. **回收机制**：\n   - LRU链表：追踪页面活跃度\n   - kswapd：后台回收线程\n   - Swap：匿名页换出到磁盘\n\n\n#### 4.1.1 问题场景\n\n**如果直接使用物理地址会怎样？**\n\n假设程序中有指令：将用户输入的数字保存到地址`0x3F10`\n\n**问题**：\n\n- 同时运行3个相同程序（3个计算器）\n- 用户分别输入：10、100、1000\n- 物理地址`0x3F10`只能保存一个值\n- **结果**：数据冲突！\n\n#### 4.1.2 虚拟内存解决方案\n\n**核心机制**：\n\n1. **物理地址对进程不可见**：进程无法直接访问物理地址\n2. **虚拟地址统一视图**：每个进程看到的都是从0开始的虚拟地址空间\n3. **映射机制**：操作系统将不同进程的虚拟地址映射到不同的物理地址\n\n```mermaid\ngraph LR\n    A[进程A<br/>VA:0x10M] --> C[操作系统<br/>地址映射]\n    B[进程B<br/>VA:0x10M] --> C\n    C --> D[物理地址<br/>0x20M]\n    C --> E[物理地址<br/>0x50M]\n    \n    style C fill:#e1f5ff\n    style D fill:#c8e6c9\n    style E fill:#c8e6c9\n```\n\n---", "subs": ["内存管理整体架构图", "4.1.1 问题场景", "4.1.2 虚拟内存解决方案"]}, {"title": "4.2 内存管理三大任务", "content": "**操作系统内存管理需要做的三件事**：\n\n1. **虚拟内存空间管理**\n   - 每个进程独立的虚拟地址空间\n   - 规划虚拟地址布局\n\n2. **物理内存管理**\n   - 物理内存分页管理\n   - 只有内存管理模块可以使用物理地址\n\n3. **地址映射**\n   - 虚拟地址→物理地址的转换\n   - 支持内存换入换出\n\n---", "subs": []}, {"title": "4.3 虚拟地址空间布局", "content": "#### 4.3.1 示例程序的内存需求\n\n```c\n#include <stdio.h>\n#include <stdlib.h>\n\nint max_length = 128;  // 全局变量\n\nchar * generate(int length) {\n    char * buffer = (char*) malloc(length+1);  // 堆分配\n    if (buffer == NULL)\n        return NULL;\n    for (int i=0; i<length; i++) {\n        buffer[i] = rand()%26+'a';\n    }\n    buffer[length] = '\\0';\n    return buffer;\n}\n\nint main(int argc, char *argv[]) {\n    int num;  // 局部变量（栈）\n    char * buffer;\n    \n    printf(\"Input the string length : \");  // 字符串常量\n    scanf(\"%d\", &num);\n    \n    if(num > max_length){\n        num = max_length;\n    }\n    buffer = generate(num);\n    printf(\"Random string is: %s\\n\", buffer);\n    free(buffer);\n    \n    return 0;\n}\n```\n\n**内存使用方式汇总**：\n\n| 类型 | 示例 | 存储位置 |\n|------|------|----------|\n| 代码 | 程序指令 | Text Segment |\n| 全局变量 | `max_length` | Data Segment |\n| 常量字符串 | `\"Input...\"` | Data Segment (rodata) |\n| 未初始化静态变量 | - | BSS Segment |\n| 局部变量 | `num` | Stack |\n| 动态分配 | `malloc()` | Heap |\n| 共享库 | glibc.so | Memory Mapping Segment |\n\n**内核态的内存需求**：\n\n- 内核代码\n- 内核全局变量\n- task_struct\n- 内核栈\n- 内核动态内存\n- 页表（映射表）\n\n#### 4.3.2 用户态vs内核态地址使用\n\n**重要原则**：\n> 几乎所有代码（用户态和内核态）都使用虚拟地址！\n\n**唯一例外**：内存管理模块本身操作页表时\n\n**原因**：\n\n- 统一管理：所有内存访问都经过虚拟地址转换\n- 安全控制：内存管理模块可以统一控制访问权限\n- 隔离保护：避免直接物理地址访问导致的混乱\n\n#### 4.3.3 虚拟地址空间划分\n\n**32位系统**：4GB虚拟地址空间 (2^32)\n**64位系统**：256TB虚拟地址空间 (实际使用48位)\n\n**空间划分**：\n\n```\n高地址 ┌─────────────────────────┐\n      │    内核空间               │ 30-39号会议室\n      │  (Kernel Space)         │ （闲人免进）\n      ├─────────────────────────┤ ← 分界线\n      │    栈 (Stack)           │ ← 向下增长\n      │         ↓               │\n      │                         │\n      │    Memory Mapping       │ ← so文件映射\n      │         ↑               │\n      │    堆 (Heap)            │ ← 向上增长\n      ├─────────────────────────┤\n      │    BSS Segment          │ ← 未初始化静态变量\n      ├─────────────────────────┤\n      │    Data Segment         │ ← 全局变量、常量\n      ├─────────────────────────┤\n      │    Text Segment         │ ← 程序代码\n低地址 └─────────────────────────┘\n```\n\n**用户空间**（低地址0-29号）：\n\n1. **Text Segment**：二进制可执行代码\n2. **Data Segment**：静态常量（rodata）、已初始化全局变量\n3. **BSS Segment**：未初始化静态变量\n4. **Heap**：动态分配（malloc），向高地址增长\n5. **Memory Mapping Segment**：so文件映射区域\n6. **Stack**：函数调用栈，向低地址增长\n\n**内核空间**（高地址30-39号）：\n\n- 内核代码（Text/Data/BSS）\n- 所有进程共享\n- 需要特权才能访问\n\n**重要特性**：\n\n- 用户进程：只能访问用户空间，内核空间\"闲人免进\"\n- 内核视角：所有进程的内核空间都是同一个\n- 内核栈：每个进程独立，但都在内核空间范围\n\n---", "subs": ["4.3.1 示例程序的内存需求", "4.3.2 用户态vs内核态地址使用", "4.3.3 虚拟地址空间划分"]}, {"title": "4.4 分段机制", "content": "#### 4.4.1 分段原理\n\n**分段地址组成**：\n\n- **段选择子**（Segment Selector）：保存在段寄存器中\n- **段内偏移量**（Offset）\n\n**地址转换过程**：\n\n1. 段选择子→段号→段表索引\n2. 从段表获取：段基地址、段界限、特权等级\n3. 检查：偏移量是否在[0, 段界限]范围内\n4. 物理地址 = 段基地址 + 段内偏移量\n\n**示例**：\n\n```\n段2的基地址 = 2000\n偏移量 = 600\n物理地址 = 20002 + 600 = 2600\n```\n\n#### 4.4.2 Linux中的分段\n\n**GDT（Global Descriptor Table）**：\n\n```c\n#define GDT_ENTRY_INIT(flags, base, limit) { { { \\\n    .a = ((limit) & 0xffff) | (((base) & 0xffff) << 16), \\\n    .b = (((base) & 0xff0000) >> 16) | (((flags) & 0xf0ff) << 8) | \\\n        ((limit) & 0xf0000) | ((base) & 0xff000000), \\\n} } }\n\n// 64位系统的段定义\n[GDT_ENTRY_KERNEL_CS] = GDT_ENTRY_INIT(0xc09a, 0, 0xfffff),  // 内核代码段\n[GDT_ENTRY_KERNEL_DS] = GDT_ENTRY_INIT(0xc092, 0, 0xfffff),  // 内核数据段\n[GDT_ENTRY_DEFAULT_USER_CS] = GDT_ENTRY_INIT(0xc0fa, 0, 0xfffff),  // 用户代码段\n[GDT_ENTRY_DEFAULT_USER_DS] = GDT_ENTRY_INIT(0xc0f2, 0, 0xfffff),  // 用户数据段\n```\n\n**段选择子定义**：\n\n```c\n#define __KERNEL_CS (GDT_ENTRY_KERNEL_CS*8)\n#define __KERNEL_DS (GDT_ENTRY_KERNEL_DS*8)\n#define __USER_DS (GDT_ENTRY_DEFAULT_USER_DS*8 + 3)  // DPL=3\n#define __USER_CS (GDT_ENTRY_DEFAULT_USER_CS*8 + 3)  // DPL=3\n```\n\n**关键发现**：\n> 所有段的基地址都是0！\n\n**Linux几乎不使用分段功能**：\n\n- ✅ 保留分段的权限检查（DPL: 用户态3，内核态0）\n- ❌ 不使用分段的内存划分功能\n- 👉 Linux倾向使用**分页机制**\n\n---", "subs": ["4.4.1 分段原理", "4.4.2 Linux中的分段"]}, {"title": "4.5 分页机制", "content": "#### 4.5.1 分页基本原理\n\n**核心概念**：\n\n- **页（Page）**：固定大小的内存块，通常4KB\n- **页表（Page Table）**：记录虚拟页→物理页的映射\n- **页号**（Page Number）：虚拟地址的高位\n- **页内偏移**（Page Offset）：虚拟地址的低位（12位，4KB）\n\n**地址转换**：\n\n```\n虚拟地址 = [页号 | 页内偏移]\n         ↓ 通过页表查找\n物理地址 = [物理页基地址 | 页内偏移]\n```\n\n**优势**：\n\n- 内存换入换出：以页为单位\n- 扩大可用内存：不常用的页可以换出到硬盘\n- 提高内存利用率\n\n#### 4.5.2 两级页表（32位系统）\n\n**问题**：\n\n- 32位系统：4GB虚拟空间\n- 页大小：4KB\n- 页数：4GB / 4KB = 1M个页\n- 页表项大小：4字节\n- **页表总大小**：4MB（太大！）\n\n**解决方案：两级页表**\n\n**结构**：\n\n1. **页目录**（Page Directory）：1K项，每项4字节，共4KB\n2. **页表**（Page Table）：每个1K项，每项4字节，共4KB\n\n**地址划分**（32位）：\n\n```\n┌──────────┬──────────┬────────────────┐\n│  10位    │  10位    │     12位       │\n│ 页目录索引 │ 页表索引  │   页内偏移     │\n└──────────┴──────────┴────────────────┘\n```\n\n**查找过程**：\n\n1. 前10位→页目录索引→页表基地址\n2. 中10位→页表索引→物理页基地址  \n3. 后12位→页内偏移→最终物理地址\n\n**优势**：\n\n- 稀疏内存：只需要分配实际使用的页表\n- 节省空间：只分配一个数据页时，只需4KB页目录 + 4KB页表\n\n#### 4.5.3 四级页表（64位系统）\n\n**地址划分**（64位，实际使用48位）：\n\n```\n┌─────┬─────┬─────┬─────┬────────────┐\n│ 9位 │ 9位 │ 9位 │ 9位 │   12位     │\n│ PGD │ PUD │ PMD │ PTE │    Offset  │\n└─────┴─────┴─────┴─────┴────────────┘\n```\n\n**四级结构**：\n\n1. **PGD**（Page Global Directory）：全局页目录\n2. **PUD**（Page Upper Directory）：上层页目录\n3. **PMD**（Page Middle Directory）：中间页目录\n4. **PTE**（Page Table Entry）：页表项\n\n```mermaid\ngraph TD\n    A[虚拟地址] --> B[PGD索引9位]\n    B --> C[PUD索引9位]\n    C --> D[PMD索引9位]\n    D --> E[PTE索引9位]\n    E --> F[页内偏移12位]\n    F --> G[物理地址]\n    \n    B -.-> PGD[全局页目录]\n    C -.-> PUD[上层页目录]\n    D -.-> PMD[中间页目录]\n    E -.-> PTE[页表项]\n    \n    style A fill:#e1f5ff\n    style G fill:#c8e6c9\n```\n\n---", "subs": ["4.5.1 分页基本原理", "4.5.2 两级页表（32位系统）", "4.5.3 四级页表（64位系统）"]}, {"title": "4.6 总结", "content": "#### 4.6.1 核心要点\n\n**为什么需要虚拟内存**：\n\n- 解决多进程地址冲突\n- 提供独立的地址空间\n- 实现内存保护和隔离\n\n**虚拟地址空间布局**：\n\n- 用户空间：Text、Data、BSS、Heap、Mmap、Stack\n- 内核空间：所有进程共享，特权访问\n\n**地址转换机制**：\n\n- 分段：Linux不使用（仅保留权限检查）\n- 分页：Linux主要使用的机制\n\n**多级页表**：\n\n- 32位：两级页表（页目录 + 页表）\n- 64位：四级页表（PGD + PUD + PMD + PTE）\n- 优势：节省内存，支持稀疏地址空间\n\n#### 4.6.2 重要命令\n\n```bash\n# 查看进程内存布局\ncat /proc/PID/maps\n\n# 查看系统页大小\ngetconf PAGE_SIZE\n\n# 查看大页配置\ncat /proc/meminfo | grep Huge\n\n# 配置大页\necho 20 > /proc/sys/vm/nr_hugepages\n```\n\n#### 4.6.3 关键数据结构\n\n```c\n// 段描述符表\nstruct gdt_page {\n    struct desc_struct gdt[GDT_ENTRIES];\n};\n\n// 页表项（简化）\nstruct {\n    unsigned long present : 1;     // 是否在内存中\n    unsigned long rw : 1;          // 读写权限\n    unsigned long user : 1;        // 用户态可访问\n    unsigned long pfn : 40;        // 物理页帧号\n};\n```\n\n---\n\n**下一节预告**:将讲解进程空间管理（brk、mmap）和物理内存管理（伙伴系统）。\n\n---", "subs": ["4.6.1 核心要点", "4.6.2 重要命令", "4.6.3 关键数据结构"]}]}, {"title": "第4章 内存管理（二）：空间管理与物理内存", "sections": [{"title": "4.7 进程虚拟空间管理", "content": "> **核心思想**：用mm_struct管理进程虚拟空间，用伙伴系统管理物理内存分配。\n\n\n#### 4.7.1 mm_struct结构\n\n**进程内存描述符**：\n\n```c\nstruct task_struct {\n    struct mm_struct *mm;  // 进程的内存管理结构\n};\n```\n\n**mm_struct关键成员**：\n\n```c\nstruct mm_struct {\n    unsigned long task_size;        // 用户态/内核态分界线\n    unsigned long mmap_base;        // 内存映射区起始地址\n    unsigned long total_vm;         // 映射的总页数\n    unsigned long locked_vm;        // 锁定不能换出的页数\n    unsigned long pinned_vm;        // 不能换出也不能移动的页数\n    \n    // 各区域统计\n    unsigned long data_vm;          // 数据页数\n    unsigned long exec_vm;          // 可执行页数\n    unsigned long stack_vm;         // 栈页数\n    \n    // 代码段\n    unsigned long start_code, end_code;\n    // 数据段\n    unsigned long start_data, end_data;\n    // 堆\n    unsigned long start_brk, brk;\n    // 栈\n    unsigned long start_stack;\n    // 参数和环境变量\n    unsigned long arg_start, arg_end;\n    unsigned long env_start, env_end;\n    \n    // 虚拟内存区域管理\n    struct vm_area_struct *mmap;    // 单链表\n    struct rb_root mm_rb;           // 红黑树\n};\n```\n\n#### 4.7.2 用户态地址空间划分\n\n**32位系统**：\n\n- 用户空间：3GB (0x00000000 - 0xC0000000)\n- 内核空间：1GB (0xC0000000 - 0xFFFFFFFF)\n\n**64位系统（使用48位）**：\n\n- 用户空间：128TB (0x0000000000000000 - 0x00007FFFFFFFF000)\n- 中间空洞：隔离区\n- 内核空间：128TB (0xFFFF800000000000 - 0xFFFFFFFFFFFFFFFF)\n\n```c\n// 32位\n#define TASK_SIZE PAGE_OFFSET  // 0xC0000000\n\n// 64位\n#define TASK_SIZE_MAX ((1UL << 47) - PAGE_SIZE)  // 128TB\n```\n\n#### 4.7.3 vm_area_struct虚拟内存区域\n\n**结构定义**：\n\n```c\nstruct vm_area_struct {\n    unsigned long vm_start;         // 起始地址\n    unsigned long vm_end;           // 结束地址\n    \n    // 链表和红黑树节点\n    struct vm_area_struct *vm_next, *vm_prev;\n    struct rb_node vm_rb;\n    \n    struct mm_struct *vm_mm;        // 所属mm\n    \n    // 操作函数\n    const struct vm_operations_struct *vm_ops;\n    \n    // 映射类型\n    struct file *vm_file;           // 文件映射\n    struct anon_vma *anon_vma;      // 匿名映射\n    void *vm_private_data;\n};\n```\n\n**管理机制**：\n\n- **单链表**：按地址顺序连接所有区域\n- **红黑树**：快速查找和修改（O(log n)）\n\n#### 4.7.4 load_elf_binary建立内存映射\n\n**ELF加载过程**：\n\n```c\nstatic int load_elf_binary(struct linux_binprm *bprm) {\n    // 1. 设置内存映射区\n    setup_new_exec(bprm);\n    \n    // 2. 设置栈\n    setup_arg_pages(bprm, randomize_stack_top(STACK_TOP), executable_stack);\n    // 设置 mm->arg_start, mm->start_stack\n    \n    // 3. 映射代码段\n    elf_map(bprm->file, load_bias + vaddr, elf_ppnt, ...);\n    \n    // 4. 设置堆\n    set_brk(elf_bss, elf_brk, bss_prot);\n    // 设置 mm->start_brk = mm->brk\n    \n    // 5. 加载动态链接库\n    load_elf_interp(&loc->interp_elf_ex, interpreter, ...);\n    \n    // 6. 设置各区域边界\n    current->mm->end_code = end_code;\n    current->mm->start_code = start_code;\n    current->mm->start_data = start_data;\n    current->mm->end_data = end_data;\n    current->mm->start_stack = bprm->p;\n}\n```\n\n---", "subs": ["4.7.1 mm_struct结构", "4.7.2 用户态地址空间划分", "4.7.3 vm_area_struct虚拟内存区域", "4.7.4 load_elf_binary建立内存映射"]}, {"title": "4.8 brk系统调用", "content": "#### 4.8.1 brk原理\n\n**作用**：扩展或收缩堆空间\n\n**系统调用入口**：\n\n```c\nSYSCALL_DEFINE1(brk, unsigned long, brk) {\n    unsigned long retval;\n    unsigned long newbrk, oldbrk;\n    struct mm_struct *mm = current->mm;\n    struct vm_area_struct *next;\n    \n    // 页对齐\n    newbrk = PAGE_ALIGN(brk);\n    oldbrk = PAGE_ALIGN(mm->brk);\n    \n    // 1. 如果在同一页，直接更新\n    if (oldbrk == newbrk)\n        goto set_brk;\n    \n    // 2. 收缩堆：释放内存\n    if (brk <= mm->brk) {\n        if (!do_munmap(mm, newbrk, oldbrk-newbrk, &uf))\n            goto set_brk;\n        goto out;\n    }\n    \n    // 3. 扩展堆：检查是否有足够空间\n    next = find_vma(mm, oldbrk);\n    if (next && newbrk + PAGE_SIZE > vm_start_gap(next))\n        goto out;  // 没有足够空间\n    \n    // 4. 分配新页\n    if (do_brk(oldbrk, newbrk-oldbrk, &uf) < 0)\n        goto out;\n    \nset_brk:\n    mm->brk = brk;\n    return brk;\nout:\n    return mm->brk;\n}\n```\n\n#### 4.8.2 do_brk分配内存\n\n```c\nstatic int do_brk_flags(unsigned long addr, unsigned long request, \n                       unsigned long flags, struct list_head *uf) {\n    struct mm_struct *mm = current->mm;\n    struct vm_area_struct *vma, *prev;\n    unsigned long len = PAGE_ALIGN(request);\n    \n    // 1. 查找插入位置\n    find_vma_links(mm, addr, addr + len, &prev, &rb_link, &rb_parent);\n    \n    // 2. 尝试合并相邻区域\n    vma = vma_merge(mm, prev, addr, addr + len, flags, ...);\n    if (vma)\n        goto out;\n    \n    // 3. 创建新的vm_area_struct\n    vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);\n    INIT_LIST_HEAD(&vma->anon_vma_chain);\n    vma->vm_mm = mm;\n    vma->vm_start = addr;\n    vma->vm_end = addr + len;\n    vma->vm_pgoff = pgoff;\n    vma->vm_flags = flags;\n    vma->vm_page_prot = vm_get_page_prot(flags);\n    \n    // 4. 插入到链表和红黑树\n    vma_link(mm, vma, prev, rb_link, rb_parent);\n    \nout:\n    mm->total_vm += len >> PAGE_SHIFT;\n    mm->data_vm += len >> PAGE_SHIFT;\n    return 0;\n}\n```\n\n---", "subs": ["4.8.1 brk原理", "4.8.2 do_brk分配内存"]}, {"title": "4.9 物理内存组织", "content": "#### 4.9.1 内存模型\n\n**三种模型**：\n\n1. **平坦内存模型（Flat Memory）**\n   - 内存连续，简单的页数组\n   - 适用于小型单CPU系统\n\n2. **NUMA（Non-Uniform Memory Access）**\n   - 每个CPU有本地内存\n   - 访问本地内存快，访问远程内存慢\n   - 当前主流\n\n3. **稀疏内存模型（Sparse Memory）**\n   - 支持内存热插拔\n   - 物理地址可能不连续\n\n#### 4.9.2 NUMA节点\n\n```c\ntypedef struct pglist_data {\n    // 节点ID\n    int node_id;\n    \n    // 节点内的所有页\n    struct page *node_mem_map;\n    \n    // 页号范围\n    unsigned long node_start_pfn;      // 起始页号\n    unsigned long node_present_pages;  // 真实可用页数\n    unsigned long node_spanned_pages;  // 包含空洞的总页数\n    \n    // 区域数组\n    struct zone node_zones[MAX_NR_ZONES];\n    int nr_zones;\n    \n    // 备用节点列表\n    struct zonelist node_zonelists[MAX_ZONELISTS];\n} pg_data_t;\n\n// 全局节点数组\nstruct pglist_data *node_data[MAX_NUMNODES];\n```\n\n**页数统计**：\n\n- `node_spanned_pages`：包含空洞的总页范围\n- `node_present_pages`：实际存在的物理页\n- 例子：64M + 4M空洞 + 64M = spanned: 33K页, present: 32K页\n\n#### 4.9.3 内存区域（Zone）\n\n**区域类型**：\n\n```c\nenum zone_type {\n    ZONE_DMA,       // DMA可用内存（<16MB）\n    ZONE_DMA32,     // 32位DMA可用（<4GB）\n    ZONE_NORMAL,    // 直接映射区\n    ZONE_HIGHMEM,   // 高端内存（32位系统>896MB）\n    ZONE_MOVABLE,   // 可移动区域，避免碎片\n    MAX_NR_ZONES\n};\n```\n\n**zone结构**：\n\n```c\nstruct zone {\n    struct pglist_data *zone_pgdat;    // 所属节点\n    \n    // 页号范围\n    unsigned long zone_start_pfn;\n    unsigned long spanned_pages;       // 包含空洞的总页数\n    unsigned long present_pages;       // 真实存在页数\n    unsigned long managed_pages;       // 伙伴系统管理页数\n    \n    // 冷热页（per-CPU页集合）\n    struct per_cpu_pageset __percpu *pageset;\n    \n    // 伙伴系统空闲区域\n    struct free_area free_area[MAX_ORDER];  // 11个\n    \n    unsigned long flags;\n    spinlock_t lock;\n    \n    const char *name;\n};\n```\n\n**关键概念**：\n\n- **冷热页**：\n  - 热页（Hot Page）：在CPU缓存中，访问快\n  - 冷页（Cold Page）：不在缓存中\n  - 每个CPU维护自己的per_cpu_pageset\n\n#### 4.9.4 页结构（struct page）\n\n**union设计**：同一内存保存不同类型数据\n\n**使用模式1：整页使用**\n\n```c\nstruct page {\n    unsigned long flags;\n    \n    union {\n        struct address_space *mapping;  // 文件映射/匿名页\n        // 匿名页：最低位=1\n        // 文件映射：最低位=0\n    };\n    \n    pgoff_t index;                   // 映射区偏移\n    atomic_t _mapcount;              // 多少页表项指向此页\n    struct list_head lru;            // LRU链表（换出等）\n    \n    // 复合页（大页）\n    unsigned long compound_head;\n    unsigned int compound_dtor;\n    unsigned int compound_order;\n};\n```\n\n**使用模式2：小块分配（slab/slub）**\n\n```c\nstruct page {\n    union {\n        void *s_mem;                 // slab第一个对象\n        void *freelist;              // 空闲对象链表\n    };\n    \n    union {\n        unsigned inuse:16;           // 已使用对象数\n        unsigned objects:15;         // 总对象数\n        unsigned frozen:1;           // 是否冻结\n    };\n    \n    struct kmem_cache *slab_cache;   // slab缓存指针\n    struct rcu_head rcu_head;        // 释放列表\n};\n```\n\n---", "subs": ["4.9.1 内存模型", "4.9.2 NUMA节点", "4.9.3 内存区域（Zone）", "4.9.4 页结构（struct page）"]}, {"title": "4.10 伙伴系统（Buddy System）", "content": "#### 4.10.1 基本原理\n\n**核心思想**：\n\n- 将内存按2的幂次方分组\n- 11个链表：1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024页\n- 最大连续分配：1024页 = 4MB\n\n**数据结构**：\n\n```c\n#define MAX_ORDER 11\n\nstruct free_area {\n    struct list_head free_list[MIGRATE_TYPES];\n    unsigned long nr_free;\n};\n\nstruct zone {\n    struct free_area free_area[MAX_ORDER];\n};\n```\n\n#### 4.10.2 分配算法\n\n**请求(2^(i-1), 2^i]页时**：\n\n1. 查找2^i页的链表\n2. 如果有空闲，直接分配\n3. 如果没有，查找2^(i+1)页链表\n4. 分裂成两半：一半使用，一半插入2^i链表\n5. 递归向上查找直到找到或失败\n\n**示例：请求128页**\n\n```\n1. 检查free_area[7]（128页）→ 空\n2. 检查free_area[8]（256页）→ 有空闲\n3. 分裂256页 → 128页(使用) + 128页(插入free_area[7])\n```\n\n**如果256也没有，查512页**：\n\n```\n1. 检查free_area[9]（512页）→ 有空闲\n2. 分裂512 → 256 + 256\n3. 分裂256 → 128(使用) + 128(插入free_area[7])\n4. 插入256到free_area[8]\n```\n\n#### 4.10.3 alloc_pages流程\n\n```c\nstruct page *alloc_pages(gfp_t gfp_mask, unsigned int order) {\n    return alloc_pages_current(gfp_mask, order);\n}\n\nstruct page *alloc_pages_current(gfp_t gfp, unsigned order) {\n    struct mempolicy *pol = &default_policy;\n    struct page *page;\n    \n    page = __alloc_pages_nodemask(gfp, order,\n                                 policy_node(gfp, pol, numa_node_id()),\n                                 policy_nodemask(gfp, pol));\n    return page;\n}\n```\n\n**gfp标志**：\n\n- `GFP_USER`：用户进程，可被硬件访问\n- `GFP_KERNEL`：内核分配，ZONE_NORMAL区\n- `GFP_HIGHMEM`：高端内存区\n- `GFP_ATOMIC`：不能睡眠，中断上下文\n\n**order参数**：\n\n- 分配2^order个页\n- order=0：1页（4KB）\n- order=10：1024页（4MB）\n\n#### 4.10.4 核心分配函数\n\n```c\nstatic struct page *\nget_page_from_freelist(gfp_t gfp_mask, unsigned int order,\n                      int alloc_flags, const struct alloc_context *ac) {\n    struct zone *zone;\n    \n    // 遍历zonelist\n    for_next_zone_zonelist_nodemask(zone, z, ac->zonelist,\n                                   ac->high_zoneidx, ac->nodemask) {\n        struct page *page;\n        \n        // 从zone的伙伴系统获取页\n        page = rmqueue(ac->preferred_zoneref->zone, zone, order,\n                      gfp_mask, alloc_flags, ac->migratetype);\n        if (page)\n            return page;\n    }\n    return NULL;\n}\n```\n\n**rmqueue → __rmqueue → __rmqueue_smallest**：\n\n```c\nstatic inline struct page *\n__rmqueue_smallest(struct zone *zone, unsigned int order, int migratetype) {\n    unsigned int current_order;\n    struct free_area *area;\n    struct page *page;\n    \n    // 从order开始向上查找\n    for (current_order = order; current_order < MAX_ORDER; ++current_order) {\n        area = &(zone->free_area[current_order]);\n        page = list_first_entry_or_null(&area->free_list[migratetype],\n                                       struct page, lru);\n        if (!page)\n            continue;\n        \n        // 找到了，从链表删除\n        list_del(&page->lru);\n        area->nr_free--;\n        \n        // 分裂大块内存\n        expand(zone, page, order, current_order, area, migratetype);\n        return page;\n    }\n    return NULL;\n}\n```\n\n**expand分裂过程**：\n\n```c\nstatic inline void expand(struct zone *zone, struct page *page,\n                         int low, int high, struct free_area *area,\n                         int migratetype) {\n    unsigned long size = 1 << high;\n    \n    while (high > low) {\n        area--;\n        high--;\n        size >>= 1;\n        \n        // 分裂：一半返回，一半加入下一级链表\n        list_add(&page[size].lru, &area->free_list[migratetype]);\n        area->nr_free++;\n    }\n}\n```\n\n---", "subs": ["4.10.1 基本原理", "4.10.2 分配算法", "4.10.3 alloc_pages流程", "4.10.4 核心分配函数"]}, {"title": "4.11 总结", "content": "#### 4.11.1 核心数据结构关系\n\n```mermaid\ngraph TD\n    A[task_struct] --> B[mm_struct]\n    B --> C[vm_area_struct链表/红黑树]\n    C --> D[Text/Data/BSS/Heap/Mmap/Stack]\n    \n    E[物理内存] --> F[NUMA节点pglist_data]\n    F --> G[Zone区域]\n    G --> H[struct page数组]\n    G --> I[伙伴系统free_area]\n    \n    style B fill:#e1f5ff\n    style F fill:#fff9c4\n    style I fill:#c8e6c9\n```\n\n#### 4.11.2 虚拟空间vs物理内存\n\n| 层级 | 虚拟空间 | 物理内存 |\n|------|----------|----------|\n| 进程级 | mm_struct | - |\n| 区域级 | vm_area_struct | zone（NUMA节点） |\n| 页级 | 虚拟页号 | struct page |\n| 分配机制 | brk/mmap系统调用 | 伙伴系统 |\n| 数据结构 | 链表+红黑树 | 2^n链表数组 |\n\n#### 4.11.3 关键函数速查\n\n| 函数 | 作用 | 使用场景 |\n|------|------|----------|\n| `load_elf_binary` | 建立进程内存映射 | exec加载程序 |\n| `sys_brk` | 调整堆大小 | malloc小内存 |  \n| `do_brk` | 分配堆内存 | brk扩展堆 |\n| `alloc_pages` | 分配页 | 内核分配内存 |\n| `__rmqueue_smallest` | 伙伴系统核心 | 查找空闲页块 |\n| `expand` | 分裂页块 | 大页块分成小页块 |\n\n#### 4.11.4 实用命令\n\n```bash\n# 查看进程内存映射\ncat /proc/PID/maps\npmap PID\n\n# 查看系统内存信息\ncat /proc/meminfo\nfree -h\n\n# 查看NUMA信息\nnumactl --hardware\nlscpu | grep NUMA\n\n# 查看伙伴系统信息\ncat /proc/buddyinfo\n\n# 查看zone信息\ncat /proc/zoneinfo\n```\n\n---", "subs": ["4.11.1 核心数据结构关系", "4.11.2 虚拟空间vs物理内存", "4.11.3 关键函数速查", "4.11.4 实用命令"]}]}, {"title": "第4章 内存管理（三）：小内存分配与映射机制", "sections": [{"title": "4.12 Slub分配器", "content": "> **核心思想**：slub分配器管理小对象，mmap系统调用建立虚实映射，缺页异常按需分配物理内存。\n\n\n#### 4.12.1 为什么需要Slub\n\n**问题**：\n\n- 伙伴系统最小分配单位：1页（4KB）\n- 小对象（如task_struct）：只需几百字节\n- 浪费严重！\n\n**解决方案**：Slub Allocator\n\n- 从伙伴系统申请整页\n- 切分成小块对象\n- 缓存常用对象\n\n#### 4.12.2 kmem_cache结构\n\n```c\nstruct kmem_cache {\n    // per-CPU快速通道\n    struct kmem_cache_cpu __percpu *cpu_slab;\n    \n    // 对象大小\n    int size;                    // 包含元数据的大小\n    int object_size;             // 纯对象大小\n    int offset;                  // 空闲指针偏移\n    \n    // 内存块配置\n    struct kmem_cache_order_objects oo;   // 默认配置\n    struct kmem_cache_order_objects max;  // 最大配置\n    struct kmem_cache_order_objects min;  // 最小配置\n    \n    gfp_t allocflags;           // 分配标志\n    const char *name;           // 缓存名称\n    struct list_head list;      // 全局缓存链表\n    \n    // per-NUMA node普通通道\n    struct kmem_cache_node *node[MAX_NUMNODES];\n};\n\n// 全局缓存链表\nLIST_HEAD(slab_caches);\n```\n\n**示例**：task_struct缓存\n\n```c\nstatic struct kmem_cache *task_struct_cachep;\n\ntask_struct_cachep = kmem_cache_create(\"task_struct\",\n                                      arch_task_struct_size,\n                                      align,\n                                      SLAB_PANIC|SLAB_NOTRACK|SLAB_ACCOUNT,\n                                      NULL);\n```\n\n#### 4.12.3 快速通道vs普通通道\n\n**两级缓存机制**：\n\n```mermaid\ngraph TD\n    A[分配请求] --> B{kmem_cache_cpu<br/>快速通道}\n    B -->|有空闲| C[直接返回]\n    B -->|无空闲| D{kmem_cache_cpu<br/>partial备用}\n    D -->|有空闲| E[替换page]\n    D -->|无空闲| F{kmem_cache_node<br/>普通通道}\n    F -->|有空闲| G[从partial获取]\n    F -->|无空闲| H[伙伴系统<br/>分配新页]\n    \n    style B fill:#c8e6c9\n    style F fill:#fff9c4\n    style H fill:#ffcdd2\n```\n\n**kmem_cache_cpu（快速通道）**：\n\n```c\nstruct kmem_cache_cpu {\n    void **freelist;          // 第一个空闲对象指针\n    unsigned long tid;        // 事务ID\n    struct page *page;        // 当前使用的大块内存\n    struct page *partial;     // 部分空闲的备用块\n};\n```\n\n**kmem_cache_node（普通通道）**：\n\n```c\nstruct kmem_cache_node {\n    spinlock_t list_lock;\n    unsigned long nr_partial;\n    struct list_head partial;  // 部分空闲块链表\n};\n```\n\n#### 4.12.4 分配流程\n\n**slab_alloc_node核心流程**：\n\n```c\nstatic __always_inline void *slab_alloc_node(struct kmem_cache *s,\n                                             gfp_t gfpflags, int node) {\n    void *object;\n    struct kmem_cache_cpu *c;\n    struct page *page;\n    \n    // 1. 快速通道：直接从cpu_slab获取\n    c = raw_cpu_ptr(s->cpu_slab);\n    object = c->freelist;\n    page = c->page;\n    \n    if (unlikely(!object || !node_match(page, node))) {\n        // 2. 慢速通道\n        object = __slab_alloc(s, gfpflags, node, addr, c);\n    }\n    \n    return object;\n}\n```\n\n**__slab_alloc慢速流程**：\n\n```c\nstatic void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,\n                          unsigned long addr, struct kmem_cache_cpu *c) {\n    void *freelist;\n    struct page *page;\n    \nredo:\n    // 1. 再次检查freelist（可能被中断释放了）\n    freelist = c->freelist;\n    if (freelist)\n        goto load_freelist;\n    \n    // 2. 尝试从cpu的partial获取\n    if (slub_percpu_partial(c)) {\n        page = c->page = slub_percpu_partial(c);\n        goto redo;\n    }\n    \nnew_slab:\n    // 3. 从node的partial获取\n    freelist = get_partial(s, flags, node, c);\n    if (freelist)\n        return freelist;\n    \n    // 4. 从伙伴系统分配新页\n    page = new_slab(s, flags, node);\n    if (page) {\n        c = raw_cpu_ptr(s->cpu_slab);\n        freelist = page->freelist;\n        page->freelist = NULL;\n        c->page = page;\n    }\n    \n    return freelist;\n}\n```\n\n**内存块组织**：\n\n```\n┌──────────────────────────────────┐\n│   Object 1   │  next ptr → Obj2 │\n├──────────────────────────────────┤\n│   Object 2   │  next ptr → Obj3 │\n├──────────────────────────────────┤\n│   Object 3   │  next ptr → Obj4 │\n├──────────────────────────────────┤\n│      ...           ...           │\n└──────────────────────────────────┘\n\n- size: 包含指针的总大小\n- object_size: 纯对象大小\n- offset: 指针存放偏移量\n```\n\n---", "subs": ["4.12.1 为什么需要Slub", "4.12.2 kmem_cache结构", "4.12.3 快速通道vs普通通道", "4.12.4 分配流程"]}, {"title": "4.13 用户态内存映射", "content": "#### 4.13.1 mmap系统调用\n\n**作用**：\n\n1. **匿名映射**：虚拟内存→物理内存（大块堆内存）\n2. **文件映射**：虚拟内存→物理内存→文件\n\n**系统调用入口**：\n\n```c\nSYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,\n               unsigned long, prot, unsigned long, flags,\n               unsigned long, fd, unsigned long, off) {\n    error = sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);\n    return error;\n}\n\nSYSCALL_DEFINE6(mmap_pgoff, ...) {\n    struct file *file = NULL;\n    \n    // 文件映射：获取文件对象\n    if (fd)\n        file = fget(fd);\n    \n    retval = vm_mmap_pgoff(file, addr, len, prot, flags, pgoff);\n    return retval;\n}\n```\n\n#### 4.13.2 mmap核心流程\n\n**do_mmap主要步骤**：\n\n1. `get_unmapped_area`：找空闲区域\n2. `mmap_region`：建立映射\n\n**get_unmapped_area**：\n\n```c\nunsigned long get_unmapped_area(struct file *file, unsigned long addr,\n                                unsigned long len, unsigned long pgoff,\n                                unsigned long flags) {\n    unsigned long (*get_area)(...);\n    \n    // 默认使用mm的函数\n    get_area = current->mm->get_unmapped_area;\n    \n    // 文件映射：使用文件系统的函数\n    if (file) {\n        if (file->f_op->get_unmapped_area)\n            get_area = file->f_op->get_unmapped_area;\n    }\n    \n    // 最终都调用arch_get_unmapped_area\n    // 在红黑树上找到合适位置\n    return get_area(file, addr, len, pgoff, flags);\n}\n```\n\n**mmap_region建立映射**：\n\n```c\nunsigned long mmap_region(struct file *file, unsigned long addr,\n                         unsigned long len, vm_flags_t vm_flags,\n                         unsigned long pgoff, struct list_head *uf) {\n    struct mm_struct *mm = current->mm;\n    struct vm_area_struct *vma, *prev;\n    \n    // 1. 尝试合并相邻区域\n    vma = vma_merge(mm, prev, addr, addr + len, vm_flags,\n                    NULL, file, pgoff, NULL, NULL_VM_UFFD_CTX);\n    if (vma)\n        goto out;\n    \n    // 2. 创建新的vm_area_struct\n    vma = kmem_cache_zalloc(vm_area_cachep, GFP_KERNEL);\n    INIT_LIST_HEAD(&vma->anon_vma_chain);\n    vma->vm_mm = mm;\n    vma->vm_start = addr;\n    vma->vm_end = addr + len;\n    vma->vm_flags = vm_flags;\n    vma->vm_pgoff = pgoff;\n    \n    // 3. 文件映射：设置操作函数\n    if (file) {\n        vma->vm_file = get_file(file);\n        error = call_mmap(file, vma);  // file->f_op->mmap(file, vma)\n        \n        // 对于ext4：vma->vm_ops = &ext4_file_vm_ops\n    }\n    \n    // 4. 插入红黑树\n    vma_link(mm, vma, prev, rb_link, rb_parent);\n    \n    return addr;\n}\n```\n\n**文件映射的双向关联**：\n\n```c\n// vm_area_struct → file\nvma->vm_file = file;\nvma->vm_ops = &ext4_file_vm_ops;\n\n// file → vm_area_struct（通过address_space）\nstruct address_space {\n    struct inode *host;\n    struct rb_root i_mmap;  // 红黑树，挂载所有vma\n    const struct address_space_operations *a_ops;\n};\n\nstatic void __vma_link_file(struct vm_area_struct *vma) {\n    struct file *file = vma->vm_file;\n    if (file) {\n        struct address_space *mapping = file->f_mapping;\n        vma_interval_tree_insert(vma, &mapping->i_mmap);\n    }\n}\n```\n\n**重要**：\n> 到此为止，只建立了逻辑映射关系，**没有分配物理内存**！\n> 物理内存在**首次访问触发缺页异常时**才按需分配。\n\n---", "subs": ["4.13.1 mmap系统调用", "4.13.2 mmap核心流程"]}, {"title": "4.14 缺页异常", "content": "#### 缺页异常处理流程决策树\n\n```mermaid\ngraph TD\n    START[\"⚡ 缺页异常触发<br/>访问未映射的虚拟地址\"] --> PAGE_FAULT[\"🚨 CPU产生Page Fault<br/>CR2寄存器=故障地址\"]\n    \n    PAGE_FAULT --> HANDLER[\"📞 do_page_fault()<br/>异常处理入口\"]\n    \n    HANDLER --> CHECK_ADDR[\"🔍 检查地址合法性<br/>在用户空间还是内核空间?\"]\n    \n    CHECK_ADDR -->|\"内核地址<br/>≥ TASK_SIZE\"| KERNEL_FAULT[\"处理内核缺页<br/>vmalloc区域等\"]\n    CHECK_ADDR -->|\"用户地址<br/>< TASK_SIZE\"| USER_FAULT[\"🔎 find_vma()<br/>查找VMA\"]\n    \n    USER_FAULT --> VMA_CHECK{\"❓ VMA存在?<br/>地址在某个VMA范围内?\"}\n    \n    VMA_CHECK -->|\"❌ 否\"| NO_VMA{\"地址类型?\"}\n    VMA_CHECK -->|\"✅ 是\"| PERM_CHECK{\"🔐 权限检查<br/>访问权限正确?\"}\n    \n    NO_VMA -->|\"栈附近\"| EXPAND_STACK[\"📏 尝试扩展栈<br/>expand_stack()\"]\n    NO_VMA -->|\"其他地址\"| SEGFAULT[\"💥 Segmentation Fault<br/>发送SIGSEGV信号\"]\n    \n    EXPAND_STACK --> EXPAND_OK{\"扩展成功?\"}\n    EXPAND_OK -->|\"✅ 是\"| PERM_CHECK\n    EXPAND_OK -->|\"❌ 否\"| SEGFAULT\n    \n    PERM_CHECK -->|\"✅ 权限正确\"| PAGE_TYPE{\"📄 页面类型?<br/>匿名页 or 文件页?\"}\n    PERM_CHECK -->|\"❌ 权限错误<br/>如写只读页\"| SEGFAULT\n    \n    subgraph 匿名页处理[\"🆕 匿名页处理（堆/栈）\"]\n        direction TB\n        ANON_START[\"匿名页缺页\"]\n        ZERO_CHECK{\"是否需要<br/>零页?\"}\n        ZERO_PAGE[\"🔵 映射零页<br/>共享只读零页\"]\n        ALLOC_PAGE[\"📦 alloc_pages()<br/>分配物理页\"]\n        ZERO_FILL[\"🧹 清零页面<br/>memset()\"]\n        MAP_ANON[\"🔗 建立映射<br/>设置PTE\"]\n    end\n    \n    subgraph 文件页处理[\"📂 文件映射页处理\"]\n        direction TB\n        FILE_START[\"文件页缺页\"]\n        PAGE_CACHE{\"📚 Page Cache?<br/>页缓存中有吗?\"}\n        CACHE_HIT[\"✅ 缓存命中<br/>直接使用\"]\n        CACHE_MISS[\"❌ 缓存未命中<br/>需从磁盘读取\"]\n        READ_DISK[\"💿 读取磁盘<br/>调用readpage()\"]\n        ADD_CACHE[\"➕ 加入Page Cache<br/>address_space\"]\n        MAP_FILE[\"🔗 建立映射<br/>设置PTE\"]\n    end\n    \n    subgraph COW处理[\"🐄 写时复制（Copy-On-Write）\"]\n        direction TB\n        COW_START[\"写只读共享页\"]\n        COW_CHECK{\"是否共享页?<br/>引用计数>1?\"}\n        COW_COPY[\"📋 复制页面<br/>分配新物理页\"]\n        COW_UPDATE[\"🔄 更新页表<br/>指向新页面\"]\n        COW_PERM[\"🔓 修改权限<br/>设为可写\"]\n    end\n    \n    PAGE_TYPE -->|\"🆕 匿名页<br/>堆/栈/匿名mmap\"| ANON_START\n    PAGE_TYPE -->|\"📂 文件页<br/>文件mmap\"| FILE_START\n    PAGE_TYPE -->|\"🐄 写共享页<br/>fork后COW\"| COW_START\n    \n    ANON_START --> ZERO_CHECK\n    ZERO_CHECK -->|\"读访问\"| ZERO_PAGE\n    ZERO_CHECK -->|\"写访问\"| ALLOC_PAGE\n    \n    ZERO_PAGE -.后续写入触发COW.-> ALLOC_PAGE\n    ALLOC_PAGE --> ZERO_FILL\n    ZERO_FILL --> MAP_ANON\n    \n    FILE_START --> PAGE_CACHE\n    PAGE_CACHE -->|\"命中\"| CACHE_HIT\n    PAGE_CACHE -->|\"未命中\"| CACHE_MISS\n    CACHE_MISS --> READ_DISK\n    READ_DISK --> ADD_CACHE\n    ADD_CACHE --> MAP_FILE\n    CACHE_HIT --> MAP_FILE\n    \n    COW_START --> COW_CHECK\n    COW_CHECK -->|\"是共享\"| COW_COPY\n    COW_CHECK -->|\"非共享\"| COW_PERM\n    COW_COPY --> COW_UPDATE\n    COW_UPDATE --> COW_PERM\n    \n    MAP_ANON --> DONE[\"✅ 缺页处理完成<br/>返回用户态继续执行\"]\n    MAP_FILE --> DONE\n    COW_PERM --> DONE\n    KERNEL_FAULT --> DONE\n    \n    SEGFAULT --> KILL[\"💀 进程终止<br/>或进入调试器\"]\n    \n    style START fill:#fff3e0,stroke:#f57c00,stroke-width:3px\n    style SEGFAULT fill:#ffcdd2,stroke:#c62828,stroke-width:3px\n    style DONE fill:#c8e6c9,stroke:#388e3c,stroke-width:3px\n    style ALLOC_PAGE fill:#e1f5fe,stroke:#0277bd,stroke-width:2px\n    style READ_DISK fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px\n    style COW_COPY fill:#ffe0b2,stroke:#e65100,stroke-width:2px\n```\n\n**缺页异常处理关键点**：\n\n#### 1️⃣ 异常触发条件\n\n| 触发情况 | 原因 | 处理方式 |\n|---------|------|----------|\n| **首次访问** | 虚拟地址未映射物理页 | 分配物理页并建立映射 |\n| **权限错误** | 写只读页 | COW或SIGSEGV |\n| **页面换出** | 物理页被swap到磁盘 | 从swap读回 |\n| **文件映射** | 文件页未加载 | 从磁盘读取文件数据 |\n| **栈增长** | 访问栈下方地址 | 扩展栈VMA |\n| **非法地址** | 访问不在任何VMA中的地址 | SIGSEGV |\n\n#### 2️⃣ 三种缺页类型\n\n##### A. 匿名页缺页（堆/栈）\n\n```c\n// malloc分配但未访问\nchar *buf = malloc(4096);  // 仅分配VMA，未分配物理页\nbuf[0] = 'A';              // ⚡ 触发缺页异常\n                           // → 分配物理页\n                           // → 清零\n                           // → 建立PTE映射\n```\n\n**流程**：\n\n1. 查找VMA：找到对应的vm_area_struct\n2. 分配物理页：通过伙伴系统`alloc_pages()`\n3. 清零页面：`clear_page()`确保安全\n4. 建立映射：设置PTE（页表项）\n\n##### B. 文件页缺页（mmap文件）\n\n```c\n// mmap映射文件\nchar *addr = mmap(NULL, 4096, PROT_READ, MAP_SHARED, fd, 0);\nchar c = addr[0];          // ⚡ 触发缺页异常\n                           // → 检查Page Cache\n                           // → 未命中则从磁盘读取\n                           // → 加入Page Cache\n                           // → 建立PTE映射\n```\n\n**流程**：\n\n1. 查找Page Cache：`find_get_page()`\n2. 如果命中：直接建立映射\n3. 如果未命中：\n   - 调用`readpage()`从磁盘读取\n   - 加入Page Cache（address_space基数树）\n   - 建立PTE映射\n\n##### C. 写时复制（COW）\n\n```c\n// fork后父子进程共享页面\npid_t pid = fork();\nif (pid == 0) {\n    data[0] = 'B';         // ⚡ 触发COW缺页异常\n                           // → 复制物理页\n                           // → 更新子进程PTE\n                           // → 修改权限为可写\n}\n```\n\n**流程**：\n\n1. 检测到写只读共享页\n2. 复制物理页：`copy_page()`\n3. 更新PTE：指向新页面\n4. 修改权限：设置PTE的Write位\n\n#### 3️⃣ 关键数据结构\n\n```c\n// 缺页异常信息\nstruct vm_fault {\n    unsigned long address;      // 故障地址\n    unsigned int flags;         // 访问标志（读/写）\n    pte_t *pte;                // 页表项指针\n    struct vm_area_struct *vma; // 对应的VMA\n    struct page *page;          // 分配的物理页\n};\n\n// VMA操作\nstruct vm_operations_struct {\n    void (*fault)(struct vm_fault *);  // 缺页处理\n    void (*page_mkwrite)(struct vm_fault *); // 页面写保护\n};\n```\n\n#### 4️⃣ 性能优化\n\n| 优化技术 | 作用 | 效果 |\n|---------|------|------|\n| **零页映射** | 首次读取映射只读零页 | 延迟分配 |\n| **COW** | fork不立即复制，写时才复制 | 节省内存 |\n| **Page Cache** | 文件页缓存在内存 | 减少磁盘I/O |\n| **预读** | 一次读取多个页面 | 减少缺页次数 |\n| **延迟分配** | malloc不立即分配物理页 | 按需分配 |\n\n#### 核心理解\n\n1. **延迟分配**：虚拟内存分配（VMA）和物理内存分配（page）分离\n2. **按需分配**：只在真正访问时才分配物理页（缺页异常）\n3. **VMA查找是第一步**：不在VMA范围内直接SIGSEGV\n4. **Page Cache是关键**：文件页优先查缓存\n5. **COW优化**：fork+exec模式下不浪费内存\n6. **零页优化**：读取未初始化内存映射共享零页\n\n#### 4.14.1 缺页异常触发\n\n**访问未映射的虚拟地址→ CPU触发Page Fault**\n\n```c\ndotraplinkage void notrace\ndo_page_fault(struct pt_regs *regs, unsigned long error_code) {\n    unsigned long address = read_cr2();  // 获取出错地址\n    __do_page_fault(regs, error_code, address);\n}\n\nstatic noinline void\n__do_page_fault(struct pt_regs *regs, unsigned long error_code,\n               unsigned long address) {\n    struct vm_area_struct *vma;\n    struct task_struct *tsk = current;\n    struct mm_struct *mm = tsk->mm;\n    \n    // 1. 查找vma\n    vma = find_vma(mm, address);\n    if (unlikely(!vma)) {\n        bad_area(regs, error_code, address);\n        return;\n    }\n    \n    // 2. 检查权限\n    if (unlikely(access_error(error_code, vma))) {\n        bad_area_access_error(regs, error_code, address, vma);\n        return;\n    }\n    \n    // 3. 处理缺页\n    fault = handle_mm_fault(vma, address, flags);\n}\n```\n\n#### 4.14.2 handle_mm_fault处理\n\n```c\nstatic vm_fault_t handle_mm_fault(struct vm_area_struct *vma,\n                                  unsigned long address,\n                                  unsigned int flags) {\n    vm_fault_t ret;\n    \n    // 1. 创建页表项（如不存在）\n    ret = __handle_mm_fault(vma, address, flags);\n    \n    return ret;\n}\n\nstatic vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,\n                                    unsigned long address,\n                                    unsigned int flags) {\n    struct mm_struct *mm = vma->vm_mm;\n    pgd_t *pgd;\n    p4d_t *p4d;\n    pud_t *pud;\n    pmd_t *pmd;\n    pte_t *pte;\n    \n    // 2. 四级页表查找/创建\n    pgd = pgd_offset(mm, address);\n    p4d = p4d_alloc(mm, pgd, address);\n    pud = pud_alloc(mm, p4d, address);\n    pmd = pmd_alloc(mm, pud, address);\n    \n    // 3. 处理pte级别的缺页\n    return handle_pte_fault(&vmf);\n}\n```\n\n**handle_pte_fault According分类处理**：\n\n```c\nstatic vm_fault_t handle_pte_fault(struct vm_fault *vmf) {\n    pte_t entry;\n    \n    if (!vmf->pte) {\n        // 情况1：匿名页（堆、栈）\n        if (vma_is_anonymous(vmf->vma))\n            return do_anonymous_page(vmf);\n        // 情况2：文件映射\n        else\n            return do_fault(vmf);\n    }\n    \n    // 情况3：页被换出（swap）\n    if (!pte_present(entry))\n        return do_swap_page(vmf);\n    \n    // 情况4：写时复制COW\n    if (vmf->flags & FAULT_FLAG_WRITE) {\n        if (!pte_write(entry))\n            return do_wp_page(vmf);\n    }\n    \n    return 0;\n}\n```\n\n**do_anonymous_page（匿名页）**：\n\n```c\nstatic vm_fault_t do_anonymous_page(struct vm_fault *vmf) {\n    struct page *page;\n    pte_t entry;\n    \n    // 1. 分配物理页\n    page = alloc_zeroed_user_highpage_movable(vma, address);\n    \n    // 2. 创建页表项\n    entry = mk_pte(page, vma->vm_page_prot);\n    entry = pte_mkwrite(pte_mkdirty(entry));\n    \n    // 3. 设置页表\n    set_pte_at(vma->vm_mm, address, vmf->pte, entry);\n    \n    // 4. 更新反向映射\n    page_add_new_anon_rmap(page, vma, address, false);\n    \n    return 0;\n}\n```\n\n---", "subs": ["缺页异常处理流程决策树", "1️⃣ 异常触发条件", "2️⃣ 三种缺页类型", "3️⃣ 关键数据结构", "4️⃣ 性能优化", "核心理解", "4.14.1 缺页异常触发", "4.14.2 handle_mm_fault处理"]}, {"title": "4.15 内核态内存映射", "content": "#### 4.15.1 内核页表\n\n**swapper_pg_dir**：内核顶级页目录\n\n```c\n// 定义\nextern pgd_t init_top_pgt[];\n#define swapper_pg_dir init_top_pgt\n\n// 包含三个区域的页表\nextern pud_t level3_ident_pgt[512];    // 直接映射区\nextern pud_t level3_kernel_pgt[512];   // 内核代码区\nextern pmd_t level2_fixmap_pgt[512];   // 固定映射区\n```\n\n**init_mm**：内核mm_struct\n\n```c\nstruct mm_struct init_mm = {\n    .mm_rb = RB_ROOT,\n    .pgd = swapper_pg_dir,\n    .mm_users = ATOMIC_INIT(2),\n    .mm_count = ATOMIC_INIT(1),\n    .mmap_sem = __RWSEM_INITIALIZER(init_mm.mmap_sem),\n    .page_table_lock = __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),\n    .mmlist = LIST_HEAD_INIT(init_mm.mmlist),\n};\n```\n\n**初始化**：\n\n```c\nvoid __init setup_arch(char **cmdline_p) {\n    // 1. 克隆初始页表\n    clone_pgd_range(swapper_pg_dir + KERNEL_PGD_BOUNDARY,\n                   initial_page_table + KERNEL_PGD_BOUNDARY,\n                   KERNEL_PGD_PTRS);\n    \n    // 2. 加载CR3\n    load_cr3(swapper_pg_dir);\n    __flush_tlb_all();\n    \n    // 3. 初始化代码数据段范围\n    init_mm.start_code = (unsigned long) _text;\n    init_mm.end_code = (unsigned long) _etext;\n    init_mm.end_data = (unsigned long) _edata;\n    init_mm.brk = _brk_end;\n    \n    // 4. 映射所有物理内存\n    init_mem_mapping();\n}\n```\n\n#### 4.15.2 vmalloc\n\n**直接映射区vs vmalloc区**：\n\n- **直接映射**：虚拟地址 = 物理地址 + 固定偏移（__PAGE_OFFSET）\n- **vmalloc**：虚拟地址和物理地址不连续\n\n**vmalloc实现**：\n\n```c\nvoid *vmalloc(unsigned long size) {\n    return __vmalloc_node_flags(size, NUMA_NO_NODE,\n                                GFP_KERNEL | __GFP_HIGHMEM);\n}\n\nstatic void *__vmalloc_node(unsigned long size, unsigned long align,\n                            gfp_t gfp_mask, pgprot_t prot,\n                            int node, const void *caller) {\n    // 1. 从vmalloc区域分配虚拟地址空间\n    area = __get_vm_area_node(size, align, VM_ALLOC | VM_UNINITIALIZED,\n                             VMALLOC_START, VMALLOC_END, node, gfp_mask, caller);\n    \n    // 2. 分配物理页面\n    ret = __vmalloc_area_node(area, gfp_mask, prot, node);\n    \n    return area->addr;\n}\n```\n\n**页表更新**：\n\n```c\nstatic int vmap_pte_range(pmd_t *pmd, unsigned long addr,\n                         unsigned long end, pgprot_t prot, struct page **pages) {\n    pte_t *pte;\n    \n    pte = pte_alloc_kernel(pmd, addr);\n    do {\n        struct page *page = *pages++;\n        set_pte_at(&init_mm, addr, pte, mk_pte(page, prot));\n    } while (pte++, addr += PAGE_SIZE, addr != end);\n    \n    return 0;\n}\n```\n\n#### 4.15.3 kmap_atomic\n\n**用途**：临时映射高端内存（32位系统）\n\n```c\nvoid *kmap_atomic(struct page *page) {\n    unsigned long vaddr;\n    int idx, type;\n    \n    // 1. 如果不是高端内存，直接返回\n    if (!PageHighMem(page))\n        return page_address(page);\n    \n    // 2. 获取固定映射区的slot\n    type = kmap_atomic_idx_push();\n    idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();\n    vaddr = __fix_to_virt(idx);\n    \n    // 3. 设置页表\n    set_pte(kmap_pte - idx, mk_pte(page, kmap_prot));\n    arch_flush_lazy_mmu_mode();\n    \n    return (void *)vaddr;\n}\n```\n\n---", "subs": ["4.15.1 内核页表", "4.15.2 vmalloc", "4.15.3 kmap_atomic"]}, {"title": "4.16 总结", "content": "#### 4.16.1 内存分配层次\n\n```mermaid\ngraph TD\n    A[内存分配需求] --> B{大小}\n    B -->|小对象<br/>几百字节| C[Slub分配器]\n    B -->|整页<br/>4KB倍数| D[伙伴系统]\n    \n    C --> E{快速通道}\n    E -->|cpu_slab| F[立即返回]\n    E -->|无空闲| G[普通通道]\n    G --> H[kmem_cache_node]\n    H --> D\n    \n    D --> I[zone的free_area]\n    \n    style C fill:#c8e6c9\n    style D fill:#fff9c4\n    style I fill:#ffcdd2\n```\n\n#### 4.16.2 映射机制对比\n\n| 维度 | 用户态 | 内核态 |\n|------|--------|--------|\n| **映射函数** | mmap系统调用 | vmalloc、kmap_atomic |\n| **页表** | 每进程独立pgd | 共享swapper_pg_dir |\n| **延迟分配** | 是（缺页时分配） | vmalloc是，直接映射否 |\n| **虚实关系** | 不固定 | 直接映射固定偏移 |\n| **典型用途** | 堆、文件映射 | 内核模块、驱动 |\n\n#### 4.16.3 关键流程\n\n**用户态内存分配完整流程**：\n\n```\nmalloc\n  ├→ 小内存(< 128KB): brk → do_brk → vm_area_struct\n  └→ 大内存(≥ 128KB): mmap → mmap_region → vm_area_struct\n      ↓\n   首次访问\n      ↓\n   缺页异常 → do_page_fault\n      ├→ 查找vma\n      ├→ 检查权限\n      └→ handle_mm_fault\n           ├→ 创建页表（四级）\n           ├→ handle_pte_fault\n           │    ├→ 匿名页: alloc_page → 分配物理内存\n           │    └→ 文件映射: 从page cache获取\n           └→ 设置页表项\n```\n\n#### 4.16.4 实用命令\n\n```bash\n# 查看slab信息\ncat /proc/slabinfo\nslabtop\n\n# 查看vmalloc使用\ncat /proc/vmallocinfo\n\n# 查看页表\ncat /proc/PID/pagemap\n\n# 查看缺页统计\ncat /proc/vmstat | grep fault\n\n# 查看TLB统计\nperf stat -e dTLB-loads,dTLB-load-misses <command>\n```\n\n---\n\n**本节完成**：第4章第三部分小内存分配与映射机制已讲解完毕。\n\n**章节回顾**：\n\n- ✅ 第一部分：虚拟地址空间与分页机制\n- ✅ 第二部分：进程空间管理与物理内存\n- ✅ 第三部分：小内存分配与映射机制\n\n**下一章预告**：第5章将讲解文件系统。\n\n---", "subs": ["4.16.1 内存分配层次", "4.16.2 映射机制对比", "4.16.3 关键流程", "4.16.4 实用命令"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>RabbitMQ 学习笔记 · 第二册：管理、监控与参考 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>RabbitMQ 学习笔记 · 第二册：管理、监控与参考</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "RabbitMQ 学习笔记 · 第二册：管理、监控与参考", "intro": "", "parts": [{"title": "第三章: 管理 RabbitMQ", "sections": [{"title": "3.1 命令行工具概览", "content": "> 本章介绍 RabbitMQ 的日常管理操作，包括配置、权限、集群、资源管理等。\n\n\n```mermaid\ngraph TD\n    CLI[RabbitMQ CLI 工具] --> A[rabbitmqctl]\n    CLI --> B[rabbitmq-diagnostics]\n    CLI --> C[rabbitmq-plugins]\n    CLI --> D[rabbitmq-queues]\n    CLI --> E[rabbitmq-streams]\n    CLI --> F[rabbitmq-upgrade]\n    CLI --> G[rabbitmqadmin]\n    \n    A --> A1[节点管理]\n    A --> A2[用户管理]\n    A --> A3[权限管理]\n    A --> A4[虚拟主机管理]\n    \n    B --> B1[健康检查]\n    B --> B2[状态诊断]\n    \n    C --> C1[插件启用/禁用]\n    \n    D --> D1[队列管理]\n    \n    G --> G1[HTTP API 客户端]\n```\n\n#### CLI 工具说明\n\n| 工具 | 用途 |\n|------|------|\n| `rabbitmqctl` | 服务管理、用户权限、集群管理 |\n| `rabbitmq-diagnostics` | 健康检查、状态诊断 |\n| `rabbitmq-plugins` | 插件管理 |\n| `rabbitmq-queues` | 仲裁队列副本管理 |\n| `rabbitmq-streams` | Stream 副本管理 |\n| `rabbitmq-upgrade` | 升级相关操作 |\n| `rabbitmqadmin` | HTTP API 命令行客户端 |\n\n#### Erlang Cookie 认证\n\nCLI 工具使用共享密钥（Erlang Cookie）与节点通信。\n\n| 平台 | Cookie 位置 |\n|------|-------------|\n| Linux | `/var/lib/rabbitmq/.erlang.cookie` |\n| macOS | `$HOME/.erlang.cookie` |\n| Windows | `%USERPROFILE%\\.erlang.cookie` |\n\n```bash\n# 查看 Cookie 信息\nrabbitmq-diagnostics erlang_cookie_sources\n```\n\n#### 常用命令\n\n```bash\n# 节点状态\nrabbitmq-diagnostics status\n\n# 集群状态\nrabbitmqctl cluster_status\n\n# 停止节点\nrabbitmqctl shutdown\n\n# 连接远程节点\nrabbitmqctl -n rabbit@remote-host status\n```\n\n---", "subs": ["CLI 工具说明", "Erlang Cookie 认证", "常用命令"]}, {"title": "3.2 配置详解", "content": "#### 配置文件类型\n\n| 文件 | 格式 | 用途 |\n|------|------|------|\n| `rabbitmq.conf` | ini (sysctl) | 主配置文件 |\n| `advanced.config` | Erlang | 高级配置 |\n| `rabbitmq-env.conf` | shell | 环境变量 |\n\n#### 配置文件位置\n\n| 平台 | 路径 |\n|------|------|\n| Linux (deb/rpm) | `/etc/rabbitmq/` |\n| Generic Unix | `$RABBITMQ_HOME/etc/rabbitmq/` |\n| Windows | `%APPDATA%\\RabbitMQ\\` |\n| macOS (Homebrew) | `/opt/homebrew/etc/rabbitmq/` |\n\n#### 查找配置文件\n\n```bash\n# 通过 CLI 查看配置路径\nrabbitmq-diagnostics status\n\n# 查看有效配置\nrabbitmq-diagnostics environment\n```\n\n#### rabbitmq.conf 示例\n\n```ini\n# 监听端口\nlisteners.tcp.default = 5672\n\n# TLS 配置\nlisteners.ssl.default = 5671\nssl_options.cacertfile = /path/to/ca.pem\nssl_options.certfile = /path/to/cert.pem\nssl_options.keyfile = /path/to/key.pem\n\n# 内存阈值\nvm_memory_high_watermark.relative = 0.6\n\n# 磁盘阈值\ndisk_free_limit.absolute = 2GB\n\n# 默认用户（仅首次启动有效）\ndefault_user = admin\ndefault_pass = secret\n\n# 日志\nlog.console = true\nlog.console.level = info\nlog.file.level = debug\n```\n\n#### 环境变量插值\n\n```ini\n# 使用环境变量\ndefault_user = ${RABBITMQ_DEFAULT_USER}\ndefault_pass = ${RABBITMQ_DEFAULT_PASS}\n\n# 部分值插值\ncluster_name = ${REGION}-cluster\n```\n\n---", "subs": ["配置文件类型", "配置文件位置", "查找配置文件", "rabbitmq", "环境变量插值"]}, {"title": "3.3 文件与目录位置", "content": "#### 关键目录\n\n| 环境变量 | Linux 默认值 | 用途 |\n|----------|--------------|------|\n| `RABBITMQ_MNESIA_DIR` | `/var/lib/rabbitmq/mnesia` | 数据目录 |\n| `RABBITMQ_LOG_BASE` | `/var/log/rabbitmq` | 日志目录 |\n| `RABBITMQ_PLUGINS_DIR` | `/usr/lib/rabbitmq/plugins` | 插件目录 |\n| `RABBITMQ_CONFIG_FILE` | `/etc/rabbitmq/rabbitmq` | 配置文件 |\n\n#### 数据目录迁移\n\n```bash\n# 停止服务前备份\nrabbitmqctl stop_app\n\n# 设置新的数据目录\nexport RABBITMQ_MNESIA_DIR=/new/path/mnesia\n\n# 重启服务\nrabbitmq-server -detached\n```\n\n---", "subs": ["关键目录", "数据目录迁移"]}, {"title": "3.4 日志配置", "content": "#### 日志输出方式\n\n| 输出 | 配置键 | 说明 |\n|------|--------|------|\n| 文件 | `log.file` | 默认启用 |\n| 控制台 | `log.console` | 容器环境常用 |\n| Syslog | `log.syslog` | 集中日志管理 |\n\n#### 日志级别\n\n| 级别 | 说明 |\n|------|------|\n| `debug` | 最详细 |\n| `info` | 默认 |\n| `warning` | 警告 |\n| `error` | 错误 |\n| `critical` | 严重 |\n| `none` | 禁用 |\n\n#### 配置示例\n\n```ini\n# 文件日志\nlog.file = /var/log/rabbitmq/rabbit.log\nlog.file.level = info\n\n# 控制台日志（容器）\nlog.console = true\nlog.console.level = info\nlog.file = false\n\n# JSON 格式\nlog.file.formatter = json\n\n# 日志轮转\nlog.file.rotation.size = 10485760\nlog.file.rotation.count = 5\n```\n\n#### 运行时调整日志级别\n\n```bash\n# 设置为 debug\nrabbitmqctl set_log_level debug\n\n# 恢复为 info\nrabbitmqctl set_log_level info\n\n# 跟踪日志\nrabbitmq-diagnostics log_tail -n rabbit@localhost -N 100\n```\n\n---", "subs": ["日志输出方式", "日志级别", "配置示例", "运行时调整日志级别"]}, {"title": "3.5 虚拟主机", "content": "#### 概念\n\n```mermaid\ngraph TD\n    RMQ[RabbitMQ] --> VH1[/vhost1]\n    RMQ --> VH2[/vhost2]\n    RMQ --> VH3[/production]\n    \n    VH1 --> E1[Exchanges]\n    VH1 --> Q1[Queues]\n    VH1 --> U1[Users/Permissions]\n    \n    VH2 --> E2[Exchanges]\n    VH2 --> Q2[Queues]\n    VH2 --> U2[Users/Permissions]\n```\n\n> 虚拟主机提供逻辑隔离，每个 vhost 拥有独立的队列、交换机、绑定和权限。\n\n#### 管理命令\n\n```bash\n# 创建虚拟主机\nrabbitmqctl add_vhost qa1\n\n# 带元数据创建\nrabbitmqctl add_vhost qa1 --description \"QA环境\" --default-queue-type quorum\n\n# 列出虚拟主机\nrabbitmqctl list_vhosts name description tags default_queue_type\n\n# 删除虚拟主机\nrabbitmqctl delete_vhost qa1\n```\n\n#### 默认队列类型\n\n```bash\n# 设置默认队列类型为仲裁队列\nrabbitmqctl update_vhost_metadata qa1 --default-queue-type quorum\n```\n\n#### 删除保护\n\n```bash\n# 启用删除保护\nrabbitmqctl set_vhost_deletion_protection qa1 true\n\n# 禁用删除保护\nrabbitmqctl set_vhost_deletion_protection qa1 false\n```\n\n#### 资源限制\n\n```bash\n# 限制最大连接数\nrabbitmqctl set_vhost_limits -p qa1 '{\"max-connections\": 100}'\n\n# 限制最大队列数\nrabbitmqctl set_vhost_limits -p qa1 '{\"max-queues\": 500}'\n\n# 查看限制\nrabbitmqctl list_vhost_limits\n\n# 清除限制\nrabbitmqctl clear_vhost_limits -p qa1\n```\n\n---", "subs": ["概念", "管理命令", "默认队列类型", "删除保护", "资源限制"]}, {"title": "3.6 用户与权限", "content": "#### 权限模型\n\n```mermaid\ngraph LR\n    U[用户] --> |授权| VH[虚拟主机]\n    VH --> C[Configure权限]\n    VH --> W[Write权限]\n    VH --> R[Read权限]\n    \n    C --> |创建/删除| RES[队列/交换机]\n    W --> |发布消息| RES\n    R --> |消费消息| RES\n```\n\n#### 用户管理\n\n```bash\n# 添加用户\nrabbitmqctl add_user admin 'P@ssw0rd!'\n\n# 使用预哈希密码\nrabbitmqctl add_user --pre-hashed-password admin '$(rabbitmqctl hash_password \"P@ssw0rd!\")'\n\n# 修改密码\nrabbitmqctl change_password admin 'NewP@ss!'\n\n# 删除用户\nrabbitmqctl delete_user admin\n\n# 列出用户\nrabbitmqctl list_users\n```\n\n#### 权限管理\n\n```bash\n# 授予完全权限（configure, write, read）\nrabbitmqctl set_permissions -p /production admin \".*\" \".*\" \".*\"\n\n# 只读权限\nrabbitmqctl set_permissions -p /production reader \"^$\" \"^$\" \".*\"\n\n# 只写权限\nrabbitmqctl set_permissions -p /production writer \"^$\" \".*\" \"^$\"\n\n# 撤销权限\nrabbitmqctl clear_permissions -p /production admin\n\n# 列出权限\nrabbitmqctl list_permissions -p /production\nrabbitmqctl list_user_permissions admin\n```\n\n#### 用户标签\n\n| 标签 | Management UI 权限 |\n|------|-------------------|\n| `(无)` | 无法访问 |\n| `management` | 查看自己的 vhost 资源 |\n| `policymaker` | management + 策略管理 |\n| `monitoring` | management + 所有节点统计 |\n| `administrator` | 全部权限 |\n\n```bash\n# 设置标签\nrabbitmqctl set_user_tags admin administrator\n\n# 设置多个标签\nrabbitmqctl set_user_tags viewer monitoring management\n```\n\n#### 用户限制\n\n```bash\n# 限制最大连接数\nrabbitmqctl set_user_limits admin '{\"max-connections\": 10}'\n\n# 限制最大通道数\nrabbitmqctl set_user_limits admin '{\"max-channels\": 20}'\n\n# 查看限制\nrabbitmqctl list_user_limits admin\n\n# 清除限制\nrabbitmqctl clear_user_limits admin\n```\n\n---", "subs": ["权限模型", "用户管理", "权限管理", "用户标签", "用户限制"]}, {"title": "3.7 身份验证机制", "content": "#### 认证后端\n\n| 后端 | 说明 |\n|------|------|\n| `internal` | 内置数据库（默认） |\n| `ldap` | LDAP/AD 认证 |\n| `http` | HTTP API 认证 |\n| `oauth2` | OAuth 2.0/JWT 认证 |\n\n#### 配置多个后端\n\n```ini\n# 先尝试 LDAP，失败后回退到内部\nauth_backends.1 = ldap\nauth_backends.2 = internal\n```\n\n#### 混合身份验证与授权\n\n```ini\n# LDAP 认证 + 内部授权\nauth_backends.1.authn = ldap\nauth_backends.1.authz = internal\n```\n\n#### Guest 用户限制\n\n```ini\n# 默认：guest 只能从 localhost 连接\nloopback_users.guest = true\n\n# 允许远程连接（不推荐用于生产）\nloopback_users = none\n```\n\n#### TLS 证书认证\n\n```bash\n# 启用 EXTERNAL 机制\nrabbitmq-plugins enable rabbitmq_auth_mechanism_ssl\n```\n\n```ini\n# 配置认证机制\nauth_mechanisms.1 = EXTERNAL\nauth_mechanisms.2 = PLAIN\n```\n\n---", "subs": ["认证后端", "配置多个后端", "混合身份验证与授权", "Guest 用户限制", "TLS 证书认证"]}, {"title": "3.8 密码与凭据", "content": "#### 密码哈希算法\n\n```ini\n# 使用 SHA-512（默认 SHA-256）\npassword_hashing_module = rabbit_password_hashing_sha512\n```\n\n#### 密码复杂度验证\n\n```ini\n# 最小长度验证\ncredential_validator.validation_backend = rabbit_credential_validator_min_password_length\ncredential_validator.min_length = 12\n\n# 正则验证\ncredential_validator.validation_backend = rabbit_credential_validator_password_regexp\ncredential_validator.regexp = ^[a-zA-Z0-9]{12,}$\n```\n\n#### 计算密码哈希\n\n```bash\n# 使用 CLI\nrabbitmqctl hash_password 'mypassword'\n\n# 使用 HTTP API\ncurl -su guest:guest GET localhost:15672/api/auth/hash_password/mypassword\n```\n\n#### 无密码用户（证书认证）\n\n```bash\n# 创建用户后清除密码\nrabbitmqctl add_user certuser temppass\nrabbitmqctl clear_password certuser\n```\n\n---", "subs": ["密码哈希算法", "密码复杂度验证", "计算密码哈希", "无密码用户（证书认证）"]}, {"title": "3.9 权限示例", "content": "#### 常见场景\n\n```bash\n# 应用用户：只能操作特定前缀的队列\nrabbitmqctl set_permissions -p /app appuser \\\n  \"^app\\.\" \\    # configure: 只能创建 app.* 队列\n  \"^app\\.\" \\    # write: 只能发布到 app.* \n  \"^app\\.\"      # read: 只能消费 app.* 队列\n\n# 监控用户：只读权限\nrabbitmqctl set_permissions -p / monitoring \\\n  '^$' \\        # configure: 无\n  '^$' \\        # write: 无\n  '.*'          # read: 可读所有\n\n# 管理员：完全权限\nrabbitmqctl set_permissions -p / admin '.*' '.*' '.*'\n```\n\n#### 定义预配置（启动时导入）\n\n```json\n{\n  \"users\": [\n    {\n      \"name\": \"admin\",\n      \"password_hash\": \"...\",\n      \"tags\": [\"administrator\"]\n    }\n  ],\n  \"vhosts\": [\n    {\"name\": \"/\"},\n    {\"name\": \"production\"}\n  ],\n  \"permissions\": [\n    {\n      \"user\": \"admin\",\n      \"vhost\": \"/\",\n      \"configure\": \".*\",\n      \"write\": \".*\",\n      \"read\": \".*\"\n    }\n  ]\n}\n```\n\n```ini\n# 配置启动时加载定义\nload_definitions = /path/to/definitions.json\n```\n\n---", "subs": ["常见场景", "定义预配置（启动时导入）"]}, {"title": "3.10 集群架构", "content": "```mermaid\ngraph TD\n    subgraph Cluster[RabbitMQ Cluster]\n        N1[Node 1<br/>Disc Node]\n        N2[Node 2<br/>Disc Node]\n        N3[Node 3<br/>RAM Node]\n        \n        N1 <--> N2\n        N2 <--> N3\n        N1 <--> N3\n    end\n    \n    LB[Load Balancer] --> N1\n    LB --> N2\n    LB --> N3\n    \n    Client[Client] --> LB\n```\n\n<!-- 待填充内容 -->\n\n---", "subs": []}, {"title": "3.11 策略 (Policies)", "content": "#### 策略概念\n\n```mermaid\ngraph TD\n    P[策略 Policy] --> |正则匹配| Q[队列]\n    P --> |正则匹配| E[交换机]\n    P --> |正则匹配| S[流 Stream]\n    \n    P --> D[策略定义]\n    D --> TTL[message-ttl]\n    D --> ML[max-length]\n    D --> DLX[dead-letter-exchange]\n    D --> FED[federation-upstream-set]\n```\n\n> 策略是动态配置队列/交换机可选参数的声明式机制，无需重新声明资源。\n\n#### 策略属性\n\n| 属性 | 说明 |\n|------|------|\n| `name` | 策略名称 |\n| `pattern` | 正则表达式匹配队列/交换机名称 |\n| `definition` | 键值对，注入到匹配资源的参数 |\n| `priority` | 优先级，数值越大优先级越高 |\n| `apply-to` | 应用目标：`queues`/`exchanges`/`all` |\n\n#### 创建策略\n\n```bash\n# 设置 TTL 策略\nrabbitmqctl set_policy ttl-policy \\\n  \"^ttl\\.\" '{\"message-ttl\": 60000}' \\\n  --priority 1 \\\n  --apply-to queues\n\n# 设置死信策略\nrabbitmqctl set_policy dlx-policy \\\n  \"^dlx\\.\" '{\"dead-letter-exchange\": \"dlx.exchange\"}' \\\n  --priority 2 \\\n  --apply-to queues\n\n# 组合策略（TTL + 队列长度限制）\nrabbitmqctl set_policy combined-policy \\\n  \"^my\\.\" '{\"message-ttl\": 300000, \"max-length\": 10000}' \\\n  --priority 1 \\\n  --apply-to queues\n```\n\n#### apply-to 选项\n\n| 值 | 说明 |\n|----|------|\n| `queues` | 所有队列类型（含流） |\n| `classic_queues` | 仅经典队列 |\n| `quorum_queues` | 仅仲裁队列 |\n| `streams` | 仅流 |\n| `exchanges` | 仅交换机 |\n| `all` | 所有（默认） |\n\n#### 删除策略\n\n```bash\nrabbitmqctl clear_policy ttl-policy\n```\n\n#### 列出策略\n\n```bash\nrabbitmqctl list_policies -p /\n```\n\n---", "subs": ["策略概念", "策略属性", "创建策略", "apply-to 选项", "删除策略", "列出策略"]}, {"title": "3.12 运营商策略", "content": "#### 运营商策略 vs 普通策略\n\n| 特性 | 普通策略 | 运营商策略 |\n|------|----------|------------|\n| 管理者 | 应用开发 | 平台运维 |\n| 用途 | 业务配置 | 资源限制/护栏 |\n| 优先级 | 低 | 高（覆盖普通策略） |\n| 支持参数 | 全部 | 有限（TTL/长度限制等） |\n\n#### 运营商策略支持的参数\n\n| 参数 | 经典队列 | 仲裁队列 | 流 |\n|------|:--------:|:--------:|:--:|\n| `max-length` | ✓ | ✓ | |\n| `max-length-bytes` | ✓ | ✓ | ✓ |\n| `message-ttl` | ✓ | ✓ | |\n| `expires` | ✓ | ✓ | |\n| `delivery-limit` | | ✓ | |\n\n#### 创建运营商策略\n\n```bash\n# 设置队列过期时间限制\nrabbitmqctl set_operator_policy queue-ttl \\\n  \".*\" '{\"expires\": 3600000}' \\\n  --priority 0 \\\n  --apply-to queues\n\n# 设置队列长度上限\nrabbitmqctl set_operator_policy max-length-limit \\\n  \".*\" '{\"max-length\": 100000, \"max-length-bytes\": 104857600}' \\\n  --priority 0 \\\n  --apply-to queues\n```\n\n#### 冲突解决\n\n当运营商策略与普通策略冲突时，取**更保守**的值：\n\n```\n运营商策略: max-length = 50\n普通策略:   max-length = 100\n生效值:     max-length = 50  # 取小值\n\n运营商策略: max-length = 50\n普通策略:   max-length = 20\n生效值:     max-length = 20  # 取小值\n```\n\n---", "subs": ["运营商策略 vs 普通策略", "运营商策略支持的参数", "创建运营商策略", "冲突解决"]}, {"title": "3.13 运行时参数", "content": "#### 参数类型\n\n| 类型 | 作用域 | 示例 |\n|------|--------|------|\n| vhost 参数 | 虚拟主机 | Federation upstream、Shovel |\n| 全局参数 | 集群 | 集群名称、集群标签 |\n\n#### vhost 参数管理\n\n```bash\n# 设置参数\nrabbitmqctl set_parameter -p / federation-upstream my-upstream \\\n  '{\"uri\":\"amqp://remote-host\"}'\n\n# 列出参数\nrabbitmqctl list_parameters -p /\n\n# 清除参数\nrabbitmqctl clear_parameter -p / federation-upstream my-upstream\n```\n\n#### 全局参数管理\n\n```bash\n# 设置集群名称\nrabbitmqctl set_cluster_name my-cluster\n\n# 设置集群标签\nrabbitmqctl set_global_parameter cluster_tags \\\n  '{\"region\":\"us-east-1\",\"env\":\"production\"}'\n\n# 列出全局参数\nrabbitmqctl list_global_parameters\n```\n\n#### 配置文件预设集群标签\n\n```ini\ncluster_tags.region = us-east-1\ncluster_tags.environment = production\ncluster_tags.owner = platform-team\n```\n\n---", "subs": ["参数类型", "vhost 参数管理", "全局参数管理", "配置文件预设集群标签"]}, {"title": "3.14 定义导入导出", "content": "#### 定义内容\n\n| 内容 | 说明 |\n|------|------|\n| 用户 | 用户名、密码哈希、标签 |\n| vhost | 虚拟主机名称、元数据 |\n| 权限 | 用户权限 |\n| 拓扑 | 队列、交换机、绑定 |\n| 策略 | 普通策略、运营商策略 |\n| 参数 | 运行时参数 |\n\n#### 导出定义\n\n```bash\n# 导出到文件\nrabbitmqctl export_definitions /path/to/definitions.json\n\n# 使用 rabbitmqadmin\nrabbitmqadmin definitions export /path/to/definitions.json\n\n# 使用 HTTP API\ncurl -u guest:guest http://localhost:15672/api/definitions > definitions.json\n```\n\n#### 导入定义\n\n```bash\n# 从文件导入\nrabbitmqctl import_definitions /path/to/definitions.json\n\n# 使用 rabbitmqadmin\nrabbitmqadmin definitions import /path/to/definitions.json\n```\n\n#### 启动时导入定义\n\n```ini\n# 从本地文件导入\ndefinitions.local.path = /etc/rabbitmq/definitions.json\n\n# 从 HTTPS URL 导入\ndefinitions.import_backend = https\ndefinitions.https.url = https://config-server/definitions.json\n\n# 仅在内容变化时导入\ndefinitions.skip_if_unchanged = true\n```\n\n#### 定义文件示例\n\n```json\n{\n  \"rabbit_version\": \"4.0.0\",\n  \"vhosts\": [\n    {\"name\": \"/\"},\n    {\"name\": \"production\"}\n  ],\n  \"users\": [\n    {\n      \"name\": \"admin\",\n      \"password_hash\": \"...\",\n      \"hashing_algorithm\": \"rabbit_password_hashing_sha256\",\n      \"tags\": [\"administrator\"]\n    }\n  ],\n  \"permissions\": [\n    {\n      \"user\": \"admin\",\n      \"vhost\": \"/\",\n      \"configure\": \".*\",\n      \"write\": \".*\",\n      \"read\": \".*\"\n    }\n  ],\n  \"queues\": [\n    {\n      \"name\": \"my-queue\",\n      \"vhost\": \"/\",\n      \"durable\": true,\n      \"auto_delete\": false,\n      \"arguments\": {\"x-queue-type\": \"quorum\"}\n    }\n  ],\n  \"exchanges\": [\n    {\n      \"name\": \"my-exchange\",\n      \"vhost\": \"/\",\n      \"type\": \"topic\",\n      \"durable\": true\n    }\n  ],\n  \"bindings\": [\n    {\n      \"source\": \"my-exchange\",\n      \"vhost\": \"/\",\n      \"destination\": \"my-queue\",\n      \"destination_type\": \"queue\",\n      \"routing_key\": \"my.#\"\n    }\n  ]\n}\n```\n\n---", "subs": ["定义内容", "导出定义", "导入定义", "启动时导入定义", "定义文件示例"]}, {"title": "3.15 元数据存储", "content": "#### 元数据存储内容\n\n```mermaid\ngraph TD\n    MS[元数据存储] --> U[用户/权限]\n    MS --> V[虚拟主机]\n    MS --> T[拓扑：队列/交换机/绑定]\n    MS --> P[策略]\n    MS --> R[运行时参数]\n    \n    MSG[消息] --> |不存储于| MS\n```\n\n#### 后端对比\n\n| 特性 | Mnesia | Khepri |\n|------|--------|--------|\n| 引入版本 | 原始 | 4.0+ |\n| 算法 | 分布式数据库 | Raft 共识 |\n| 网络分区 | 需配置恢复策略 | 自动处理 |\n| 推荐 | 已弃用 | 推荐 |\n\n#### Khepri 特点\n\n- 基于 **Raft 共识算法**\n- 与仲裁队列、流使用相同算法\n- 网络分区处理更加确定性\n- 需要多数节点在线才能写入\n\n---", "subs": ["元数据存储内容", "后端对比", "Khepri 特点"]}, {"title": "3.16 启用 Khepri", "content": "#### 检查当前后端\n\n```bash\nrabbitmq-diagnostics metadata_store_status\n```\n\n#### 启用 Khepri\n\n```bash\n# 方式1：启用功能标志\nrabbitmqctl enable_feature_flag khepri_db\n\n# 方式2：启动时通过环境变量\nRABBITMQ_FEATURE_FLAGS=\"+khepri_db\" rabbitmq-server\n```\n\n#### 启用条件\n\n- **所有集群节点在线**\n- **集群处于健康状态**\n- **建议在非高峰时段执行**\n\n#### 迁移过程\n\n1. 同步集群成员到 Khepri\n2. 复制 Mnesia 数据到 Khepri\n3. 将 Mnesia 表标记为只读\n4. 完成剩余数据迁移\n5. 切换到 Khepri\n\n#### 回滚\n\n> ⚠️ 一旦启用 Khepri，**无法回退到 Mnesia**\n\n如需回退，使用蓝绿部署迁移到新集群。\n\n---", "subs": ["检查当前后端", "启用 Khepri", "启用条件", "迁移过程", "回滚"]}, {"title": "3.17 Khepri 运维注意事项", "content": "#### 一致性模型\n\n| 场景 | Mnesia | Khepri |\n|------|--------|--------|\n| 声明确认 | 所有节点提交 | 多数节点提交 |\n| 可见性 | 立即全局可见 | 可能有短暂延迟 |\n\n#### 影响场景\n\n```mermaid\nsequenceDiagram\n    participant C1 as 客户端1 (节点1)\n    participant C2 as 客户端2 (节点3)\n    participant R1 as 节点1\n    participant R2 as 节点2\n    participant R3 as 节点3\n    \n    C1->>R1: 声明队列Q\n    R1->>R2: 复制成功\n    Note over R1,R2: 多数节点确认\n    R1->>C1: 确认成功\n    C1->>C2: 通知队列已创建\n    C2->>R3: 发布消息到Q\n    Note over R3: 可能尚未看到队列Q\n```\n\n#### 变通策略\n\n1. **注入短暂暂停**：声明后等待 1-2 秒\n2. **使用静态拓扑**：避免动态声明\n3. **连接同一节点**：多连接使用同一节点\n\n#### 少数派节点行为\n\n- 元数据写入操作（声明队列等）会**超时**\n- 与 Mnesia 的 `pause_minority` 策略类似\n- 客户端收到错误，可稍后重试\n\n#### 故障恢复\n\n1. 领导者故障时自动选举新领导者\n2. 恢复节点自动同步变更\n3. 对应用程序透明\n\n---", "subs": ["一致性模型", "影响场景", "变通策略", "少数派节点行为", "故障恢复"]}, {"title": "3.18 Khepri 已知问题", "content": "| 问题 | 说明 |\n|------|------|\n| 批量删除较慢 | 大量实体删除性能不如 Mnesia |\n| 超时处理 | 少数派节点写操作可能超时 |\n| 数据丢失恢复 | 节点数据永久丢失后难以重新加入 |\n\n#### 最佳实践\n\n- 在非高峰时段启用 Khepri\n- 确保集群健康再执行迁移\n- 测试工作负载与 Khepri 兼容性\n- 监控 Raft 领导者状态\n\n---", "subs": ["最佳实践"]}, {"title": "3.19 网络配置", "content": "#### 端口列表\n\n| 端口 | 协议 | 用途 |\n|------|------|------|\n| 4369 | EPMD | 节点发现服务 |\n| 5672 | AMQP | 客户端连接（非TLS） |\n| 5671 | AMQPS | 客户端连接（TLS） |\n| 5552 | Stream | Stream协议（非TLS） |\n| 5551 | Stream | Stream协议（TLS） |\n| 6000-6500 | Stream | Stream 复制 |\n| 15672 | HTTP | Management UI |\n| 15671 | HTTPS | Management UI (TLS) |\n| 15692 | Prometheus | 指标端点 |\n| 25672 | Clustering | 节点间通信 |\n| 35672-35682 | CLI | CLI 工具连接 |\n| 1883 | MQTT | MQTT（非TLS） |\n| 8883 | MQTTS | MQTT（TLS） |\n| 61613 | STOMP | STOMP（非TLS） |\n\n#### 网络接口配置\n\n```ini\n# 监听所有接口\nlisteners.tcp.default = 5672\n\n# 监听特定接口\nlisteners.tcp.1 = 192.168.1.99:5672\n\n# 仅 IPv6\nlisteners.tcp.1 = :::5672\n\n# 双栈（IPv4 + IPv6）\nlisteners.tcp.1 = 127.0.0.1:5672\nlisteners.tcp.2 = ::1:5672\n```\n\n#### 禁用非 TLS 连接\n\n```ini\nlisteners.tcp = none\nlisteners.ssl.default = 5671\n```\n\n---", "subs": ["端口列表", "网络接口配置", "禁用非 TLS 连接"]}, {"title": "3.20 TLS/SSL 配置", "content": "#### TLS 配置架构\n\n```mermaid\ngraph LR\n    C[客户端] -->|TLS| RMQ[RabbitMQ]\n    \n    subgraph TLS配置\n        CA[CA证书]\n        CERT[服务器证书]\n        KEY[私钥]\n    end\n    \n    RMQ --> CA\n    RMQ --> CERT\n    RMQ --> KEY\n```\n\n#### 基本 TLS 配置\n\n```ini\nlisteners.ssl.default = 5671\n\nssl_options.cacertfile = /path/to/ca_certificate.pem\nssl_options.certfile = /path/to/server_certificate.pem\nssl_options.keyfile = /path/to/server_key.pem\n\n# 对等方验证\nssl_options.verify = verify_peer\nssl_options.fail_if_no_peer_cert = true\n\n# 私钥密码（可选）\nssl_options.password = secret\n```\n\n#### TLS 版本控制\n\n```ini\n# 仅启用 TLS 1.2 和 1.3\nssl_options.versions.1 = tlsv1.3\nssl_options.versions.2 = tlsv1.2\n```\n\n#### 密码套件配置\n\n```ini\n# TLSv1.3 密码套件\nssl_options.ciphers.1 = TLS_AES_256_GCM_SHA384\nssl_options.ciphers.2 = TLS_AES_128_GCM_SHA256\nssl_options.ciphers.3 = TLS_CHACHA20_POLY1305_SHA256\n\n# TLSv1.2 密码套件\nssl_options.ciphers.4 = ECDHE-ECDSA-AES256-GCM-SHA384\nssl_options.ciphers.5 = ECDHE-RSA-AES256-GCM-SHA384\n```\n\n#### 证书对等方验证\n\n| 配置 | 说明 |\n|------|------|\n| `verify = verify_peer` | 启用对等方验证 |\n| `verify = verify_none` | 禁用验证 |\n| `fail_if_no_peer_cert = true` | 客户端必须提供证书 |\n| `depth = 2` | 证书链验证深度 |\n\n---", "subs": ["TLS 配置架构", "基本 TLS 配置", "TLS 版本控制", "密码套件配置", "证书对等方验证"]}, {"title": "3.21 使用 tls-gen 生成证书", "content": "```bash\n# 克隆 tls-gen\ngit clone https://github.com/rabbitmq/tls-gen tls-gen\ncd tls-gen/basic\n\n# 生成证书\nmake PASSWORD=bunnies\nmake verify\nmake info\n\n# 查看生成的文件\nls -l ./result\n# ca_certificate.pem      - CA 证书\n# server_certificate.pem  - 服务器证书\n# server_key.pem          - 服务器私钥\n# client_certificate.pem  - 客户端证书\n# client_key.pem          - 客户端私钥\n```\n\n---", "subs": []}, {"title": "3.22 节点间通信", "content": "#### EPMD 配置\n\n```bash\n# 限制 EPMD 监听接口\nexport ERL_EPMD_ADDRESS=192.168.1.99\n\n# 修改 EPMD 端口\nexport ERL_EPMD_PORT=4370\n```\n\n#### 节点间通信端口\n\n```ini\n# 自定义分发端口范围\ninet_dist_listen_min = 35672\ninet_dist_listen_max = 35672\n```\n\n#### IPv6 节点间通信\n\n```bash\n# 启用 IPv6 节点间通信\nexport RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=\"-proto_dist inet6_tcp\"\n```\n\n---", "subs": ["EPMD 配置", "节点间通信端口", "IPv6 节点间通信"]}, {"title": "3.23 网络滴答时间 (Net Tick)", "content": "#### 概念\n\n节点间定期交换\"滴答\"消息检测连接状态，类似心跳机制。\n\n#### 配置\n\n```erlang\n% advanced.config\n[\n  {kernel, [{net_ticktime, 120}]}\n].\n```\n\n#### 影响\n\n| net_ticktime | 故障检测 | 风险 |\n|--------------|----------|------|\n| 增大（如120s） | 更慢 | 对短暂网络中断更宽容 |\n| 减小（如30s） | 更快 | 可能产生误报分区 |\n\n> 默认值 60 秒，修改需集群所有节点一致。\n\n---", "subs": ["概念", "配置", "影响"]}, {"title": "3.24 代理协议", "content": "#### 启用代理协议\n\n```ini\n# AMQP\nproxy_protocol = true\n\n# MQTT\nmqtt.proxy_protocol = true\n\n# STOMP\nstomp.proxy_protocol = true\n```\n\n#### 用途\n\n- 在代理/负载均衡器后获取真实客户端 IP\n- 支持 HAProxy、AWS ELB 等\n\n> ⚠️ 启用后客户端必须通过支持代理协议的代理连接\n\n---", "subs": ["启用代理协议", "用途"]}, {"title": "3.25 网络调优", "content": "#### TCP 缓冲区大小\n\n```ini\n# 提高吞吐量（增加 RAM 使用）\ntcp_listen_options.sndbuf = 196608\ntcp_listen_options.recbuf = 196608\n\n# 降低 RAM 使用（降低吞吐量）\ntcp_listen_options.sndbuf = 32768\ntcp_listen_options.recbuf = 32768\n```\n\n#### 连接积压\n\n```ini\n# 处理连接突发\ntcp_listen_options.backlog = 4096\n```\n\n#### 禁用 Nagle 算法\n\n```ini\ntcp_listen_options.nodelay = true\n```\n\n#### 内核参数调优\n\n```bash\n# 增加文件描述符限制\nsysctl -w fs.file-max=200000\n\n# TCP 连接相关\nsysctl -w net.core.somaxconn=4096\nsysctl -w net.ipv4.tcp_max_syn_backlog=8192\nsysctl -w net.ipv4.tcp_fin_timeout=15\n\n# TIME_WAIT 重用\nsysctl -w net.ipv4.tcp_tw_reuse=1\n```\n\n---", "subs": ["TCP 缓冲区大小", "连接积压", "禁用 Nagle 算法", "内核参数调优"]}, {"title": "3.26 网络故障排查", "content": "#### 检查监听器\n\n```bash\nrabbitmq-diagnostics listeners\n\n# 输出示例\n# Interface: [::], port: 5672, protocol: amqp\n# Interface: [::], port: 5671, protocol: amqp/ssl\n# Interface: [::], port: 15672, protocol: http\n```\n\n#### 检查端口\n\n```bash\n# 检查端口监听\nsudo lsof -n -i4TCP:5672 | grep LISTEN\n\n# 使用 ss\nsudo ss --tcp -f inet --listening --numeric --processes\n\n# TCP 连接状态\nnetstat --all --numeric --tcp --programs\n```\n\n#### 测试连接\n\n```bash\n# 使用 telnet\ntelnet localhost 5672\n\n# 测试 TLS 连接\nopenssl s_client -connect localhost:5671 -tls1_2\n```\n\n#### TLS 故障排查\n\n```bash\n# 验证 TLS 支持\nrabbitmq-diagnostics tls_versions\n\n# 列出密码套件\nrabbitmq-diagnostics cipher_suites --format openssl --silent\n\n# 使用 OpenSSL 测试\nopenssl s_client -connect localhost:5671 \\\n  -cert client_cert.pem -key client_key.pem \\\n  -CAfile ca_cert.pem\n```\n\n#### 常见 TLS 错误\n\n| 错误 | 原因 |\n|------|------|\n| `Unknown CA` | CA 证书不在信任链中 |\n| `Certificate Expired` | 证书已过期 |\n| `ekeyfile/ecertfile` | 密钥或证书文件无效 |\n| `bad record mac` | 网络问题或客户端 TLS 实现错误 |\n\n---", "subs": ["检查监听器", "检查端口", "测试连接", "TLS 故障排查", "常见 TLS 错误"]}, {"title": "3.27 集群基础", "content": "#### 集群架构\n\n```mermaid\ngraph TD\n    subgraph 集群\n        N1[节点1<br/>rabbit@node1]\n        N2[节点2<br/>rabbit@node2]\n        N3[节点3<br/>rabbit@node3]\n    end\n    \n    N1 <-->|Erlang分布| N2\n    N2 <-->|Erlang分布| N3\n    N1 <-->|Erlang分布| N3\n    \n    C[客户端] --> N1\n    C --> N2\n    C --> N3\n```\n\n#### 集群中复制的内容\n\n| 内容 | 复制 | 说明 |\n|------|------|------|\n| 用户、虚拟主机、权限 | ✅ | 所有节点共享 |\n| 队列、交换机、绑定 | ✅ | 元数据复制 |\n| 运行时参数、策略 | ✅ | 所有节点共享 |\n| 消息 | ❌/✅ | 仲裁队列复制，经典队列不复制 |\n\n#### 节点名称\n\n```bash\n# 短名称（同一域内）\nrabbit@hostname1\n\n# 长名称（FQDN）\nrabbit@node1.messaging.svc.local\n\n# 启用长名称\nexport RABBITMQ_USE_LONGNAME=true\n```\n\n#### 集群端口\n\n| 端口 | 用途 |\n|------|------|\n| 4369 | EPMD 节点发现 |\n| 25672 | 节点间通信 |\n| 35672-35682 | CLI 工具 |\n| 6000-6500 | Stream 复制 |\n\n---", "subs": ["集群架构", "集群中复制的内容", "节点名称", "集群端口"]}, {"title": "3.28 集群形成", "content": "#### 节点发现机制\n\n| 机制 | 配置 Backend | 说明 |\n|------|--------------|------|\n| 配置文件 | `classic_config` | 预定义节点列表 |\n| DNS | `dns` | 通过 DNS A/AAAA 记录 |\n| Kubernetes | `k8s` | Kubernetes API |\n| AWS | `aws` | EC2 实例标签/ASG |\n| Consul | `consul` | HashiCorp Consul |\n| etcd | `etcd` | 分布式 KV 存储 |\n\n#### 配置文件发现\n\n```ini\ncluster_formation.peer_discovery_backend = classic_config\ncluster_formation.classic_config.nodes.1 = rabbit@node1\ncluster_formation.classic_config.nodes.2 = rabbit@node2\ncluster_formation.classic_config.nodes.3 = rabbit@node3\n```\n\n#### DNS 发现\n\n```ini\ncluster_formation.peer_discovery_backend = dns\ncluster_formation.dns.hostname = discovery.rabbitmq.local\n```\n\n#### Kubernetes 发现\n\n```ini\ncluster_formation.peer_discovery_backend = k8s\n# 4.1+ 默认使用最低序数索引节点作为种子\n```\n\n#### 手动加入集群\n\n```bash\n# 在 rabbit@node2 上\nrabbitmqctl stop_app\nrabbitmqctl join_cluster rabbit@node1\nrabbitmqctl start_app\n\n# 检查集群状态\nrabbitmqctl cluster_status\n```\n\n---", "subs": ["节点发现机制", "配置文件发现", "DNS 发现", "Kubernetes 发现", "手动加入集群"]}, {"title": "3.29 Erlang Cookie", "content": "#### 概念\n\n节点间通信的共享密钥，所有集群节点必须相同。\n\n#### Cookie 文件位置\n\n| 平台 | 位置 |\n|------|------|\n| Linux | `/var/lib/rabbitmq/.erlang.cookie` |\n| macOS | `$HOME/.erlang.cookie` |\n| Windows | `C:\\Users\\%USERNAME%\\.erlang.cookie` |\n| Docker | `RABBITMQ_ERLANG_COOKIE` 环境变量 |\n\n#### 检查 Cookie 信息\n\n```bash\nrabbitmq-diagnostics erlang_cookie_sources\n```\n\n#### Cookie 不匹配错误\n\n```text\n* TCP connection succeeded but Erlang distribution failed\n* suggestion: is the cookie set correctly?\n```\n\n---", "subs": ["概念", "Cookie 文件位置", "检查 Cookie 信息", "Cookie 不匹配错误"]}, {"title": "3.30 网络分区处理", "content": "#### 检测分区\n\n```bash\nrabbitmq-diagnostics cluster_status\n\n# 分区示例输出\n# Network Partitions\n# Node flopsy@warp10 cannot communicate with hare@warp10\n```\n\n#### 分区处理策略\n\n| 策略 | 配置值 | 行为 |\n|------|--------|------|\n| Ignore | `ignore` | 默认，不自动处理 |\n| Pause Minority | `pause_minority` | 暂停少数派节点 |\n| Pause If All Down | `pause_if_all_down` | 指定节点全宕机才暂停 |\n| Autoheal | `autoheal` | 自动恢复，重启非获胜分区 |\n\n#### 配置分区处理\n\n```ini\n# Pause Minority（推荐3+节点）\ncluster_partition_handling = pause_minority\n\n# Autoheal\ncluster_partition_handling = autoheal\n\n# Pause If All Down\ncluster_partition_handling = pause_if_all_down\ncluster_partition_handling.pause_if_all_down.recover = autoheal\ncluster_partition_handling.pause_if_all_down.nodes.1 = rabbit@node1\ncluster_partition_handling.pause_if_all_down.nodes.2 = rabbit@node2\n```\n\n#### 策略选择\n\n| 场景 | 推荐策略 |\n|------|----------|\n| 高可用网络（单机架） | `ignore` |\n| 跨可用区（3+节点） | `pause_minority` |\n| 重视服务连续性 | `autoheal` |\n\n> ⚠️ 双节点集群不应使用 `pause_minority`，任何故障都会暂停所有节点\n\n---", "subs": ["检测分区", "分区处理策略", "配置分区处理", "策略选择"]}, {"title": "3.31 集群节点管理", "content": "#### 节点数量建议\n\n- 使用**奇数个节点**（3, 5, 7）\n- **强烈不建议双节点集群**（无法达成共识）\n- 4节点与3节点可用性相同\n\n#### 移除节点\n\n```bash\n# 方法1：在目标节点执行\nrabbitmqctl stop_app\nrabbitmqctl reset\nrabbitmqctl start_app\n\n# 方法2：从集群其他节点移除\nrabbitmqctl forget_cluster_node rabbit@nodeX\n```\n\n#### 重置节点\n\n```bash\n# 停止应用\nrabbitmqctl stop_app\n# 重置（删除所有数据）\nrabbitmqctl reset\n# 重新启动\nrabbitmqctl start_app\n```\n\n#### 强制启动节点\n\n```bash\n# 对等节点不可用时强制启动\nrabbitmqctl force_boot\nrabbitmq-server -detached\n```\n\n#### 队列领导者放置\n\n```ini\n# 均衡分布（推荐）\nqueue_leader_locator = balanced\n\n# 客户端本地\nqueue_leader_locator = client-local\n```\n\n---", "subs": ["节点数量建议", "移除节点", "重置节点", "强制启动节点", "队列领导者放置"]}, {"title": "3.32 集群 TLS 配置", "content": "#### 节点间 TLS 配置文件\n\n```erlang\n% /etc/rabbitmq/inter_node_tls.config\n[\n  {server, [\n    {cacertfile, \"/path/to/ca_certificate.pem\"},\n    {certfile, \"/path/to/server_certificate.pem\"},\n    {keyfile, \"/path/to/server_key.pem\"},\n    {verify, verify_peer},\n    {fail_if_no_peer_cert, true}\n  ]},\n  {client, [\n    {cacertfile, \"/path/to/ca_certificate.pem\"},\n    {certfile, \"/path/to/client_certificate.pem\"},\n    {keyfile, \"/path/to/client_key.pem\"},\n    {verify, verify_peer}\n  ]}\n].\n```\n\n#### 启用节点间 TLS\n\n```bash\n# rabbitmq-env.conf\nERL_SSL_PATH=\"/usr/lib64/erlang/lib/ssl-9.4/ebin\"\n\nSERVER_ADDITIONAL_ERL_ARGS=\"-pa $ERL_SSL_PATH \\\n  -proto_dist inet_tls \\\n  -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config\"\n\nRABBITMQ_CTL_ERL_ARGS=\"-pa $ERL_SSL_PATH \\\n  -proto_dist inet_tls \\\n  -ssl_dist_optfile /etc/rabbitmq/inter_node_tls.config\"\n```\n\n---", "subs": ["节点间 TLS 配置文件", "启用节点间 TLS"]}, {"title": "3.33 EC2 部署注意事项", "content": "#### 实例选择\n\n- 使用 64 位实例\n- 确保足够内存并启用交换空间\n- EBS 卷注意 IOPS 限制\n\n#### 存储配置\n\n```bash\n# 数据目录\n/var/lib/rabbitmq/\n\n# 日志目录\n/var/log/rabbitmq/\n\n# 可创建符号链接到 EBS 卷\n```\n\n#### AWS 节点发现\n\n```ini\ncluster_formation.peer_discovery_backend = aws\ncluster_formation.aws.region = us-east-1\ncluster_formation.aws.use_autoscaling_group = true\n# 或使用实例标签\ncluster_formation.aws.instance_tags.environment = production\ncluster_formation.aws.instance_tags.service = rabbitmq\n```\n\n---\n\n---", "subs": ["实例选择", "存储配置", "AWS 节点发现"]}, {"title": "3.34 资源限制", "content": "#### 资源限制架构\n\n```mermaid\ngraph TD\n    subgraph 限制层级\n        CL[集群级别]\n        NL[节点级别]\n        VL[虚拟主机级别]\n        UL[用户级别]\n        QL[队列/流级别]\n    end\n    \n    CL --> NL\n    NL --> VL\n    VL --> UL\n    UL --> QL\n```\n\n#### 虚拟主机限制\n\n```bash\n# 设置最大连接数\nrabbitmqctl set_vhost_limits -p \"/\" '{\"max-connections\": 256}'\n\n# 设置最大队列数\nrabbitmqctl set_vhost_limits -p \"/\" '{\"max-queues\": 1024}'\n\n# 清除限制\nrabbitmqctl clear_vhost_limits -p \"/\"\n```\n\n#### 用户限制\n\n```bash\n# 设置用户最大连接数\nrabbitmqctl set_user_limits user1 '{\"max-connections\": 64}'\n\n# 设置最大通道数\nrabbitmqctl set_user_limits user1 '{\"max-channels\": 10}'\n\n# 清除限制\nrabbitmqctl clear_user_limits user1\n```\n\n#### 连接限制配置\n\n```ini\n# 每连接最大通道数\nchannel_max = 128\n\n# 握手超时\nhandshake_timeout = 10000\n\n# TLS 握手超时\nssl_handshake_timeout = 5000\n\n# 心跳间隔\nheartbeat = 60\n\n# 每通道最大消费者数\nconsumer_max_per_channel = 10\n```\n\n#### 节点级别限制\n\n```ini\n# 最大连接数\nconnection_max = 10000\n\n# 每节点最大通道数\nchannel_max_per_node = 50000\n\n# 最大消息大小（默认 128MiB）\nmax_message_size = 134217728\n\n# 消费者确认超时（30分钟）\nconsumer_timeout = 1800000\n```\n\n#### 队列限制（通过策略）\n\n| 参数 | 说明 |\n|------|------|\n| `max-length` | 最大消息数 |\n| `max-length-bytes` | 最大字节数 |\n| `message-ttl` | 消息过期时间 |\n| `queue-ttl` | 队列过期时间 |\n| `delivery-limit` | 最大投递次数（仲裁队列） |\n\n---", "subs": ["资源限制架构", "虚拟主机限制", "用户限制", "连接限制配置", "节点级别限制", "队列限制（通过策略）"]}, {"title": "3.35 内存管理", "content": "#### 内存告警机制\n\n```mermaid\ngraph LR\n    M[内存使用] --> T{超过阈值?}\n    T -->|是| A[触发告警]\n    A --> B[阻止发布者]\n    T -->|否| N[正常运行]\n```\n\n#### 配置内存阈值\n\n```ini\n# 相对阈值（默认 60%）\nvm_memory_high_watermark.relative = 0.6\n\n# 绝对阈值（推荐容器环境）\nvm_memory_high_watermark.absolute = 4GB\n\n# 支持单位\n# GB, MB, TB (10的幂)\n# Gi, Mi, Ti (2的幂，Kubernetes风格)\n```\n\n#### 运行时调整\n\n```bash\n# 设置相对阈值\nrabbitmqctl set_vm_memory_high_watermark 0.7\n\n# 设置绝对阈值\nrabbitmqctl set_vm_memory_high_watermark absolute \"4G\"\n```\n\n#### 内存计算策略\n\n```ini\n# RSS 策略（默认Linux）查询进程驻留集大小\nvm_memory_calculation_strategy = rss\n\n# Allocated 策略（默认Windows）查询分配器\nvm_memory_calculation_strategy = allocated\n```\n\n---", "subs": ["内存告警机制", "配置内存阈值", "运行时调整", "内存计算策略"]}, {"title": "3.36 内存使用分析", "content": "#### 内存细分命令\n\n```bash\n# 查看内存使用细分\nrabbitmq-diagnostics memory_breakdown\n\n# 使用 rabbitmqadmin\nrabbitmqadmin show memory_breakdown_in_bytes --node rabbit@hostname\nrabbitmqadmin show memory_breakdown_in_percent --node rabbit@hostname\n```\n\n#### 内存分类\n\n| 类别 | 说明 |\n|------|------|\n| `quorum_queue_procs` | 仲裁队列进程 |\n| `binary` | 消息正文和元数据 |\n| `allocated_unused` | 已分配未使用 |\n| `connection_other` | 连接相关内存 |\n| `connection_readers` | TCP读取缓冲区 |\n| `connection_writers` | TCP写入缓冲区 |\n| `connection_channels` | 通道内存 |\n| `plugins` | 插件使用内存 |\n| `code` | 字节码和元数据 |\n| `mnesia` | 内部数据库 |\n\n#### 强制垃圾回收\n\n```bash\n# 强制GC并查看释放最多内存的进程\nrabbitmqctl eval 'recon:bin_leak(10).'\nrabbitmqctl force_gc\n```\n\n#### 内核页面缓存\n\n> ⚠️ Stream 工作负载可能导致大量页面缓存。页面缓存由OS内核管理，不计入RabbitMQ内存使用。\n\n```bash\n# 非容器环境检查\ncat /proc/meminfo | grep -E \"(Cached|Buffers)\"\n\n# 容器环境检查\ncat /sys/fs/cgroup/memory/memory.stat\n```\n\n---", "subs": ["内存细分命令", "内存分类", "强制垃圾回收", "内核页面缓存"]}, {"title": "3.37 磁盘告警", "content": "#### 配置磁盘限制\n\n```ini\n# 绝对限制（推荐）\ndisk_free_limit.absolute = 2GB\n\n# 相对限制（相对于RAM）\ndisk_free_limit.relative = 1.0\n```\n\n#### 工作原理\n\n- 默认限制：50MB\n- 检查频率：约每10秒\n- 接近限制时：最高 10次/秒\n- 触发时：阻止所有发布者\n- 集群范围：任一节点触发则全集群阻止\n\n#### 运行时调整\n\n```bash\nrabbitmqctl set_disk_free_limit \"2GB\"\n\n# 或设置相对于内存的比例\nrabbitmqctl set_disk_free_limit mem_relative 1.0\n```\n\n---", "subs": ["配置磁盘限制", "工作原理", "运行时调整"]}, {"title": "3.38 资源告警", "content": "#### 告警触发条件\n\n```mermaid\ngraph TD\n    subgraph 告警源\n        M[内存超阈值]\n        D[磁盘空间不足]\n        F[文件描述符耗尽]\n    end\n    \n    M --> A[资源告警]\n    D --> A\n    F --> A\n    \n    A --> B[阻止发布连接]\n    A --> C[禁用心跳监控]\n```\n\n#### 告警行为\n\n| 告警类型 | 触发条件 | 影响 |\n|----------|----------|------|\n| 内存告警 | 超过 `vm_memory_high_watermark` | 阻止发布者 |\n| 磁盘告警 | 低于 `disk_free_limit` | 阻止发布者 |\n| 文件描述符 | 接近系统限制 | 拒绝新连接 |\n\n#### 连接状态\n\n| 状态 | 含义 |\n|------|------|\n| `blocking` | 连接尚未发布，可继续 |\n| `blocked` | 连接已发布，已暂停 |\n\n#### 客户端通知\n\n```python\n# 客户端可以监听 connection.blocked 通知\n# 应用程序应处理发布失败\n# 使用发布者确认跟踪消息\n```\n\n---", "subs": ["告警触发条件", "告警行为", "连接状态", "客户端通知"]}, {"title": "3.39 流控制", "content": "#### 概念\n\n当发布速度超过队列处理能力时，RabbitMQ 自动降低发布连接速度。\n\n#### 流控状态\n\n- 连接显示 `flow` 状态表示正在被限速\n- 通道和队列也可能处于 `flow` 状态\n- 对客户端表现为网络带宽降低\n\n#### 检测方法\n\n```bash\n# 查看连接状态\nrabbitmqctl list_connections pid state\n\n# 查看通道状态\nrabbitmqctl list_channels pid connection state\n\n# 查看队列状态\nrabbitmqctl list_queues name state\n```\n\n#### 流控传播\n\n```mermaid\ngraph LR\n    Q[队列积压] --> C[通道受限]\n    C --> CONN[连接受限]\n    CONN --> P[发布者降速]\n```\n\n#### 最佳实践\n\n- 监控 `flow` 状态连接数\n- 检查消费者是否跟上发布速度\n- 调整预取计数 (`prefetch_count`)\n- 增加消费者数量分摊负载\n\n---", "subs": ["概念", "流控状态", "检测方法", "流控传播", "最佳实践"]}, {"title": "3.40 备份与恢复", "content": "#### 数据类型\n\n| 类型 | 内容 | 存储位置 |\n|------|------|----------|\n| 定义（元数据） | 用户、vhost、队列、交换机、绑定、策略 | 内部数据库（复制到所有节点） |\n| 消息 | 消息正文和状态 | `msg_stores`、`quorum`、`stream` 目录 |\n\n#### 备份定义\n\n```bash\n# 导出定义（推荐方式）\nrabbitmqctl export_definitions /path/to/definitions.json\n\n# 或通过 HTTP API\ncurl -u guest:guest http://localhost:15672/api/definitions > definitions.json\n\n# 导入定义\nrabbitmqctl import_definitions /path/to/definitions.json\n```\n\n#### 备份消息\n\n> ⚠️ 备份消息必须先停止节点\n\n```bash\n# 查找数据目录\nrabbitmq-diagnostics status | grep -A 2 \"Node data directory\"\n\n# 停止节点后复制\n/var/lib/rabbitmq/mnesia/rabbit@hostname/\n├── msg_stores/     # 经典队列消息\n├── quorum/         # 仲裁队列消息\n└── stream/         # 流消息\n```\n\n#### 恢复注意事项\n\n- 必须使用相同的节点名称恢复\n- 仲裁队列/流不支持节点重命名\n- 恢复消息前先确保定义已存在\n\n---", "subs": ["数据类型", "备份定义", "备份消息", "恢复注意事项"]}, {"title": "3.41 运行时调优", "content": "#### 调度器配置\n\n```bash\n# 设置调度器数量（CPU核心数）\nexport RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=\"+S 4:4\"\n\n# 禁用推测性忙等待（降低CPU使用）\nexport RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=\"+sbwt none +sbwtdcpu none +sbwtdio none\"\n```\n\n#### 线程统计\n\n```bash\n# 查看线程时间分布\nrabbitmq-diagnostics runtime_thread_stats\n```\n\n| 状态 | 说明 |\n|------|------|\n| `emulator` | 代码执行 |\n| `port` | I/O 活动 |\n| `gc` | 垃圾回收 |\n| `sleep` | 休眠/空闲 |\n\n#### 内存分配器\n\n```bash\n# 默认分配器参数\nRABBITMQ_DEFAULT_ALLOC_ARGS=\"+MBas ageffcbf +MHas ageffcbf +MBlmbcs 512 +MHlmbcs 512 +MMmcs 30\"\n\n# 预分配更大区域减少碎片\nexport RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=\"+MMscs 1024\"\n```\n\n#### 进程和Atom限制\n\n```bash\n# Erlang 进程数量（默认约100万）\nexport RABBITMQ_MAX_NUMBER_OF_PROCESSES=2000000\n\n# Atom 限制（默认500万）\nexport RABBITMQ_MAX_NUMBER_OF_ATOMS=10000000\n```\n\n#### 节点间通信缓冲区\n\n```bash\n# 增大缓冲区（默认128MB，值为KB）\nexport RABBITMQ_DISTRIBUTION_BUFFER_SIZE=256000\n```\n\n---", "subs": ["调度器配置", "线程统计", "内存分配器", "进程和Atom限制", "节点间通信缓冲区"]}, {"title": "3.42 持久化配置", "content": "#### 队列类型存储特性\n\n| 队列类型 | 存储方式 | 可调参数 |\n|----------|----------|----------|\n| 仲裁队列 | Raft WAL日志 | WAL段大小 |\n| 流 | 日志文件 | 无 |\n| 经典队列 v2 | 新索引+存储 | 嵌入阈值 |\n| 经典队列 v1 | 索引+消息存储 | 嵌入阈值 |\n\n#### 仲裁队列 WAL 配置\n\n```ini\n# WAL 文件达到此大小时刷新到磁盘\nraft.wal_max_size_bytes = 32000000\n```\n\n> 建议分配至少 WAL 大小 3 倍的内存\n\n#### 经典队列版本切换\n\n```ini\n# 默认使用 v2（推荐）\nclassic_queue.default_version = 2\n```\n\n#### 消息嵌入队列索引\n\n```ini\n# 小于此字节的消息嵌入队列索引（默认 4096）\nqueue_index_embed_msgs_below = 4096\n```\n\n---", "subs": ["队列类型存储特性", "仲裁队列 WAL 配置", "经典队列版本切换", "消息嵌入队列索引"]}, {"title": "3.43 生产环境检查清单", "content": "#### 最低硬件要求\n\n| 资源 | 最低要求 |\n|------|----------|\n| CPU | 4 核心 |\n| 内存 | 4 GiB |\n| 存储 | 持久化 SSD/NVMe |\n\n> ⚠️ RabbitMQ 不应与其他 I/O 密集型服务共置\n\n#### 存储建议\n\n- 使用持久化存储（非瞬态）\n- 优先本地 SSD/NVMe over NAS\n- 数据目录不得共享\n- 避免分布式文件系统\n\n#### 内存配置\n\n```ini\n# 内存阈值（推荐 0.4-0.7）\nvm_memory_high_watermark.relative = 0.6\n\n# 容器环境使用绝对值\nvm_memory_high_watermark.absolute = 4GB\n```\n\n#### 磁盘配置\n\n```ini\n# 磁盘空间限制（推荐与内存阈值相同）\ndisk_free_limit.absolute = 4GB\n```\n\n#### 文件句柄限制\n\n```bash\n# 生产环境至少 50K\n# 推荐计算：连接数 × 2 + 队列数\nulimit -n 500000\n```\n\n#### 安全检查\n\n- [ ] 删除默认 guest 用户\n- [ ] 每个应用使用独立用户\n- [ ] 禁用匿名登录\n- [ ] 配置 TLS 加密\n- [ ] 限制节点间通信端口访问\n- [ ] 确保 Erlang Cookie 使用安全值\n\n#### 集群检查\n\n- [ ] 使用奇数节点（3、5、7）\n- [ ] 选择分区处理策略\n- [ ] 节点时间同步（NTP）\n- [ ] 配置队列复制因子\n\n#### 网络带宽估算\n\n```\n最小带宽 = 消息速率 × 消息大小 × 110% × 8 bit/B\n例：20K msg/s × 6KB × 1.1 × 8 = ~1 Gbps\n```\n\n#### 应用程序最佳实践\n\n- 使用长连接而非频繁开关\n- 发布者和消费者使用独立连接\n- 实现自动重连机制\n- 减少不必要的通道使用\n- 避免轮询消费（basic.get）\n\n---", "subs": ["最低硬件要求", "存储建议", "内存配置", "磁盘配置", "文件句柄限制", "安全检查", "集群检查", "网络带宽估算", "应用程序最佳实践"]}]}, {"title": "第四章: 监控 RabbitMQ", "sections": [{"title": "4.1 监控概述", "content": "> 本章介绍 RabbitMQ 的可观测性，包括指标采集、告警配置、调试工具等。\n\n\n#### 4.1.1 基础设施与内核级指标\n\n对于 RabbitMQ 节点，需要监控的基础设施和操作系统级别指标包括：\n\n| 类别 | 关键指标 |\n|------|----------|\n| **CPU** | 使用率、iowait、steal（虚拟化环境）|\n| **内存** | 可用内存、已用内存、缓存/缓冲区 |\n| **磁盘** | 可用空间、IOps、吞吐量、读写延迟 |\n| **网络** | 吞吐量、TCP 连接数、打开的文件描述符 |\n| **虚拟化** | 虚拟机时间同步状态 |\n\n#### 4.1.2 RabbitMQ 关键指标分类\n\n```mermaid\ngraph TD\n    subgraph 节点指标\n        N1[内存使用]\n        N2[磁盘空间]\n        N3[文件描述符]\n        N4[TCP/Socket 连接]\n        N5[进程限制]\n    end\n    \n    subgraph 集群指标\n        C1[节点健康状态]\n        C2[网络分区]\n        C3[资源告警]\n    end\n    \n    subgraph 消息指标\n        M1[队列深度]\n        M2[消息速率]\n        M3[消费者数量]\n        M4[Unacked 消息]\n    end\n    \n    subgraph 连接指标\n        L1[连接总数]\n        L2[通道总数]\n        L3[连接状态]\n    end\n```\n\n#### 4.1.3 健康检查端点\n\nRabbitMQ 提供多种健康检查端点：\n\n| 端点 | 用途 | 适用场景 |\n|------|------|----------|\n| `/api/health/checks/alarms` | 检查资源告警 | 基本健康检查 |\n| `/api/health/checks/local-alarms` | 检查本地节点告警 | 单节点检查 |\n| `/api/health/checks/node-is-quorum-critical` | 检查仲裁队列临界状态 | 节点维护前 |\n| `/api/health/checks/port-listener/:port` | 检查端口监听状态 | 协议可用性 |\n| `/api/health/checks/virtual-hosts` | 检查所有 vhost | 应用健康检查 |\n\n**CLI 健康检查命令：**\n\n```bash\n# 基本检查\nrabbitmq-diagnostics check_running\nrabbitmq-diagnostics check_local_alarms\n\n# Kubernetes 存活探针推荐\nrabbitmq-diagnostics check_port_connectivity\n\n# 就绪探针推荐\nrabbitmq-diagnostics check_if_node_is_quorum_critical\n```\n\n#### 4.1.4 日志监控\n\n推荐监控的日志事件：\n\n```bash\n# 连接错误\nconnection_closed_with_no_data_received\n\n# 认证失败\nrabbit_auth_backend_*\n\n# 集群问题\nmnesia_* | inconsistent_cluster\n\n# 资源告警\nalarm_set | alarm_cleared\n```\n\n---", "subs": ["4.1.1 基础设施与内核级指标", "4.1.2 RabbitMQ 关键指标分类", "4.1.3 健康检查端点", "4.1.4 日志监控"]}, {"title": "4.2 Prometheus 集成", "content": "#### 4.2.1 架构概览\n\n```mermaid\ngraph LR\n    RMQ[RabbitMQ<br/>rabbitmq_prometheus 插件] -->|:15692/metrics| P[Prometheus]\n    P -->|PromQL| G[Grafana]\n    P -->|AlertRules| AM[Alertmanager]\n    AM -->|Notify| N[通知渠道]\n    \n    subgraph RabbitMQ Cluster\n        RMQ\n        RMQ2[Node 2]\n        RMQ3[Node 3]\n    end\n```\n\n#### 4.2.2 启用 Prometheus 插件\n\n```bash\n# 启用插件\nrabbitmq-plugins enable rabbitmq_prometheus\n\n# 验证端点\ncurl -s localhost:15692/metrics | head -20\n\n# 聚合端点（所有节点指标）\ncurl -s localhost:15692/metrics/cluster\n```\n\n#### 4.2.3 Prometheus 抓取配置\n\n```yaml\n# prometheus.yml\nscrape_configs:\n  # 每个节点单独抓取（推荐）\n  - job_name: rabbitmq-individual\n    static_configs:\n      - targets:\n          - rabbit1:15692\n          - rabbit2:15692\n          - rabbit3:15692\n    metrics_path: /metrics\n\n  # 或使用聚合端点\n  - job_name: rabbitmq-cluster\n    static_configs:\n      - targets: ['rabbit1:15692']\n    metrics_path: /metrics/cluster\n```\n\n#### 4.2.4 核心监控指标\n\n**队列指标：**\n\n| 指标名 | 含义 |\n|--------|------|\n| `rabbitmq_queue_messages` | 队列消息总数 |\n| `rabbitmq_queue_messages_ready` | 可投递消息数 |\n| `rabbitmq_queue_messages_unacked` | 未确认消息数 |\n| `rabbitmq_queue_consumers` | 消费者数量 |\n| `rabbitmq_queue_messages_published_total` | 发布消息计数器 |\n| `rabbitmq_queue_messages_delivered_total` | 投递消息计数器 |\n\n**连接与通道指标：**\n\n| 指标名 | 含义 |\n|--------|------|\n| `rabbitmq_connections` | 当前连接数 |\n| `rabbitmq_channels` | 当前通道数 |\n| `rabbitmq_connection_incoming_bytes_total` | 入站流量 |\n| `rabbitmq_connection_outgoing_bytes_total` | 出站流量 |\n\n**节点指标：**\n\n| 指标名 | 含义 |\n|--------|------|\n| `rabbitmq_process_resident_memory_bytes` | 进程 RSS 内存 |\n| `rabbitmq_disk_space_available_bytes` | 可用磁盘空间 |\n| `rabbitmq_alarms_memory_used_watermark` | 内存告警状态 |\n| `rabbitmq_alarms_free_disk_space_watermark` | 磁盘告警状态 |\n\n#### 4.2.5 常用告警规则\n\n```yaml\ngroups:\n  - name: rabbitmq-alerts\n    rules:\n      # 队列积压告警\n      - alert: RabbitMQQueueBacklog\n        expr: rabbitmq_queue_messages > 10000\n        for: 5m\n        labels:\n          severity: warning\n        annotations:\n          summary: \"队列 {{ $labels.queue }} 积压消息超过 10000\"\n\n      # 资源告警触发\n      - alert: RabbitMQResourceAlarm\n        expr: rabbitmq_alarms_memory_used_watermark == 1\n        for: 0m\n        labels:\n          severity: critical\n        annotations:\n          summary: \"节点 {{ $labels.instance }} 触发内存告警\"\n\n      # 节点下线\n      - alert: RabbitMQNodeDown\n        expr: up{job=\"rabbitmq\"} == 0\n        for: 1m\n        labels:\n          severity: critical\n        annotations:\n          summary: \"RabbitMQ 节点 {{ $labels.instance }} 不可达\"\n\n      # Unacked 消息堆积\n      - alert: RabbitMQUnackedMessagesHigh\n        expr: rabbitmq_queue_messages_unacked > 1000\n        for: 5m\n        labels:\n          severity: warning\n        annotations:\n          summary: \"队列 {{ $labels.queue }} 有大量未确认消息\"\n```\n\n#### 4.2.6 性能调优\n\n```ini\n# rabbitmq.conf\n\n# 减少详细指标暴露（生产环境推荐）\nprometheus.return_per_object_metrics = false\n\n# 调整抓取超时\nprometheus.tcp_listen_options.send_timeout = 15000\n```\n\n---", "subs": ["4.2.1 架构概览", "4.2.2 启用 Prometheus 插件", "4.2.3 Prometheus 抓取配置", "4.2.4 核心监控指标", "4.2.5 常用告警规则", "4.2.6 性能调优"]}, {"title": "4.3 事件交换机", "content": "#### 4.3.1 概述\n\n`rabbitmq_event_exchange` 插件将内部事件发布到 `amq.rabbitmq.event` 主题交换机，允许应用程序订阅系统事件。\n\n```mermaid\ngraph LR\n    subgraph RabbitMQ\n        E[内部事件] -->|发布| EX[amq.rabbitmq.event<br/>topic exchange]\n        EX -->|connection.*| Q1[连接事件队列]\n        EX -->|queue.*| Q2[队列事件队列]\n        EX -->|user.*| Q3[用户事件队列]\n    end\n    \n    Q1 --> C1[审计消费者]\n    Q2 --> C2[监控消费者]\n    Q3 --> C3[安全消费者]\n```\n\n#### 4.3.2 启用插件\n\n```bash\nrabbitmq-plugins enable rabbitmq_event_exchange\n```\n\n#### 4.3.3 可用事件类型\n\n| 路由键模式 | 事件类型 |\n|------------|----------|\n| `connection.created` | 新连接建立 |\n| `connection.closed` | 连接关闭 |\n| `channel.created` | 通道创建 |\n| `channel.closed` | 通道关闭 |\n| `queue.created` | 队列声明 |\n| `queue.deleted` | 队列删除 |\n| `exchange.created` | 交换机声明 |\n| `exchange.deleted` | 交换机删除 |\n| `binding.created` | 绑定创建 |\n| `binding.deleted` | 绑定删除 |\n| `user.created` | 用户创建 |\n| `user.deleted` | 用户删除 |\n| `user.authentication.success` | 认证成功 |\n| `user.authentication.failure` | 认证失败 |\n| `permission.created` | 权限授予 |\n| `permission.deleted` | 权限撤销 |\n| `vhost.created` | 虚拟主机创建 |\n| `vhost.deleted` | 虚拟主机删除 |\n| `alarm.set` | 告警触发 |\n| `alarm.cleared` | 告警解除 |\n| `policy.set` | 策略设置 |\n| `policy.cleared` | 策略清除 |\n\n#### 4.3.4 订阅事件示例\n\n**Python 示例：**\n\n```python\nimport pika\n\nconnection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))\nchannel = connection.channel()\n\n# 声明队列并绑定到事件交换机\nresult = channel.queue_declare(queue='', exclusive=True)\nqueue_name = result.method.queue\n\n# 订阅所有连接事件\nchannel.queue_bind(\n    exchange='amq.rabbitmq.event',\n    queue=queue_name,\n    routing_key='connection.*'\n)\n\n# 订阅所有用户认证事件\nchannel.queue_bind(\n    exchange='amq.rabbitmq.event',\n    queue=queue_name,\n    routing_key='user.authentication.*'\n)\n\ndef callback(ch, method, properties, body):\n    print(f\"Event: {method.routing_key}\")\n    print(f\"Properties: {properties.headers}\")\n    print(f\"Body: {body}\")\n\nchannel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)\nchannel.start_consuming()\n```\n\n#### 4.3.5 常见用例\n\n- **安全审计**：监控 `user.authentication.*` 事件记录登录尝试\n- **资源追踪**：监控 `queue.created`/`queue.deleted` 跟踪队列生命周期\n- **告警集成**：监控 `alarm.*` 事件触发外部告警\n- **合规日志**：记录所有管理操作用于审计\n\n---", "subs": ["4.3.1 概述", "4.3.2 启用插件", "4.3.3 可用事件类型", "4.3.4 订阅事件示例", "4.3.5 常见用例"]}, {"title": "4.4 Firehose 调试", "content": "#### 4.4.1 概述\n\nFirehose 是一个调试功能，将所有经过 broker 的消息副本发布到特殊交换机，用于调试和追踪消息流。\n\n> **⚠️ 警告**：Firehose 会显著增加系统负载，仅用于调试目的，禁止在生产环境启用！\n\n```mermaid\ngraph LR\n    P[Publisher] -->|消息| EX[交换机]\n    EX -->|路由| Q[目标队列]\n    \n    EX -.->|副本| FE[amq.rabbitmq.trace<br/>Firehose Exchange]\n    Q -.->|副本| FE\n    \n    FE -->|publish.*| TQ1[发布追踪队列]\n    FE -->|deliver.*| TQ2[投递追踪队列]\n    \n    TQ1 --> D[调试应用]\n    TQ2 --> D\n```\n\n#### 4.4.2 启用与禁用\n\n```bash\n# 启用 Firehose（仅调试用）\nrabbitmqctl trace_on\n\n# 指定 vhost\nrabbitmqctl trace_on -p my_vhost\n\n# 禁用 Firehose\nrabbitmqctl trace_off\n\n# 禁用指定 vhost\nrabbitmqctl trace_off -p my_vhost\n```\n\n#### 4.4.3 追踪消息格式\n\n启用后，消息会被发布到 `amq.rabbitmq.trace` 交换机：\n\n| 路由键格式 | 含义 |\n|------------|------|\n| `publish.{exchangename}` | 发布到指定交换机的消息 |\n| `deliver.{queuename}` | 投递到指定队列的消息 |\n\n**追踪消息头部包含：**\n\n| Header | 含义 |\n|--------|------|\n| `exchange_name` | 原始交换机名称 |\n| `routing_keys` | 消息的路由键列表 |\n| `connection` | 发布者连接名称 |\n| `channel` | 发布者通道号 |\n| `user` | 发布消息的用户 |\n| `routed_queues` | 消息路由到的队列列表 |\n| `redelivered` | 是否为重新投递（仅 deliver 事件）|\n\n#### 4.4.4 订阅追踪消息\n\n```bash\n# 使用 rabbitmqadmin 订阅所有追踪消息\nrabbitmqadmin declare queue name=trace-queue\n\nrabbitmqadmin declare binding \\\n    source=amq.rabbitmq.trace \\\n    destination=trace-queue \\\n    routing_key=\"#\"\n\n# 获取追踪消息\nrabbitmqadmin get queue=trace-queue count=10\n```\n\n**Python 示例：**\n\n```python\nimport pika\n\nconnection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))\nchannel = connection.channel()\n\n# 绑定到所有发布事件\nresult = channel.queue_declare(queue='', exclusive=True)\nqueue_name = result.method.queue\n\nchannel.queue_bind(\n    exchange='amq.rabbitmq.trace',\n    queue=queue_name,\n    routing_key='publish.#'\n)\n\ndef callback(ch, method, properties, body):\n    print(f\"Traced: {method.routing_key}\")\n    print(f\"Headers: {properties.headers}\")\n    print(f\"Body: {body[:100]}...\")\n\nchannel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)\nchannel.start_consuming()\n```\n\n#### 4.4.5 使用场景\n\n| 场景 | 说明 |\n|------|------|\n| **消息路由调试** | 验证消息是否正确路由到目标队列 |\n| **消息内容检查** | 检查消息格式和内容是否正确 |\n| **性能分析** | 分析消息流量和模式 |\n| **故障排查** | 追踪消息丢失或延迟原因 |\n\n#### 4.4.6 注意事项\n\n1. **性能影响**：Firehose 会复制每条消息，大幅增加负载\n2. **存储压力**：追踪队列会快速积累消息，需及时消费\n3. **安全风险**：追踪消息包含完整消息内容，注意敏感数据\n4. **临时使用**：调试完成后必须立即禁用\n\n---", "subs": ["4.4.1 概述", "4.4.2 启用与禁用", "4.4.3 追踪消息格式", "4.4.4 订阅追踪消息", "4.4.5 使用场景", "4.4.6 注意事项"]}]}, {"title": "附录", "sections": [{"title": "A. 常用端口列表", "content": "| 端口 | 用途 |\n|------|------|\n| 5672 | AMQP |\n| 5671 | AMQP over TLS |\n| 15672 | Management UI |\n| 15692 | Prometheus metrics |\n| 25672 | Inter-node communication |\n| 4369 | epmd |\n| 1883 | MQTT |\n| 8883 | MQTT over TLS |\n| 61613 | STOMP |", "subs": []}, {"title": "B. 常用命令速查表", "content": "#### 服务管理\n\n```bash\n# 启动/停止/重启\nrabbitmqctl start_app\nrabbitmqctl stop_app\nrabbitmqctl stop\n\n# 状态检查\nrabbitmqctl status\nrabbitmqctl cluster_status\nrabbitmq-diagnostics check_running\n```\n\n#### 用户与权限\n\n```bash\n# 用户管理\nrabbitmqctl add_user <user> <password>\nrabbitmqctl delete_user <user>\nrabbitmqctl change_password <user> <newpass>\nrabbitmqctl list_users\n\n# 权限管理\nrabbitmqctl set_permissions -p <vhost> <user> \".*\" \".*\" \".*\"\nrabbitmqctl clear_permissions -p <vhost> <user>\nrabbitmqctl list_permissions -p <vhost>\n```\n\n#### 队列与交换机\n\n```bash\n# 列出资源\nrabbitmqctl list_queues name messages consumers\nrabbitmqctl list_exchanges name type\nrabbitmqctl list_bindings\n\n# 队列操作\nrabbitmqctl purge_queue <queue>\nrabbitmqctl delete_queue <queue>\n```\n\n#### 集群管理\n\n```bash\n# 加入集群\nrabbitmqctl stop_app\nrabbitmqctl join_cluster rabbit@node1\nrabbitmqctl start_app\n\n# 离开集群\nrabbitmqctl stop_app\nrabbitmqctl reset\nrabbitmqctl start_app\n\n# 强制启动\nrabbitmqctl force_boot\n```\n\n#### 定义导入导出\n\n```bash\n# 导出\nrabbitmqctl export_definitions /path/to/definitions.json\n\n# 导入\nrabbitmqctl import_definitions /path/to/definitions.json\n```", "subs": ["服务管理", "用户与权限", "队列与交换机", "集群管理", "定义导入导出"]}, {"title": "C. 配置参数参考", "content": "#### 核心配置 (rabbitmq.conf)\n\n| 参数 | 默认值 | 说明 |\n|------|--------|------|\n| `listeners.tcp.default` | 5672 | AMQP 端口 |\n| `listeners.ssl.default` | 5671 | AMQP-TLS 端口 |\n| `management.listener.port` | 15672 | 管理界面端口 |\n| `vm_memory_high_watermark.relative` | 0.4 | 内存告警阈值（相对值） |\n| `disk_free_limit.relative` | 1.0 | 磁盘告警阈值（相对于 RAM） |\n| `channel_max` | 2047 | 每连接最大通道数 |\n| `heartbeat` | 60 | 心跳间隔（秒） |\n| `default_vhost` | / | 默认虚拟主机 |\n| `default_user` | guest | 默认用户名 |\n| `default_pass` | guest | 默认密码 |\n| `log.file.level` | info | 日志级别 |\n\n#### 集群配置\n\n| 参数 | 默认值 | 说明 |\n|------|--------|------|\n| `cluster_formation.peer_discovery_backend` | classic_config | 节点发现方式 |\n| `cluster_partition_handling` | ignore | 分区处理策略 |\n| `cluster_keepalive_interval` | 10000 | 集群心跳间隔（毫秒） |\n\n#### 队列配置\n\n| 参数 | 默认值 | 说明 |\n|------|--------|------|\n| `queue_leader_locator` | client-local | 队列领导者放置策略 |\n| `quorum_queue.x-max-in-memory-length` | - | 仲裁队列内存中最大消息数 |\n| `classic_queue.default_version` | 2 | 经典队列默认版本 |", "subs": ["核心配置 (rabbitmq", "集群配置", "队列配置"]}, {"title": "D. 故障排查指南", "content": "#### 连接问题\n\n| 症状 | 可能原因 | 解决方案 |\n|------|----------|----------|\n| 连接被拒绝 | 端口未监听 | 检查 `rabbitmqctl status` |\n| 认证失败 | 密码错误/用户不存在 | 检查 `rabbitmqctl list_users` |\n| 权限不足 | 缺少 vhost 权限 | 使用 `set_permissions` 授权 |\n| 连接断开 | 心跳超时 | 调整心跳间隔或网络 |\n\n#### 消息堆积\n\n| 症状 | 可能原因 | 解决方案 |\n|------|----------|----------|\n| 队列消息增长 | 消费者慢/不存在 | 增加消费者或优化处理 |\n| Unacked 堆积 | 消费者未确认 | 检查 prefetch 和 ack 逻辑 |\n| 发布被阻塞 | 资源告警触发 | 检查内存/磁盘，清理队列 |\n\n#### 集群问题\n\n| 症状 | 可能原因 | 解决方案 |\n|------|----------|----------|\n| 节点无法加入 | Cookie 不匹配 | 同步 `.erlang.cookie` |\n| 网络分区 | 网络抖动/节点挂起 | 根据策略恢复或手动干预 |\n| 节点不可用 | 进程崩溃/OOM | 检查日志，重启节点 |\n\n#### 性能问题\n\n| 症状 | 可能原因 | 解决方案 |\n|------|----------|----------|\n| 吞吐量低 | 持久化慢/网络瓶颈 | 使用 SSD，优化网络 |\n| 延迟高 | 队列过长/资源不足 | 扩容，优化队列数量 |\n| 内存增长 | 消息堆积/连接泄漏 | 清理队列，限制连接 |\n\n#### 诊断命令\n\n```bash\n# 整体状态\nrabbitmq-diagnostics status\n\n# 内存使用分析\nrabbitmq-diagnostics memory_breakdown\n\n# 网络连接检查\nrabbitmq-diagnostics check_port_connectivity\n\n# 告警检查\nrabbitmq-diagnostics check_local_alarms\n\n# 日志检查\ntail -f /var/log/rabbitmq/rabbit@hostname.log\n```", "subs": ["连接问题", "消息堆积", "集群问题", "性能问题", "诊断命令"]}, {"title": "E. 术语表", "content": "| 术语 | 英文 | 说明 |\n|------|------|------|\n| 交换机 | Exchange | 接收消息并根据绑定规则路由到队列 |\n| 队列 | Queue | 存储消息的缓冲区 |\n| 绑定 | Binding | 交换机与队列之间的路由规则 |\n| 路由键 | Routing Key | 用于消息路由的字符串标识 |\n| 虚拟主机 | Virtual Host (vhost) | 逻辑隔离的消息代理实例 |\n| 生产者 | Publisher/Producer | 发送消息的客户端应用 |\n| 消费者 | Consumer | 接收并处理消息的客户端应用 |\n| 通道 | Channel | 复用 TCP 连接的轻量级连接 |\n| 连接 | Connection | 应用与 RabbitMQ 之间的 TCP 连接 |\n| 确认 | Acknowledgement (ack) | 消费者确认已处理消息 |\n| 预取 | Prefetch | 限制未确认消息的数量 |\n| 持久化 | Durable | 重启后保留的队列/交换机/消息 |\n| 死信 | Dead Letter | 无法正常处理的消息 |\n| 仲裁队列 | Quorum Queue | 基于 Raft 的复制队列 |\n| 流 | Stream | 高吞吐量的追加日志结构 |\n| 联邦 | Federation | 跨集群消息复制 |\n| Shovel | Shovel | 队列间消息转发工具 |\n| 策略 | Policy | 动态应用于队列/交换机的配置 |\n| 告警 | Alarm | 资源超限触发的警告状态 |\n| 流控 | Flow Control | 背压机制，防止过载 |\n\n---", "subs": []}, {"title": "更新日志", "content": "| 日期 | 版本 | 更新内容 |\n|------|------|----------|\n| 2025-12-05 | v1.0 | 初始版本，创建文档框架 |\n| 2025-12-05 | v2.0 | 完成第一章（安装与升级）和第二章（使用 RabbitMQ） |\n| 2025-12-05 | v3.0 | 完成第三章（管理 RabbitMQ）43 个小节 |\n| 2025-12-05 | v4.0 | 完成第四章（监控 RabbitMQ）4 个小节及附录完善 |", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

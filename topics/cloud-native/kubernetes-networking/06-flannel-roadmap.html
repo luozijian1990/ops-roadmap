@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 容器网络学习笔记 · 第六册：Flannel · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 容器网络学习笔记 · 第六册：Flannel</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 容器网络学习笔记 · 第六册：Flannel", "intro": "", "parts": [{"title": "Flannel CNI", "sections": [{"title": "第四十五章 Flannel-TUN-TAP 精讲", "content": "本章深入讲解 Linux TUN/TAP 虚拟网络设备，这是理解 Flannel UDP 模式等网络方案的基础。\n\n#### 45.1 背景与概述\n\n##### 45.1.1 Flannel 简介\n\nFlannel 是由 CoreOS 开源的轻量级 CNI 方案，适合快速部署 Kubernetes 网络。\n\n**资源获取**：\n\n| 资源 | 地址 |\n|:---|:---|\n| GitHub | <https://github.com/flannel-io/flannel> |\n| Slack | Kubernetes Slack #flannel 频道 |\n\n##### 45.1.2 Flannel 与 Calico 的核心区别\n\n| 特性 | Flannel | Calico |\n|:---|:---|:---|\n| 同节点通信 | L2 交换（Bridge） | L3 路由 |\n| Pod 网络 | 挂在交换机上 | 挂在路由器上 |\n| Pod 掩码 | /24（同网段） | /32（独立主机路由） |\n| 复杂度 | 简单 | 较复杂 |\n\n```mermaid\ngraph LR\n    subgraph \"Flannel 同节点通信\"\n        Pod1F[\"Pod A<br/>10.244.1.2/24\"]\n        Pod2F[\"Pod B<br/>10.244.1.3/24\"]\n        Bridge[\"cni0 Bridge<br/>L2 交换\"]\n    end\n    \n    subgraph \"Calico 同节点通信\"\n        Pod1C[\"Pod A<br/>10.244.1.2/32\"]\n        Pod2C[\"Pod B<br/>10.244.1.3/32\"]\n        Router[\"L3 路由\"]\n    end\n    \n    Pod1F --> Bridge\n    Pod2F --> Bridge\n    Pod1C --> Router\n    Pod2C --> Router\n```\n\n#### 45.2 TUN/TAP 设备原理\n\n##### 45.2.1 什么是 TUN/TAP 设备\n\nTUN/TAP 是 Linux 内核提供的虚拟网络设备，用于在**用户空间**和**内核空间**之间传递网络数据。\n\n```mermaid\ngraph TB\n    subgraph \"用户空间 User Space\"\n        App[\"应用程序<br/>如 flanneld\"]\n        FD[\"/dev/net/tun<br/>字符设备\"]\n    end\n    \n    subgraph \"内核空间 Kernel Space\"\n        Stack[\"TCP/IP 协议栈\"]\n        TUN[\"TUN/TAP 设备<br/>flannel0\"]\n        NIC[\"物理网卡<br/>eth0\"]\n    end\n    \n    App <-->|\"read/write\"| FD\n    FD <-->|\"数据传递\"| TUN\n    TUN <-->|\"L3/L2\"| Stack\n    Stack <--> NIC\n```\n\n##### 45.2.2 TUN 与 TAP 的区别\n\n| 特性 | TUN 设备 | TAP 设备 |\n|:---|:---|:---|\n| 工作层次 | L3 网络层 | L2 数据链路层 |\n| 处理数据 | IP 包（裸 IP） | 以太网帧（含 MAC） |\n| MAC 地址 | 无 | 有 |\n| 典型应用 | VPN、Flannel UDP | 虚拟机网桥、OpenVPN TAP |\n| 抓包格式 | raw IP packet | 完整以太网帧 |\n\n```mermaid\ngraph LR\n    subgraph \"TUN 设备 - L3\"\n        TUN[\"flannel0<br/>TUN\"]\n        IP[\"IP 包<br/>无 MAC\"]\n    end\n    \n    subgraph \"TAP 设备 - L2\"\n        TAP[\"tap0<br/>TAP\"]\n        ETH[\"以太网帧<br/>有 MAC\"]\n    end\n    \n    TUN --> IP\n    TAP --> ETH\n```\n\n##### 45.2.3 TUN/TAP 数据传输流程\n\n```mermaid\nsequenceDiagram\n    participant App as 应用程序 A\n    participant Stack as TCP/IP 协议栈\n    participant TUN as TUN 设备\n    participant DEV as /dev/net/tun\n    participant Proc as flanneld 进程\n    participant NIC as 物理网卡\n    \n    App->>Stack: 1. 发送数据包\n    Stack->>TUN: 2. 路由到 TUN 设备\n    TUN->>DEV: 3. 写入字符设备\n    DEV->>Proc: 4. 用户空间读取\n    Proc->>Proc: 5. 封装处理\n    Proc->>Stack: 6. 重新发送\n    Stack->>NIC: 7. 物理网卡发出\n```\n\n**数据流经过程说明**：\n\n1. **应用发包**：用户空间应用产生数据包\n2. **协议栈处理**：经过 TCP/IP 协议栈\n3. **路由到 TUN**：根据路由表转发到 TUN 设备\n4. **字符设备读取**：数据写入 `/dev/net/tun`\n5. **用户空间处理**：flanneld 进程读取数据\n6. **封装转发**：flanneld 封装后重新发送\n7. **物理发送**：通过物理网卡发出\n\n#### 45.3 TUN/TAP 与内核模块的效率对比\n\n##### 45.3.1 效率差异\n\n```mermaid\ngraph TB\n    subgraph \"TUN/TAP 方式 - 效率较低\"\n        U1[\"用户空间\"] --> K1[\"内核空间\"]\n        K1 --> U1\n        U1 --> K2[\"内核空间\"]\n        K2 --> Out1[\"物理网卡\"]\n    end\n    \n    subgraph \"内核模块方式 - 效率较高\"\n        KM[\"内核模块<br/>VxLAN\"]\n        KM --> Out2[\"物理网卡\"]\n    end\n```\n\n| 方式 | 数据路径 | 上下文切换 | 效率 |\n|:---|:---|:---|:---|\n| TUN/TAP | 用户空间 ↔ 内核空间 多次 | 多次 | 较低 |\n| 内核模块 | 全程内核空间 | 无 | 较高 |\n\n##### 45.3.2 为什么 TUN/TAP 效率低\n\n```mermaid\nflowchart LR\n    A[\"内核空间<br/>原始数据\"] --> B[\"用户空间<br/>数据拷贝\"]\n    B --> C[\"用户空间处理\"]\n    C --> D[\"内核空间<br/>数据拷贝\"]\n    D --> E[\"物理网卡\"]\n    \n    style B fill:#f9f,stroke:#333\n    style D fill:#f9f,stroke:#333\n```\n\n**效率低的原因**：\n\n1. **数据拷贝开销**：内核 ↔ 用户空间多次拷贝\n2. **上下文切换**：用户态/内核态切换消耗 CPU\n3. **中断处理**：额外的中断开销\n4. **调度延迟**：用户空间进程调度不确定\n\n> [!NOTE]\n> **典型案例**：OpenVPN 使用 TUN/TAP 设备，效率低于 WireGuard（内核模块实现）\n\n#### 45.4 Flannel 中的 TUN 设备实践\n\n##### 45.4.1 查看 TUN 设备\n\n```bash\n# 查看网络设备详情\nip -d link show flannel0\n\n# 输出示例\n# flannel0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP> mtu 1472 qdisc pfifo_fast\n#     link/none\n#     tun type tun pi off vnet_hdr off persist off\n```\n\n**关键信息解读**：\n\n| 字段 | 含义 |\n|:---|:---|\n| `link/none` | 无 MAC 地址（TUN 设备特征） |\n| `tun type tun` | TUN 类型设备 |\n| `POINTOPOINT` | 点对点连接 |\n\n##### 45.4.2 查看 TUN/TAP 设备类型\n\n```bash\n# 列出所有 TUN/TAP 设备\nip tuntap list\n\n# 输出示例\n# flannel0: tun\n```\n\n##### 45.4.3 查看设备关联进程\n\n```bash\n# 查看 TUN 设备关联的进程\nip -d tuntap show\n\n# 输出示例\n# flannel0: tun persist\n#   Attached to processes: flanneld(1220)\n```\n\n**这说明**：\n\n- `flannel0` 设备一端连接 TCP/IP 协议栈\n- 另一端连接用户空间的 `flanneld` 进程\n\n##### 45.4.4 验证进程\n\n```bash\n# 查看 flanneld 进程\nps aux | grep flanneld\n\n# 输出示例\n# root  1220  0.0  0.5 1234567 12345 ?  Sl  10:00  0:01 /opt/bin/flanneld\n\n# 查看网络连接\nnetstat -anp | grep flanneld\n```\n\n#### 45.5 Flannel UDP 模式配置\n\n##### 45.5.1 配置示例\n\n```yaml\n# ConfigMap 配置\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"udp\"\n      }\n    }\n```\n\n##### 45.5.2 挂载 TUN 设备\n\n在非特权模式下，需要显式挂载 `/dev/net/tun`：\n\n```yaml\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: kube-flannel-ds\nspec:\n  template:\n    spec:\n      containers:\n      - name: kube-flannel\n        volumeMounts:\n        - name: dev-net-tun\n          mountPath: /dev/net/tun\n      volumes:\n      - name: dev-net-tun\n        hostPath:\n          path: /dev/net/tun\n```\n\n> [!WARNING]\n> **非特权模式注意事项**\n>\n> 在非特权模式（`privileged: false`）下：\n>\n> - 必须显式挂载 `/dev/net/tun`\n> - 需要添加 `NET_ADMIN` 和 `NET_RAW` capabilities\n> - 特权模式下无需额外配置\n\n##### 45.5.3 验证 UDP 模式\n\n```bash\n# 查看 flanneld 日志\nkubectl logs -n kube-flannel -l app=flannel\n\n# 应该看到\n# Found network config - Backend type: udp\n```\n\n#### 45.6 其他 TUN/TAP 应用场景\n\n##### 45.6.1 常见应用\n\n| 应用 | 设备类型 | 用途 |\n|:---|:---|:---|\n| OpenVPN | TUN/TAP | VPN 隧道 |\n| Flannel UDP | TUN | 容器网络 |\n| Calico VPP | TUN | 高性能转发 |\n| 虚拟机网桥 | TAP | VM 网络 |\n| WireGuard | 内核模块 | 高效 VPN |\n\n##### 45.6.2 TUN 设备在 Calico VPP 中的应用\n\n```mermaid\ngraph LR\n    Pod[\"Pod\"] --> TUN[\"TUN 设备\"]\n    TUN -->|\"点对点\"| VPP[\"VPP<br/>用户空间\"]\n    VPP --> DPDK[\"DPDK\"]\n    DPDK --> NIC[\"物理网卡\"]\n```\n\n#### 45.7 章节小结\n\n```mermaid\nmindmap\n  root((TUN/TAP 精讲))\n    设备类型\n      TUN - L3 网络层\n      TAP - L2 数据链路层\n    工作原理\n      用户空间 ↔ 内核空间\n      字符设备 /dev/net/tun\n      一端协议栈 一端进程\n    效率对比\n      TUN/TAP 多次拷贝\n      内核模块 全程内核\n    应用场景\n      Flannel UDP\n      OpenVPN\n      Calico VPP\n    实践验证\n      ip tuntap list\n      ip -d tuntap show\n```\n\n> [!TIP]\n> **TUN/TAP 设备要点总结**：\n>\n> 1. **设备类型**：\n>    - TUN：L3 网络层，处理 IP 包，无 MAC 地址\n>    - TAP：L2 数据链路层，处理以太网帧，有 MAC 地址\n>\n> 2. **工作原理**：\n>    - 一端连接 TCP/IP 协议栈（内核空间）\n>    - 一端连接用户空间进程（如 flanneld）\n>    - 通过 `/dev/net/tun` 字符设备通信\n>\n> 3. **效率对比**：\n>    - TUN/TAP：用户空间处理，效率较低\n>    - 内核模块（VxLAN）：全程内核处理，效率较高\n>\n> 4. **Flannel 配置**：\n>    - UDP 模式使用 TUN 设备\n>    - 非特权模式需挂载 `/dev/net/tun`\n>    - 需要 `NET_ADMIN` 和 `NET_RAW` 权限\n>\n> 5. **验证命令**：\n>    - `ip tuntap list`：列出 TUN/TAP 设备\n>    - `ip -d tuntap show`：查看设备关联进程\n\n---", "subs": ["45.1 背景与概述", "45.2 TUN/TAP 设备原理", "45.3 TUN/TAP 与内核模块的效率对比", "45.4 Flannel 中的 TUN 设备实践", "45.5 Flannel UDP 模式配置", "45.6 其他 TUN/TAP 应用场景", "45.7 章节小结"]}, {"title": "第四十六章 Flannel-UDP 模式", "content": "本章深入讲解 Flannel 的 UDP 封装模式，包括同节点和跨节点的 Pod 通信原理及数据包封装机制。\n\n#### 46.1 背景与概述\n\n##### 46.1.1 Flannel 后端类型\n\nFlannel 支持多种后端（Backend）类型：\n\n| 后端类型 | 封装方式 | 性能 | 适用场景 |\n|:---|:---|:---|:---|\n| **UDP** | TUN + UDP 封装 | 较低 | 通用/测试 |\n| **VxLAN** | 内核 VxLAN | 较高 | 生产推荐 |\n| **host-gw** | 主机路由 | 最高 | 同子网 |\n| **IPIP** | IP-in-IP | 中等 | 跨子网 |\n\n##### 46.1.2 UDP 模式特点\n\n```mermaid\ngraph TB\n    subgraph \"UDP 模式架构\"\n        Pod[\"Pod\"] --> TUN[\"flannel0<br/>TUN 设备\"]\n        TUN --> FD[\"flanneld 进程<br/>用户空间\"]\n        FD -->|\"UDP 封装\"| ETH[\"eth0<br/>物理网卡\"]\n    end\n```\n\n**UDP 模式核心特点**：\n\n- 使用 TUN 设备连接内核与用户空间\n- flanneld 进程在**用户空间**处理封装\n- 通过 UDP 协议封装原始 IP 包\n- 监听端口：**8285**\n\n#### 46.2 同节点 Pod 通信\n\n##### 46.2.1 通信架构\n\n同节点 Pod 通信通过 **Linux Bridge** 实现 L2 交换。\n\n```mermaid\ngraph TB\n    subgraph \"Worker 节点\"\n        subgraph \"Pod A\"\n            PodA[\"10.244.2.2/24\"]\n            EthA[\"eth0\"]\n        end\n        \n        subgraph \"Pod B\"\n            PodB[\"10.244.2.3/24\"]\n            EthB[\"eth0\"]\n        end\n        \n        CNI0[\"cni0<br/>Linux Bridge\"]\n        VethA[\"veth-podA\"]\n        VethB[\"veth-podB\"]\n    end\n    \n    EthA --> VethA\n    EthB --> VethB\n    VethA --> CNI0\n    VethB --> CNI0\n```\n\n##### 46.2.2 通信原理\n\n**路由表分析**（Pod 内部）：\n\n```bash\n# Pod 内查看路由\nip route\n\n# 输出示例\n10.244.2.0/24 dev eth0 scope link  # 同网段走 L2\ndefault via 10.244.2.1 dev eth0     # 跨网段走网关\n```\n\n**关键点**：\n\n| 特征 | 说明 |\n|:---|:---|\n| 掩码 | /24（同网段） |\n| 网关 | 0.0.0.0（无网关） |\n| 通信层次 | L2 交换 |\n| 设备 | cni0 Bridge |\n\n##### 46.2.3 Bridge MAC 地址学习\n\n```bash\n# 查看网卡所属 Bridge\nip -d link show veth-pod\n\n# 输出示例\n# veth-pod: ... master cni0 ...\n\n# 查看 Bridge MAC 表\nbridge fdb show dev cni0\n\n# 输出示例\n# 8e:b1:82:xx:xx:xx dev veth-podA master cni0\n# 7a:c3:91:xx:xx:xx dev veth-podB master cni0\n```\n\n#### 46.3 跨节点 Pod 通信\n\n##### 46.3.1 通信架构\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A<br/>10.244.2.3\n    participant TUN as flannel0<br/>TUN\n    participant FD as flanneld\n    participant ETH as eth0\n    participant Net as 物理网络\n    participant ETH2 as eth0\n    participant FD2 as flanneld\n    participant TUN2 as flannel0\n    participant PodB as Pod B<br/>10.244.0.27\n    \n    PodA->>TUN: 1. IP 包发送\n    TUN->>FD: 2. 读取数据\n    FD->>FD: 3. 查询目标节点\n    FD->>ETH: 4. UDP 封装发送\n    ETH->>Net: 5. 物理传输\n    Net->>ETH2: 6. 到达目标节点\n    ETH2->>FD2: 7. 接收 UDP\n    FD2->>TUN2: 8. 解封装写入\n    TUN2->>PodB: 9. 交付目标 Pod\n```\n\n##### 46.3.2 路由表分析\n\n```bash\n# 宿主机路由表\nip route\n\n# 输出示例\n10.244.0.0/24 via 10.244.2.1 dev flannel0  # 目标网段走 flannel0\n10.244.2.0/24 dev cni0 proto kernel        # 本地网段走 cni0\n```\n\n**路由匹配过程**：\n\n1. 目标地址 `10.244.0.27`\n2. 匹配路由 `10.244.0.0/24 via 10.244.2.1 dev flannel0`\n3. 数据包发送到 `flannel0` TUN 设备\n\n##### 46.3.3 TUN 设备与 flanneld\n\n```bash\n# 查看 flannel0 设备\nip -d link show flannel0\n\n# 输出示例\n# flannel0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP>\n#     link/none\n#     tun type tun pi off\n\n# 查看关联进程\nip -d tuntap show\n\n# 输出示例\n# flannel0: tun persist\n#   Attached to processes: flanneld(1220)\n```\n\n##### 46.3.4 flanneld 工作原理\n\n```mermaid\nflowchart TB\n    subgraph \"flanneld 进程\"\n        Read[\"读取 TUN 数据\"]\n        Query[\"查询 API Server<br/>获取目标节点信息\"]\n        Encap[\"UDP 封装\"]\n        Send[\"发送到目标节点\"]\n    end\n    \n    TUN[\"flannel0\"] --> Read\n    Read --> Query\n    Query --> Encap\n    Encap --> Send\n    Send --> ETH[\"eth0\"]\n```\n\n**flanneld 职责**：\n\n| 职责 | 说明 |\n|:---|:---|\n| 监听 TUN | 从 flannel0 读取原始 IP 包 |\n| 查询路由 | 从 API Server/etcd 获取 Pod 所在节点 |\n| UDP 封装 | 将原始包封装为 UDP 数据 |\n| 发送数据 | 通过 8285 端口发送到目标节点 |\n\n#### 46.4 数据包封装分析\n\n##### 46.4.1 封装结构\n\n```mermaid\ngraph LR\n    subgraph \"原始包\"\n        IP1[\"IP Header<br/>Src: 10.244.2.3<br/>Dst: 10.244.0.27\"]\n        Data[\"Payload<br/>ICMP/TCP/...\"]\n    end\n    \n    subgraph \"封装后\"\n        IP2[\"外层 IP<br/>Src: 172.18.0.3<br/>Dst: 172.18.0.2\"]\n        UDP[\"UDP Header<br/>Port: 8285\"]\n        IP1_2[\"原始 IP\"]\n        Data_2[\"原始 Payload\"]\n    end\n    \n    IP1 --> IP1_2\n    Data --> Data_2\n```\n\n##### 46.4.2 封装字段详解\n\n| 层次 | 字段 | 值 |\n|:---|:---|:---|\n| **外层 IP** | Src IP | 源节点物理 IP |\n| | Dst IP | 目标节点物理 IP |\n| **UDP** | Src Port | 随机高端口 |\n| | Dst Port | 8285（flanneld） |\n| **内层（原始）** | Src IP | 源 Pod IP |\n| | Dst IP | 目标 Pod IP |\n| | Payload | 原始数据 |\n\n##### 46.4.3 抓包验证\n\n```bash\n# 在 flannel0 上抓包（裸 IP）\ntcpdump -i flannel0 -nn\n\n# 输出示例（raw IP，无 MAC）\n# IP 10.244.2.3 > 10.244.0.27: ICMP echo request\n\n# 在 eth0 上抓包（UDP 封装）\ntcpdump -i eth0 -nn port 8285\n\n# 输出示例\n# IP 172.18.0.3.xxxxx > 172.18.0.2.8285: UDP, length xxx\n```\n\n**Wireshark 解码技巧**：\n\n```\n# 将 8285 端口的 UDP 数据解码为 IPv4\nAnalyze -> Decode As -> UDP port 8285 -> IPv4\n```\n\n#### 46.5 MTU 设置\n\n##### 46.5.1 为什么 MTU 是 1472\n\n```mermaid\ngraph LR\n    ETH[\"eth0 MTU<br/>1500\"] --> UDP[\"UDP Header<br/>8 bytes\"]\n    UDP --> IP[\"IP Header<br/>20 bytes\"]\n    IP --> Payload[\"Payload<br/>1472 bytes\"]\n```\n\n**MTU 计算**：\n\n| 组成 | 大小 |\n|:---|:---|\n| 物理网卡 MTU | 1500 bytes |\n| - 外层 IP Header | 20 bytes |\n| - UDP Header | 8 bytes |\n| = flannel0 MTU | **1472 bytes** |\n\n> [!WARNING]\n> **MTU 不匹配问题**\n>\n> 如果内层 MTU 设置过大，会导致：\n>\n> - 数据包分片\n> - 传输效率降低\n> - 可能出现通信失败\n\n#### 46.6 UDP 模式配置\n\n##### 46.6.1 ConfigMap 配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"udp\"\n      }\n    }\n```\n\n##### 46.6.2 DaemonSet 配置（非特权模式）\n\n```yaml\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: kube-flannel-ds\nspec:\n  template:\n    spec:\n      containers:\n      - name: kube-flannel\n        securityContext:\n          privileged: false\n          capabilities:\n            add: [\"NET_ADMIN\", \"NET_RAW\"]\n        volumeMounts:\n        - name: dev-net-tun\n          mountPath: /dev/net/tun\n      volumes:\n      - name: dev-net-tun\n        hostPath:\n          path: /dev/net/tun\n```\n\n> [!IMPORTANT]\n> **非特权模式必须挂载 /dev/net/tun**\n>\n> 否则 flanneld 无法创建 flannel0 TUN 设备，Pod 会 CrashLoopBackOff\n\n#### 46.7 UDP 模式 vs VxLAN 模式\n\n##### 46.7.1 效率对比\n\n```mermaid\ngraph TB\n    subgraph \"UDP 模式 - 效率较低\"\n        U1[\"内核空间\"] -->|\"数据拷贝\"| U2[\"用户空间<br/>flanneld\"]\n        U2 -->|\"数据拷贝\"| U3[\"内核空间\"]\n        U3 --> U4[\"eth0\"]\n    end\n    \n    subgraph \"VxLAN 模式 - 效率较高\"\n        V1[\"内核空间\"] --> V2[\"VxLAN 模块<br/>内核\"]\n        V2 --> V3[\"eth0\"]\n    end\n```\n\n##### 46.7.2 对比表\n\n| 特性 | UDP 模式 | VxLAN 模式 |\n|:---|:---|:---|\n| 封装位置 | 用户空间（flanneld） | 内核空间 |\n| 数据拷贝 | 多次（内核↔用户） | 少（内核内） |\n| 上下文切换 | 有 | 无 |\n| 性能 | 较低 | 较高 |\n| 调试难度 | 较易 | 较难 |\n| 生产推荐 | ❌ | ✅ |\n\n#### 46.8 章节小结\n\n```mermaid\nmindmap\n  root((Flannel UDP 模式))\n    同节点通信\n      cni0 Bridge\n      L2 交换\n      veth pair\n    跨节点通信\n      flannel0 TUN\n      flanneld 用户空间\n      UDP 封装 Port 8285\n    数据封装\n      外层 IP 节点地址\n      UDP Header\n      内层 IP Pod 地址\n    配置要点\n      Backend Type udp\n      挂载 /dev/net/tun\n      MTU 1472\n    效率对比\n      低于 VxLAN\n      用户空间处理\n```\n\n> [!TIP]\n> **Flannel UDP 模式要点总结**：\n>\n> 1. **同节点通信**：\n>    - 通过 `cni0` Linux Bridge 实现 L2 交换\n>    - Pod 使用 /24 掩码，在同一网段\n>    - 无需封装，直接二层转发\n>\n> 2. **跨节点通信**：\n>    - 数据包发送到 `flannel0` TUN 设备\n>    - flanneld 进程读取并 UDP 封装\n>    - 通过 8285 端口发送到目标节点\n>\n> 3. **封装机制**：\n>    - 外层：节点 IP + UDP 8285\n>    - 内层：原始 Pod IP + 数据\n>    - MTU 设置为 1472（1500-20-8）\n>\n> 4. **配置要点**：\n>    - Backend Type 设置为 `udp`\n>    - 非特权模式需挂载 `/dev/net/tun`\n>    - 需要 `NET_ADMIN` 和 `NET_RAW` 权限\n>\n> 5. **生产建议**：\n>    - UDP 模式效率低于 VxLAN\n>    - 生产环境推荐使用 VxLAN 或 host-gw\n\n---", "subs": ["46.1 背景与概述", "46.2 同节点 Pod 通信", "46.3 跨节点 Pod 通信", "46.4 数据包封装分析", "46.5 MTU 设置", "46.6 UDP 模式配置", "46.7 UDP 模式 vs VxLAN 模式", "46.8 章节小结"]}, {"title": "第四十七章 Flannel-VxLAN 模式", "content": "本章深入讲解 Flannel 的 VxLAN 封装模式，包括配置方法、内核封装机制、ARP/FDB 表工作原理，以及 DirectRouting 优化模式。\n\n#### 47.1 背景与概述\n\n##### 47.1.1 VxLAN 模式定位\n\nFlannel VxLAN 模式是**生产环境推荐**的后端类型：\n\n```mermaid\ngraph TB\n    subgraph \"Flannel 后端选择\"\n        UDP[\"UDP 模式<br/>❌ 不推荐\"]\n        VxLAN[\"VxLAN 模式<br/>✅ 生产推荐\"]\n        HostGW[\"host-gw 模式<br/>✅ 同子网最优\"]\n    end\n    \n    VxLAN -->|\"跨子网\"| Best[\"最佳选择\"]\n    HostGW -->|\"同子网\"| Best\n```\n\n##### 47.1.2 与 Calico VxLAN 的关系\n\nFlannel 官方明确表示 VxLAN 模式设计目标是支持从 Calico 迁移：\n\n| 特性 | Flannel VxLAN | Calico VxLAN |\n|:---|:---|:---|\n| 封装机制 | 相同 | 相同 |\n| FDB 表 | 相同 | 相同 |\n| VNI | 1 | 4096 |\n| 端口 | 8472 | 4789 |\n| 网络策略 | 不支持 | 支持 |\n\n> [!TIP]\n> **生产建议**\n>\n> - 如需**网络策略**功能，使用 Calico\n> - 如追求**简单稳定**，使用 Flannel\n> - 可使用 **Flannel + Calico 组合**：Flannel 负责网络，Calico 负责策略\n\n#### 47.2 VxLAN 配置\n\n##### 47.2.1 ConfigMap 配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"vxlan\"\n      }\n    }\n```\n\n##### 47.2.2 验证 VxLAN 设备\n\n```bash\n# 查看 flannel.1 VxLAN 设备\nip -d link show flannel.1\n\n# 输出示例\n# flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP>\n#     link/ether 7c:a2:9a:xx:xx:xx brd ff:ff:ff:ff:ff:ff\n#     vxlan id 1 local 172.18.0.2 dev eth0 srcport 0 0 dstport 8472 ...\n\n# 查看 FDB 表\nbridge fdb show dev flannel.1\n```\n\n#### 47.3 VxLAN 通信原理\n\n##### 47.3.1 通信架构\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A<br/>10.244.0.5\n    participant CNI as cni0\n    participant FL as flannel.1\n    participant Kernel as 内核 VxLAN\n    participant ETH as eth0\n    participant Net as 物理网络\n    participant ETH2 as eth0\n    participant Kernel2 as 内核 VxLAN\n    participant FL2 as flannel.1\n    participant CNI2 as cni0\n    participant PodB as Pod B<br/>10.244.2.2\n    \n    PodA->>CNI: 1. 发送 IP 包\n    CNI->>FL: 2. 路由转发\n    FL->>Kernel: 3. VxLAN 封装\n    Kernel->>ETH: 4. UDP:8472\n    ETH->>Net: 5. 物理传输\n    Net->>ETH2: 6. 到达目标\n    ETH2->>Kernel2: 7. 接收 UDP\n    Kernel2->>FL2: 8. VxLAN 解封装\n    FL2->>CNI2: 9. 路由转发\n    CNI2->>PodB: 10. 交付 Pod\n```\n\n##### 47.3.2 路由表分析\n\n```bash\n# 宿主机路由表\nip route\n\n# 输出示例\n10.244.0.0/24 dev cni0 proto kernel scope link  # 本地网段\n10.244.2.0/24 via 10.244.2.0 dev flannel.1      # 远端网段走 flannel.1\n```\n\n**路由决策过程**：\n\n1. Pod 发送数据包到 `10.244.2.2`\n2. 匹配路由 `10.244.2.0/24 via 10.244.2.0 dev flannel.1`\n3. 下一跳 `10.244.2.0`，出接口 `flannel.1`\n\n#### 47.4 ARP 与 FDB 表机制\n\n##### 47.4.1 工作流程\n\n```mermaid\nflowchart TB\n    subgraph \"封装过程\"\n        Route[\"查询路由表<br/>确定下一跳\"]\n        ARP[\"查询 ARP 表<br/>获取下一跳 MAC\"]\n        FDB[\"查询 FDB 表<br/>获取目标节点 IP\"]\n        Encap[\"VxLAN 封装<br/>发送到目标节点\"]\n    end\n    \n    Route --> ARP\n    ARP --> FDB\n    FDB --> Encap\n```\n\n##### 47.4.2 ARP 表作用\n\n```bash\n# 查看 ARP 缓存\narp -n\n\n# 或在 Pod 内查看\nip neigh\n\n# 输出示例\n10.244.2.0 dev flannel.1 lladdr 24:81:58:xx:xx:xx PERMANENT\n```\n\n**ARP 表功能**：\n\n- 存储下一跳 IP 对应的 MAC 地址\n- 用于封装内层以太网帧\n\n##### 47.4.3 FDB 表作用\n\n```bash\n# 查看 FDB 表\nbridge fdb show dev flannel.1\n\n# 输出示例\n24:81:58:xx:xx:xx dev flannel.1 dst 172.18.0.4 self permanent\n```\n\n**FDB 表功能**：\n\n| 作用 | 说明 |\n|:---|:---|\n| MAC → Node IP | 将目标 MAC 映射到节点 IP |\n| 确定封装目标 | 外层 IP 的目标地址 |\n| 由 flanneld 维护 | 通过 API Server 同步 |\n\n#### 47.5 内核空间封装优势\n\n##### 47.5.1 VxLAN vs UDP 模式\n\n```mermaid\ngraph TB\n    subgraph \"VxLAN 模式 - 内核空间\"\n        V1[\"Pod 数据\"] --> V2[\"内核路由\"]\n        V2 --> V3[\"VxLAN 模块<br/>内核封装\"]\n        V3 --> V4[\"eth0 发送\"]\n    end\n    \n    subgraph \"UDP 模式 - 用户空间\"\n        U1[\"Pod 数据\"] --> U2[\"内核路由\"]\n        U2 --> U3[\"TUN 设备\"]\n        U3 -->|\"上下文切换\"| U4[\"flanneld<br/>用户空间封装\"]\n        U4 -->|\"上下文切换\"| U5[\"eth0 发送\"]\n    end\n```\n\n##### 47.5.2 性能对比\n\n| 指标 | VxLAN 模式 | UDP 模式 |\n|:---|:---|:---|\n| 封装位置 | 内核空间 | 用户空间 |\n| 上下文切换 | 无 | 有 |\n| 数据拷贝 | 少 | 多 |\n| CPU 开销 | 低 | 高 |\n| 性能 | **高** | 低 |\n| 端口 | 8472 | 8285 |\n\n##### 47.5.3 识别内核进程\n\n```bash\n# 查看 8472 端口\nnetstat -anp | grep 8472\n\n# 输出示例\nudp        0      0 0.0.0.0:8472    0.0.0.0:*      -\n\n# 注意: 进程名为 \"-\" 表示内核空间进程\n# 用户空间进程会显示如: flanneld(1220)\n```\n\n#### 47.6 抓包分析\n\n##### 47.6.1 抓包命令\n\n```bash\n# 在 eth0 上抓取 VxLAN 流量\ntcpdump -i eth0 -nn port 8472 -w vxlan.pcap\n\n# 测试跨节点通信\nkubectl exec -it test-pod -- curl http://10.244.2.2:80\n```\n\n##### 47.6.2 Wireshark 解码\n\n```\n# 将 8472 端口解码为 VxLAN\nAnalyze -> Decode As -> UDP port 8472 -> VxLAN\n```\n\n##### 47.6.3 封装结构\n\n```mermaid\ngraph LR\n    subgraph \"VxLAN 封装\"\n        L2_Out[\"外层 MAC\"]\n        IP_Out[\"外层 IP<br/>节点 IP\"]\n        UDP[\"UDP:8472\"]\n        VXLAN[\"VxLAN Header<br/>VNI=1\"]\n        L2_In[\"内层 MAC\"]\n        IP_In[\"内层 IP<br/>Pod IP\"]\n        Data[\"TCP/HTTP...\"]\n    end\n    \n    L2_Out --> IP_Out --> UDP --> VXLAN --> L2_In --> IP_In --> Data\n```\n\n#### 47.7 DirectRouting 模式\n\n##### 47.7.1 概念说明\n\nDirectRouting 是 VxLAN 模式的优化选项：\n\n| 场景 | 通信方式 |\n|:---|:---|\n| 节点在**同一二层** | 直接路由（无封装） |\n| 节点**跨二层** | VxLAN 封装 |\n\n> [!NOTE]\n> **与 Calico CrossSubnet 相同**\n>\n> DirectRouting 功能等同于 Calico 的 `ipipMode: CrossSubnet` 或 `vxlanMode: CrossSubnet`\n\n##### 47.7.2 配置方法\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"vxlan\",\n        \"DirectRouting\": true\n      }\n    }\n```\n\n##### 47.7.3 路由表变化\n\n```bash\n# 启用 DirectRouting 后的路由表\nip route\n\n# 同二层节点 - 直接路由\n10.244.1.0/24 via 10.1.5.11 dev eth0   # 下一跳是节点 IP\n\n# 跨二层节点 - VxLAN 封装\n10.244.2.0/24 via 10.244.2.0 dev flannel.1  # 走 flannel.1\n```\n\n##### 47.7.4 拓扑示例\n\n```mermaid\ngraph TB\n    subgraph \"二层域 A (10.1.5.0/24)\"\n        N1[\"Node1<br/>10.1.5.10\"]\n        N2[\"Node2<br/>10.1.5.11\"]\n    end\n    \n    subgraph \"二层域 B (10.1.8.0/24)\"\n        N3[\"Node3<br/>10.1.8.10\"]\n        N4[\"Node4<br/>10.1.8.11\"]\n    end\n    \n    GW[\"网关/路由器\"]\n    \n    N1 <-->|\"直接路由\"| N2\n    N3 <-->|\"直接路由\"| N4\n    N1 <-->|\"VxLAN\"| GW\n    GW <-->|\"VxLAN\"| N3\n```\n\n##### 47.7.5 抓包验证\n\n```bash\n# 同二层通信 - 抓 eth0\ntcpdump -i eth0 host 10.244.1.2 -w direct.pcap\n# 结果: 无 VxLAN 封装，直接 IP 路由\n\n# 跨二层通信 - 抓 flannel.1 或 eth0\ntcpdump -i eth0 port 8472 -w vxlan.pcap\n# 结果: VxLAN 封装\n```\n\n#### 47.8 VxLAN MTU 设置\n\n##### 47.8.1 MTU 计算\n\n```mermaid\ngraph LR\n    ETH[\"eth0 MTU<br/>1500\"] --> VXLAN[\"VxLAN Header<br/>50 bytes\"]\n    VXLAN --> Payload[\"flannel.1 MTU<br/>1450 bytes\"]\n```\n\n| 组成 | 大小 |\n|:---|:---|\n| 物理网卡 MTU | 1500 bytes |\n| - 外层 IP Header | 20 bytes |\n| - UDP Header | 8 bytes |\n| - VxLAN Header | 8 bytes |\n| - 外层 MAC | 14 bytes |\n| = flannel.1 MTU | **1450 bytes** |\n\n#### 47.9 章节小结\n\n```mermaid\nmindmap\n  root((Flannel VxLAN 模式))\n    配置\n      Backend Type vxlan\n      DirectRouting true\n    设备\n      flannel.1 VxLAN\n      端口 8472\n      VNI 1\n    机制\n      ARP 表\n      FDB 表\n      内核封装\n    DirectRouting\n      同二层走路由\n      跨二层走VxLAN\n    优势\n      内核空间处理\n      无上下文切换\n      生产推荐\n```\n\n> [!TIP]\n> **Flannel VxLAN 模式要点总结**：\n>\n> 1. **配置方式**：\n>    - `Backend.Type: \"vxlan\"`\n>    - 可选 `DirectRouting: true` 优化同二层通信\n>\n> 2. **核心机制**：\n>    - **ARP 表**：下一跳 IP → MAC 地址\n>    - **FDB 表**：MAC 地址 → 目标节点 IP\n>    - **内核封装**：UDP 8472 端口\n>\n> 3. **与 UDP 模式对比**：\n>    - VxLAN 在内核空间封装，效率更高\n>    - 无上下文切换，无多次数据拷贝\n>    - 端口 8472（vs UDP 的 8285）\n>\n> 4. **DirectRouting 模式**：\n>    - 同二层节点：直接路由，不封装\n>    - 跨二层节点：VxLAN 封装\n>    - 等同于 Calico CrossSubnet\n>\n> 5. **生产建议**：\n>    - VxLAN 是 Flannel 生产推荐模式\n>    - 如需网络策略，可结合 Calico 使用\n\n---", "subs": ["47.1 背景与概述", "47.2 VxLAN 配置", "47.3 VxLAN 通信原理", "47.4 ARP 与 FDB 表机制", "47.5 内核空间封装优势", "47.6 抓包分析", "47.7 DirectRouting 模式", "47.8 VxLAN MTU 设置", "47.9 章节小结"]}, {"title": "第四十八章 Flannel-IPIP 模式", "content": "本章深入讲解 Flannel 的 IPIP 封装模式，包括配置方法、裸 IP 设备特性、NOARP 标志原理，以及 DirectRouting 优化模式。\n\n#### 48.1 背景与概述\n\n##### 48.1.1 IPIP 模式定位\n\nIPIP（IP-in-IP）是一种轻量级的隧道封装方式：\n\n```mermaid\ngraph TB\n    subgraph \"封装方式对比\"\n        VxLAN[\"VxLAN<br/>UDP + VxLAN Header<br/>50 bytes 开销\"]\n        IPIP[\"IPIP<br/>IP Header<br/>20 bytes 开销\"]\n        HostGW[\"host-gw<br/>无封装<br/>0 bytes 开销\"]\n    end\n    \n    VxLAN -->|\"跨子网\"| Use[\"适用场景\"]\n    IPIP -->|\"跨子网\"| Use\n    HostGW -->|\"同子网\"| Use\n```\n\n##### 48.1.2 与 Calico IPIP 的关系\n\n| 特性 | Flannel IPIP | Calico IPIP |\n|:---|:---|:---|\n| 封装机制 | IP-in-IP | IP-in-IP |\n| 默认模式 | 需手动配置 | 默认开启 |\n| BGP 路由 | 不支持 | 支持 |\n| 网络策略 | 不支持 | 支持 |\n\n> [!NOTE]\n> **Flannel vs Calico IPIP**\n>\n> - Calico IPIP 模式结合了 BGP 路由宣告\n> - Flannel IPIP 仅做封装，路由由 flanneld 静态维护\n\n#### 48.2 IPIP 配置\n\n##### 48.2.1 ConfigMap 配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"ipip\"\n      }\n    }\n```\n\n##### 48.2.2 验证 IPIP 设备\n\n```bash\n# 查看 flannel.ipip 设备\nip -d link show flannel.ipip\n\n# 输出示例\n# flannel.ipip: <POINTOPOINT,NOARP,UP,LOWER_UP>\n#     link/ipip 172.18.0.3 brd 0.0.0.0\n#     ipip remote any local 172.18.0.3 ...\n\n# 查看路由表\nip route | grep flannel.ipip\n# 10.244.1.0/24 via 172.18.0.4 dev flannel.ipip\n```\n\n#### 48.3 IPIP 通信原理\n\n##### 48.3.1 通信架构\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A<br/>10.244.0.5\n    participant CNI as cni0\n    participant IPIP as flannel.ipip\n    participant Kernel as 内核 IPIP\n    participant ETH as eth0\n    participant Net as 物理网络\n    participant ETH2 as eth0\n    participant Kernel2 as 内核 IPIP\n    participant IPIP2 as flannel.ipip\n    participant CNI2 as cni0\n    participant PodB as Pod B<br/>10.244.1.2\n    \n    PodA->>CNI: 1. 发送 IP 包\n    CNI->>IPIP: 2. 路由转发\n    IPIP->>Kernel: 3. IPIP 封装\n    Kernel->>ETH: 4. 外层 IP\n    ETH->>Net: 5. 物理传输\n    Net->>ETH2: 6. 到达目标\n    ETH2->>Kernel2: 7. 接收\n    Kernel2->>IPIP2: 8. IPIP 解封装\n    IPIP2->>CNI2: 9. 路由转发\n    CNI2->>PodB: 10. 交付 Pod\n```\n\n##### 48.3.2 路由表分析\n\n```bash\n# 宿主机路由表\nip route\n\n# 输出示例\n10.244.0.0/24 dev cni0 proto kernel scope link      # 本地网段\n10.244.1.0/24 via 172.18.0.4 dev flannel.ipip       # 远端走 IPIP\n```\n\n**路由决策过程**：\n\n1. Pod 发送数据包到 `10.244.1.2`\n2. 匹配路由 `10.244.1.0/24 via 172.18.0.4 dev flannel.ipip`\n3. 下一跳 `172.18.0.4`（目标节点），出接口 `flannel.ipip`\n\n#### 48.4 裸 IP 设备特性\n\n##### 48.4.1 Raw 设备说明\n\nflannel.ipip 是一个 **裸 IP（Raw IP）** 设备：\n\n```mermaid\ngraph LR\n    subgraph \"普通以太网设备\"\n        E1[\"MAC Header\"]\n        E2[\"IP Header\"]\n        E3[\"Payload\"]\n    end\n    \n    subgraph \"Raw IP 设备\"\n        R1[\"IP Header\"]\n        R2[\"Payload\"]\n    end\n    \n    E1 --> E2 --> E3\n    R1 --> R2\n```\n\n**特点**：\n\n| 特性 | 普通网卡 (eth0) | Raw 设备 (flannel.ipip) |\n|:---|:---|:---|\n| MAC 层 | 有 | 无 |\n| 抓包显示 | 有 MAC 地址 | 无 MAC 地址 |\n| tcpdump 类型 | LINUX_SLL | Raw |\n\n##### 48.4.2 抓包验证\n\n```bash\n# 在 flannel.ipip 上抓包 - 无 MAC 层\ntcpdump -i flannel.ipip -nn\n\n# 输出示例 - 只有 IP 信息，无 MAC\n# IP 10.244.0.5 > 10.244.1.2: ICMP echo request\n\n# 在 eth0 上抓包 - 有完整 MAC 层\ntcpdump -i eth0 -nn ip proto 4\n\n# 输出示例 - IPIP 封装\n# IP 172.18.0.3 > 172.18.0.4: IP 10.244.0.5 > 10.244.1.2 ...\n```\n\n#### 48.5 NOARP 标志详解\n\n##### 48.5.1 标志含义\n\n```bash\n# 查看设备标志\nip link show flannel.ipip\n\n# 输出示例\n# flannel.ipip: <POINTOPOINT,NOARP,UP,LOWER_UP>\n```\n\n| 标志 | 含义 |\n|:---|:---|\n| POINTOPOINT | 点对点设备 |\n| **NOARP** | 禁用 ARP 协议 |\n| UP | 设备启用 |\n| LOWER_UP | 底层链路可用 |\n\n##### 48.5.2 为什么禁用 ARP\n\n```mermaid\nflowchart TB\n    subgraph \"ARP 功能\"\n        ARP[\"ARP 协议<br/>解析 IP → MAC\"]\n        GARP[\"GARP 消息<br/>地址冲突检测\"]\n    end\n    \n    subgraph \"NOARP 原因\"\n        R1[\"裸 IP 设备无 MAC 层\"]\n        R2[\"避免地址冲突告警\"]\n        R3[\"隧道封装不需要 MAC\"]\n    end\n    \n    ARP --> R1\n    GARP --> R2\n```\n\n**禁用 ARP 的场景**：\n\n1. **裸 IP 设备**：flannel.ipip 没有 MAC 层，ARP 无意义\n2. **避免 GARP 冲突**：多节点配置相同隧道网段时，避免 GARP 告警\n3. **隧道封装**：IPIP/GRE 隧道直接使用 IP 封装，不需要 MAC 解析\n\n> [!TIP]\n> **NOARP 实际应用**\n>\n> 在 FE/BE（前端/后端）负载均衡架构中，BE 节点可能需要配置与 VIP 相同的地址用于响应。\n> 此时需要设置 NOARP 避免 GARP 冲突告警。\n\n#### 48.6 封装结构对比\n\n##### 48.6.1 IPIP vs VxLAN\n\n```mermaid\ngraph LR\n    subgraph \"IPIP 封装\"\n        I1[\"外层 IP<br/>20 bytes\"]\n        I2[\"内层 IP<br/>Pod 地址\"]\n        I3[\"Payload\"]\n    end\n    \n    subgraph \"VxLAN 封装\"\n        V1[\"外层 MAC<br/>14 bytes\"]\n        V2[\"外层 IP<br/>20 bytes\"]\n        V3[\"UDP<br/>8 bytes\"]\n        V4[\"VxLAN<br/>8 bytes\"]\n        V5[\"内层 MAC<br/>14 bytes\"]\n        V6[\"内层 IP\"]\n        V7[\"Payload\"]\n    end\n    \n    I1 --> I2 --> I3\n    V1 --> V2 --> V3 --> V4 --> V5 --> V6 --> V7\n```\n\n##### 48.6.2 开销对比\n\n| 封装方式 | 额外开销 | MTU (1500基础) |\n|:---|:---|:---|\n| IPIP | 20 bytes | 1480 |\n| VxLAN | 50 bytes | 1450 |\n| host-gw | 0 bytes | 1500 |\n\n#### 48.7 DirectRouting 模式\n\n##### 48.7.1 配置方法\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"ipip\",\n        \"DirectRouting\": true\n      }\n    }\n```\n\n##### 48.7.2 工作原理\n\n```mermaid\ngraph TB\n    subgraph \"节点 A (10.1.5.10)\"\n        PodA[\"Pod A\"]\n    end\n    \n    subgraph \"节点 B (10.1.5.11) - 同二层\"\n        PodB[\"Pod B\"]\n    end\n    \n    subgraph \"节点 C (10.1.8.10) - 跨二层\"\n        PodC[\"Pod C\"]\n    end\n    \n    PodA -->|\"直接路由<br/>无封装\"| PodB\n    PodA -->|\"IPIP 封装\"| PodC\n```\n\n##### 48.7.3 路由表变化\n\n```bash\n# 启用 DirectRouting 后的路由表\nip route\n\n# 同二层节点 - 直接路由\n10.244.1.0/24 via 10.1.5.11 dev eth0    # 下一跳是节点 IP，走 eth0\n\n# 跨二层节点 - IPIP 封装\n10.244.2.0/24 via 10.1.8.10 dev flannel.ipip  # 走 flannel.ipip\n```\n\n##### 48.7.4 抓包验证\n\n```bash\n# 同二层通信 - 抓 eth0，port 80\ntcpdump -i eth0 port 80 -nn -w direct.pcap\n# 结果: 普通 TCP 包，无 IPIP 封装\n\n# 跨二层通信 - 抓 IPIP 协议\ntcpdump -i eth0 -nn ip proto 4 -w ipip.pcap\n# 结果: IPIP 封装包\n```\n\n#### 48.8 抓包分析技巧\n\n##### 48.8.1 IPIP 协议过滤\n\n```bash\n# IPIP 协议号为 4\ntcpdump -i eth0 -nn ip proto 4\n\n# 或使用协议名\ntcpdump -i eth0 -nn ipip\n```\n\n##### 48.8.2 查看 HTTP 内容\n\n```bash\n# 使用 -X 或 -A 查看内容\ntcpdump -i eth0 -nn -A port 80\n\n# 输出示例\n# GET / HTTP/1.1\n# Host: 10.244.1.2\n# ...\n# HTTP/1.1 200 OK\n# flannel-pod-name: xxx\n```\n\n#### 48.9 章节小结\n\n```mermaid\nmindmap\n  root((Flannel IPIP 模式))\n    配置\n      Backend Type ipip\n      DirectRouting true\n    设备\n      flannel.ipip\n      Raw IP 裸设备\n      NOARP 标志\n    封装\n      20 bytes 开销\n      MTU 1480\n      轻量高效\n    DirectRouting\n      同二层走路由\n      跨二层走IPIP\n    与VxLAN对比\n      开销更小\n      无MAC层\n      内核封装\n```\n\n> [!TIP]\n> **Flannel IPIP 模式要点总结**：\n>\n> 1. **配置方式**：\n>    - `Backend.Type: \"ipip\"`\n>    - 可选 `DirectRouting: true` 优化同二层通信\n>\n> 2. **设备特性**：\n>    - `flannel.ipip` 是 Raw IP 裸设备\n>    - 无 MAC 层，抓包只有 IP 信息\n>    - NOARP 标志禁用 ARP 协议\n>\n> 3. **封装开销**：\n>    - 仅 20 bytes（外层 IP Header）\n>    - 比 VxLAN 少 30 bytes\n>    - MTU = 1500 - 20 = 1480\n>\n> 4. **DirectRouting 模式**：\n>    - 同二层节点：直接路由，走 eth0\n>    - 跨二层节点：IPIP 封装，走 flannel.ipip\n>    - 等同于 Calico CrossSubnet\n>\n> 5. **抓包技巧**：\n>    - IPIP 协议：`tcpdump ip proto 4`\n>    - flannel.ipip 上只能看到裸 IP，无 MAC\n\n---", "subs": ["48.1 背景与概述", "48.2 IPIP 配置", "48.3 IPIP 通信原理", "48.4 裸 IP 设备特性", "48.5 NOARP 标志详解", "48.6 封装结构对比", "48.7 DirectRouting 模式", "48.8 抓包分析技巧", "48.9 章节小结"]}, {"title": "第四十九章 Flannel-HostGW 模式", "content": "本章深入讲解 Flannel 的 Host-Gateway 模式，包括配置方法、纯路由通信原理、MAC 地址变化规律，以及为什么只能在同二层网络中使用。\n\n#### 49.1 背景与概述\n\n##### 49.1.1 HostGW 模式定位\n\nHost-Gateway 是 Flannel 中**性能最高**的后端类型：\n\n```mermaid\ngraph TB\n    subgraph \"Flannel 后端性能对比\"\n        UDP[\"UDP 模式<br/>❌ 性能最低\"]\n        VxLAN[\"VxLAN 模式<br/>⭐ 中等\"]\n        IPIP[\"IPIP 模式<br/>⭐⭐ 较高\"]\n        HostGW[\"host-gw 模式<br/>⭐⭐⭐ 最高\"]\n    end\n    \n    UDP -->|\"封装开销大\"| Low[\"低效\"]\n    VxLAN -->|\"50 bytes 开销\"| Mid[\"中等\"]\n    IPIP -->|\"20 bytes 开销\"| High[\"较高\"]\n    HostGW -->|\"无封装\"| Best[\"最优\"]\n```\n\n##### 49.1.2 核心特点\n\n| 特性 | 说明 |\n|:---|:---|\n| 封装方式 | **无封装** |\n| MTU | **1500**（无损耗） |\n| 通信方式 | 纯三层路由 |\n| 适用场景 | **同二层网络** |\n| 性能 | **最高** |\n\n#### 49.2 HostGW 配置\n\n##### 49.2.1 ConfigMap 配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"host-gw\"\n      }\n    }\n```\n\n##### 49.2.2 路由表验证\n\n```bash\n# 查看宿主机路由表\nip route\n\n# 输出示例\n10.244.0.0/24 dev cni0 proto kernel scope link           # 本地网段\n10.244.1.0/24 via 172.18.0.4 dev eth0                    # 远端走物理网卡\n10.244.2.0/24 via 172.18.0.5 dev eth0                    # 远端走物理网卡\n```\n\n**关键观察**：\n\n- 远端网段的出接口是 `eth0`（物理网卡）\n- 下一跳是**目标节点的物理 IP**\n- 没有 `flannel.1`、`flannel.ipip` 等隧道设备\n\n#### 49.3 HostGW 通信原理\n\n##### 49.3.1 通信架构\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A<br/>10.244.0.5\n    participant CNI as cni0\n    participant Host1 as 宿主机 1<br/>172.18.0.3\n    participant Net as 物理网络<br/>二层交换\n    participant Host2 as 宿主机 2<br/>172.18.0.4\n    participant CNI2 as cni0\n    participant PodB as Pod B<br/>10.244.1.2\n    \n    PodA->>CNI: 1. 发送 IP 包\n    CNI->>Host1: 2. 查路由表\n    Host1->>Net: 3. 直接转发<br/>无封装\n    Net->>Host2: 4. 二层交换\n    Host2->>CNI2: 5. 查路由表\n    CNI2->>PodB: 6. 交付 Pod\n```\n\n##### 49.3.2 路由核心原则\n\n> [!IMPORTANT]\n> **纯路由转发的黄金法则**\n>\n> 在没有 NAT 和 Overlay 封装的路由网络中：\n>\n> - **IP 地址不变**：源 IP 和目标 IP 全程不变\n> - **MAC 地址变化**：每经过一跳，MAC 地址都会改变\n\n##### 49.3.3 数据包变化过程\n\n```mermaid\ngraph TB\n    subgraph \"第一跳：Pod → 宿主机\"\n        P1[\"Src IP: 10.244.0.5\"]\n        P2[\"Dst IP: 10.244.1.2\"]\n        P3[\"Src MAC: Pod eth0\"]\n        P4[\"Dst MAC: cni0 网关\"]\n    end\n    \n    subgraph \"第二跳：宿主机 → 目标宿主机\"\n        Q1[\"Src IP: 10.244.0.5\"]\n        Q2[\"Dst IP: 10.244.1.2\"]\n        Q3[\"Src MAC: eth0\"]\n        Q4[\"Dst MAC: 目标节点 eth0\"]\n    end\n    \n    P1 --> Q1\n    P2 --> Q2\n```\n\n**变化规律**：\n\n| 字段 | 变化情况 |\n|:---|:---|\n| 源 IP | ❌ 不变 |\n| 目标 IP | ❌ 不变 |\n| 源 MAC | ✅ 变为出接口 MAC |\n| 目标 MAC | ✅ 变为下一跳 MAC |\n\n#### 49.4 为什么只能在同二层使用\n\n##### 49.4.1 同二层场景\n\n```mermaid\ngraph TB\n    subgraph \"同二层网络 - ✅ 可用 host-gw\"\n        N1[\"Node1<br/>172.18.0.3\"]\n        N2[\"Node2<br/>172.18.0.4\"]\n        SW[\"二层交换机\"]\n    end\n    \n    N1 <-->|\"直接可达\"| SW\n    SW <-->|\"直接可达\"| N2\n```\n\n**同二层时**：\n\n- 节点之间可以直接通过 MAC 地址转发\n- 只需要配置静态路由，无需封装\n- 每个节点都知道如何到达其他节点\n\n##### 49.4.2 跨二层场景\n\n```mermaid\ngraph TB\n    subgraph \"域 A\"\n        N1[\"Node1<br/>172.18.0.3\"]\n    end\n    \n    subgraph \"路由器\"\n        R1[\"Router A\"]\n        R2[\"Router B\"]\n    end\n    \n    subgraph \"域 B\"\n        N2[\"Node2<br/>10.1.8.10\"]\n    end\n    \n    N1 --> R1\n    R1 --> R2\n    R2 --> N2\n```\n\n**跨二层时的问题**：\n\n| 问题 | 说明 |\n|:---|:---|\n| 路由器不知道 Pod 网段 | 中间路由器没有 `10.244.x.0/24` 的路由 |\n| 无法转发 | 数据包到达路由器后会被丢弃或走默认路由 |\n| 需要动态路由协议 | 必须使用 BGP 等协议宣告 Pod 网段 |\n\n> [!CAUTION]\n> **host-gw 限制**\n>\n> 如果节点不在同一二层网络，host-gw 模式**不能工作**！\n>\n> 跨二层场景请使用：\n>\n> - VxLAN 模式（推荐）\n> - IPIP 模式\n> - VxLAN/IPIP + DirectRouting 混合模式\n\n#### 49.5 抓包分析\n\n##### 49.5.1 抓包验证\n\n```bash\n# 在 eth0 上抓包\ntcpdump -i eth0 -nn port 80\n\n# 输出示例 - 无封装，直接是原始 IP 包\n# 10.244.0.5.xxxxx > 10.244.1.2.80: Flags [S], ...\n# 10.244.1.2.80 > 10.244.0.5.xxxxx: Flags [S.], ...\n```\n\n##### 49.5.2 包结构对比\n\n```mermaid\ngraph LR\n    subgraph \"host-gw 模式\"\n        H1[\"MAC Header\"]\n        H2[\"IP Header<br/>Pod IP\"]\n        H3[\"TCP/Payload\"]\n    end\n    \n    subgraph \"VxLAN 模式\"\n        V1[\"外层 MAC\"]\n        V2[\"外层 IP\"]\n        V3[\"UDP + VxLAN\"]\n        V4[\"内层 MAC\"]\n        V5[\"内层 IP\"]\n        V6[\"TCP/Payload\"]\n    end\n    \n    H1 --> H2 --> H3\n    V1 --> V2 --> V3 --> V4 --> V5 --> V6\n```\n\n#### 49.6 性能对比\n\n##### 49.6.1 各模式对比\n\n| 模式 | 封装开销 | MTU | 性能 | 适用场景 |\n|:---|:---|:---|:---|:---|\n| host-gw | 0 bytes | 1500 | ⭐⭐⭐ | 同二层 |\n| IPIP | 20 bytes | 1480 | ⭐⭐ | 跨二层 |\n| VxLAN | 50 bytes | 1450 | ⭐ | 跨二层 |\n| UDP | 28 bytes | 1472 | ❌ | 不推荐 |\n\n##### 49.6.2 性能优势原因\n\n```mermaid\nflowchart LR\n    subgraph \"host-gw 优势\"\n        A[\"无封装\"] --> B[\"无额外 Header\"]\n        B --> C[\"MTU 无损耗\"]\n        C --> D[\"CPU 开销最小\"]\n        D --> E[\"延迟最低\"]\n    end\n```\n\n#### 49.7 与 Calico 对比\n\n| 特性 | Flannel host-gw | Calico (无封装) |\n|:---|:---|:---|\n| 路由方式 | 静态路由 | BGP 动态路由 |\n| 跨子网支持 | ❌ 不支持 | ✅ 支持 |\n| 网络策略 | ❌ 不支持 | ✅ 支持 |\n| 复杂度 | 简单 | 较复杂 |\n\n> [!TIP]\n> **选择建议**\n>\n> - 如果节点在同二层且不需要网络策略：**Flannel host-gw**\n> - 如果需要跨子网或网络策略：**Calico**\n\n#### 49.8 章节小结\n\n```mermaid\nmindmap\n  root((Flannel host-gw 模式))\n    配置\n      Backend Type host-gw\n      无封装\n    原理\n      纯路由转发\n      IP 不变 MAC 变\n      下一跳是节点 IP\n    限制\n      只能同二层\n      跨二层需封装\n    优势\n      MTU 1500\n      零封装开销\n      性能最高\n    对比\n      VxLAN 跨子网\n      IPIP 轻量封装\n      Calico BGP\n```\n\n> [!TIP]\n> **Flannel host-gw 模式要点总结**：\n>\n> 1. **配置方式**：\n>    - `Backend.Type: \"host-gw\"`\n>    - 路由表直接指向目标节点 IP\n>\n> 2. **核心原理**：\n>    - **无封装**：直接三层路由转发\n>    - **IP 不变 MAC 变**：每跳 MAC 地址更新\n>    - 出接口是物理网卡 `eth0`\n>\n> 3. **使用限制**：\n>    - **只能在同二层网络使用**\n>    - 跨二层需要封装（VxLAN/IPIP）\n>    - 或使用 BGP 宣告路由（Calico）\n>\n> 4. **性能优势**：\n>    - MTU 1500，无损耗\n>    - 零封装开销\n>    - CPU 开销最小\n>\n> 5. **适用场景**：\n>    - 所有节点在同一二层网络\n>    - 追求最高网络性能\n>    - 不需要跨子网通信\n\n---", "subs": ["49.1 背景与概述", "49.2 HostGW 配置", "49.3 HostGW 通信原理", "49.4 为什么只能在同二层使用", "49.5 抓包分析", "49.6 性能对比", "49.7 与 Calico 对比", "49.8 章节小结"]}, {"title": "第五十章 Flannel-IPsec 模式", "content": "本章深入讲解 Flannel 的 IPsec 模式，包括预共享密钥（PSK）配置、ESP 封装原理、xfrm 状态与策略、Wireshark 解密技巧，以及与其他模式的对比。\n\n#### 50.1 背景与概述\n\n##### 50.1.1 IPsec 模式定位\n\nIPsec（IP Security）是 Flannel 中提供**加密传输**的后端类型：\n\n```mermaid\ngraph TB\n    subgraph \"Flannel 后端功能对比\"\n        UDP[\"UDP 模式<br/>🔓 不加密\"]\n        VxLAN[\"VxLAN 模式<br/>🔓 不加密\"]\n        IPIP[\"IPIP 模式<br/>🔓 不加密\"]\n        HostGW[\"host-gw 模式<br/>🔓 不加密\"]\n        IPsec[\"IPsec 模式<br/>🔐 加密\"]\n        WireGuard[\"WireGuard 模式<br/>🔐 加密\"]\n    end\n    \n    IPsec -->|\"ESP 封装+加密\"| Secure[\"安全传输\"]\n    WireGuard -->|\"现代加密\"| Secure\n```\n\n##### 50.1.2 核心特点\n\n| 特性 | 说明 |\n|:---|:---|\n| 加密协议 | ESP（Encapsulating Security Payload） |\n| 密钥类型 | PSK（Pre-Shared Key） |\n| 封装模式 | **Tunnel Mode** |\n| 适用场景 | 跨不可信网络的安全通信 |\n| 性能开销 | 加解密消耗 CPU |\n\n#### 50.2 IPsec 配置\n\n##### 50.2.1 生成 PSK\n\n```bash\n# 生成 96 位（12 字节）预共享密钥\ndd if=/dev/urandom bs=12 count=1 2>/dev/null | base64\n# 输出示例：iVzSdJHgXWNqpuJE\n```\n\n##### 50.2.2 ConfigMap 配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"ipsec\",\n        \"PSK\": \"iVzSdJHgXWNqpuJE\"\n      }\n    }\n```\n\n> [!IMPORTANT]\n> **PSK 配置要点**\n>\n> - PSK 是**必选参数**，至少 96 位（12 字节 Base64）\n> - 所有节点必须使用相同的 PSK\n> - 生产环境建议使用更长的密钥\n\n#### 50.3 IPsec 工作原理\n\n##### 50.3.1 IPsec Tunnel 模式架构\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A<br/>10.244.0.5\n    participant Kernel1 as Node1 内核<br/>ESP 封装\n    participant Network as 物理网络<br/>加密传输\n    participant Kernel2 as Node2 内核<br/>ESP 解封\n    participant PodB as Pod B<br/>10.244.1.2\n    \n    PodA->>Kernel1: 1. 原始 IP 包\n    Kernel1->>Kernel1: 2. xfrm policy 匹配\n    Kernel1->>Kernel1: 3. ESP 加密+封装\n    Kernel1->>Network: 4. 加密数据包\n    Network->>Kernel2: 5. 传输\n    Kernel2->>Kernel2: 6. ESP 解密+解封\n    Kernel2->>PodB: 7. 原始 IP 包\n```\n\n##### 50.3.2 ESP 包结构\n\n```mermaid\ngraph LR\n    subgraph \"IPsec ESP Tunnel 模式\"\n        A[\"外层 MAC<br/>节点 MAC\"]\n        B[\"外层 IP<br/>节点 IP\"]\n        C[\"ESP Header<br/>SPI + 序列号\"]\n        D[\"加密载荷<br/>内层 IP + 数据\"]\n        E[\"ESP Trailer<br/>填充 + 认证\"]\n    end\n    \n    A --> B --> C --> D --> E\n```\n\n**关键特点**：\n\n- **内层无 MAC**：IPsec 是三层协议，封装时不包含内层 MAC\n- **整体加密**：内层 IP 包被完全加密\n- **完整性校验**：ESP 提供认证功能\n\n#### 50.4 xfrm 状态与策略\n\n##### 50.4.1 查看 xfrm 状态\n\n```bash\n# 查看 IPsec SA（Security Association）\nip xfrm state\n\n# 输出示例\nsrc 172.18.0.3 dst 172.18.0.4\n    proto esp spi 0x0000a1b2 reqid 1 mode tunnel\n    replay-window 0 \n    auth-trunc hmac(sha256) 0x... 128\n    enc cbc(aes) 0x...\n```\n\n##### 50.4.2 查看 xfrm 策略\n\n```bash\n# 查看 IPsec 策略\nip xfrm policy\n\n# 输出示例\nsrc 10.244.0.0/24 dst 10.244.1.0/24 \n    dir out priority 100\n    tmpl src 172.18.0.3 dst 172.18.0.4\n        proto esp reqid 1 mode tunnel\n```\n\n##### 50.4.3 xfrm 工作流程\n\n```mermaid\nflowchart TB\n    A[\"数据包到达内核\"] --> B{\"匹配 xfrm policy?\"}\n    B -->|\"是\"| C[\"查找对应 xfrm state\"]\n    B -->|\"否\"| D[\"普通路由转发\"]\n    C --> E[\"获取加密算法和密钥\"]\n    E --> F[\"ESP 封装+加密\"]\n    F --> G[\"添加外层 IP\"]\n    G --> H[\"发送到物理网络\"]\n```\n\n> [!TIP]\n> **IPsec 不依赖路由表**\n>\n> 与 host-gw 不同，IPsec Tunnel 模式通过 `xfrm policy` 决定转发，不需要在路由表中配置到远端 Pod 网段的路由。\n\n#### 50.5 抓包与解密\n\n##### 50.5.1 抓取 ESP 包\n\n```bash\n# 在 eth0 上抓取 ESP 协议包\ntcpdump -i eth0 -nn esp -w ipsec.pcap\n```\n\n##### 50.5.2 Wireshark 解密配置\n\n```mermaid\nflowchart LR\n    A[\"打开 Wireshark\"] --> B[\"Edit → Preferences\"]\n    B --> C[\"Protocols → ESP\"]\n    C --> D[\"添加 SA\"]\n    D --> E[\"填写 SPI/算法/密钥\"]\n    E --> F[\"解密成功\"]\n```\n\n**解密步骤**：\n\n1. 从 `ip xfrm state` 获取 SPI、算法、密钥\n2. 在 Wireshark 中：`Edit → Preferences → Protocols → ESP`\n3. 添加 SA 条目：\n   - Source/Destination IP\n   - SPI 值\n   - 加密算法（如 AES-GCM-128）\n   - 密钥\n\n#### 50.6 与其他模式对比\n\n##### 50.6.1 封装方式对比\n\n| 模式 | 封装 | 加密 | MTU | CPU 开销 |\n|:---|:---|:---|:---|:---|\n| host-gw | 无 | ❌ | 1500 | 最低 |\n| IPIP | IP-in-IP | ❌ | 1480 | 低 |\n| VxLAN | UDP+VxLAN | ❌ | 1450 | 中 |\n| **IPsec** | **ESP+Tunnel** | **✅** | **~1400** | **高** |\n| WireGuard | UDP | ✅ | ~1420 | 中 |\n\n##### 50.6.2 IPsec vs WireGuard\n\n```mermaid\ngraph TB\n    subgraph \"IPsec\"\n        I1[\"复杂配置\"]\n        I2[\"成熟稳定\"]\n        I3[\"多种算法\"]\n        I4[\"较高 CPU\"]\n    end\n    \n    subgraph \"WireGuard\"\n        W1[\"简单配置\"]\n        W2[\"现代设计\"]\n        W3[\"固定算法\"]\n        W4[\"较低 CPU\"]\n    end\n    \n    I1 -.->|\"对比\"| W1\n    I4 -.->|\"对比\"| W4\n```\n\n| 特性 | IPsec | WireGuard |\n|:---|:---|:---|\n| 复杂度 | 高 | 低 |\n| 密钥管理 | PSK/证书 | 公钥 |\n| 性能 | 中等 | 较高 |\n| 内核集成 | 传统 | Linux 5.6+ 原生 |\n\n#### 50.7 生产注意事项\n\n> [!CAUTION]\n> **IPsec 生产使用注意**\n>\n> 1. **性能开销**：每个数据包都需要加解密，高流量场景下 CPU 消耗显著\n> 2. **MTU 调整**：ESP 封装会减少可用 MTU，注意调整应用配置\n> 3. **密钥安全**：PSK 需要安全分发和存储\n> 4. **调试复杂**：加密后的数据包难以直接分析\n\n#### 50.8 章节小结\n\n```mermaid\nmindmap\n  root((Flannel IPsec 模式))\n    配置\n      Type ipsec\n      PSK 预共享密钥\n    原理\n      Tunnel 模式\n      ESP 封装+加密\n      xfrm state/policy\n    特点\n      三层协议\n      内层无 MAC\n      不依赖路由表\n    解密\n      ip xfrm state\n      Wireshark ESP\n    对比\n      比 WireGuard 复杂\n      CPU 开销高\n      成熟稳定\n```\n\n> [!TIP]\n> **Flannel IPsec 模式要点总结**：\n>\n> 1. **配置方式**：\n>    - `Backend.Type: \"ipsec\"`\n>    - PSK 是必选参数（至少 96 位）\n>\n> 2. **核心原理**：\n>    - 使用 **ESP Tunnel 模式**封装和加密\n>    - 通过 **xfrm policy** 决定转发（不依赖路由表）\n>    - 三层协议，封装时不包含内层 MAC\n>\n> 3. **xfrm 命令**：\n>    - `ip xfrm state`：查看 SA（密钥、算法）\n>    - `ip xfrm policy`：查看转发策略\n>\n> 4. **抓包解密**：\n>    - 抓包：`tcpdump esp`\n>    - Wireshark 需配置 ESP SA 才能解密\n>\n> 5. **适用场景**：\n>    - 跨不可信网络的安全通信\n>    - 对数据传输有加密要求的场景\n\n---", "subs": ["50.1 背景与概述", "50.2 IPsec 配置", "50.3 IPsec 工作原理", "50.4 xfrm 状态与策略", "50.5 抓包与解密", "50.6 与其他模式对比", "50.7 生产注意事项", "50.8 章节小结"]}, {"title": "第五十一章 Flannel-WireGuard 模式", "content": "本章深入讲解 Flannel 的 WireGuard 模式，包括配置方法、公钥/私钥加密机制、flannel-wg 设备原理、peer 概念，以及与 IPsec 的对比。\n\n#### 51.1 背景与概述\n\n##### 51.1.1 WireGuard 模式定位\n\nWireGuard 是 Flannel 中提供**现代加密传输**的后端类型：\n\n```mermaid\ngraph TB\n    subgraph \"加密后端对比\"\n        IPsec[\"IPsec 模式<br/>🔐 传统加密<br/>复杂配置\"]\n        WireGuard[\"WireGuard 模式<br/>🔐 现代加密<br/>简单高效\"]\n    end\n    \n    IPsec -->|\"ESP + PSK\"| Encrypt[\"加密传输\"]\n    WireGuard -->|\"ChaCha20 + 公钥\"| Encrypt\n```\n\n##### 51.1.2 核心特点\n\n| 特性 | 说明 |\n|:---|:---|\n| 加密算法 | ChaCha20-Poly1305 |\n| 密钥类型 | 公钥/私钥对 |\n| 传输协议 | UDP |\n| 默认端口 | **51820** |\n| 内核集成 | Linux 5.6+ 原生支持 |\n| 性能 | 优于 IPsec |\n\n#### 51.2 WireGuard 配置\n\n##### 51.2.1 ConfigMap 配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: kube-flannel-cfg\n  namespace: kube-flannel\ndata:\n  net-conf.json: |\n    {\n      \"Network\": \"10.244.0.0/16\",\n      \"Backend\": {\n        \"Type\": \"wireguard\"\n      }\n    }\n```\n\n> [!TIP]\n> **最简配置**\n>\n> WireGuard 后端只需要指定 `Type: \"wireguard\"`，无需像 IPsec 那样手动配置 PSK。密钥对由 Flannel 自动生成和分发。\n\n##### 51.2.2 可选参数\n\n| 参数 | 类型 | 说明 |\n|:---|:---|:---|\n| PSK | string | 可选的预共享密钥 |\n| ListenPort | int | 监听端口（默认 51820） |\n| MTU | int | 自动协商 |\n\n#### 51.3 WireGuard 工作原理\n\n##### 51.3.1 设备与路由\n\n```bash\n# 查看 WireGuard 设备\nip link show type wireguard\n\n# 输出示例\n5: flannel-wg: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue\n    link/none\n```\n\n```bash\n# 路由表\nip route\n\n# 输出示例\n10.244.0.0/16 dev flannel-wg\n```\n\n##### 51.3.2 通信架构\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A<br/>10.244.0.5\n    participant CNI as cni0\n    participant WG as flannel-wg<br/>WireGuard 设备\n    participant Network as 物理网络<br/>UDP 51820\n    participant WG2 as flannel-wg\n    participant CNI2 as cni0\n    participant PodB as Pod B<br/>10.244.1.2\n    \n    PodA->>CNI: 1. 原始 IP 包\n    CNI->>WG: 2. 路由匹配\n    WG->>WG: 3. 加密+封装\n    WG->>Network: 4. UDP 51820\n    Network->>WG2: 5. 传输\n    WG2->>WG2: 6. 解密+解封\n    WG2->>CNI2: 7. 路由\n    CNI2->>PodB: 8. 交付\n```\n\n##### 51.3.3 Peer 概念\n\n```mermaid\ngraph TB\n    subgraph \"Node1 172.18.0.3\"\n        WG1[\"flannel-wg<br/>Private Key: xxx\"]\n        Peer1A[\"Peer: Node2<br/>Public Key: yyy<br/>Endpoint: 172.18.0.4:51820<br/>AllowedIPs: 10.244.1.0/24\"]\n        Peer1B[\"Peer: Node3<br/>Public Key: zzz<br/>Endpoint: 172.18.0.5:51820<br/>AllowedIPs: 10.244.2.0/24\"]\n    end\n    \n    WG1 --> Peer1A\n    WG1 --> Peer1B\n```\n\n**Peer 配置说明**：\n\n| 字段 | 说明 |\n|:---|:---|\n| Public Key | 对端的公钥（用于加密） |\n| Endpoint | 对端的 IP:Port |\n| AllowedIPs | 允许通过此 Peer 的 Pod 网段 |\n\n#### 51.4 wg 命令详解\n\n##### 51.4.1 安装工具\n\n```bash\n# Debian/Ubuntu\napt-get install wireguard-tools\n\n# CentOS/RHEL\nyum install wireguard-tools\n```\n\n##### 51.4.2 查看配置\n\n```bash\n# 查看 WireGuard 接口配置\nwg show flannel-wg\n\n# 输出示例\ninterface: flannel-wg\n  public key: ABC123...\n  private key: (hidden)\n  listening port: 51820\n\npeer: XYZ789...\n  endpoint: 172.18.0.4:51820\n  allowed ips: 10.244.1.0/24\n  latest handshake: 5 seconds ago\n  transfer: 1.2 MiB received, 800 KiB sent\n```\n\n##### 51.4.3 关键字段解读\n\n```mermaid\nflowchart LR\n    subgraph \"wg show 输出\"\n        A[\"listening port<br/>监听端口\"]\n        B[\"public key<br/>本端公钥\"]\n        C[\"peer<br/>对端公钥\"]\n        D[\"endpoint<br/>对端地址\"]\n        E[\"allowed ips<br/>允许的网段\"]\n        F[\"handshake<br/>握手状态\"]\n    end\n    \n    A --> B --> C --> D --> E --> F\n```\n\n#### 51.5 加密机制\n\n##### 51.5.1 公钥/私钥\n\n```mermaid\ngraph TB\n    subgraph \"Node1\"\n        Priv1[\"私钥 (保密)\"]\n        Pub1[\"公钥 (公开)\"]\n        Priv1 -->|\"生成\"| Pub1\n    end\n    \n    subgraph \"Node2\"\n        Priv2[\"私钥 (保密)\"]\n        Pub2[\"公钥 (公开)\"]\n        Priv2 -->|\"生成\"| Pub2\n    end\n    \n    Pub1 -.->|\"交换\"| Node2\n    Pub2 -.->|\"交换\"| Node1\n```\n\n**加密过程**：\n\n| 步骤 | 说明 |\n|:---|:---|\n| 1 | Node1 用 **Node2 的公钥**加密数据 |\n| 2 | 数据通过网络传输 |\n| 3 | Node2 用 **自己的私钥**解密数据 |\n\n##### 51.5.2 内核态处理\n\n```bash\n# 检查端口监听\nss -ulnp | grep 51820\n\n# 输出示例\nudp  UNCONN 0  0  0.0.0.0:51820  0.0.0.0:*\n                           users:((\"kernel\",pid=-))\n```\n\n> [!IMPORTANT]\n> **内核态进程**\n>\n> WireGuard 是 in-kernel 实现，端口由内核直接监听（pid 显示为 `-` 或 `kernel`），无用户态进程，性能更高。\n\n#### 51.6 与其他模式对比\n\n##### 51.6.1 加密模式对比\n\n| 特性 | IPsec | WireGuard |\n|:---|:---|:---|\n| 配置复杂度 | 高（需手动 PSK） | 低（自动密钥） |\n| 加密协议 | ESP (AES-GCM) | ChaCha20-Poly1305 |\n| 内核支持 | 传统模块 | 5.6+ 原生 |\n| 性能 | 中等 | 较高 |\n| 代码行数 | ~400,000 | ~4,000 |\n\n##### 51.6.2 Flannel 后端总结\n\n```mermaid\ngraph TB\n    subgraph \"无加密\"\n        UDP[\"UDP<br/>❌ 废弃\"]\n        VxLAN[\"VxLAN<br/>⭐ 推荐\"]\n        IPIP[\"IPIP<br/>轻量\"]\n        HostGW[\"host-gw<br/>最快\"]\n    end\n    \n    subgraph \"有加密\"\n        IPsec[\"IPsec<br/>传统\"]\n        WireGuard[\"WireGuard<br/>⭐ 现代\"]\n    end\n```\n\n| 模式 | 封装 | 加密 | 推荐场景 |\n|:---|:---|:---|:---|\n| VxLAN | ✅ | ❌ | 通用场景 |\n| host-gw | ❌ | ❌ | 同二层高性能 |\n| IPIP | ✅ | ❌ | 轻量跨子网 |\n| IPsec | ✅ | ✅ | 传统安全需求 |\n| **WireGuard** | ✅ | ✅ | **现代安全需求** |\n\n#### 51.7 章节小结\n\n```mermaid\nmindmap\n  root((Flannel WireGuard 模式))\n    配置\n      Type wireguard\n      自动密钥管理\n      端口 51820\n    原理\n      公钥/私钥\n      Peer 概念\n      UDP 封装\n    设备\n      flannel-wg\n      内核态\n      in-kernel\n    命令\n      wg show\n      wg showconf\n    优势\n      配置简单\n      性能高\n      代码精简\n```\n\n> [!TIP]\n> **Flannel WireGuard 模式要点总结**：\n>\n> 1. **配置方式**：\n>    - `Backend.Type: \"wireguard\"`\n>    - 密钥自动生成，无需手动配置 PSK\n>\n> 2. **核心原理**：\n>    - 使用 **公钥/私钥**加密\n>    - 通过 **Peer** 概念管理对端信息\n>    - **UDP 51820** 端口传输\n>\n> 3. **关键设备**：\n>    - `flannel-wg`：WireGuard 虚拟接口\n>    - 内核态运行，无用户态进程\n>\n> 4. **核心命令**：\n>    - `wg show flannel-wg`：查看配置\n>    - `ip link show type wireguard`：查看设备\n>\n> 5. **与 IPsec 对比**：\n>    - 配置更简单\n>    - 性能更高\n>    - Linux 5.6+ 原生支持\n\n---", "subs": ["51.1 背景与概述", "51.2 WireGuard 配置", "51.3 WireGuard 工作原理", "51.4 wg 命令详解", "51.5 加密机制", "51.6 与其他模式对比", "51.7 章节小结"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

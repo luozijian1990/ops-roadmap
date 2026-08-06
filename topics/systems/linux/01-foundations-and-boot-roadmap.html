@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Linux 底层原理学习笔记 · 第一册：系统基础与启动 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Linux 底层原理学习笔记 · 第一册：系统基础与启动</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Linux 底层原理学习笔记 · 第一册：系统基础与启动", "intro": "> 本笔记从Linux内核底层原理出发，系统性地讲解操作系统的核心机制。以\"软件外包公司\"作为类比，帮助理解Linux各个子系统的工作原理。\n\n---", "parts": [{"title": "第1章 Linux操作系统综述", "sections": [{"title": "1.1 Linux内核的整体架构", "content": "> **核心思想**：将Linux内核比作一家软件外包公司的老板，通过这个类比理解Linux各个子系统的协作机制。\n\n\n#### 1.1.1 从零开始理解操作系统\n\n操作系统在我们的日常生活中无处不在，却常常被我们忽视。当你购买一部手机或平板电脑时，之所以能够立刻上手使用,是因为设备中预装了操作系统。**操作系统就像一个默默负重前行的角色**，让我们能够轻松使用各种电子设备。\n\n##### 组装电脑的启示\n\n回想DIY电脑的时代：\n\n- **硬件组装**：CPU、主板、显卡、网卡、硬盘、鼠标、键盘、显示器\n- **操作系统安装**：组装完硬件后仍不能直接使用，必须安装操作系统\n- **复杂的过程**：涉及十几个步骤、几十项配置，进度条走到100%才能看到熟悉的界面\n\n从这个过程可以看出：**操作系统的作用是将复杂的硬件管理起来，呈现出简单易用的界面**。\n\n#### 1.1.2 核心类比：软件外包公司\n\n为了深入理解Linux内核的工作机制，我们引入一个重要的类比模型：\n\n> **Linux内核 ≈ 软件外包公司的老板**\n\n在这个类比中：\n\n- **操作系统内核** = 外包公司老板\n- **用户程序/进程** = 公司接的项目\n- **系统调用** = 办事大厅的服务窗口\n- **硬件资源** = 公司的各种资源（会议室、办公设备等）\n\n这个类比将贯穿整个学习过程，帮助我们理解Linux的各个子系统。\n\n#### 1.1.3 \"双击QQ图标\"背后的操作系统\n\n一个看似简单的操作——双击QQ图标，实际上涉及操作系统的几乎所有功能。\n\n##### 输入与输出设备\n\n**输入设备（鼠标、键盘）**：\n\n- 鼠标移动时，通过鼠标线向电脑发送消息\n- 触发**中断事件**（Interrupt Event）\n- 类比：客户向客户对接员提出需求\n\n**输出设备（显示器、显卡）**：\n\n- 显示器展示计算机处理后的结果\n- 显卡控制屏幕上的内容显示\n- 按照坐标系统绘制图像\n- 类比：交付人员向客户演示成果\n\n**设备驱动程序**：\n\n- **输入设备驱动** = 客户对接员（接收用户请求）\n- **输出设备驱动** = 交付人员（展示处理结果）\n\n##### 从点击到运行的完整流程\n\n```mermaid\ngraph TD\n    A[用户双击QQ图标] --> B[鼠标触发中断事件]\n    B --> C[输入设备驱动程序处理]\n    C --> D[调用中断处理函数]\n    D --> E[识别为QQ图标双击]\n    E --> F[从文件系统加载QQ程序]\n    F --> G[调用fork系统调用]\n    G --> H[创建QQ进程]\n    H --> I[分配CPU和内存资源]\n    I --> J[进程管理子系统管理]\n    J --> K[QQ进程执行代码]\n    K --> L[调用显卡驱动绘制界面]\n    L --> M[用户看到QQ窗口]\n    \n    style A fill:#e1f5ff\n    style H fill:#fff9c4\n    style M fill:#c8e6c9\n```\n\n**详细过程分析**：\n\n1. **立项阶段**：\n   - 运行QQ需要单独立项（创建进程）\n   - 程序 = 项目执行计划书（静态的二进制文件）\n   - 进程 = 项目的执行（动态的运行状态）\n   - 程序存储在**文件系统**中\n\n2. **资源分配**：\n   - 每个进程需要独立的内存空间（类比：独立的会议室）\n   - 通过**内存管理子系统**分配和管理\n   - 避免进程间相互干扰\n\n3. **执行管理**：\n   - CPU按照二进制代码逐行执行\n   - **进程管理子系统**负责调度\n   - 多个进程并发运行时需要CPU调度能力\n\n4. **系统调用**：\n   - 进程不能直接操作硬件\n   - 必须通过**系统调用**（System Call）请求服务\n   - 类比：办事大厅统一提供服务\n\n5. **交互过程**：\n   - 用户通过键盘输入字符（如\"a\"）\n   - 键盘驱动触发中断，通知操作系统\n   - 操作系统将事件传递给QQ进程\n   - QQ进程处理后，调用显卡驱动在屏幕上绘制\"a\"\n\n#### 1.1.4 Linux内核体系结构\n\nLinux内核主要包含以下几个核心子系统：\n\n##### 系统总体架构图\n\n```mermaid\ngraph TB\n    subgraph 用户空间[\"📱 用户空间 User Space\"]\n        APP[应用程序<br/>QQ/Chrome/VSCode]\n        LIB[系统库glibc<br/>封装系统调用]\n    end\n    \n    subgraph 系统调用接口[\"🚪 系统调用接口 System Call Interface\"]\n        SCI[系统调用表<br/>read/write/open/fork...]\n    end\n    \n    subgraph 内核空间[\"🔧 内核空间 Kernel Space\"]\n        direction TB\n        subgraph 核心子系统[\"核心子系统\"]\n            direction LR\n            PM[进程管理<br/>调度/fork]\n            MM[内存管理<br/>分页/伙伴系统]\n            VFS[文件系统VFS<br/>ext4/tmpfs]\n            NET[网络协议栈<br/>TCP/IP/Socket]\n        end\n        \n        subgraph 驱动层[\"设备驱动层\"]\n            direction LR\n            CHAR[字符设备驱动]\n            BLOCK[块设备驱动]\n            NIC[网卡驱动]\n        end\n    end\n    \n    subgraph 硬件层[\"⚙️ 硬件层 Hardware\"]\n        direction LR\n        CPU[CPU处理器]\n        RAM[物理内存RAM]\n        DISK[硬盘存储]\n        CARD[网卡/显卡]\n    end\n    \n    %% 数据流向\n    APP --> LIB\n    LIB --> SCI\n    SCI --> PM\n    SCI --> MM\n    SCI --> VFS\n    SCI --> NET\n    \n    PM -.调度.-> CPU\n    MM -.分页.-> RAM\n    VFS --> BLOCK\n    NET --> NIC\n    \n    CHAR --> CARD\n    BLOCK --> DISK\n    NIC --> CARD\n    \n    %% 样式\n    style SCI fill:#ffe082,stroke:#ff6d00,stroke-width:3px\n    style PM fill:#e1f5fe\n    style MM fill:#f3e5f5\n    style VFS fill:#e8f5e9\n    style NET fill:#fff3e0\n    \n    classDef userSpace fill:#bbdefb\n    classDef hardware fill:#ffccbc\n    class APP,LIB userSpace\n    class CPU,RAM,DISK,CARD hardware\n    style C fill:#90caf9\n    style D fill:#90caf9\n    style E fill:#90caf9\n    style F fill:#90caf9\n    style G fill:#90caf9\n```\n\n**各子系统的作用**：\n\n1. **进程管理子系统**（Process Management Subsystem）\n   - 管理进程的创建、调度、销毁\n   - 类比：项目管理部门，负责项目立项、执行、结项\n\n2. **内存管理子系统**（Memory Management Subsystem）\n   - 管理物理内存和虚拟内存\n   - 类比：会议室管理部门，分配和管理办公空间\n\n3. **文件管理子系统**（File Management Subsystem）\n   - 管理文件的存储、读写、组织\n   - 类比：档案库管理部门，保存各种项目文档\n\n4. **设备驱动程序**\n   - 管理硬件设备的输入输出\n   - 类比：客户对接员和交付人员\n\n5. **网络协议栈**\n   - 管理网络通信\n   - 类比：对外合作部门\n\n---", "subs": ["1.1.1 从零开始理解操作系统", "1.1.2 核心类比：软件外包公司", "1.1.3 \"双击QQ图标\"背后的操作系统", "1.1.4 Linux内核体系结构"]}, {"title": "1.2 Linux命令快速上手", "content": "Linux的一大特点是**命令行（Command Line）模式**。命令行就像\"行业黑话\"，只有使用正确的术语，Linux才能理解你的需求。\n\n#### 1.2.1 用户与密码管理\n\n##### 用户账户\n\n**Root用户**：\n\n- Linux的超级管理员账户\n- 拥有最高操作权限\n- 对应Windows的Administrator\n\n**创建普通用户**：\n\n```bash\n# 创建用户\nuseradd cliu8\n\n# 设置密码\npasswd cliu8\n\n# 创建用户并指定组\nuseradd -g groupname username\n\n# 查看命令帮助\nuseradd -h\nman useradd\n```\n\n**用户配置文件**：\n\n- `/etc/passwd`：存储用户信息\n- `/etc/group`：存储组信息\n\n`/etc/passwd`文件格式：\n\n```\nroot:x:0:0:root:/root:/bin/bash\ncliu8:x:1000:1000::/home/cliu8:/bin/bash\n```\n\n字段说明：\n\n1. 用户名\n2. 密码占位符（x表示密码存储在shadow文件中）\n3. 用户ID（UID）\n4. 组ID（GID）\n5. 用户描述\n6. 主目录（Home Directory）\n7. 默认Shell\n\n#### 1.2.2 文件浏览与权限管理\n\n##### 基本命令\n\n```bash\n# 切换目录\ncd /path/to/directory\ncd ..    # 上级目录\ncd .     # 当前目录\n\n# 列出文件\nls\nls -l    # 列表形式显示详细信息\nls -la   # 显示所有文件（包括隐藏文件）\n```\n\n##### 文件权限\n\n`ls -l`输出示例：\n\n```\ndrwxr-xr-x 6 root root 4096 Oct 20 2017 apt\n-rw-r--r-- 1 root root  211 Oct 20 2017 hosts\n```\n\n**权限位解析**：\n\n```\n-rw-r--r--\n│└┬┘└┬┘└┬┘\n│ │  │  └─ 其他用户权限 (r--): 只读\n│ │  └──── 所属组权限 (r--): 只读\n│ └─────── 所属用户权限 (rw-): 读写\n└───────── 文件类型 (-: 普通文件, d: 目录)\n```\n\n**权限字符**：\n\n- `r` (read): 读权限\n- `w` (write): 写权限\n- `x` (execute): 执行权限\n- `-`: 无权限\n\n**权限修改命令**：\n\n```bash\nchmod 711 filename  # 数字方式修改权限\nchown user filename # 修改所属用户\nchgrp group filename # 修改所属组\n```\n\n#### 1.2.3 软件安装与管理\n\n##### 安装包方式\n\n**CentOS体系（使用rpm）**：\n\n```bash\n# 安装\nrpm -i jdk-XXX_linux-x64_bin.rpm\n\n# 查询已安装软件\nrpm -qa\nrpm -qa | grep jdk\n\n# 删除软件\nrpm -e package-name\n```\n\n**Ubuntu体系（使用deb）**：\n\n```bash\n# 安装\ndpkg -i jdk-XXX_linux-x64_bin.deb\n\n# 查询已安装软件\ndpkg -l\ndpkg -l | grep jdk\n\n# 删除软件\ndpkg -r package-name\n```\n\n##### 软件管理器方式\n\n**CentOS - yum**：\n\n```bash\nyum search jdk              # 搜索软件\nyum install java-11-openjdk # 安装软件\nyum erase java-11-openjdk   # 卸载软件\n```\n\n**Ubuntu - apt-get**：\n\n```bash\napt-cache search jdk        # 搜索软件\napt-get install openjdk-9-jdk  # 安装软件\napt-get purge openjdk-9-jdk    # 卸载软件\n```\n\n**软件源配置**：\n\n- CentOS: `/etc/yum.repos.d/CentOS-Base.repo`\n- Ubuntu: `/etc/apt/sources.list`\n\n建议选择国内镜像源（如163.com）以提高下载速度。\n\n##### 压缩包方式\n\n```bash\n# 下载\nwget http://example.com/jdk-XXX_linux-x64_bin.tar.gz\n\n# 解压\ntar xvzf jdk-XXX_linux-x64_bin.tar.gz\n\n# 配置环境变量\nexport JAVA_HOME=/root/jdk-XXX_linux-x64\nexport PATH=$JAVA_HOME/bin:$PATH\n\n# 永久生效（写入.bashrc）\nvim ~/.bashrc\n# 添加上面的export命令\nsource ~/.bashrc\n```\n\n#### 1.2.4 文本编辑器vim\n\n**基本操作**：\n\n```bash\nvim filename  # 打开/创建文件\n```\n\n**常用命令**：\n\n- `i`: 进入插入模式（编辑）\n- `ESC`: 退出插入模式\n- `:w`: 保存\n- `:q`: 退出\n- `:wq`: 保存并退出\n- `:q!`: 不保存强制退出\n\n#### 1.2.5 程序运行\n\n##### 交互式运行\n\n```bash\n./program    # 当前目录运行\nprogram      # PATH路径下可直接运行\n```\n\n**特点**：\n\n- 命令行退出，程序停止\n- 适合简单、短期的任务\n\n##### 后台运行\n\n```bash\nnohup command >out.file 2>&1 &\n```\n\n**参数说明**：\n\n- `nohup`: no hang up，命令行退出程序继续运行\n- `>out.file`: 标准输出重定向到文件\n- `2>&1`: 标准错误输出合并到标准输出\n- `&`: 后台运行\n\n**进程管理**：\n\n```bash\n# 查看进程\nps -ef | grep keyword\n\n# 杀死进程\nps -ef | grep keyword | awk '{print $2}' | xargs kill -9\n# 或者\nkill -9 PID\n```\n\n##### 服务方式运行\n\n```bash\n# Ubuntu\nsystemctl start mysql    # 启动服务\nsystemctl stop mysql     # 停止服务\nsystemctl enable mysql   # 设置开机启动\nsystemctl status mysql   # 查看服务状态\n\n# CentOS (以MariaDB为例)\nsystemctl start mariadb\nsystemctl enable mariadb\n```\n\n**服务配置文件**：\n\n- Ubuntu: `/lib/systemd/system/XXX.service`\n- CentOS: `/usr/lib/systemd/system/XXX.service`\n\n##### 系统关机与重启\n\n```bash\nshutdown -h now  # 立即关机\nreboot           # 重启\n```\n\n---", "subs": ["1.2.1 用户与密码管理", "1.2.2 文件浏览与权限管理", "1.2.3 软件安装与管理", "1.2.4 文本编辑器vim", "1.2.5 程序运行"]}, {"title": "1.3 系统调用详解", "content": "> 系统调用是用户程序与操作系统内核交互的唯一接口，它决定了操作系统的能力边界。\n\n#### 1.3.1 什么是系统调用\n\n**定义**：系统调用（System Call）是操作系统提供给用户程序的一组API接口，用于请求内核提供的服务。\n\n**类比**：办事大厅的服务窗口\n\n- 明文列出提供哪些服务\n- 统一的服务入口\n- 规范的服务流程\n\n**重要性**：\n\n- 系统调用的质量决定操作系统的好用程度\n- 功能全面性影响应用程序的能力范围\n\n#### 1.3.2 主要系统调用分类\n\n##### 1. 进程管理类\n\n**fork - 创建进程**：\n\n```c\npid_t fork(void);\n```\n\n工作原理：\n\n- 父进程调用fork创建子进程\n- 子进程拷贝父进程的所有数据结构\n- 通过返回值区分父子进程：\n  - 子进程返回0\n  - 父进程返回子进程PID\n\n```mermaid\ngraph LR\n    A[父进程执行中] --> B[调用fork]\n    B --> C{fork返回}\n    C -->|返回0| D[子进程]\n    C -->|返回子进程PID| E[父进程]\n    D --> F[调用execve执行新程序]\n    E --> G[继续执行原程序]\n    \n    style A fill:#e1f5ff\n    style D fill:#fff9c4\n    style E fill:#fff9c4\n```\n\n**特点**：采用\"先拷贝，再修改\"的策略\n\n**execve - 执行新程序**：\n\n```c\nint execve(const char *filename, char *const argv[], char *const envp[]);\n```\n\n**waitpid - 等待子进程**：\n\n```c\npid_t waitpid(pid_t pid, int *status, int options);\n```\n\n作用：父进程等待子进程结束，获取子进程退出状态\n\n**进程家族树**：\n\n- 所有进程都由\"祖宗进程\"fork而来\n- 系统启动时创建第一个init进程\n- 形成进程树结构\n\n##### 2. 内存管理类\n\n**独立内存空间**：\n\n- 每个进程拥有独立的虚拟内存空间\n- 32位系统：4GB\n- 64位系统：更大\n\n**内存空间布局**：\n\n- **代码段**（Code Segment）：存放程序代码\n- **数据段**（Data Segment）：存放运行时数据\n  - 栈（Stack）：局部变量，函数结束自动释放\n  - 堆（Heap）：动态分配，需要显式释放\n\n**内存分配系统调用**：\n\n```c\n// brk - 小块内存分配（与原堆连续）\nint brk(void *addr);\n\n// mmap - 大块内存分配（独立区域）\nvoid *mmap(void *addr, size_t length, int prot, int flags, \n           int fd, off_t offset);\n```\n\n**虚拟内存机制**：\n\n- 进程申请内存时先登记，不立即分配物理内存\n- 真正写入数据时触发缺页中断\n- 此时才分配实际物理内存\n\n##### 3. 文件管理类\n\n**\"一切皆文件\"**理念：\n\n- 普通文件：二进制文件、文本文件\n- 设备文件：硬件设备\n- 管道文件：进程间通信\n- Socket文件：网络通信\n- 目录：也是特殊文件\n- `/proc`：进程信息也以文件形式呈现\n\n**核心文件操作**：\n\n```c\n// 打开文件\nint open(const char *pathname, int flags, mode_t mode);\n\n// 创建文件\nint creat(const char *pathname, mode_t mode);\n\n// 关闭文件\nint close(int fd);\n\n// 定位文件\noff_t lseek(int fd, off_t offset, int whence);\n\n// 读文件\nssize_t read(int fd, void *buf, size_t count);\n\n// 写文件\nssize_t write(int fd, const void *buf, size_t count);\n```\n\n**文件描述符**（File Descriptor）：\n\n- 整数，标识打开的文件\n- 统一了所有文件类型的操作接口\n- 标准文件描述符：\n  - 0: stdin（标准输入）\n  - 1: stdout（标准输出）\n  - 2: stderr（标准错误输出）\n\n##### 4. 信号处理类\n\n**信号**（Signal）：用于异常处理和进程间通知\n\n**常见信号**：\n\n- `SIGINT`（Ctrl+C）：中断信号\n- `SIGKILL`：终止进程（不可忽略）\n- `SIGSTOP`：停止进程（不可忽略）\n- `SIGSEGV`：非法内存访问\n- 硬件故障信号\n\n**信号处理方式**：\n\n1. 忽略（某些信号可以）\n2. 执行默认动作\n3. 自定义处理函数\n\n```c\n// 注册信号处理函数\nint sigaction(int signum, const struct sigaction *act, \n               struct sigaction *oldact);\n```\n\n##### 5. 进程间通信类\n\n**消息队列**（Message Queue）：\n\n```c\nint msgget(key_t key, int msgflg);      // 创建消息队列\nint msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);  // 发送\nssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);  // 接收\n```\n\n**共享内存**（Shared Memory）：\n\n```c\nint shmget(key_t key, size_t size, int shmflg);  // 创建共享内存\nvoid *shmat(int shmid, const void *shmaddr, int shmflg);  // 映射到进程空间\n```\n\n特点：零拷贝，效率最高\n\n**信号量**（Semaphore）：\n\n```c\nint sem_wait(sem_t *sem);   // P操作，申请资源\nint sem_post(sem_t *sem);   // V操作，释放资源\n```\n\n作用：解决共享资源的互斥访问问题\n\n```mermaid\ngraph TD\n    A[进程A准备访问共享资源] --> B[调用sem_wait]\n    B --> C{信号量>0?}\n    C -->|是| D[信号量-1,获得访问权]\n    C -->|否| E[等待]\n    D --> F[访问共享资源]\n    F --> G[调用sem_post]\n    G --> H[信号量+1,释放资源]\n    H --> I[唤醒等待的进程]\n    I --> E\n    E --> B\n    \n    style D fill:#c8e6c9\n    style E fill:#ffccbc\n```\n\n##### 6. 网络通信类\n\n**Socket通信**：\n\n```c\n// 创建Socket\nint socket(int domain, int type, int protocol);\n\n// 绑定地址\nint bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);\n\n// 监听连接\nint listen(int sockfd, int backlog);\n\n// 接受连接\nint accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);\n\n// 连接服务器\nint connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);\n```\n\n**特点**：\n\n- Socket也是文件，有文件描述符\n- 可通过read/write进行通信\n- 支持TCP/IP协议栈\n\n#### 1.3.3 系统调用的实现\n\n**系统调用表**：\n\n在`unistd_64.h`中定义：\n\n```c\n#define __NR_read 0\n#define __NR_write 1\n#define __NR_open 2\n#define __NR_close 3\n#define __NR_fork 57\n#define __NR_execve 59\n...\n```\n\n每个系统调用对应一个编号。\n\n**调用过程**：\n\n```mermaid\ngraph TD\n    A[用户程序] --> B[调用Glibc封装函数]\n    B --> C[Glibc转换为系统调用]\n    C --> D[触发软中断/异常]\n    D --> E[CPU切换到内核态]\n    E --> F[根据调用号查系统调用表]\n    F --> G[执行对应内核函数]\n    G --> H[返回结果到用户态]\n    H --> I[用户程序继续执行]\n    \n    style A fill:#e1f5ff\n    style E fill:#fff9c4\n    style G fill:#ffccbc\n```\n\n#### 1.3.4 Glibc与系统调用\n\n**Glibc的作用**：\n\n- GNU C Library，Linux的标准C库\n- 封装系统调用，提供更友好的API\n- 提供用户态服务（字符串处理、数学运算等）\n\n**映射关系**：\n\n- 一对一：`open()` → `sys_open`\n- 一对多：`printf()` → `sys_open` + `sys_write` + `sys_close`\n- 多对一：`malloc()` + `calloc()` + `free()` → `sys_brk`\n\n**为什么需要Glibc**：\n\n- 简化编程，提供更高层次的抽象\n- 跨平台兼容性\n- 错误处理和参数检查\n\n**调试工具strace**：\n\n```bash\nstrace ls    # 跟踪ls命令的系统调用\nstrace -c program  # 统计系统调用次数\n```\n\n---", "subs": ["1.3.1 什么是系统调用", "1.3.2 主要系统调用分类", "1.3.3 系统调用的实现", "1.3.4 Glibc与系统调用"]}, {"title": "1.4 总结", "content": "#### 1.4.1 核心要点\n\n1. **Linux内核 = 软件外包公司老板**\n   - 通过这个类比理解各个子系统的职责\n   - 进程 = 项目，系统调用 = 办事大厅\n\n2. **内核体系结构**\n   - 进程管理子系统：调度和管理进程\n   - 内存管理子系统：分配和管理内存\n   - 文件管理子系统：组织和存储文件\n   - 设备驱动：管理硬件输入输出\n   - 网络协议栈：处理网络通信\n\n3. **命令行操作**\n   - 用户管理：`useradd`、`passwd`\n   - 文件浏览：`ls`、`cd`、`vim`\n   - 软件安装：`yum`/`apt-get`、`rpm`/`dpkg`\n   - 程序运行：交互式、后台、服务\n\n4. **系统调用**\n   - 用户程序与内核的唯一接口\n   - 六大类：进程管理、内存管理、文件管理、信号处理、IPC、网络通信\n   - Glibc封装系统调用，提供友好API\n\n5. **一切皆文件**\n   - 统一了操作接口\n   - 简化了编程模型\n   - 文件描述符是核心抽象\n\n#### 1.4.2 学习建议\n\n1. **动手实践**：\n   - 按照命令操作步骤实际操作\n   - 安装JDK和MySQL练习\n   - 使用strace查看系统调用\n\n2. **阅读源码**：\n   - 下载Linux内核源码\n   - 查看`unistd_64.h`中的系统调用定义\n   - 理解各子系统的代码组织\n\n3. **建立关联**：\n   - 将命令操作与系统调用对应起来\n   - 理解每个操作背后的内核机制\n\n4. **深入类比**：\n   - 牢记\"软件外包公司\"的类比\n   - 用类比思维理解复杂概念\n\n#### 1.4.3 常用命令速查表\n\n| 功能 | 命令 | 说明 |\n|------|------|------|\n| 用户管理 | `useradd/passwd` | 创建用户和设置密码 |\n| 文件浏览 | `ls -l / cd / pwd` | 列出文件/切换目录/当前路径 |\n| 权限管理 | `chmod / chown / chgrp` | 修改权限/所有者/组 |\n| 软件安装 | `yum/apt-get install` | 安装软件包 |\n| 软件查询 | `rpm -qa / dpkg -l` | 查看已安装软件 |\n| 文本编辑 | `vim` | 编辑文件 |\n| 进程管理 | `ps -ef / kill` | 查看进程/终止进程 |\n| 后台运行 | `nohup ... &` | 后台运行程序 |\n| 服务管理 | `systemctl start/stop` | 启动/停止服务 |\n| 管道过滤 | `grep / awk / less` | 过滤和分页显示 |\n\n---", "subs": ["1.4.1 核心要点", "1.4.2 学习建议", "1.4.3 常用命令速查表"]}]}, {"title": "第2章 系统初始化", "sections": [{"title": "2.1 x86架构：开放的营商环境", "content": "> **核心思想**：系统初始化是Linux从\"个体户\"成长为\"大公司\"的过程，从实模式到保护模式，从BIOS到内核，逐步建立起完整的运行环境。\n\n\n#### 2.1.1 计算机的工作模式\n\n计算机的核心是**CPU**（Central Processing Unit），所有设备都围绕它展开。类比到公司，CPU就是真正干活的程序员，是营商环境中最重要的部分。\n\n##### 核心组件\n\n**CPU内部组成**：\n\n1. **运算单元**\n   - 负责执行各种运算（加法、位移等）\n   - 不知道操作哪些数据，结果放哪里\n\n2. **数据单元**\n   - CPU内部缓存和寄存器组\n   - 空间小但速度快\n   - 暂存数据和运算结果\n\n3. **控制单元**\n   - 统一指挥中心\n   - 获取并执行指令\n   - 指导运算单元操作数据\n\n```mermaid\ngraph TD\n    A[内存中的程序] --> B[控制单元]\n    B --> C[指令指针寄存器IP]\n    C --> D[取出指令]\n    D --> E{指令解析}\n    E -->|操作类型| F[运算单元]\n    E -->|数据地址| G[数据单元]\n    G --> H[从内存读取数据]\n    H --> F\n    F --> I[计算结果]\n    I --> G\n    G --> J[写回内存]\n    \n    style B fill:#e1f5ff\n    style F fill:#fff9c4\n    style G fill:#c8e6c9\n```\n\n**总线系统**：\n\n- **地址总线**（Address Bus）：传输内存地址\n  - 位数决定可访问的地址范围\n  - 例如：20位可访问1M（2^20）\n  \n- **数据总线**（Data Bus）：传输实际数据\n  - 位数决定一次传输的数据量\n  - 位数越多，访问速度越快\n\n#### 2.1.2 x86架构的历史\n\n**IBM PC的诞生**：\n\n- IBM采用英特尔8086芯片和微软MS-DOS\n- 因垄断被诉，被迫公开技术\n- 促成IBM-PC兼容机的大量出现\n- 形成开放的行业标准\n\n**x86的三大原则**：\n\n1. **标准化**：统一的处理器架构\n2. **开放性**：技术公开，生态繁荣\n3. **兼容性**：向后兼容，持续发展\n\n#### 2.1.3 8086处理器详解\n\n**寄存器组织**：\n\n```\n通用寄存器（16位）:\n  AX, BX, CX, DX    - 可分为8位使用 (AH/AL, BH/BL, CH/CL, DH/DL)\n  SP, BP, SI, DI    - 栈和索引寄存器\n\n段寄存器（16位）:\n  CS - 代码段寄存器\n  DS - 数据段寄存器  \n  SS - 栈段寄存器\n  ES - 扩展段寄存器\n\n指令指针:\n  IP - 指向下一条指令的位置\n```\n\n**内存寻址方式**：\n\n- CS/DS保存段起始地址（16位）\n- IP/通用寄存器保存偏移量（16位）\n- 物理地址 = 段地址 × 16 + 偏移量\n- 最大寻址：2^20 = 1MB\n- 段大小限制：2^16 = 64KB\n\n**示例**：\n\n```\n段地址CS: 0x1000 (实际地址 0x10000)\n偏移量IP:  0x0050\n物理地址 = 0x10000 + 0x0050 = 0x10050\n```\n\n#### 2.1.4 32位处理器的演进\n\n**扩展的寄存器**：\n\n- 16位寄存器扩展为32位\n- 保持向下兼容（仍可使用16位和8位）\n- IP扩展为EIP（32位）\n\n**段寄存器的重新定义**：\n\n```mermaid\ngraph LR\n    A[16位段寄存器] --> B[选择子Selector]\n    B --> C[段描述符表]\n    C --> D[段描述符Segment Descriptor]\n    D --> E[32位段起始地址]\n    E --> F[加上偏移量]\n    F --> G[物理地址]\n    \n    style A fill:#ffccbc\n    style C fill:#fff9c4\n    style E fill:#c8e6c9\n```\n\n**两种模式**：\n\n| 模式 | 地址空间 | 特点 | 使用场景 |\n|------|----------|------|----------|\n| **实模式** | 1MB | 简单直接，段地址×16+偏移 | 系统启动初期 |\n| **保护模式** | 4GB (32位) | 灵活强大，通过描述符表寻址 | 正常运行 |\n\n**模式切换**：\n\n- 系统启动时处于实模式（兼容）\n- 逐步切换到保护模式（更强大）\n- 不能无缝切换，需要特定操作\n\n**保护模式的优势**：\n\n1. 可访问更大内存空间（4GB）\n2. 段起始地址更灵活\n3. 支持内存保护机制\n4. 为多任务系统提供基础\n\n---", "subs": ["2.1.1 计算机的工作模式", "2.1.2 x86架构的历史", "2.1.3 8086处理器详解", "2.1.4 32位处理器的演进"]}, {"title": "2.2 从BIOS到Bootloader", "content": "#### 2.2.1 BIOS时期\n\n**加电启动过程**：\n\n```mermaid\ngraph TD\n    A[按下电源按钮] --> B[主板加电]\n    B --> C[CPU开始工作]\n    C --> D[CS=0xFFFF, IP=0x0000]\n    D --> E[访问0xFFFF0地址]\n    E --> F[ROM中的BIOS代码]\n    F --> G[JMP到BIOS初始化代码]\n    G --> H[BIOS开始执行]\n    \n    style A fill:#e1f5ff\n    style F fill:#fff9c4\n    style H fill:#c8e6c9\n```\n\n**BIOS的职责**：\n\n1. **硬件检测**（POST - Power-On Self-Test）\n   - 检查RAM、CPU、外设等是否正常\n   - 类比：创业指导手册第一条\n\n2. **建立中断向量表**\n   - 设置中断服务程序\n   - 处理键盘、鼠标等输入设备\n   - 类比：建立办事大厅，自己当办事员\n\n3. **显示输出**\n   - 映射显存空间\n   - 在显示器上显示信息\n   - 类比：充当客户对接人\n\n**内存映射**：\n\n```\n0xF0000 - 0xFFFFF: ROM (BIOS代码)\n0xFFFF0: 第一条指令的位置\n实模式下：1MB地址空间\n```\n\n#### 2.2.2 Bootloader时期\n\n**GRUB2的作用**：\n\nGRUB (Grand Unified Bootloader Version 2) 是Linux的启动管理器。\n\n**启动盘特征**：\n\n- 位于第一个扇区（MBR）\n- 占512字节\n- 以`0xAA55`结束\n\n**GRUB2的组成**：\n\n1. **boot.img** (512字节)\n   - 安装在MBR\n   - 由boot.S编译而成\n   - 加载到内存0x7c00运行\n   - 负责加载core.img\n\n2. **core.img** (更大更复杂)\n   - diskboot.img: 从硬盘加载\n   - lzma_decompress.img: 解压缩程序\n   - kernel.img: GRUB的内核（不是Linux内核）\n   - 各种模块\n\n**GRUB配置示例**：\n\n```bash\nmenuentry 'CentOS Linux (3.10.0-862.el7.x86_64)' {\n    load_video\n    set gfxpayload=keep\n    insmod gzio\n    insmod part_msdos\n    insmod ext2\n    set root='hd0,msdos1'\n    linux16 /boot/vmlinuz-3.10.0-862.el7.x86_64 root=UUID=...\n    initrd16 /boot/initramfs-3.10.0-862.el7.x86_64.img\n}\n```\n\n#### 2.2.3 从实模式切换到保护模式\n\n```mermaid\ngraph TD\n    A[boot.img加载] --> B[core.img加载]\n    B --> C[diskboot.img执行]\n    C --> D[加载lzma_decompress.img]\n    D --> E{内存不够?}\n    E -->|是| F[调用real_to_prot]\n    F --> G[切换到保护模式]\n    G --> H[解压kernel.img]\n    H --> I[执行grub_main]\n    I --> J[解析grub.cfg]\n    J --> K[显示启动菜单]\n    K --> L[用户选择系统]\n    L --> M[加载Linux内核]\n    \n    style F fill:#ffccbc\n    style G fill:#fff9c4\n    style M fill:#c8e6c9\n```\n\n**切换保护模式的步骤**：\n\n1. **启用分段**\n   - 建立段描述符表（GDT）\n   - 段寄存器变成段选择子\n   - 指向段描述符\n\n2. **启用分页**\n   - 管理更大的内存\n   - 将内存分成相等大小的块\n\n3. **打开Gate A20**\n   - 第21根地址线\n   - 实模式下只有20根（1MB）\n   - 保护模式需要21根及以上\n\n**类比**：\n\n- 个体户模式 → 老板角色\n- 所有东西都是自己的 → 需要划分权限\n- 本小利微 → 可以雇人做大项目\n\n---", "subs": ["2.2.1 BIOS时期", "2.2.2 Bootloader时期", "2.2.3 从实模式切换到保护模式"]}, {"title": "2.3 内核初始化", "content": "#### 2.3.1 start_kernel函数\n\n`start_kernel`是内核的main函数，位于`init/main.c`。它包含大量初始化函数`XXXX_init()`。\n\n**初始化顺序**：\n\n1. **创建0号进程init_task**\n\n   ```c\n   set_task_stack_end_magic(&init_task);\n   ```\n\n   - 第一个进程，唯一不通过fork创建的\n   - 进程列表的第一个\n\n2. **初始化中断trap_init()**\n\n   ```c\n   set_system_intr_gate(IA32_SYSCALL_VECTOR, entry_INT80_32);\n   ```\n\n   - 设置中断门\n   - 包括系统调用的中断门\n\n3. **初始化内存mm_init()**\n   - 初始化内存管理模块\n   - 类比：会议室管理系统\n\n4. **初始化调度sched_init()**\n   - 项目调度需要调度策略\n   - 类比：项目管理流程\n\n5. **初始化VFS vfs_caches_init()**\n   - 初始化虚拟文件系统rootfs\n   - 注册rootfs_fs_type\n\n6. **rest_init()**\n   - 其他方面的初始化\n\n#### 2.3.2 创建1号进程\n\n```c\nkernel_thread(kernel_init, NULL, CLONE_FS);\n```\n\n**1号进程的意义**：\n\n- \"划时代\"的进程\n- 第一个用户态进程\n- 用户进程的祖先（所有用户进程的根）\n\n**用户态与内核态**：\n\n```mermaid\ngraph LR\n    subgraph 内核态Ring0\n        A[内核代码]\n        B[核心资源]\n    end\n    \n    subgraph 用户态Ring3  \n        C[用户程序]\n    end\n    \n    C -->|系统调用| D[保存寄存器]\n    D --> A\n    A --> E[恢复寄存器]\n    E --> C\n    \n    style A fill:#ffccbc\n    style C fill:#e1f5ff\n```\n\n**权限保护机制**：\n\n- x86提供4个Ring（0-3）\n- Ring0：内核态，最高权限\n- Ring3：用户态，受限权限\n- 用户态不能直接访问核心资源\n- 必须通过系统调用请求服务\n\n**系统调用过程**：\n\n```\n用户态 → 系统调用 → 保存寄存器 → 内核态执行 → 恢复寄存器 → 返回用户态\n```\n\n#### 2.3.3 从内核态到用户态\n\n**关键函数调用链**：\n\n```\nkernel_init\n  → kernel_init_freeable\n    → ramdisk_execute_command = \"/init\"\n  → run_init_process(ramdisk_execute_command)\n    → do_execve\n      → exec_binprm\n        → search_binary_handler\n          → load_elf_binary\n            → start_thread\n```\n\n**start_thread的作用**：\n\n```c\nvoid start_thread(struct pt_regs *regs, unsigned long new_ip, unsigned long new_sp) {\n    regs->cs = __USER_CS;     // 用户态代码段\n    regs->ds = __USER_DS;     // 用户态数据段\n    regs->ss = __USER_DS;     // 用户态栈段\n    regs->ip = new_ip;        // 指令指针\n    regs->sp = new_sp;        // 栈指针\n    force_iret();             // 强制iret返回\n}\n```\n\n**如何实现跃迁**：\n\n1. 补上系统调用时保存寄存器的步骤\n2. 设置用户态的CS、DS、IP、SP\n3. 使用`iret`指令返回\n4. 恢复寄存器时，指向用户态地址\n5. 成功进入用户态\n\n#### 2.3.4 ramdisk的作用\n\n**为什么需要ramdisk**：\n\n- 内核需要加载存储设备上的/init\n- 访问存储设备需要驱动程序\n- 驱动太多，无法全部放入内核\n- 基于内存的文件系统不需要驱动\n\n**启动流程**：\n\n```mermaid\ngraph TD\n    A[内核加载到内存] --> B[加载initramfs到内存]\n    B --> C[ramdisk作为根文件系统]\n    C --> D[运行ramdisk的/init]\n    D --> E[进入用户态]\n    E --> F[加载存储设备驱动]\n    F --> G[设置真正的根文件系统]\n    G --> H[切换到真正的/init]\n    H --> I[启动系统服务]\n    I --> J[用户登录]\n    \n    style C fill:#fff9c4\n    style E fill:#c8e6c9\n```\n\n**initramfs参数**：\n\n```bash\ninitrd16 /boot/initramfs-3.10.0-862.el7.x86_64.img\n```\n\n#### 2.3.5 创建2号进程\n\n```c\nkernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);\n```\n\n**2号进程的作用**：\n\n- 内核态所有线程的祖先\n- 负责内核态线程的调度和管理\n- 函数名kthreadd负责所有内核态线程\n\n**进程vs线程**：\n\n- **用户态视角**：进程是项目，线程是项目中的执行人员\n- **内核态视角**：都统称为任务（Task），使用相同数据结构\n\n**三个重要进程**：\n\n1. **0号进程**：创始进程，系统init_task\n2. **1号进程**：用户态进程祖先\n3. **2号进程**：内核态进程祖先\n\n---", "subs": ["2.3.1 start_kernel函数", "2.3.2 创建1号进程", "2.3.3 从内核态到用户态", "2.3.4 ramdisk的作用", "2.3.5 创建2号进程"]}, {"title": "2.4 系统调用的实现机制", "content": "#### 系统调用完整流程序列图\n\n```mermaid\nsequenceDiagram\n    participant User as 👤 用户进程<br/>用户态 Ring 3\n    participant Glibc as 📚 Glibc库<br/>封装层\n    participant Syscall as 🚪 系统调用接口<br/>int 0x80/syscall\n    participant Handler as ⚙️ 系统调用处理<br/>内核态 Ring 0\n    participant Kernel as 🔧 内核函数<br/>sys_read/sys_write\n    \n    Note over User,Kernel: 1️⃣ 调用准备阶段\n    User->>Glibc: 调用read(fd, buf, len)\n    Note right of User: C代码：read(3, buffer, 100)\n    \n    Glibc->>Glibc: 查找系统调用号<br/>__NR_read = 0\n    Glibc->>Glibc: 准备参数<br/>32位：栈传递<br/>64位：寄存器传递\n    \n    Note over User,Kernel: 2️⃣ 进入内核态\n    Glibc->>Syscall: 32位: int 0x80<br/>64位: syscall\n    activate Syscall\n    Note right of Syscall: 触发软件中断/<br/>快速系统调用指令\n    \n    Syscall->>Handler: CPU切换到内核态<br/>Ring 3 → Ring 0\n    activate Handler\n    Note right of Handler: 保存用户态寄存器<br/>到内核栈\n    \n    Handler->>Handler: 1. 保存用户态上下文<br/>   - 寄存器(rax,rbx...)<br/>   - 返回地址(rip)<br/>   - 栈指针(rsp)\n    Handler->>Handler: 2. 验证系统调用号<br/>   - 检查调用号范围<br/>   - 防止越界访问\n    \n    Note over User,Kernel: 3️⃣ 执行系统调用\n    Handler->>Kernel: 查系统调用表<br/>sys_call_table[0] → sys_read\n    activate Kernel\n    Note right of Kernel: 系统调用表：<br/>数组映射调用号→函数指针\n    \n    Kernel->>Kernel: 执行sys_read()<br/>- 验证文件描述符<br/>- 检查权限<br/>- 读取数据<br/>- 拷贝到用户缓冲区\n    Note right of Kernel: 可能阻塞等待I/O\n    \n    Kernel-->>Handler: 返回读取字节数<br/>或错误码(-1)\n    deactivate Kernel\n    \n    Note over User,Kernel: 4️⃣ 返回用户态\n    Handler->>Handler: 3. 恢复用户态上下文<br/>   - 恢复寄存器<br/>   - 设置返回值(rax)\n    Handler->>Syscall: 准备返回\n    deactivate Handler\n    \n    Syscall->>Glibc: CPU切换回用户态<br/>Ring 0 → Ring 3\n    deactivate Syscall\n    Note right of Syscall: iret/sysret指令\n    \n    Glibc->>Glibc: 检查返回值<br/>如果<0设置errno\n    Glibc-->>User: 返回结果\n    Note right of User: 继续执行用户代码\n    \n    Note over User,Kernel: ⏱️ 性能考量<br/>上下文切换开销：~1-2微秒<br/>应减少系统调用次数\n```\n\n**系统调用流程关键点**：\n\n| 阶段 | 执行环境 | 关键操作 | 数据结构 |\n|------|---------|---------|----------|\n| **调用准备** | 用户态 Ring 3 | 准备参数、查调用号 | Glibc封装函数 |\n| **陷入内核** | 切换中 | int 0x80/syscall指令 | IDT中断描述符表 |\n| **保存上下文** | 内核态 Ring 0 | 保存寄存器到内核栈 | pt_regs结构 |\n| **查表执行** | 内核态 Ring 0 | sys_call_table[nr] | 系统调用表 |\n| **内核函数** | 内核态 Ring 0 | sys_read()等 | 内核数据结构 |\n| **恢复上下文** | 内核态 Ring 0 | 恢复寄存器、设置返回值 | pt_regs结构 |\n| **返回用户** | 切换中 | iret/sysret指令 | - |\n| **继续执行** | 用户态 Ring 3 | 检查errno | Glibc处理 |\n\n**32位 vs 64位系统调用差异**：\n\n| 项目 | 32位 (x86) | 64位 (x86-64) |\n|------|-----------|---------------|\n| **陷入指令** | `int 0x80` | `syscall` |\n| **返回指令** | `iret` | `sysret` |\n| **调用号寄存器** | `eax` | `rax` |\n| **参数传递** | 栈（ebx,ecx,edx...） | 寄存器（rdi,rsi,rdx,r10,r8,r9） |\n| **系统调用表** | `sys_call_table` | `sys_call_table` |\n| **性能** | 较慢（中断） | 较快（专用指令） |\n\n**核心理解**：\n\n1. **特权级切换**：从Ring 3（用户态）到Ring 0（内核态）\n2. **上下文保存**：必须保存所有寄存器，保证能正确返回\n3. **系统调用表**：通过数组索引快速定位内核函数（函数指针数组）\n4. **参数传递**：64位使用寄存器更高效，32位使用栈\n5. **性能开销**：上下文切换约1-2微秒，应尽量减少系统调用次数（如批量I/O）\n6. **Glibc封装**：提供类型安全和错误处理（errno）\n\n#### 2.4.1 glibc对系统调用的封装\n\n**系统调用配置**（syscalls.list）：\n\n```\n# File name  Caller  Syscall name  Args  Strong name  Weak names\nopen         -       open          Ci:siv __libc_open  __open open\n```\n\n**生成过程**：\n\n1. make-syscall.sh脚本解析配置\n2. 生成宏定义：`#define SYSCALL_NAME open`\n3. syscall-template.S定义调用方式\n4. 生成封装函数\n\n#### 2.4.2 32位系统调用过程\n\n**参数传递**（通过寄存器）：\n\n```\n系统调用号    %eax\n参数1         %ebx\n参数2         %ecx\n参数3         %edx\n参数4         %esi\n参数5         %edi\n参数6         %ebp\n```\n\n**调用流程**：\n\n```mermaid\ngraph TD\n    A[用户程序调用open] --> B[glibc的open函数]\n    B --> C[DO_CALL宏]\n    C --> D[参数放入寄存器]\n    D --> E[eax=系统调用号]\n    E --> F[int 0x80触发中断]\n    F --> G[entry_INT80_32]\n    G --> H[SAVE_ALL保存寄存器]\n    H --> I[do_syscall_32_irqs_on]\n    I --> J[查sys_call_table]\n    J --> K[调用sys_open]\n    K --> L[执行内核函数]\n    L --> M[iret返回用户态]\n    \n    style F fill:#ffccbc\n    style J fill:#fff9c4\n    style M fill:#c8e6c9\n```\n\n**关键代码**：\n\n```c\n// 触发中断\n#define ENTER_KERNEL int $0x80\n\n// 中断处理\nENTRY(entry_INT80_32)\n    pushl %eax\n    SAVE_ALL\n    movl %esp, %eax\n    call do_syscall_32_irqs_on\n\n// 查表调用\nif (likely(nr < IA32_NR_syscalls)) {\n    regs->ax = ia32_sys_call_table[nr](...);\n}\n\n// 返回用户态\n#define INTERRUPT_RETURN iret\n```\n\n#### 2.4.3 64位系统调用过程\n\n**参数传递**（64位寄存器）：\n\n```\n系统调用号    rax\n参数1         rdi\n参数2         rsi\n参数3         rdx\n参数4         r10\n参数5         r8\n参数6         r9\n```\n\n**不同之处**：\n\n- 使用`syscall`指令（非中断）\n- 使用MSR（Model Specific Registers）\n- 更快的切换速度\n\n**MSR寄存器设置**：\n\n```c\n// 系统初始化\nwrmsrl(MSR_LSTAR, (unsigned long)entry_SYSCALL_64);\n```\n\n**调用流程**：\n\n```mermaid  \ngraph TD\n    A[用户程序] --> B[glibc封装]\n    B --> C[DO_CALL设置rax]\n    C --> D[syscall指令]\n    D --> E[MSR_LSTAR跳转]\n    E --> F[entry_SYSCALL_64]\n    F --> G[保存寄存器到pt_regs]\n    G --> H[do_syscall_64]\n    H --> I[sys_call_table查表]\n    I --> J[执行内核函数]\n    J --> K[sysretq返回]\n    \n    style D fill:#ffccbc\n    style H fill:#fff9c4\n    style K fill:#c8e6c9\n```\n\n#### 2.4.4 系统调用表的生成\n\n**定义文件**：\n\n- 32位：`arch/x86/entry/syscalls/syscall_32.tbl`\n- 64位：`arch/x86/entry/syscalls/syscall_64.tbl`\n\n**示例定义**：\n\n```\n# 32位\n5  i386   open    sys_open  compat_sys_open\n\n# 64位  \n2  common open    sys_open\n```\n\n**系统调用宏**：\n\n```c\nSYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)\n{\n    if (force_o_largefile())\n        flags |= O_LARGEFILE;\n    return do_sys_open(AT_FDCWD, filename, flags, mode);\n}\n```\n\n**宏展开后**：\n\n```c\nasmlinkage long sys_open(const char __user * filename, int flags, int mode)\n{\n    long ret;\n    if (force_o_largefile())\n        flags |= O_LARGEFILE;\n    ret = do_sys_open(AT_FDCWD, filename, flags, mode);\n    return ret;\n}\n```\n\n**生成过程**：\n\n1. syscallhdr.sh生成`#define __NR_open`\n2. syscalltbl.sh生成`__SYSCALL(__NR_open, sys_open)`\n3. 生成unistd_32.h和unistd_64.h\n4. 包含头文件形成系统调用表\n\n**32位系统调用表**：\n\n```c\n__visible const sys_call_ptr_t ia32_sys_call_table[__NR_syscall_compat_max+1] = {\n    [0 ... __NR_syscall_compat_max] = &sys_ni_syscall,\n    #include <asm/syscalls_32.h>\n};\n```\n\n**64位系统调用表**：\n\n```c\nasmlinkage const sys_call_ptr_t sys_call_table[__NR_syscall_max+1] = {\n    [0 ... __NR_syscall_max] = &sys_ni_syscall,\n    #include <asm/syscalls_64.h>\n};\n```\n\n---", "subs": ["系统调用完整流程序列图", "2.4.1 glibc对系统调用的封装", "2.4.2 32位系统调用过程", "2.4.3 64位系统调用过程", "2.4.4 系统调用表的生成"]}, {"title": "2.5 总结", "content": "#### 2.5.1 核心要点\n\n1. **x86架构**\n   - 开放、标准、兼容的三大原则\n   - 实模式（1MB）→ 保护模式（4GB）\n   - 寄存器组织：通用、段、指令指针\n   - 总线系统：地址总线、数据总线\n\n2. **启动流程**\n   - BIOS：硬件检测、中断向量、显示输出\n   - Bootloader：boot.img → core.img → GRUB\n   - 实模式切换到保护模式\n\n3. **内核初始化**\n   - start_kernel：各子系统初始化\n   - 0号进程：创始进程\n   - 1号进程：用户态祖先\n   - 2号进程：内核态祖先\n   - ramdisk：临时根文件系统\n\n4. **系统调用**\n   - 32位：int 0x80中断方式\n   - 64位：syscall指令方式\n   - 通过寄存器传递参数\n   - 系统调用表：编号到函数的映射\n\n#### 2.5.2 启动流程图\n\n```mermaid\ngraph TD\n    A[按下电源] --> B[BIOS加载执行]\n    B --> C[硬件检测POST]\n    C --> D[加载boot.img到MBR]\n    D --> E[boot.img执行]\n    E --> F[加载core.img]\n    F --> G[切换保护模式]\n    G --> H[解析grub.cfg]\n    H --> I[显示启动菜单]\n    I --> J[加载Linux内核]\n    J --> K[加载initramfs]\n    K --> L[start_kernel开始]\n    L --> M[初始化各子系统]\n    M --> N[创建0号进程]\n    N --> O[创建1号进程]\n    O --> P[切换到用户态]\n    P --> Q[ramdisk的/init]\n    Q --> R[加载驱动程序]\n    R --> S[挂载真正根文件系统]\n    S --> T[启动系统服务]\n    T --> U[用户登录]\n    \n    style B fill:#ffccbc\n    style G fill:#fff9c4  \n    style L fill:#ffe082\n    style P fill:#c8e6c9\n```\n\n#### 2.5.3 关键数据结构\n\n| 结构 | 作用 | 说明 |\n|------|------|------|\n| pt_regs | 保存寄存器 | 系统调用时保存用户态上下文 |\n| task_struct | 进程描述符 | 描述进程的所有信息 |\n| 系统调用表 | 调用映射 | 系统调用号到函数的映射 |\n| GDT | 全局描述符表 | 保护模式下的段描述符 |\n\n#### 2.5.4 学习建议\n\n1. **理解模式切换**\n   - 实模式到保护模式的必要性\n   - 用户态和内核态的权限划分\n\n2. **跟踪启动过程**\n   - 从BIOS到内核的完整流程\n   - 各个阶段的作用和转换\n\n3. **掌握系统调用**\n   - 理解系统调用的实现机制\n   - 32位和64位的区别\n\n4. **实践验证**\n   - 使用strace跟踪系统调用\n   - 查看Linux内核源码\n   - 尝试编写简单的系统调用\n\n---\n\n**下一章预告**：第3章将深入讲解进程管理，包括进程的数据结构、调度机制、创建过程等核心内容。\n\n---", "subs": ["2.5.1 核心要点", "2.5.2 启动流程图", "2.5.3 关键数据结构", "2.5.4 学习建议"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

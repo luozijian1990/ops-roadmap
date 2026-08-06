@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Docker 学习笔记 · 第四册：Dockerfile 与附录 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Docker 学习笔记 · 第四册：Dockerfile 与附录</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Docker 学习笔记 · 第四册：Dockerfile 与附录", "intro": "", "parts": [{"title": "第十章 Dockerfile 篇", "sections": [{"title": "10.1 Dockerfile 概述与基础语法", "content": "#### 什么是 Dockerfile\n\nDockerfile 是一个文本文件，包含构建 Docker 镜像所需的所有指令。Docker 读取 Dockerfile 中的指令，自动构建镜像。\n\n```dockerfile\n# 简单示例\nFROM ubuntu:22.04\nRUN apt-get update && apt-get install -y nginx\nEXPOSE 80\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n```\n\n---\n\n#### 基本语法规则\n\n| 规则       | 说明                         |\n| ---------- | ---------------------------- |\n| 注释       | 以 `#` 开头                |\n| 指令       | 不区分大小写，但建议大写     |\n| 顺序       | 指令按顺序执行               |\n| 第一条指令 | 必须是 `FROM`（除 ARG 外） |\n\n```dockerfile\n# 这是注释\nFROM ubuntu:22.04    # 行尾注释\n\n# 指令不区分大小写（但建议大写）\nRUN echo \"Hello\"\nrun echo \"World\"     # 有效但不推荐\n```\n\n---\n\n#### 指令分类\n\n| 类别               | 指令                                   | 说明         |\n| ------------------ | -------------------------------------- | ------------ |\n| **基础**     | `FROM`                               | 指定基础镜像 |\n| **构建参数** | `ARG`                                | 构建时变量   |\n| **文件操作** | `COPY`, `ADD`                      | 复制文件     |\n| **执行**     | `RUN`, `CMD`, `ENTRYPOINT`       | 执行命令     |\n| **环境配置** | `ENV`, `WORKDIR`, `USER`         | 设置环境     |\n| **网络**     | `EXPOSE`                             | 声明端口     |\n| **存储**     | `VOLUME`                             | 声明挂载点   |\n| **元数据**   | `LABEL`, `HEALTHCHECK`             | 元数据       |\n| **高级**     | `ONBUILD`, `STOPSIGNAL`, `SHELL` | 高级功能     |\n\n---\n\n#### 构建上下文\n\n构建上下文是 `docker build` 命令发送给 Docker 守护进程的文件集合。\n\n```bash\n# 当前目录作为构建上下文\ndocker build -t myimage .\n\n# 指定 Dockerfile\ndocker build -t myimage -f path/to/Dockerfile .\n\n# 指定上下文目录\ndocker build -t myimage -f Dockerfile /path/to/context\n```\n\n---\n\n#### .dockerignore 文件\n\n`.dockerignore` 文件用于排除不需要的文件，减少构建上下文大小。\n\n```text\n# .dockerignore 示例\n# 注释\n.git\n.gitignore\n*.md\n!README.md\nnode_modules\nnpm-debug.log\nDockerfile*\ndocker-compose*\n.env\n.env.*\n__pycache__\n*.pyc\n.DS_Store\n```\n\n##### 语法规则\n\n| 模式   | 说明         |\n| ------ | ------------ |\n| `#`  | 注释         |\n| `*`  | 匹配任意字符 |\n| `?`  | 匹配单个字符 |\n| `**` | 匹配多级目录 |\n| `!`  | 排除例外     |\n\n---\n\n#### 多行指令\n\n使用 `\\` 进行换行。\n\n```dockerfile\nRUN apt-get update && \\\n    apt-get install -y \\\n    nginx \\\n    curl \\\n    vim && \\\n    rm -rf /var/lib/apt/lists/*\n```\n\n---\n\n#### 解析器指令\n\n解析器指令是特殊注释，必须在 Dockerfile 最前面。\n\n```dockerfile\n# syntax=docker/dockerfile:1\n# escape=\\\n\nFROM ubuntu:22.04\n```\n\n##### 常用解析器指令\n\n| 指令       | 说明                       |\n| ---------- | -------------------------- |\n| `syntax` | 指定 Dockerfile 语法版本   |\n| `escape` | 设置转义字符（默认 `\\`） |\n\n---\n\n#### 构建缓存\n\nDocker 使用缓存加速构建。每条指令创建一个镜像层。\n\n##### 缓存命中条件\n\n1. 父层未变化\n2. 指令未变化\n3. 对于 `COPY`/`ADD`，文件内容未变化\n\n##### 优化缓存利用\n\n```dockerfile\n# 不好的写法（依赖变化导致全部重建）\nFROM node:18\nCOPY . /app\nRUN npm install\n\n# 好的写法（利用缓存）\nFROM node:18\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\n```\n\n---\n\n#### 实战示例\n\n##### 示例 1：Python 应用\n\n```dockerfile\n# syntax=docker/dockerfile:1\nFROM python:3.11-slim\n\nWORKDIR /app\n\n# 先复制依赖文件（利用缓存）\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\n# 再复制应用代码\nCOPY . .\n\nEXPOSE 8000\n\nCMD [\"python\", \"app.py\"]\n```\n\n##### 示例 2：Node.js 应用\n\n```dockerfile\n# syntax=docker/dockerfile:1\nFROM node:18-alpine\n\nWORKDIR /app\n\n# 安装依赖\nCOPY package*.json ./\nRUN npm ci --only=production\n\n# 复制应用\nCOPY . .\n\nEXPOSE 3000\n\nCMD [\"node\", \"server.js\"]\n```\n\n##### 示例 3：Go 应用\n\n```dockerfile\n# syntax=docker/dockerfile:1\nFROM golang:1.21-alpine AS builder\n\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\n\nCOPY . .\nRUN CGO_ENABLED=0 go build -o /app/main .\n\nFROM alpine:3.18\nCOPY --from=builder /app/main /main\nEXPOSE 8080\nCMD [\"/main\"]\n```\n\n---\n\n#### 注意事项\n\n> ⚠️ **最佳实践**：\n>\n> 1. 每个 Dockerfile 只有一个 `CMD` 指令生效\n> 2. 使用 `.dockerignore` 减少构建上下文\n> 3. 合并 `RUN` 指令减少层数\n> 4. 将不常变化的指令放在前面\n> 5. 使用官方基础镜像\n\n---", "subs": ["什么是 Dockerfile", "基本语法规则", "指令分类", "构建上下文", ".dockerignore 文件", "多行指令", "解析器指令", "构建缓存", "实战示例", "注意事项"]}, {"title": "10.2 构建阶段指令详解（FROM/ARG）", "content": "#### FROM 指令\n\n`FROM` 指令指定基础镜像，是 Dockerfile 的第一条指令（除 ARG 外）。\n\n##### 基本语法\n\n```dockerfile\nFROM <image>\nFROM <image>:<tag>\nFROM <image>@<digest>\nFROM <image> AS <stage_name>\n```\n\n##### 基础镜像选择\n\n| 类型     | 示例                     | 说明     |\n| -------- | ------------------------ | -------- |\n| 官方镜像 | `ubuntu`, `nginx`    | 官方维护 |\n| 带标签   | `python:3.11`          | 指定版本 |\n| 精简版   | `python:3.11-slim`     | 更小体积 |\n| Alpine   | `python:3.11-alpine`   | 最小体积 |\n| 摘要     | `python@sha256:abc...` | 固定版本 |\n| scratch  | `scratch`              | 空镜像   |\n\n##### 命名阶段\n\n```dockerfile\nFROM golang:1.21 AS builder\n# 构建阶段\n\nFROM alpine:3.18 AS runtime\n# 运行阶段\n```\n\n##### 多阶段构建\n\n```dockerfile\n# 第一阶段：构建\nFROM node:18 AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\n# 第二阶段：运行\nFROM nginx:alpine\nCOPY --from=build /app/dist /usr/share/nginx/html\n```\n\n---\n\n#### ARG 指令\n\n`ARG` 指令定义构建时变量。\n\n##### 基本语法\n\n```dockerfile\nARG <name>\nARG <name>=<default_value>\n```\n\n##### 构建时传递\n\n```bash\ndocker build --build-arg VERSION=1.0.0 -t myimage .\n```\n\n##### 在 Dockerfile 中使用\n\n```dockerfile\nARG VERSION=latest\nARG BASE_IMAGE=ubuntu\n\nFROM ${BASE_IMAGE}:22.04\n\nARG VERSION\nRUN echo \"Building version: ${VERSION}\"\n```\n\n##### ARG 作用域\n\n```dockerfile\n# FROM 之前的 ARG 只能用于 FROM\nARG BASE_IMAGE=alpine\nFROM ${BASE_IMAGE}:3.18\n\n# FROM 之后需要重新声明\nARG VERSION\nRUN echo \"Version: ${VERSION}\"\n```\n\n##### 预定义 ARG\n\n| 变量               | 说明                       |\n| ------------------ | -------------------------- |\n| `HTTP_PROXY`     | HTTP 代理                  |\n| `HTTPS_PROXY`    | HTTPS 代理                 |\n| `FTP_PROXY`      | FTP 代理                   |\n| `NO_PROXY`       | 不代理的地址               |\n| `TARGETPLATFORM` | 目标平台（如 linux/amd64） |\n| `TARGETARCH`     | 目标架构（如 amd64）       |\n| `TARGETOS`       | 目标操作系统（如 linux）   |\n| `BUILDPLATFORM`  | 构建平台                   |\n\n---\n\n#### ARG vs ENV\n\n| 特性     | ARG             | ENV                       |\n| -------- | --------------- | ------------------------- |\n| 作用时间 | 构建时          | 构建时 + 运行时           |\n| 传递方式 | `--build-arg` | `-e` 或 `environment` |\n| 持久化   | 不持久化到镜像  | 持久化到镜像              |\n| 覆盖方式 | 构建时          | 运行时                    |\n\n##### 结合使用\n\n```dockerfile\nARG VERSION=1.0.0\nENV APP_VERSION=${VERSION}\n\n# ARG 不会保留到运行时\n# ENV 会保留，容器内可以访问\n```\n\n---\n\n#### 实战示例\n\n##### 示例 1：多平台构建\n\n```dockerfile\n# syntax=docker/dockerfile:1\nARG TARGETARCH\n\nFROM golang:1.21-alpine AS builder\nARG TARGETARCH\nWORKDIR /app\nCOPY . .\nRUN GOARCH=${TARGETARCH} go build -o /app/main\n\nFROM alpine:3.18\nCOPY --from=builder /app/main /main\nCMD [\"/main\"]\n```\n\n##### 示例 2：可配置基础镜像\n\n```dockerfile\nARG PYTHON_VERSION=3.11\nARG BASE_VARIANT=slim\n\nFROM python:${PYTHON_VERSION}-${BASE_VARIANT}\n\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\n\nCMD [\"python\", \"app.py\"]\n```\n\n```bash\n# 使用不同基础镜像构建\ndocker build --build-arg PYTHON_VERSION=3.10 --build-arg BASE_VARIANT=alpine .\n```\n\n##### 示例 3：版本注入\n\n```dockerfile\nARG GIT_COMMIT=unknown\nARG BUILD_DATE=unknown\nARG VERSION=dev\n\nFROM alpine:3.18\n\nLABEL org.opencontainers.image.revision=\"${GIT_COMMIT}\" \\\n      org.opencontainers.image.created=\"${BUILD_DATE}\" \\\n      org.opencontainers.image.version=\"${VERSION}\"\n\n# 转换为环境变量（运行时可用）\nARG VERSION\nENV APP_VERSION=${VERSION}\n\nCOPY app /app\nCMD [\"/app\"]\n```\n\n```bash\ndocker build \\\n  --build-arg GIT_COMMIT=$(git rev-parse HEAD) \\\n  --build-arg BUILD_DATE=$(date -u +\"%Y-%m-%dT%H:%M:%SZ\") \\\n  --build-arg VERSION=1.2.3 \\\n  -t myapp .\n```\n\n---\n\n#### 注意事项\n\n> ⚠️ **重要提示**：\n>\n> 1. `ARG` 值不会保留到运行时，敏感信息可用 ARG\n> 2. 但 ARG 会记录在镜像历史中（`docker history`）\n> 3. FROM 之前的 ARG 作用域仅限于 FROM 指令\n> 4. 优先使用官方 `-slim` 或 `-alpine` 镜像\n\n---", "subs": ["FROM 指令", "ARG 指令", "ARG vs ENV", "实战示例", "注意事项"]}, {"title": "10.3 文件操作指令详解（COPY/ADD）", "content": "#### COPY 指令\n\n`COPY` 指令从构建上下文复制文件到镜像中。\n\n##### 基本语法\n\n```dockerfile\nCOPY [--chown=<user>:<group>] <src>... <dest>\nCOPY [--chown=<user>:<group>] [\"<src>\",... \"<dest>\"]\n```\n\n##### 基本用法\n\n```dockerfile\n# 复制单个文件\nCOPY app.py /app/\n\n# 复制多个文件\nCOPY app.py config.yaml /app/\n\n# 复制目录\nCOPY src/ /app/src/\n\n# 使用通配符\nCOPY *.py /app/\nCOPY package*.json /app/\n```\n\n##### 设置文件权限\n\n```dockerfile\n# 设置所有者（需要 Linux 镜像）\nCOPY --chown=node:node package.json /app/\n\n# 设置权限（需要 BuildKit）\nCOPY --chmod=755 script.sh /app/\n```\n\n##### 多阶段构建复制\n\n```dockerfile\nFROM golang:1.21 AS builder\nCOPY . .\nRUN go build -o /app\n\nFROM alpine:3.18\nCOPY --from=builder /app /app\n```\n\n---\n\n#### ADD 指令\n\n`ADD` 指令功能类似 COPY，但额外支持 URL 下载和自动解压。\n\n##### 基本语法\n\n```dockerfile\nADD [--chown=<user>:<group>] <src>... <dest>\n```\n\n##### 自动解压\n\n```dockerfile\n# 自动解压 tar 文件\nADD archive.tar.gz /app/\n\n# 支持的压缩格式\nADD archive.tar /app/\nADD archive.tar.gz /app/\nADD archive.tar.bz2 /app/\nADD archive.tar.xz /app/\n```\n\n##### 从 URL 下载\n\n```dockerfile\n# 从 URL 下载（不推荐）\nADD https://example.com/file.tar.gz /app/\n```\n\n---\n\n#### COPY vs ADD\n\n| 特性         | COPY | ADD      |\n| ------------ | ---- | -------- |\n| 复制本地文件 | ✅   | ✅       |\n| 通配符       | ✅   | ✅       |\n| `--chown`  | ✅   | ✅       |\n| 自动解压 tar | ❌   | ✅       |\n| 下载 URL     | ❌   | ✅       |\n| 推荐使用     | ✅   | 仅解压时 |\n\n> 💡 **最佳实践**：优先使用 `COPY`，仅在需要解压时使用 `ADD`\n\n---\n\n#### 路径规则\n\n##### 源路径规则\n\n| 规则            | 说明                         |\n| --------------- | ---------------------------- |\n| 相对路径        | 相对于构建上下文             |\n| 不能使用 `..` | 不能超出构建上下文           |\n| 目录            | 复制目录内容（不含目录本身） |\n| 通配符          | 支持 Go filepath 模式        |\n\n##### 目标路径规则\n\n| 规则          | 说明               |\n| ------------- | ------------------ |\n| 绝对路径      | `/app/file`      |\n| 相对路径      | 相对于 `WORKDIR` |\n| 以 `/` 结尾 | 作为目录           |\n| 自动创建      | 目标目录自动创建   |\n\n---\n\n#### 实战示例\n\n##### 示例 1：Node.js 应用\n\n```dockerfile\nFROM node:18-alpine\n\nWORKDIR /app\n\n# 先复制依赖文件（利用缓存）\nCOPY package*.json ./\nRUN npm ci --only=production\n\n# 再复制应用代码\nCOPY --chown=node:node . .\n\nUSER node\nCMD [\"node\", \"server.js\"]\n```\n\n##### 示例 2：Python 应用\n\n```dockerfile\nFROM python:3.11-slim\n\nWORKDIR /app\n\n# 复制并安装依赖\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\n# 复制应用\nCOPY src/ ./src/\nCOPY config/ ./config/\n\nCMD [\"python\", \"src/main.py\"]\n```\n\n##### 示例 3：多阶段构建\n\n```dockerfile\n# 构建阶段\nFROM node:18 AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\n# 生产阶段\nFROM nginx:alpine\nCOPY --from=builder /app/dist /usr/share/nginx/html\nCOPY nginx.conf /etc/nginx/nginx.conf\n```\n\n##### 示例 4：解压预打包文件\n\n```dockerfile\nFROM ubuntu:22.04\n\nWORKDIR /app\n\n# ADD 自动解压\nADD app-release.tar.gz ./\n\n# 等价于\n# COPY app-release.tar.gz ./\n# RUN tar -xzf app-release.tar.gz && rm app-release.tar.gz\n```\n\n---\n\n#### 注意事项\n\n> ⚠️ **重要提示**：\n>\n> 1. 优先使用 `COPY` 而非 `ADD`\n> 2. `ADD` 从 URL 下载不会利用缓存，推荐使用 `RUN curl`\n> 3. 复制目录时，是复制目录内容而非目录本身\n> 4. 使用 `.dockerignore` 排除不需要的文件\n\n---", "subs": ["COPY 指令", "ADD 指令", "COPY vs ADD", "路径规则", "实战示例", "注意事项"]}, {"title": "10.4 执行指令详解（RUN/CMD/ENTRYPOINT）", "content": "#### RUN 指令\n\n`RUN` 指令在构建时执行命令，结果会被提交到镜像层。\n\n##### 两种格式\n\n```dockerfile\n# Shell 格式（在 shell 中执行）\nRUN apt-get update && apt-get install -y nginx\n\n# Exec 格式（直接执行）\nRUN [\"apt-get\", \"update\"]\nRUN [\"apt-get\", \"install\", \"-y\", \"nginx\"]\n```\n\n##### Shell vs Exec 格式\n\n| 特性        | Shell 格式     | Exec 格式 |\n| ----------- | -------------- | --------- |\n| 执行方式    | `/bin/sh -c` | 直接执行  |\n| 变量替换    | ✅ 支持        | ❌ 不支持 |\n| 管道/重定向 | ✅ 支持        | ❌ 不支持 |\n| 信号处理    | 通过 shell     | 直接接收  |\n\n##### RUN 最佳实践\n\n```dockerfile\n# 合并命令减少层数\nRUN apt-get update && \\\n    apt-get install -y \\\n        nginx \\\n        curl \\\n        vim && \\\n    rm -rf /var/lib/apt/lists/*\n\n# 使用 --no-install-recommends\nRUN apt-get update && \\\n    apt-get install -y --no-install-recommends nginx && \\\n    rm -rf /var/lib/apt/lists/*\n\n# pip 使用 --no-cache-dir\nRUN pip install --no-cache-dir -r requirements.txt\n```\n\n---\n\n#### CMD 指令\n\n`CMD` 指令指定容器启动时的默认命令。\n\n##### 三种格式\n\n```dockerfile\n# Exec 格式（推荐）\nCMD [\"executable\", \"param1\", \"param2\"]\n\n# 作为 ENTRYPOINT 的参数\nCMD [\"param1\", \"param2\"]\n\n# Shell 格式\nCMD command param1 param2\n```\n\n##### 基本用法\n\n```dockerfile\n# 启动 nginx\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n\n# 启动 Python 应用\nCMD [\"python\", \"app.py\"]\n\n# Shell 格式\nCMD python app.py\n```\n\n##### CMD 特点\n\n- 只有最后一个 `CMD` 生效\n- 可被 `docker run` 参数覆盖\n- 如有 `ENTRYPOINT`，则作为其参数\n\n---\n\n#### ENTRYPOINT 指令\n\n`ENTRYPOINT` 指令配置容器的入口程序。\n\n##### 两种格式\n\n```dockerfile\n# Exec 格式（推荐）\nENTRYPOINT [\"executable\", \"param1\"]\n\n# Shell 格式\nENTRYPOINT command param1\n```\n\n##### 基本用法\n\n```dockerfile\nENTRYPOINT [\"nginx\", \"-g\", \"daemon off;\"]\n\n# 配合 CMD 使用\nENTRYPOINT [\"python\"]\nCMD [\"app.py\"]\n```\n\n##### ENTRYPOINT 特点\n\n- 只有最后一个 `ENTRYPOINT` 生效\n- 不会被 `docker run` 参数覆盖\n- 可用 `--entrypoint` 覆盖\n\n---\n\n#### CMD vs ENTRYPOINT\n\n| 特性     | CMD                 | ENTRYPOINT       |\n| -------- | ------------------- | ---------------- |\n| 用途     | 默认命令/参数       | 入口程序         |\n| 可覆盖   | `docker run` 参数 | `--entrypoint` |\n| 推荐格式 | Exec                | Exec             |\n| 组合使用 | 作为参数            | 主命令           |\n\n##### 组合规则表\n\n| ENTRYPOINT    | CMD                          | 实际命令                 |\n| ------------- | ---------------------------- | ------------------------ |\n| 无            | `[\"nginx\"]`                | `nginx`                |\n| `[\"nginx\"]` | 无                           | `nginx`                |\n| `[\"nginx\"]` | `[\"-g\", \"daemon off;\"]`    | `nginx -g daemon off;` |\n| `[\"nginx\"]` | `docker run ... /bin/bash` | `nginx /bin/bash`      |\n\n---\n\n#### 实战示例\n\n##### 示例 1：固定入口程序\n\n```dockerfile\nFROM python:3.11-slim\n\nWORKDIR /app\nCOPY . .\nRUN pip install --no-cache-dir -r requirements.txt\n\nENTRYPOINT [\"python\"]\nCMD [\"app.py\"]\n```\n\n```bash\n# 运行默认应用\ndocker run myapp\n\n# 运行其他脚本\ndocker run myapp script.py\n```\n\n##### 示例 2：使用启动脚本\n\n```dockerfile\nFROM ubuntu:22.04\n\nCOPY docker-entrypoint.sh /\nRUN chmod +x /docker-entrypoint.sh\n\nENTRYPOINT [\"/docker-entrypoint.sh\"]\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n```\n\n```bash\n#!/bin/bash\n# docker-entrypoint.sh\n\n# 初始化操作\necho \"Starting...\"\n\n# 执行传入的命令\nexec \"$@\"\n```\n\n##### 示例 3：信号处理\n\n```dockerfile\nFROM node:18-alpine\n\nWORKDIR /app\nCOPY . .\nRUN npm ci\n\n# 使用 exec 格式确保信号正确传递\nENTRYPOINT [\"node\"]\nCMD [\"server.js\"]\n```\n\n##### 示例 4：多命令应用\n\n```dockerfile\nFROM alpine:3.18\n\nCOPY app /usr/local/bin/\n\n# 根据参数执行不同命令\nENTRYPOINT [\"app\"]\nCMD [\"serve\"]\n```\n\n```bash\ndocker run myapp serve      # 运行服务\ndocker run myapp migrate    # 运行迁移\ndocker run myapp version    # 显示版本\n```\n\n---\n\n#### 注意事项\n\n> ⚠️ **重要提示**：\n>\n> 1. 优先使用 Exec 格式而非 Shell 格式\n> 2. Shell 格式会导致 PID 1 不是应用进程\n> 3. 使用 `exec` 确保信号正确传递\n> 4. `CMD` 和 `ENTRYPOINT` 只有最后一个生效\n\n---", "subs": ["RUN 指令", "CMD 指令", "ENTRYPOINT 指令", "CMD vs ENTRYPOINT", "实战示例", "注意事项"]}, {"title": "10.5 环境配置指令详解（ENV/EXPOSE/WORKDIR/USER）", "content": "#### ENV 指令\n\n`ENV` 指令设置环境变量，在构建时和运行时都可用。\n\n##### 语法格式\n\n```dockerfile\nENV <key>=<value> ...\nENV <key> <value>\n```\n\n##### 基本用法\n\n```dockerfile\n# 单个变量\nENV APP_HOME=/app\n\n# 多个变量\nENV NODE_ENV=production \\\n    PORT=3000 \\\n    LOG_LEVEL=info\n\n# 旧格式（不推荐）\nENV APP_HOME /app\n```\n\n##### 在指令中使用\n\n```dockerfile\nENV APP_HOME=/app\nWORKDIR $APP_HOME\nCOPY . $APP_HOME\nRUN echo \"App installed in $APP_HOME\"\n```\n\n##### 运行时覆盖\n\n```bash\ndocker run -e PORT=8080 myimage\ndocker run --env-file .env myimage\n```\n\n---\n\n#### EXPOSE 指令\n\n`EXPOSE` 指令声明容器监听的端口（仅作文档用途）。\n\n##### 语法格式\n\n```dockerfile\nEXPOSE <port> [<port>/<protocol>...]\n```\n\n##### 基本用法\n\n```dockerfile\n# 单个端口\nEXPOSE 80\n\n# 多个端口\nEXPOSE 80 443\n\n# 指定协议\nEXPOSE 80/tcp\nEXPOSE 53/udp\n\n# 组合\nEXPOSE 80/tcp 443/tcp 53/udp\n```\n\n##### EXPOSE vs -p\n\n| 操作           | 说明                   |\n| -------------- | ---------------------- |\n| `EXPOSE 80`  | 声明端口（无实际效果） |\n| `-p 8080:80` | 发布端口到主机         |\n| `-P`         | 发布所有 EXPOSE 端口   |\n\n---\n\n#### WORKDIR 指令\n\n`WORKDIR` 指令设置工作目录。\n\n##### 语法格式\n\n```dockerfile\nWORKDIR /path/to/workdir\n```\n\n##### 基本用法\n\n```dockerfile\nWORKDIR /app\n\n# 相对路径\nWORKDIR src\n# 现在是 /app/src\n\n# 使用变量\nENV APP_HOME=/app\nWORKDIR $APP_HOME\n```\n\n##### 特点\n\n- 自动创建目录\n- 影响后续 `RUN`、`CMD`、`ENTRYPOINT`、`COPY`、`ADD`\n- 可多次使用\n- 推荐使用绝对路径\n\n---\n\n#### USER 指令\n\n`USER` 指令设置运行时用户。\n\n##### 语法格式\n\n```dockerfile\nUSER <user>[:<group>]\nUSER <UID>[:<GID>]\n```\n\n##### 基本用法\n\n```dockerfile\n# 使用用户名\nUSER node\n\n# 使用 UID\nUSER 1000\n\n# 用户和组\nUSER node:node\nUSER 1000:1000\n```\n\n##### 创建用户\n\n```dockerfile\n# Alpine\nRUN addgroup -S appgroup && adduser -S appuser -G appgroup\nUSER appuser\n\n# Debian/Ubuntu\nRUN groupadd -r appgroup && useradd -r -g appgroup appuser\nUSER appuser\n```\n\n---\n\n#### 实战示例\n\n##### 示例 1：Node.js 应用\n\n```dockerfile\nFROM node:18-alpine\n\n# 环境变量\nENV NODE_ENV=production \\\n    PORT=3000\n\n# 工作目录\nWORKDIR /app\n\n# 安装依赖\nCOPY package*.json ./\nRUN npm ci --only=production\n\n# 复制应用\nCOPY --chown=node:node . .\n\n# 声明端口\nEXPOSE 3000\n\n# 使用非 root 用户\nUSER node\n\nCMD [\"node\", \"server.js\"]\n```\n\n##### 示例 2：Python 应用\n\n```dockerfile\nFROM python:3.11-slim\n\nENV PYTHONDONTWRITEBYTECODE=1 \\\n    PYTHONUNBUFFERED=1 \\\n    PIP_NO_CACHE_DIR=1\n\nWORKDIR /app\n\n# 创建非 root 用户\nRUN useradd -r -s /bin/false appuser\n\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\n\nCOPY --chown=appuser:appuser . .\n\nEXPOSE 8000\n\nUSER appuser\n\nCMD [\"python\", \"-m\", \"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\"]\n```\n\n##### 示例 3：多阶段构建\n\n```dockerfile\nFROM golang:1.21 AS builder\n\nWORKDIR /build\nCOPY . .\nRUN CGO_ENABLED=0 go build -o app\n\nFROM alpine:3.18\n\nENV APP_ENV=production\n\n# 创建非 root 用户\nRUN adduser -D -s /bin/sh appuser\n\nWORKDIR /app\nCOPY --from=builder /build/app .\n\nEXPOSE 8080\n\nUSER appuser\n\nCMD [\"./app\"]\n```\n\n---\n\n#### 注意事项\n\n> ⚠️ **重要提示**：\n>\n> 1. `ENV` 值会持久化到镜像，敏感信息用 `ARG`\n> 2. `EXPOSE` 仅作文档，需 `-p` 发布端口\n> 3. 始终使用 `WORKDIR` 而非 `RUN cd`\n> 4. 生产环境必须使用非 root 用户运行\n\n---", "subs": ["ENV 指令", "EXPOSE 指令", "WORKDIR 指令", "USER 指令", "实战示例", "注意事项"]}, {"title": "10.6 元数据指令详解（LABEL/VOLUME/HEALTHCHECK）", "content": "#### LABEL 指令\n\n`LABEL` 指令为镜像添加元数据。\n\n##### 语法格式\n\n```dockerfile\nLABEL <key>=<value> <key>=<value> ...\n```\n\n##### 基本用法\n\n```dockerfile\n# 单个标签\nLABEL version=\"1.0\"\n\n# 多个标签\nLABEL maintainer=\"admin@example.com\" \\\n      version=\"1.0\" \\\n      description=\"My Application\"\n```\n\n##### OCI 标准标签\n\n```dockerfile\nLABEL org.opencontainers.image.title=\"My App\" \\\n      org.opencontainers.image.description=\"Application description\" \\\n      org.opencontainers.image.version=\"1.0.0\" \\\n      org.opencontainers.image.authors=\"admin@example.com\" \\\n      org.opencontainers.image.source=\"https://github.com/user/repo\" \\\n      org.opencontainers.image.licenses=\"MIT\" \\\n      org.opencontainers.image.created=\"2024-01-01T00:00:00Z\" \\\n      org.opencontainers.image.revision=\"abc123\"\n```\n\n##### 常用标签\n\n| 标签                                  | 说明       |\n| ------------------------------------- | ---------- |\n| `org.opencontainers.image.title`    | 镜像名称   |\n| `org.opencontainers.image.version`  | 版本号     |\n| `org.opencontainers.image.authors`  | 作者       |\n| `org.opencontainers.image.source`   | 源码地址   |\n| `org.opencontainers.image.created`  | 创建时间   |\n| `org.opencontainers.image.revision` | Git commit |\n\n##### 查看标签\n\n```bash\ndocker inspect --format='{{json .Config.Labels}}' myimage\n```\n\n---\n\n#### VOLUME 指令\n\n`VOLUME` 指令声明挂载点。\n\n##### 语法格式\n\n```dockerfile\nVOLUME [\"/data\"]\nVOLUME /data /logs\n```\n\n##### 基本用法\n\n```dockerfile\n# JSON 格式\nVOLUME [\"/var/lib/mysql\"]\n\n# 单个目录\nVOLUME /data\n\n# 多个目录\nVOLUME /data /logs /config\n```\n\n##### VOLUME 特点\n\n- 创建匿名卷\n- 容器删除时数据保留（除非 `-v`）\n- 可被 `-v` 覆盖\n\n##### VOLUME vs -v\n\n| 操作                | 说明       |\n| ------------------- | ---------- |\n| `VOLUME /data`    | 创建匿名卷 |\n| `-v mydata:/data` | 命名卷     |\n| `-v /host:/data`  | 绑定挂载   |\n\n---\n\n#### HEALTHCHECK 指令\n\n`HEALTHCHECK` 指令定义容器健康检查。\n\n##### 语法格式\n\n```dockerfile\nHEALTHCHECK [OPTIONS] CMD command\nHEALTHCHECK NONE\n```\n\n##### 选项\n\n| 选项                 | 默认值 | 说明         |\n| -------------------- | ------ | ------------ |\n| `--interval`       | 30s    | 检查间隔     |\n| `--timeout`        | 30s    | 超时时间     |\n| `--start-period`   | 0s     | 启动等待     |\n| `--start-interval` | 5s     | 启动期间间隔 |\n| `--retries`        | 3      | 失败重试次数 |\n\n##### 返回值\n\n| 返回值 | 状态               |\n| ------ | ------------------ |\n| 0      | healthy            |\n| 1      | unhealthy          |\n| 2      | reserved（不使用） |\n\n##### 基本用法\n\n```dockerfile\n# HTTP 检查\nHEALTHCHECK --interval=30s --timeout=10s --retries=3 \\\n    CMD curl -f http://localhost:8080/health || exit 1\n\n# TCP 检查\nHEALTHCHECK --interval=30s --timeout=10s \\\n    CMD nc -z localhost 3306 || exit 1\n\n# 自定义脚本\nHEALTHCHECK --interval=30s --timeout=10s \\\n    CMD /app/healthcheck.sh\n\n# 禁用健康检查\nHEALTHCHECK NONE\n```\n\n---\n\n#### 实战示例\n\n##### 示例 1：完整元数据\n\n```dockerfile\nFROM node:18-alpine\n\nARG GIT_COMMIT=unknown\nARG BUILD_DATE=unknown\nARG VERSION=dev\n\nLABEL org.opencontainers.image.title=\"My API\" \\\n      org.opencontainers.image.version=\"${VERSION}\" \\\n      org.opencontainers.image.created=\"${BUILD_DATE}\" \\\n      org.opencontainers.image.revision=\"${GIT_COMMIT}\" \\\n      org.opencontainers.image.source=\"https://github.com/user/myapi\"\n\nWORKDIR /app\nCOPY . .\nRUN npm ci\n\nEXPOSE 3000\n\nHEALTHCHECK --interval=30s --timeout=10s --retries=3 \\\n    CMD curl -f http://localhost:3000/health || exit 1\n\nCMD [\"node\", \"server.js\"]\n```\n\n##### 示例 2：数据库镜像\n\n```dockerfile\nFROM postgres:15\n\nLABEL maintainer=\"dba@example.com\" \\\n      version=\"15.0\"\n\n# 声明数据目录\nVOLUME [\"/var/lib/postgresql/data\"]\n\n# 健康检查\nHEALTHCHECK --interval=30s --timeout=10s --retries=5 \\\n    CMD pg_isready -U postgres || exit 1\n```\n\n##### 示例 3：Web 应用\n\n```dockerfile\nFROM nginx:alpine\n\nLABEL org.opencontainers.image.title=\"Web Frontend\" \\\n      org.opencontainers.image.version=\"1.0.0\"\n\nCOPY dist /usr/share/nginx/html\nCOPY nginx.conf /etc/nginx/nginx.conf\n\nEXPOSE 80\n\nHEALTHCHECK --interval=30s --timeout=5s \\\n    CMD wget -q --spider http://localhost/ || exit 1\n```\n\n##### 示例 4：多服务健康检查\n\n```dockerfile\nFROM python:3.11-slim\n\nWORKDIR /app\nCOPY . .\nRUN pip install -r requirements.txt\n\n# 检查多个服务\nHEALTHCHECK --interval=30s --timeout=10s --start-period=60s \\\n    CMD python -c \"import requests; requests.get('http://localhost:8000/health', timeout=5)\" || exit 1\n\nEXPOSE 8000\n\nCMD [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\"]\n```\n\n---\n\n#### 注意事项\n\n> ⚠️ **重要提示**：\n>\n> 1. 使用 OCI 标准标签格式\n> 2. `VOLUME` 创建的是匿名卷，生产环境推荐使用命名卷\n> 3. `HEALTHCHECK` 命令应该轻量快速\n> 4. 合理设置 `start-period` 给应用启动时间\n\n---", "subs": ["LABEL 指令", "VOLUME 指令", "HEALTHCHECK 指令", "实战示例", "注意事项"]}, {"title": "10.7 高级指令详解（ONBUILD/STOPSIGNAL/SHELL）", "content": "#### ONBUILD 指令\n\n`ONBUILD` 指令定义触发器，在子镜像构建时执行。\n\n##### 语法格式\n\n```dockerfile\nONBUILD <INSTRUCTION>\n```\n\n##### 基本用法\n\n```dockerfile\n# 基础镜像\nFROM node:18-alpine\nWORKDIR /app\nONBUILD COPY package*.json ./\nONBUILD RUN npm ci\nONBUILD COPY . .\n```\n\n##### 触发时机\n\n1. 父镜像构建时：`ONBUILD` 指令被记录但不执行\n2. 子镜像 `FROM` 父镜像时：`ONBUILD` 指令在 `FROM` 后立即执行\n\n##### 不支持的指令\n\n- `FROM`\n- `MAINTAINER`（已弃用）\n- `ONBUILD`（不能嵌套）\n\n---\n\n#### STOPSIGNAL 指令\n\n`STOPSIGNAL` 指令设置容器停止时发送的信号。\n\n##### 语法格式\n\n```dockerfile\nSTOPSIGNAL signal\n```\n\n##### 基本用法\n\n```dockerfile\n# 使用信号名称\nSTOPSIGNAL SIGTERM\n\n# 使用信号编号\nSTOPSIGNAL 15\n\n# 立即终止\nSTOPSIGNAL SIGKILL\n```\n\n##### 常用信号\n\n| 信号        | 编号 | 说明                 |\n| ----------- | ---- | -------------------- |\n| `SIGTERM` | 15   | 优雅终止（默认）     |\n| `SIGINT`  | 2    | 中断（Ctrl+C）       |\n| `SIGQUIT` | 3    | 退出并生成 core dump |\n| `SIGKILL` | 9    | 强制终止             |\n| `SIGUSR1` | 10   | 用户定义信号         |\n| `SIGUSR2` | 12   | 用户定义信号         |\n\n---\n\n#### SHELL 指令\n\n`SHELL` 指令设置默认 shell。\n\n##### 语法格式\n\n```dockerfile\nSHELL [\"executable\", \"parameters\"]\n```\n\n##### 基本用法\n\n```dockerfile\n# Linux 默认\nSHELL [\"/bin/sh\", \"-c\"]\n\n# 使用 bash\nSHELL [\"/bin/bash\", \"-c\"]\n\n# Windows PowerShell\nSHELL [\"powershell\", \"-command\"]\n\n# Windows cmd\nSHELL [\"cmd\", \"/S\", \"/C\"]\n```\n\n##### 使用场景\n\n```dockerfile\n# 需要 bash 特性（如数组）\nSHELL [\"/bin/bash\", \"-c\"]\nRUN arr=(1 2 3) && echo ${arr[0]}\n\n# pipefail 确保管道错误被捕获\nSHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"]\nRUN curl -s https://example.com | grep pattern\n```\n\n---\n\n#### 实战示例\n\n##### 示例 1：Node.js 基础镜像\n\n```dockerfile\n# Dockerfile.base\nFROM node:18-alpine\n\nWORKDIR /app\n\n# 子镜像会自动执行这些\nONBUILD COPY package*.json ./\nONBUILD RUN npm ci --only=production\nONBUILD COPY . .\n\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n```\n\n```dockerfile\n# 子镜像只需\nFROM mycompany/node-base:18\n# ONBUILD 指令会自动执行\n```\n\n##### 示例 2：优雅停止\n\n```dockerfile\nFROM python:3.11-slim\n\nWORKDIR /app\nCOPY . .\nRUN pip install -r requirements.txt\n\n# 使用 SIGTERM 优雅停止\nSTOPSIGNAL SIGTERM\n\n# 应用需要处理 SIGTERM\nCMD [\"python\", \"app.py\"]\n```\n\n```python\n# app.py\nimport signal\nimport sys\n\ndef graceful_shutdown(signum, frame):\n    print(\"Shutting down gracefully...\")\n    # 清理资源\n    sys.exit(0)\n\nsignal.signal(signal.SIGTERM, graceful_shutdown)\n```\n\n##### 示例 3：使用 Bash\n\n```dockerfile\nFROM ubuntu:22.04\n\n# 切换到 bash 并启用 pipefail\nSHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"]\n\n# 现在可以使用 bash 特性\nRUN echo \"Hello\" | grep -q \"Hello\" && echo \"Found\"\n\n# 管道错误会导致构建失败\nRUN false | true  # 这会失败\n```\n\n##### 示例 4：Python 基础镜像\n\n```dockerfile\nFROM python:3.11-slim\n\nENV PYTHONDONTWRITEBYTECODE=1 \\\n    PYTHONUNBUFFERED=1\n\nWORKDIR /app\n\n# 子镜像触发器\nONBUILD COPY requirements.txt .\nONBUILD RUN pip install --no-cache-dir -r requirements.txt\nONBUILD COPY . .\n\nSTOPSIGNAL SIGTERM\n\nCMD [\"python\", \"main.py\"]\n```\n\n---\n\n#### 注意事项\n\n> ⚠️ **重要提示**：\n>\n> 1. `ONBUILD` 常用于创建语言/框架基础镜像\n> 2. 应用应正确处理 `STOPSIGNAL` 实现优雅关闭\n> 3. 使用 `pipefail` 确保管道中的错误被捕获\n> 4. `ONBUILD` 不会传递到孙镜像\n\n---", "subs": ["ONBUILD 指令", "STOPSIGNAL 指令", "SHELL 指令", "实战示例", "注意事项"]}, {"title": "10.8 多阶段构建详解", "content": "多阶段构建允许在一个 Dockerfile 中使用多个 `FROM` 指令，显著减小最终镜像体积。\n\n#### 基本概念\n\n```dockerfile\n# 第一阶段：构建\nFROM node:18 AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN npm run build\n\n# 第二阶段：运行\nFROM nginx:alpine\nCOPY --from=builder /app/dist /usr/share/nginx/html\n```\n\n---\n\n#### 核心语法\n\n##### 命名阶段\n\n```dockerfile\nFROM image AS stage_name\n```\n\n##### 从阶段复制\n\n```dockerfile\nCOPY --from=stage_name /src /dest\nCOPY --from=0 /src /dest          # 使用阶段索引\nCOPY --from=nginx:latest /etc/nginx/nginx.conf /etc/nginx/\n```\n\n---\n\n#### 多阶段构建优势\n\n| 优势            | 说明                   |\n| --------------- | ---------------------- |\n| 减小镜像体积    | 最终镜像不包含构建工具 |\n| 单一 Dockerfile | 无需维护多个文件       |\n| 更好的缓存      | 每个阶段独立缓存       |\n| 安全性          | 不暴露源码和构建工具   |\n\n---\n\n#### 实战示例\n\n##### 示例 1：Go 应用\n\n```dockerfile\n# 构建阶段\nFROM golang:1.21-alpine AS builder\n\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\n\nCOPY . .\nRUN CGO_ENABLED=0 GOOS=linux go build -ldflags=\"-s -w\" -o /app/main\n\n# 运行阶段\nFROM scratch\n\nCOPY --from=builder /app/main /main\nCOPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/\n\nEXPOSE 8080\nENTRYPOINT [\"/main\"]\n```\n\n##### 示例 2：Node.js 前端\n\n```dockerfile\n# 依赖阶段\nFROM node:18-alpine AS deps\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\n\n# 构建阶段\nFROM node:18-alpine AS builder\nWORKDIR /app\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY . .\nRUN npm run build\n\n# 运行阶段\nFROM nginx:alpine\n\nCOPY --from=builder /app/dist /usr/share/nginx/html\nCOPY nginx.conf /etc/nginx/nginx.conf\n\nEXPOSE 80\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n```\n\n##### 示例 3：Python 应用\n\n```dockerfile\n# 构建阶段\nFROM python:3.11-slim AS builder\n\nWORKDIR /app\n\n# 创建虚拟环境\nRUN python -m venv /opt/venv\nENV PATH=\"/opt/venv/bin:$PATH\"\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\n# 运行阶段\nFROM python:3.11-slim\n\n# 复制虚拟环境\nCOPY --from=builder /opt/venv /opt/venv\nENV PATH=\"/opt/venv/bin:$PATH\"\n\nWORKDIR /app\nCOPY . .\n\nRUN useradd -r appuser\nUSER appuser\n\nEXPOSE 8000\nCMD [\"python\", \"-m\", \"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\"]\n```\n\n##### 示例 4：Java 应用\n\n```dockerfile\n# 构建阶段\nFROM maven:3.9-eclipse-temurin-17 AS builder\n\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline\n\nCOPY src ./src\nRUN mvn package -DskipTests\n\n# 运行阶段\nFROM eclipse-temurin:17-jre-alpine\n\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\n\nRUN addgroup -S app && adduser -S app -G app\nUSER app\n\nEXPOSE 8080\nENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]\n```\n\n##### 示例 5：Rust 应用\n\n```dockerfile\n# 构建阶段\nFROM rust:1.73-alpine AS builder\n\nRUN apk add --no-cache musl-dev\n\nWORKDIR /app\nCOPY Cargo.toml Cargo.lock ./\nRUN mkdir src && echo \"fn main() {}\" > src/main.rs\nRUN cargo build --release && rm -rf src\n\nCOPY src ./src\nRUN touch src/main.rs && cargo build --release\n\n# 运行阶段\nFROM scratch\n\nCOPY --from=builder /app/target/release/myapp /myapp\n\nEXPOSE 8080\nENTRYPOINT [\"/myapp\"]\n```\n\n---\n\n#### 高级技巧\n\n##### 只构建特定阶段\n\n```bash\ndocker build --target builder -t myapp:builder .\n```\n\n##### 从外部镜像复制\n\n```dockerfile\nCOPY --from=busybox:latest /bin/busybox /busybox\n```\n\n##### 并行构建阶段\n\n```dockerfile\n# 这两个阶段可以并行构建\nFROM node:18 AS frontend\nWORKDIR /frontend\nCOPY frontend/ .\nRUN npm ci && npm run build\n\nFROM golang:1.21 AS backend\nWORKDIR /backend\nCOPY backend/ .\nRUN go build -o /app\n\n# 最终阶段\nFROM alpine:3.18\nCOPY --from=frontend /frontend/dist /static\nCOPY --from=backend /app /app\n```\n\n##### 使用 ARG 控制缓存（CI/CD 场景）\n\n在 CI/CD 中，可以通过 `--build-arg` 配合 `--mount=type=cache` 控制缓存行为：\n\n```dockerfile\n# Nginx 前端多阶段构建示例\nARG NODE_VERSION=16.20\nARG NGINX_VERSION=latest\nARG CACHE_TARGET=/root/.npm/\nARG CACHE_ID=frontend-app\n\n# 构建阶段\nFROM node:${NODE_VERSION} AS builder\nWORKDIR /app\nCOPY . .\n\nARG BUILD_CMD=\"npm config set registry http://registry.npmmirror.com && npm install && npm run build:prod\"\nARG CACHE_TARGET\nARG CACHE_ID\n\n# 使用 BuildKit 缓存挂载，CACHE_ID 用于隔离不同项目的缓存\nRUN --mount=type=cache,target=${CACHE_TARGET},id=${CACHE_ID} \\\n    sh -c \"${BUILD_CMD}\"\n\n# 运行阶段\nFROM nginx:${NGINX_VERSION} AS runtime\nARG RELEASE_FILE=dist\nCOPY --from=builder /app/${RELEASE_FILE} /usr/share/nginx/html\n```\n\n**CI/CD 构建命令：**\n\n```bash\n# Jenkins 示例 - 使用 JOB_NAME 隔离不同任务的缓存\ndocker build \\\n  --build-arg CACHE_ID=$JOB_NAME \\\n  -t myapp:$BUILD_NUMBER \\\n  .\n\n# 不同项目使用不同缓存\ndocker build --build-arg CACHE_ID=project-a -t project-a:latest .\ndocker build --build-arg CACHE_ID=project-b -t project-b:latest .\n\n# 强制重建（使用唯一 ID 跳过缓存）\ndocker build --build-arg CACHE_ID=$JOB_NAME-$BUILD_NUMBER -t myapp:$BUILD_NUMBER .\n```\n\n**缓存挂载类型：**\n\n| 类型       | 说明           | 示例                                       |\n| ---------- | -------------- | ------------------------------------------ |\n| `cache`  | 可重用缓存目录 | `--mount=type=cache,target=/root/.npm`   |\n| `bind`   | 绑定主机目录   | `--mount=type=bind,source=.,target=/src` |\n| `secret` | 敏感信息       | `--mount=type=secret,id=npmrc`           |\n| `ssh`    | SSH 代理       | `--mount=type=ssh`                       |\n\n**CACHE_ID 策略：**\n\n| 策略     | CACHE_ID 值                 | 效果             |\n| -------- | --------------------------- | ---------------- |\n| 项目隔离 | `$JOB_NAME`               | 每个项目独立缓存 |\n| 分支隔离 | `$JOB_NAME-$BRANCH`       | 不同分支独立缓存 |\n| 每次重建 | `$JOB_NAME-$BUILD_NUMBER` | 完全跳过缓存     |\n| 共享缓存 | `shared-npm-cache`        | 多项目共享缓存   |\n\n---\n\n#### 镜像大小对比\n\n| 语言    | 单阶段 | 多阶段 | 减少 |\n| ------- | ------ | ------ | ---- |\n| Go      | ~800MB | ~10MB  | 99%  |\n| Node.js | ~1GB   | ~30MB  | 97%  |\n| Java    | ~500MB | ~200MB | 60%  |\n| Python  | ~1GB   | ~200MB | 80%  |\n\n---\n\n#### 注意事项\n\n> ⚠️ **最佳实践**：\n>\n> 1. 为阶段命名便于维护\n> 2. 使用 `scratch` 或 `alpine` 作为最终基础镜像\n> 3. 使用 `--target` 调试中间阶段\n> 4. 静态链接二进制文件可使用 `scratch`\n> 5. 不要忘记复制必要的运行时依赖（如 CA 证书）\n\n---\n\n*（第十章 Dockerfile 篇完成）*\n\n---", "subs": ["基本概念", "核心语法", "多阶段构建优势", "实战示例", "高级技巧", "镜像大小对比", "注意事项"]}]}, {"title": "第十一章 附录", "sections": [{"title": "11.1 Docker 架构图", "content": "```mermaid\ngraph TB\n    subgraph Client[\"Docker Client\"]\n        CLI[docker CLI]\n        API[Docker API]\n    end\n  \n    subgraph Host[\"Docker Host\"]\n        Daemon[Docker Daemon]\n      \n        subgraph Containers[\"Containers\"]\n            C1[Container 1]\n            C2[Container 2]\n            C3[Container 3]\n        end\n      \n        subgraph Images[\"Images\"]\n            I1[nginx:alpine]\n            I2[python:3.11]\n            I3[myapp:latest]\n        end\n      \n        subgraph Storage[\"Storage\"]\n            V1[Volume 1]\n            V2[Volume 2]\n        end\n      \n        subgraph Network[\"Networks\"]\n            N1[bridge]\n            N2[custom-net]\n        end\n    end\n  \n    subgraph Registry[\"Registry\"]\n        Hub[Docker Hub]\n        Private[Private Registry]\n    end\n  \n    CLI --> Daemon\n    API --> Daemon\n    Daemon --> Containers\n    Daemon --> Images\n    Daemon --> Storage\n    Daemon --> Network\n    Daemon <--> Registry\n```\n\n---", "subs": []}, {"title": "11.2 容器生命周期", "content": "```mermaid\nstateDiagram-v2\n    [*] --> Created: docker create\n    Created --> Running: docker start\n    Running --> Paused: docker pause\n    Paused --> Running: docker unpause\n    Running --> Stopped: docker stop\n    Stopped --> Running: docker start\n    Running --> Stopped: docker kill\n    Stopped --> Removed: docker rm\n    Running --> Removed: docker rm -f\n    Removed --> [*]\n```\n\n---", "subs": []}, {"title": "11.3 常用命令速查表", "content": "#### 容器操作\n\n| 命令                              | 说明         |\n| --------------------------------- | ------------ |\n| `docker run -d --name c1 nginx` | 后台运行容器 |\n| `docker run -it ubuntu bash`    | 交互式运行   |\n| `docker ps -a`                  | 列出所有容器 |\n| `docker stop c1`                | 停止容器     |\n| `docker start c1`               | 启动容器     |\n| `docker restart c1`             | 重启容器     |\n| `docker rm c1`                  | 删除容器     |\n| `docker rm -f $(docker ps -aq)` | 删除所有容器 |\n| `docker exec -it c1 bash`       | 进入容器     |\n| `docker logs -f c1`             | 查看日志     |\n| `docker inspect c1`             | 查看详情     |\n| `docker stats`                  | 资源监控     |\n\n#### 镜像操作\n\n| 命令                               | 说明     |\n| ---------------------------------- | -------- |\n| `docker pull nginx:alpine`       | 拉取镜像 |\n| `docker push myrepo/myapp:v1`    | 推送镜像 |\n| `docker images`                  | 列出镜像 |\n| `docker rmi nginx`               | 删除镜像 |\n| `docker build -t myapp:v1 .`     | 构建镜像 |\n| `docker tag nginx myrepo/nginx`  | 标记镜像 |\n| `docker save -o nginx.tar nginx` | 导出镜像 |\n| `docker load -i nginx.tar`       | 导入镜像 |\n| `docker history nginx`           | 查看历史 |\n| `docker image prune -a`          | 清理镜像 |\n\n#### 网络操作\n\n| 命令                                   | 说明     |\n| -------------------------------------- | -------- |\n| `docker network create mynet`        | 创建网络 |\n| `docker network ls`                  | 列出网络 |\n| `docker network inspect mynet`       | 查看网络 |\n| `docker network connect mynet c1`    | 连接网络 |\n| `docker network disconnect mynet c1` | 断开网络 |\n| `docker network rm mynet`            | 删除网络 |\n| `docker network prune`               | 清理网络 |\n\n#### 存储操作\n\n| 命令                                | 说明       |\n| ----------------------------------- | ---------- |\n| `docker volume create myvol`      | 创建卷     |\n| `docker volume ls`                | 列出卷     |\n| `docker volume inspect myvol`     | 查看卷     |\n| `docker volume rm myvol`          | 删除卷     |\n| `docker volume prune`             | 清理卷     |\n| `docker run -v myvol:/data nginx` | 挂载命名卷 |\n| `docker run -v /host:/data nginx` | 绑定挂载   |\n\n#### Docker Compose\n\n| 命令                             | 说明       |\n| -------------------------------- | ---------- |\n| `docker compose up -d`         | 启动服务   |\n| `docker compose down`          | 停止并删除 |\n| `docker compose ps`            | 查看状态   |\n| `docker compose logs -f`       | 查看日志   |\n| `docker compose exec app bash` | 进入容器   |\n| `docker compose build`         | 构建镜像   |\n| `docker compose pull`          | 拉取镜像   |\n| `docker compose restart`       | 重启服务   |\n\n#### 系统管理\n\n| 命令                       | 说明     |\n| -------------------------- | -------- |\n| `docker system df`       | 磁盘使用 |\n| `docker system prune -a` | 全面清理 |\n| `docker info`            | 系统信息 |\n| `docker version`         | 版本信息 |\n\n---", "subs": ["容器操作", "镜像操作", "网络操作", "存储操作", "Docker Compose", "系统管理"]}, {"title": "11.4 安全最佳实践", "content": "#### 镜像安全\n\n| 实践         | 说明                           |\n| ------------ | ------------------------------ |\n| 使用官方镜像 | 优先选择官方维护的镜像         |\n| 指定版本标签 | 避免使用 `latest`            |\n| 使用精简镜像 | 优先 `alpine` 或 `slim`    |\n| 扫描漏洞     | 使用 `docker scout` 或 Trivy |\n| 签名验证     | 启用 Docker Content Trust      |\n\n#### 容器运行时安全\n\n| 实践         | 说明                                 |\n| ------------ | ------------------------------------ |\n| 非 root 用户 | `USER appuser`                     |\n| 只读文件系统 | `--read-only`                      |\n| 限制资源     | `--memory` / `--cpus`            |\n| 禁用特权     | 避免 `--privileged`                |\n| 删除能力     | `--cap-drop=ALL`                   |\n| 禁止提权     | `--security-opt=no-new-privileges` |\n\n#### Dockerfile 安全\n\n```dockerfile\n# 安全 Dockerfile 示例\nFROM python:3.11-slim\n\n# 创建非 root 用户\nRUN groupadd -r app && useradd -r -g app app\n\n# 设置工作目录\nWORKDIR /app\n\n# 复制依赖并安装\nCOPY --chown=app:app requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\n# 复制应用\nCOPY --chown=app:app . .\n\n# 切换用户\nUSER app\n\n# 暴露端口\nEXPOSE 8000\n\n# 健康检查\nHEALTHCHECK --interval=30s --timeout=10s \\\n    CMD curl -f http://localhost:8000/health || exit 1\n\nCMD [\"python\", \"app.py\"]\n```\n\n#### Docker Compose 安全配置\n\n```yaml\nservices:\n  app:\n    image: myapp:latest\n    user: \"1000:1000\"\n    read_only: true\n    security_opt:\n      - no-new-privileges:true\n    cap_drop:\n      - ALL\n    deploy:\n      resources:\n        limits:\n          cpus: '0.5'\n          memory: 256M\n    tmpfs:\n      - /tmp\n```\n\n---", "subs": ["镜像安全", "容器运行时安全", "Dockerfile 安全", "Docker Compose 安全配置"]}, {"title": "11.5 故障排查", "content": "#### 常见问题\n\n| 问题         | 排查命令                              |\n| ------------ | ------------------------------------- |\n| 容器无法启动 | `docker logs <container>`           |\n| 网络不通     | `docker network inspect`            |\n| 磁盘空间不足 | `docker system df`                  |\n| 镜像拉取失败 | `docker pull --debug`               |\n| 容器 OOM     | `docker stats` / `docker inspect` |\n\n#### 调试命令\n\n```bash\n# 查看容器详情\ndocker inspect <container>\n\n# 查看容器进程\ndocker top <container>\n\n# 查看容器变更\ndocker diff <container>\n\n# 导出容器文件系统\ndocker export <container> > container.tar\n\n# 查看构建历史\ndocker history <image>\n\n# 进入容器调试\ndocker exec -it <container> sh\n\n# 查看网络连接\ndocker exec <container> netstat -tlnp\n```\n\n---\n\n*（Docker 学习笔记 完）*\n\n---\n\n> 📝 **文档信息**\n>\n> - **总行数**: 13,400+ 行\n> - **总字节**: 270KB+\n> - **章节数**: 11 章\n> - **涵盖内容**: Docker 基础、容器管理、镜像操作、网络配置、存储管理、Dockerfile、Docker Compose\n> - **目标读者**: SRE / 运维工程师 / 容器技术学习者", "subs": ["常见问题", "调试命令"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

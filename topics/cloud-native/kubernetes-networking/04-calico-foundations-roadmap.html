@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 容器网络学习笔记 · 第四册：Calico 基础与隧道 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 容器网络学习笔记 · 第四册：Calico 基础与隧道</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 容器网络学习笔记 · 第四册：Calico 基础与隧道", "intro": "", "parts": [{"title": "Calico 基础与隧道", "sections": [{"title": "第二十九章 Calico 基础介绍", "content": "本章介绍 Calico CNI 的基础知识，包括其支持的多种网络模式、核心组件和架构设计。Calico 是目前使用最广泛的 Kubernetes CNI 之一，在生产环境中积累了大量经验。\n\n#### 29.1 Calico 概述\n\n##### 29.1.1 什么是 Calico\n\nCalico 是一个开源的网络和安全解决方案，提供：\n\n```mermaid\ngraph TB\n    subgraph \"Calico 功能\"\n        Net[\"网络功能\"]\n        Policy[\"网络策略\"]\n        IPAM[\"IP 地址管理\"]\n    end\n    \n    Net --> IPIP[\"IPIP 隧道\"]\n    Net --> VXLAN[\"VXLAN 隧道\"]\n    Net --> BGP[\"BGP 路由\"]\n    Policy --> NP[\"Network Policy\"]\n```\n\n| 特性 | 说明 |\n|:---|:---|\n| **多种网络模式** | IPIP、VXLAN、BGP |\n| **网络策略** | 支持 Kubernetes NetworkPolicy |\n| **自有 IPAM** | calico-ipam，支持 IP 池管理 |\n| **成熟稳定** | 在 OpenStack 时代即已存在 |\n\n##### 29.1.2 官方资源\n\n| 资源 | 地址 |\n|:---|:---|\n| **官网** | <https://www.tigera.io/project-calico/> |\n| **文档** | <https://docs.tigera.io/> |\n| **版本** | 社区版 3.25+，企业版另有 |\n\n#### 29.2 网络模式对比\n\n##### 29.2.1 支持的网络模式\n\n```mermaid\ngraph LR\n    subgraph \"Overlay 模式\"\n        IPIP[\"IPIP<br/>IP-in-IP\"]\n        VXLAN[\"VXLAN<br/>MAC-in-UDP\"]\n    end\n    \n    subgraph \"路由模式\"\n        BGP[\"BGP<br/>Full Mesh / RR\"]\n    end\n    \n    subgraph \"高性能\"\n        eBPF[\"eBPF<br/>加速\"]\n        VPP[\"VPP<br/>用户态协议栈\"]\n    end\n```\n\n##### 29.2.2 模式对比\n\n| 模式 | 封装方式 | 额外开销 | 适用场景 |\n|:---|:---|:---|:---|\n| **IPIP** | IP 包封装在 IP 中 | 20 字节 | 跨子网通信 |\n| **VXLAN** | MAC 包封装在 UDP 中 | 50 字节 | 大二层网络 |\n| **BGP** | 无封装，纯路由 | 0 | 同子网或可控网络 |\n\n##### 29.2.3 Cross Subnet 模式\n\nCalico 支持智能选择封装方式：\n\n```mermaid\ngraph TB\n    Q[\"节点间通信\"]\n    Same[\"同子网?\"]\n    Route[\"直接路由<br/>无封装\"]\n    Encap[\"Overlay 封装<br/>IPIP/VXLAN\"]\n    \n    Q --> Same\n    Same -->|\"是\"| Route\n    Same -->|\"否\"| Encap\n```\n\n> [!NOTE]\n> **Cross Subnet 模式**：节点在同一子网时使用直接路由（节省开销），跨子网时使用 Overlay 封装（保证连通）。这是生产环境常见的配置方式。\n\n#### 29.3 核心组件\n\n##### 29.3.1 组件架构\n\n```mermaid\ngraph TB\n    subgraph \"Calico 组件\"\n        Felix[\"Felix<br/>数据平面代理\"]\n        Bird[\"BIRD<br/>BGP 守护进程\"]\n        Confd[\"Confd<br/>配置管理\"]\n        IPAM[\"calico-ipam<br/>IP 地址管理\"]\n        Typha[\"Typha<br/>数据缓存（可选）\"]\n    end\n    \n    subgraph \"数据存储\"\n        Etcd[\"etcd\"]\n        K8sAPI[\"Kubernetes API\"]\n    end\n    \n    Felix --> Bird\n    Felix --> Confd\n    Confd --> K8sAPI\n    Felix --> K8sAPI\n```\n\n| 组件 | 作用 |\n|:---|:---|\n| **Felix** | 核心代理，管理路由、ACL、接口 |\n| **BIRD** | BGP 守护进程，路由交换 |\n| **Confd** | 监听配置变化，生成 BIRD 配置 |\n| **Typha** | 大规模集群数据缓存 |\n\n##### 29.3.2 BIRD 进程\n\n```mermaid\ngraph LR\n    subgraph \"BGP 实现\"\n        Calico[\"Calico\"]\n        Bird[\"BIRD\"]\n        GoBGP[\"GoBGP\"]\n    end\n    \n    Calico -->|\"原生支持\"| Bird\n    Cilium -->|\"使用\"| GoBGP\n```\n\n| 特性 | BIRD（Calico） | GoBGP（Cilium） |\n|:---|:---|:---|\n| **语言** | C | Go |\n| **成熟度** | 非常成熟 | 较新 |\n| **资源占用** | 较低 | 适中 |\n\n#### 29.4 BGP 网络架构\n\n##### 29.4.1 AS per Rack 模式\n\n```mermaid\ngraph TB\n    subgraph \"Spine 层\"\n        Spine0[\"Spine 0\"]\n        Spine1[\"Spine 1\"]\n    end\n    \n    subgraph \"Rack 0 (AS 65001)\"\n        ToR0[\"ToR Switch 0\"]\n        Node0[\"Node 0\"]\n        Node1[\"Node 1\"]\n    end\n    \n    subgraph \"Rack 1 (AS 65002)\"\n        ToR1[\"ToR Switch 1\"]\n        Node2[\"Node 2\"]\n        Node3[\"Node 3\"]\n    end\n    \n    Spine0 <-->|\"eBGP\"| ToR0\n    Spine0 <-->|\"eBGP\"| ToR1\n    Spine1 <-->|\"eBGP\"| ToR0\n    Spine1 <-->|\"eBGP\"| ToR1\n    \n    ToR0 <-->|\"iBGP\"| Node0\n    ToR0 <-->|\"iBGP\"| Node1\n    ToR1 <-->|\"iBGP\"| Node2\n    ToR1 <-->|\"iBGP\"| Node3\n```\n\n**特点**：\n\n- 同一机架的节点共享同一 AS 号\n- ToR 交换机作为 BGP 路由反射器（RR）\n- Spine 与 ToR 之间建立 eBGP\n\n##### 29.4.2 AS per Node 模式\n\n```mermaid\ngraph TB\n    subgraph \"ToR Switch\"\n        ToR[\"ToR\"]\n    end\n    \n    subgraph \"Nodes\"\n        N1[\"Node 1<br/>AS 65001\"]\n        N2[\"Node 2<br/>AS 65002\"]\n        N3[\"Node 3<br/>AS 65003\"]\n    end\n    \n    ToR <-->|\"eBGP\"| N1\n    ToR <-->|\"eBGP\"| N2\n    ToR <-->|\"eBGP\"| N3\n```\n\n**特点**：\n\n- 每个节点都是独立的 AS\n- 节点间都是 eBGP 关系\n- 配置更简单，适合小规模\n\n##### 29.4.3 Downward Default 模式\n\n```mermaid\ngraph TB\n    Spine[\"Spine<br/>掌握全网路由\"]\n    ToR[\"ToR\"]\n    Node[\"Node\"]\n    \n    Node -->|\"通告: 默认路由\"| ToR\n    ToR -->|\"转发\"| Spine\n    \n    Note[\"节点只通告默认路由<br/>减轻负载\"]\n```\n\n**特点**：\n\n- 节点只向上通告默认路由\n- 降低端侧设备压力\n- 全网路由集中在 Spine 层\n\n#### 29.5 VPP 高性能方案\n\n##### 29.5.1 VPP 简介\n\n```mermaid\ngraph TB\n    subgraph \"传统路径\"\n        App1[\"应用\"]\n        Kernel[\"内核协议栈\"]\n        NIC1[\"网卡\"]\n    end\n    \n    subgraph \"VPP 路径\"\n        App2[\"应用\"]\n        VPP[\"VPP 用户态协议栈\"]\n        DPDK[\"DPDK\"]\n        NIC2[\"网卡\"]\n    end\n    \n    App1 --> Kernel --> NIC1\n    App2 --> VPP --> DPDK --> NIC2\n```\n\n| 概念 | 说明 |\n|:---|:---|\n| **VPP** | 用户态协议栈，等价于内核协议栈 |\n| **DPDK** | 绕过内核直接访问网卡 |\n| **用途** | 高带宽场景（10G/25G/40G+） |\n\n##### 29.5.2 VPP 与 Calico 集成\n\n```yaml\n# VPP 支持的功能\n- 路由 (Routing)\n- 负载均衡 (Load Balancing)\n- 策略 (Policy)\n- VXLAN / IPIP / IPsec / MPLS\n```\n\n> [!WARNING]\n> VPP 方案门槛较高，需要深入理解用户态协议栈和 DPDK。目前主要用于电信/媒体处理等高带宽行业。\n\n#### 29.6 calicoctl 工具\n\n##### 29.6.1 基本用法\n\n```bash\n# 安装\ncurl -O -L https://github.com/projectcalico/calico/releases/download/v3.25.0/calicoctl-linux-amd64\nmv calicoctl-linux-amd64 /usr/local/bin/calicoctl\nchmod +x /usr/local/bin/calicoctl\n\n# 常用命令\ncalicoctl get nodes\ncalicoctl get ippool\ncalicoctl get bgpconfig\ncalicoctl get bgppeer\n```\n\n##### 29.6.2 功能对比\n\n| 工具 | 说明 |\n|:---|:---|\n| **calicoctl** | Calico 资源管理 |\n| **cilium** | Cilium 资源管理 |\n| **kubectl** | 通用 K8s 资源 |\n\n#### 29.7 IP 池管理\n\n##### 29.7.1 IP Pool 配置\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: IPPool\nmetadata:\n  name: default-pool\nspec:\n  cidr: 10.244.0.0/16\n  ipipMode: CrossSubnet\n  vxlanMode: Never\n  nodeSelector: all()\n```\n\n| 字段 | 说明 |\n|:---|:---|\n| `cidr` | Pod 使用的 IP 段 |\n| `ipipMode` | IPIP 模式：Always/CrossSubnet/Never |\n| `vxlanMode` | VXLAN 模式：Always/CrossSubnet/Never |\n| `nodeSelector` | 哪些节点使用此池 |\n\n##### 29.7.2 指定 Pod IP\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: test-pod\n  annotations:\n    # 指定 Pod 使用特定 IP\n    cni.projectcalico.org/ipAddrs: '[\"172.16.0.2\"]'\nspec:\n  containers:\n    - name: nginx\n      image: nginx\n```\n\n#### 29.8 IPIP vs VXLAN 的区别\n\n##### 29.8.1 与 Flannel 迁移\n\n```mermaid\ngraph LR\n    Flannel[\"Flannel\"] -->|\"迁移\"| Calico[\"Calico\"]\n    \n    subgraph \"Calico IPIP\"\n        IPIP[\"IPIP + BIRD\"]\n    end\n    \n    subgraph \"Calico VXLAN\"\n        VXLAN[\"VXLAN (无 BIRD)\"]\n    end\n```\n\n| 模式 | BIRD 进程 | 说明 |\n|:---|:---|:---|\n| **IPIP** | 需要 | 使用 BGP 分发路由 |\n| **VXLAN** | 不需要 | 兼容 Flannel 迁移 |\n\n> [!NOTE]\n> VXLAN 模式不使用 BIRD 进程，是为了支持从 Flannel 迁移。因为 Flannel 的 VXLAN 模式也不使用 BGP。\n\n#### 29.9 与 Cilium 对比\n\n| 特性 | Calico | Cilium |\n|:---|:---|:---|\n| **BGP 实现** | BIRD | GoBGP |\n| **eBPF 支持** | 有（可选） | 原生 |\n| **高性能方案** | VPP/DPDK | XDP |\n| **多集群** | Federation | ClusterMesh |\n| **成熟度** | 非常成熟 | 较新但活跃 |\n\n#### 29.10 章节小结\n\n```mermaid\nmindmap\n  root((Calico 基础))\n    网络模式\n      IPIP\n      VXLAN\n      BGP\n    组件\n      Felix\n      BIRD\n      Confd\n    架构\n      AS per Rack\n      AS per Node\n      Downward Default\n    高级\n      VPP/DPDK\n      eBPF\n    工具\n      calicoctl\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **网络模式**：\n>    - IPIP：IP 封装，20 字节开销\n>    - VXLAN：MAC 封装，50 字节开销\n>    - BGP：纯路由，无开销\n>\n> 2. **Cross Subnet**：\n>    - 同子网走路由\n>    - 跨子网走 Overlay\n>    - 智能选择，兼顾性能\n>\n> 3. **BGP 架构**：\n>    - AS per Rack：机架共享 AS\n>    - AS per Node：节点独立 AS\n>    - Downward Default：减轻端侧压力\n>\n> 4. **BIRD vs 无 BIRD**：\n>    - IPIP 模式需要 BIRD\n>    - VXLAN 模式不需要 BIRD\n>\n> 5. **高性能方案**：\n>    - VPP：用户态协议栈\n>    - DPDK：绕过内核\n>    - 适用于高带宽场景\n>\n> 6. **工具**：\n>    - calicoctl 管理 Calico 资源\n>    - 类似 Cilium CLI\n\n---", "subs": ["29.1 Calico 概述", "29.2 网络模式对比", "29.3 核心组件", "29.4 BGP 网络架构", "29.5 VPP 高性能方案", "29.6 calicoctl 工具", "29.7 IP 池管理", "29.8 IPIP vs VXLAN 的区别", "29.9 与 Cilium 对比", "29.10 章节小结"]}, {"title": "第三十章 Calico 环境准备", "content": "本章介绍 Calico CNI 的环境准备工作，包括集群创建、Calico 安装、管理工具配置和环境验证。这是后续学习 Calico 各种网络模式的基础。\n\n#### 30.1 背景与目标\n\n##### 30.1.1 学习环境需求\n\n```mermaid\ngraph TB\n    subgraph \"环境组成\"\n        K8s[\"Kubernetes 集群\"]\n        Calico[\"Calico CNI\"]\n        CLI[\"calicoctl 工具\"]\n        Lab[\"ContainerLab (可选)\"]\n    end\n    \n    K8s --> Calico\n    CLI --> Calico\n    Lab --> K8s\n```\n\n| 组件 | 版本 | 说明 |\n|:---|:---|:---|\n| **Kubernetes** | 1.25+ | 使用 kind 创建 |\n| **Calico** | 3.23.x | 默认 IPIP 模式 |\n| **calicoctl** | 与 Calico 版本匹配 | 管理 Calico 资源 |\n\n##### 30.1.2 环境目标\n\n| 目标 | 说明 |\n|:---|:---|\n| **Pod 互通** | Pod 之间可以相互 ping 通 |\n| **Service 可达** | Service 可正常访问 |\n| **跨节点通信** | 不同节点的 Pod 可互通 |\n\n#### 30.2 集群创建\n\n##### 30.2.1 使用 kind 创建集群\n\n```yaml\n# calico-cluster.yaml\nkind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnetworking:\n  disableDefaultCNI: true    # 禁用默认 CNI\n  podSubnet: \"10.244.0.0/16\" # Pod CIDR\nnodes:\n  - role: control-plane\n  - role: worker\n  - role: worker\n```\n\n```bash\n# 创建集群\nkind create cluster --name calico-demo --config calico-cluster.yaml\n\n# 去除 master 节点污点（可选）\nkubectl taint nodes --all node-role.kubernetes.io/control-plane-\n```\n\n##### 30.2.2 创建流程\n\n```mermaid\nsequenceDiagram\n    participant User as 用户\n    participant Kind as kind\n    participant K8s as Kubernetes\n    participant CNI as CNI 插件\n    \n    User->>Kind: kind create cluster\n    Kind->>K8s: 创建集群\n    Note over K8s: 默认 CNI 禁用\n    Note over K8s: Pod CIDR: 10.244.0.0/16\n    User->>K8s: 安装 Calico\n    K8s->>CNI: Calico 就绪\n    Note over K8s: Pod 网络可用\n```\n\n#### 30.3 安装 Calico\n\n##### 30.3.1 安装方式对比\n\n| 方式 | 适用场景 | 特点 |\n|:---|:---|:---|\n| **Quick Start** | 快速体验 | 使用 YAML Manifest |\n| **Helm** | 生产环境 | 更灵活的配置 |\n| **Operator** | 企业环境 | 声明式管理 |\n\n##### 30.3.2 Quick Start 安装\n\n```bash\n# 安装 Calico Operator 和 CRD\nkubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.23.2/manifests/tigera-operator.yaml\n\n# 安装 Calico 自定义资源\nkubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.23.2/manifests/custom-resources.yaml\n\n# 等待 Pod 就绪\nkubectl wait --for=condition=Ready pods --all -n calico-system --timeout=300s\nkubectl wait --for=condition=Ready pods --all -n calico-apiserver --timeout=300s\n```\n\n##### 30.3.3 查看安装结果\n\n```bash\n# 查看 Calico Pod\nkubectl get pods -n calico-system\nkubectl get pods -n calico-apiserver\n\n# 输出示例\nNAME                                       READY   STATUS    RESTARTS   AGE\ncalico-kube-controllers-xxx                1/1     Running   0          5m\ncalico-node-xxx                            1/1     Running   0          5m\ncalico-typha-xxx                           1/1     Running   0          5m\n```\n\n#### 30.4 calicoctl 工具\n\n##### 30.4.1 安装 calicoctl\n\n```bash\n# 下载 calicoctl（需与 Calico 版本匹配）\ncurl -L https://github.com/projectcalico/calico/releases/download/v3.23.2/calicoctl-linux-amd64 -o calicoctl\n\n# 添加执行权限\nchmod +x calicoctl\nmv calicoctl /usr/local/bin/\n\n# 验证版本\ncalicoctl version\n```\n\n##### 30.4.2 版本匹配重要性\n\n```mermaid\ngraph LR\n    Client[\"calicoctl v3.23.5\"]\n    Cluster[\"Cluster v3.23.2\"]\n    \n    Client -->|\"版本不匹配\"| Warning[\"WARNING: mismatched versions\"]\n    \n    Client2[\"calicoctl v3.23.2\"]\n    Cluster2[\"Cluster v3.23.2\"]\n    \n    Client2 -->|\"版本匹配\"| OK[\"正常工作\"]\n```\n\n> [!WARNING]\n> **版本匹配非常重要！** calicoctl 版本必须与集群中 Calico 版本一致，否则会出现 `mismatched versions` 警告。虽然可以使用 `--allow-version-mismatch` 强制运行，但不推荐在生产环境中这样做。\n\n##### 30.4.3 常用命令\n\n```bash\n# 查看节点\ncalicoctl get nodes\n\n# 查看 IP 池\ncalicoctl get ippool -o yaml\n\n# 查看 BGP 配置\ncalicoctl get bgpconfig\n\n# 查看 BGP Peer\ncalicoctl get bgppeer\n```\n\n#### 30.5 IPPool 配置详解\n\n##### 30.5.1 默认 IPPool\n\n```bash\n# 查看 IPPool\ncalicoctl get ippool -o yaml\n```\n\n```yaml\napiVersion: projectcalico.org/v3\nkind: IPPool\nmetadata:\n  name: default-ipv4-ippool\nspec:\n  cidr: 10.244.0.0/16           # Pod CIDR\n  ipipMode: Always              # IPIP 模式\n  vxlanMode: Never              # 不使用 VXLAN\n  natOutgoing: true             # 出站 NAT\n  nodeSelector: all()           # 所有节点\n  disabled: false               # 启用状态\n```\n\n##### 30.5.2 关键字段说明\n\n```mermaid\ngraph TB\n    subgraph \"IPPool 字段\"\n        CIDR[\"cidr<br/>Pod 网段\"]\n        IPIP[\"ipipMode<br/>IPIP 封装模式\"]\n        VXLAN[\"vxlanMode<br/>VXLAN 封装模式\"]\n        NAT[\"natOutgoing<br/>出站 NAT\"]\n        Selector[\"nodeSelector<br/>节点选择器\"]\n        Disabled[\"disabled<br/>是否禁用\"]\n    end\n```\n\n| 字段 | 可选值 | 说明 |\n|:---|:---|:---|\n| `ipipMode` | Always/CrossSubnet/Never | IPIP 封装策略 |\n| `vxlanMode` | Always/CrossSubnet/Never | VXLAN 封装策略 |\n| `natOutgoing` | true/false | Pod 出站是否 NAT |\n| `nodeSelector` | all()/标签表达式 | 哪些节点使用此池 |\n| `disabled` | true/false | 是否禁用此池 |\n\n##### 30.5.3 封装模式对比\n\n```mermaid\ngraph TB\n    subgraph \"ipipMode/vxlanMode 值\"\n        Always[\"Always<br/>始终封装\"]\n        Cross[\"CrossSubnet<br/>跨子网封装\"]\n        Never[\"Never<br/>不封装\"]\n    end\n    \n    Always --> A1[\"所有跨节点通信都封装\"]\n    Cross --> C1[\"同子网路由，跨子网封装\"]\n    Never --> N1[\"纯路由，不封装\"]\n```\n\n> [!NOTE]\n> **IPIP 和 VXLAN 互斥**：不能同时设置 `ipipMode: Always` 和 `vxlanMode: Always`。通常只启用其中一种，另一种设为 `Never`。\n\n#### 30.6 环境验证\n\n##### 30.6.1 验证流程\n\n```mermaid\ngraph LR\n    Deploy[\"部署测试 Pod\"]\n    PodPing[\"Pod 间 ping 测试\"]\n    SvcTest[\"Service 访问测试\"]\n    Result[\"验证通过\"]\n    \n    Deploy --> PodPing --> SvcTest --> Result\n```\n\n##### 30.6.2 部署测试资源\n\n```yaml\n# test-pods.yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: pod1\n  labels:\n    app: test\nspec:\n  containers:\n    - name: busybox\n      image: busybox\n      command: [\"sleep\", \"3600\"]\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: pod2\n  labels:\n    app: test\nspec:\n  containers:\n    - name: busybox\n      image: busybox\n      command: [\"sleep\", \"3600\"]\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: test-svc\nspec:\n  selector:\n    app: test\n  ports:\n    - port: 80\n      targetPort: 80\n```\n\n```bash\n# 创建测试资源\nkubectl apply -f test-pods.yaml\n\n# 等待 Pod 就绪\nkubectl wait --for=condition=Ready pods --all --timeout=120s\n```\n\n##### 30.6.3 执行验证\n\n```bash\n# 获取 Pod IP\nPOD1_IP=$(kubectl get pod pod1 -o jsonpath='{.status.podIP}')\nPOD2_IP=$(kubectl get pod pod2 -o jsonpath='{.status.podIP}')\n\n# Pod 间 ping 测试\nkubectl exec pod1 -- ping -c 3 $POD2_IP\n\n# Service 访问测试\nSVC_IP=$(kubectl get svc test-svc -o jsonpath='{.spec.clusterIP}')\nkubectl exec pod1 -- wget -qO- http://$SVC_IP --timeout=5\n\n# 验证成功标志\necho \"Pod 互通: OK\"\necho \"Service 可达: OK\"\n```\n\n#### 30.7 ContainerLab 拓扑规划\n\n##### 30.7.1 IPIP 学习拓扑\n\n为后续学习 IPIP 模式，建议搭建以下拓扑：\n\n```mermaid\ngraph TB\n    subgraph \"Router\"\n        GW[\"网关路由器<br/>192.168.1.1\"]\n    end\n    \n    subgraph \"子网 1: 192.168.1.0/24\"\n        Node1[\"Node 1<br/>192.168.1.10\"]\n        Node2[\"Node 2<br/>192.168.1.11\"]\n    end\n    \n    subgraph \"子网 2: 192.168.2.0/24\"\n        Node3[\"Node 3<br/>192.168.2.10\"]\n    end\n    \n    Node1 --- Node2\n    Node1 <--> GW\n    Node2 <--> GW\n    GW <--> Node3\n```\n\n##### 30.7.2 拓扑说明\n\n| 节点 | 子网 | 说明 |\n|:---|:---|:---|\n| Node 1 | 192.168.1.0/24 | 与 Node 2 同子网 |\n| Node 2 | 192.168.1.0/24 | 与 Node 1 同子网 |\n| Node 3 | 192.168.2.0/24 | 跨子网，需 IPIP |\n\n**通信路径**：\n\n- Node 1 ↔ Node 2：同子网，可直接路由\n- Node 1 ↔ Node 3：跨子网，经过网关，需要 IPIP 封装\n\n#### 30.8 IPAM 问题排查\n\n##### 30.8.1 常见问题\n\n| 问题 | 原因 | 解决方案 |\n|:---|:---|:---|\n| **IP 重复** | IPAM 数据库不一致 | 使用 calicoctl ipam check |\n| **无法分配 IP** | IPPool 禁用或耗尽 | 检查 IPPool 状态 |\n| **Pod 无 IP** | CNI 配置错误 | 检查 /etc/cni/net.d/ |\n\n##### 30.8.2 IPAM 命令\n\n```bash\n# 检查 IPAM 状态\ncalicoctl ipam check\n\n# 释放未使用的 IP\ncalicoctl ipam release --ip=10.244.x.x\n\n# 显示 IPAM 使用情况\ncalicoctl ipam show\n\n# 显示某个 IP 的分配信息\ncalicoctl ipam show --ip=10.244.x.x\n```\n\n> [!TIP]\n> IBM 文档中有详细的 Calico IPAM 故障排查指南，搜索 \"IBM Calico IPAM\" 可以找到更多实用信息。\n\n#### 30.9 章节小结\n\n```mermaid\nmindmap\n  root((环境准备))\n    集群创建\n      kind\n      禁用默认 CNI\n    安装 Calico\n      Quick Start\n      Helm\n      Operator\n    calicoctl\n      版本匹配\n      常用命令\n    IPPool\n      ipipMode\n      vxlanMode\n      nodeSelector\n    验证\n      Pod 互通\n      Service 可达\n    拓扑规划\n      同子网节点\n      跨子网节点\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **集群创建**：\n>    - 使用 kind 创建集群\n>    - 禁用默认 CNI：`disableDefaultCNI: true`\n>    - 指定 Pod CIDR\n>\n> 2. **Calico 安装**：\n>    - Quick Start 适合快速体验\n>    - 安装 Operator + CustomResources\n>    - 等待所有 Pod 就绪\n>\n> 3. **calicoctl 工具**：\n>    - 版本必须与 Calico 匹配\n>    - 避免使用 `--allow-version-mismatch`\n>    - 可用于查看/管理 Calico 资源\n>\n> 4. **IPPool 配置**：\n>    - `ipipMode`：Always/CrossSubnet/Never\n>    - `vxlanMode`：与 ipipMode 互斥\n>    - `nodeSelector`：all() 表示全部节点\n>\n> 5. **环境验证**：\n>    - Pod 间 ping 测试\n>    - Service 访问测试\n>    - 两项都通过 = CNI 工作正常\n>\n> 6. **后续学习**：\n>    - 搭建 ContainerLab 拓扑\n>    - 准备同子网/跨子网场景\n>    - 实践 IPIP/CrossSubnet 模式\n\n---", "subs": ["30.1 背景与目标", "30.2 集群创建", "30.3 安装 Calico", "30.4 calicoctl 工具", "30.5 IPPool 配置详解", "30.6 环境验证", "30.7 ContainerLab 拓扑规划", "30.8 IPAM 问题排查", "30.9 章节小结"]}, {"title": "第三十一章 Calico 同节点通信", "content": "本章深入分析 Calico 同节点 Pod 之间的通信原理，这是所有 Calico 网络模式（IPIP/VXLAN/BGP）的共同基础。同节点通信采用 L3 路由转发方式，核心技术是 Proxy ARP。\n\n#### 31.1 背景与概述\n\n##### 31.1.1 同节点通信的重要性\n\n| 特点 | 说明 |\n|:---|:---|\n| **模式通用** | IPIP、VXLAN、BGP 同节点通信方式相同 |\n| **L3 转发** | 采用三层路由方式，非二层交换 |\n| **Proxy ARP** | 核心技术，打通 Pod 与 Root Namespace |\n\n##### 31.1.2 与其他 CNI 对比\n\n```mermaid\ngraph LR\n    subgraph \"Calico 方式\"\n        P1[\"Pod 1\"] --> Router[\"Host 路由器\"]\n        Router --> P2[\"Pod 2\"]\n    end\n    \n    subgraph \"Flannel 方式\"\n        F1[\"Pod 1\"] --> Bridge[\"Linux Bridge\"]\n        Bridge --> F2[\"Pod 2\"]\n    end\n```\n\n| CNI | 转发层级 | 设备 | 特点 |\n|:---|:---|:---|:---|\n| **Calico** | L3 路由 | Host 作为路由器 | 无广播，效率高 |\n| **Flannel** | L2 交换 | Linux Bridge | 有广播，传统方式 |\n\n#### 31.2 网络拓扑结构\n\n##### 31.2.1 veth pair 连接\n\n```mermaid\ngraph TB\n    subgraph \"Pod 1 (10.244.x.66/32)\"\n        eth0_1[\"eth0\"]\n    end\n    \n    subgraph \"Host (Root Namespace)\"\n        cali1[\"cali-xxx1\"]\n        cali2[\"cali-xxx2\"]\n        Routing[\"路由表\"]\n    end\n    \n    subgraph \"Pod 2 (10.244.x.65/32)\"\n        eth0_2[\"eth0\"]\n    end\n    \n    eth0_1 ---|\"veth pair\"| cali1\n    eth0_2 ---|\"veth pair\"| cali2\n    cali1 --> Routing\n    cali2 --> Routing\n```\n\n**关键点**：\n\n- 每个 Pod 的 eth0 通过 veth pair 连接到 Host\n- Host 端的网卡名为 `cali-xxx` 格式\n- Pod IP 使用 `/32` 掩码（与任何地址都不同网段）\n\n##### 31.2.2 网卡特征\n\n```bash\n# 在 Pod 内查看网卡\nip link show eth0\n# eth0@if5: ...\n\n# 在 Host 上查看对应的 cali 网卡\nip link show | grep \"^5:\"\n# 5: cali-xxx@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> ...\n```\n\n| 网卡 | 位置 | MAC 地址 | 说明 |\n|:---|:---|:---|:---|\n| `eth0` | Pod 内 | 随机 MAC | Pod 的主网卡 |\n| `cali-xxx` | Host | `ee:ee:ee:ee:ee:ee` | 全 1 固定 MAC |\n\n#### 31.3 路由转发原理\n\n##### 31.3.1 Pod 内路由表\n\n```bash\n# 在 Pod 内查看路由\nip route\n\n# 输出示例\ndefault via 169.254.1.1 dev eth0\n169.254.1.1 dev eth0 scope link\n```\n\n**路由表解读**：\n\n- **默认路由**：所有流量发往 `169.254.1.1`（网关）\n- **出接口**：通过 `eth0` 发出\n- **scope link**：本地链路范围\n\n##### 31.3.2 为什么使用 /32 掩码\n\n```mermaid\ngraph TB\n    subgraph \"Pod IP: 10.244.66.66/32\"\n        Any[\"任何其他 IP\"]\n    end\n    \n    Any -->|\"不同网段\"| L3[\"必须走 L3 路由\"]\n    L3 -->|\"查询路由表\"| Gateway[\"发往网关 169.254.1.1\"]\n```\n\n| 掩码 | 含义 | 结果 |\n|:---|:---|:---|\n| `/32` | 只有自己在网段内 | 任何目的 IP 都走 L3 |\n| `/24` | 256 个地址同网段 | 同网段走 L2 交换 |\n\n> [!NOTE]\n> 使用 `/32` 掩码强制所有流量走三层路由，这是 Calico L3 网络模型的核心设计。\n\n##### 31.3.3 Host 路由表\n\n```bash\n# 在 Host 上查看路由\nip route | grep 10.244\n\n# 输出示例\n10.244.66.65 dev cali-xxx1 scope link\n10.244.66.66 dev cali-xxx2 scope link\n```\n\n**解读**：到达每个 Pod IP 的路由，出接口就是连接该 Pod 的 cali 网卡。\n\n#### 31.4 数据包转发流程\n\n##### 31.4.1 同节点通信流程\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod 1 (10.244.66.66)\n    participant Cali1 as cali-xxx1\n    participant Host as Host 路由表\n    participant Cali2 as cali-xxx2\n    participant Pod2 as Pod 2 (10.244.66.65)\n    \n    Pod1->>Pod1: 1. 查路由表，找到网关 169.254.1.1\n    Pod1->>Pod1: 2. ARP 请求网关 MAC\n    Note over Pod1: Proxy ARP 返回全 1 MAC\n    Pod1->>Cali1: 3. 封包发送 (dst MAC: ee:ee:ee:ee:ee:ee)\n    Cali1->>Host: 4. 进入 Host 路由表查询\n    Host->>Host: 5. 查到 10.244.66.65 出口是 cali-xxx2\n    Host->>Cali2: 6. 从 cali-xxx2 发出\n    Cali2->>Pod2: 7. 到达 Pod 2\n```\n\n##### 31.4.2 数据包封装详解\n\n**第一跳（Pod → Host）**：\n\n| 字段 | 值 | 说明 |\n|:---|:---|:---|\n| Src IP | 10.244.66.66 | 源 Pod IP |\n| Dst IP | 10.244.66.65 | 目的 Pod IP |\n| Src MAC | Pod 1 的 MAC | eth0 的 MAC |\n| Dst MAC | `ee:ee:ee:ee:ee:ee` | 网关（Proxy ARP 返回） |\n\n**第二跳（Host → Pod 2）**：\n\n| 字段 | 值 | 说明 |\n|:---|:---|:---|\n| Src IP | 10.244.66.66 | 保持不变 |\n| Dst IP | 10.244.66.65 | 保持不变 |\n| Src MAC | `ee:ee:ee:ee:ee:ee` | cali-xxx2 的 MAC |\n| Dst MAC | Pod 2 的 MAC | 目的 Pod 的 MAC |\n\n#### 31.5 Proxy ARP 机制\n\n##### 31.5.1 什么是 Proxy ARP\n\n```mermaid\ngraph LR\n    subgraph \"Pod\"\n        ARP[\"ARP Request<br/>Who has 169.254.1.1?\"]\n    end\n    \n    subgraph \"Host cali 网卡\"\n        Proxy[\"Proxy ARP<br/>启用 proxy_arp\"]\n    end\n    \n    ARP -->|\"请求\"| Proxy\n    Proxy -->|\"用自己的 MAC 回复\"| ARP\n```\n\n**Proxy ARP 原理**：\n\n1. Pod 发送 ARP 请求查询 `169.254.1.1` 的 MAC\n2. cali 网卡开启了 `proxy_arp` 功能\n3. cali 网卡用自己的 MAC 地址（全 1）回复\n4. Pod 得到 MAC 后即可封装数据包\n\n##### 31.5.2 169.254.1.1 的意义\n\n```bash\n# 这个地址在 Host 上找不到\nip addr | grep 169.254\n# 无输出\n\n# 但 ARP 可以获得响应\narping -I eth0 169.254.1.1\n# ARPING 169.254.1.1\n# 60 bytes from ee:ee:ee:ee:ee:ee: index=0 ...\n```\n\n| 问题 | 答案 |\n|:---|:---|\n| 为什么找不到 169.254.1.1？ | 这个 IP 从未分配给任何接口 |\n| 为什么 ARP 能成功？ | Proxy ARP 代为响应 |\n| 为什么用链路本地地址？ | 避免与其他 IP 冲突 |\n\n> [!IMPORTANT]\n> **169.254.0.0/16 是链路本地地址（Link-Local）**，RFC 3927 规定这个网段用于无 DHCP 时的自动配置。Calico 使用它作为虚拟网关，因为：\n>\n> 1. 不会与真实 IP 冲突\n> 2. 不需要实际分配给接口\n> 3. 通过 Proxy ARP 即可工作\n\n##### 31.5.3 查看 Proxy ARP 配置\n\n```bash\n# 查看 cali 网卡的 proxy_arp 设置\ncat /proc/sys/net/ipv4/conf/cali*/proxy_arp\n# 1   (启用状态)\n\n# 或使用 sysctl\nsysctl net.ipv4.conf.cali*.proxy_arp\n```\n\n#### 31.6 全 1 MAC 地址的原因\n\n##### 31.6.1 为什么使用 ee:ee:ee:ee:ee:ee\n\n```mermaid\ngraph TB\n    subgraph \"设计考虑\"\n        Stable[\"稳定性<br/>内核无法生成持久 MAC\"]\n        Unique[\"唯一性<br/>不与厂商 OUI 冲突\"]\n        Simple[\"简单性<br/>点对点链路不需唯一\"]\n    end\n```\n\n| 原因 | 说明 |\n|:---|:---|\n| **内核限制** | 内核不能为 veth 生成持久稳定的 MAC |\n| **不冲突** | 全 1 不会与任何厂商 OUI 冲突 |\n| **点对点** | veth pair 是点对点，MAC 只需本地有效 |\n\n##### 31.6.2 MAC 地址作用域\n\n```mermaid\ngraph TB\n    subgraph \"Pod 1 广播域\"\n        P1[\"Pod 1 eth0\"]\n        C1[\"cali-xxx1\"]\n        P1 <--> C1\n    end\n    \n    subgraph \"Pod 2 广播域\"\n        P2[\"Pod 2 eth0\"]\n        C2[\"cali-xxx2\"]\n        P2 <--> C2\n    end\n    \n    subgraph \"Host\"\n        Router[\"路由转发 (L3)\"]\n    end\n    \n    C1 --> Router\n    Router --> C2\n```\n\n> [!TIP]\n> **MAC 地址只需在冲突域/广播域内唯一**。每个 Pod 与其 cali 网卡组成独立的点对点链路，所以全部使用相同的 MAC 地址不会冲突。\n\n##### 31.6.3 Calico 官方 FAQ\n\nCalico 官网 FAQ 解答了这些常见疑问：\n\n1. **Why do my containers have a route to 169.254.1.1?**\n   - 这是虚拟网关，通过 Proxy ARP 工作\n\n2. **Why can't I see 169.254.1.1 on my host?**\n   - 不需要实际配置，Proxy ARP 代为响应\n\n3. **Why do all cali* interfaces have the same MAC?**\n   - 点对点链路，无需唯一 MAC\n\n#### 31.7 与 Flannel 对比\n\n##### 31.7.1 架构对比\n\n```mermaid\ngraph TB\n    subgraph \"Calico L3 模式\"\n        CP1[\"Pod 1\"] --> CR[\"Host (Router)\"]\n        CR --> CP2[\"Pod 2\"]\n        Note1[\"无广播<br/>路由转发\"]\n    end\n    \n    subgraph \"Flannel Bridge 模式\"\n        FP1[\"Pod 1\"] --> FB[\"Linux Bridge\"]\n        FB --> FP2[\"Pod 2\"]\n        Note2[\"有广播<br/>交换转发\"]\n    end\n```\n\n##### 31.7.2 特性对比\n\n| 特性 | Calico | Flannel |\n|:---|:---|:---|\n| **转发层级** | L3（路由） | L2（交换） |\n| **广播域** | 隔离（每 Pod 独立） | 共享（同节点共享） |\n| **ARP 广播** | 无（Proxy ARP） | 有 |\n| **效率** | 高（无广播开销） | 较低 |\n| **隔离性** | 强 | 弱 |\n\n#### 31.8 抓包验证\n\n##### 31.8.1 在 Pod 内抓包\n\n```bash\n# 进入 Pod\nkubectl exec -it pod1 -- sh\n\n# 安装 tcpdump（如果没有）\napk add tcpdump\n\n# 抓取 ICMP 包\ntcpdump -i eth0 icmp -n\n```\n\n##### 31.8.2 在 Host 抓包\n\n```bash\n# 找到对应的 cali 网卡\nip link | grep cali\n\n# 抓包\ntcpdump -i cali-xxx -n icmp\n```\n\n##### 31.8.3 验证 MAC 地址\n\n```bash\n# Ping 测试后查看 ARP 缓存\nip neigh\n\n# 示例输出\n169.254.1.1 dev eth0 lladdr ee:ee:ee:ee:ee:ee REACHABLE\n```\n\n#### 31.9 章节小结\n\n```mermaid\nmindmap\n  root((同节点通信))\n    网络拓扑\n      veth pair\n      cali 网卡\n      /32 掩码\n    路由转发\n      Pod 路由表\n      Host 路由表\n      L3 处理\n    Proxy ARP\n      169.254.1.1\n      全 1 MAC\n      代理响应\n    设计优势\n      无广播\n      效率高\n      隔离性强\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **网络拓扑**：\n>    - Pod eth0 ↔ Host cali 网卡（veth pair）\n>    - Pod IP 使用 /32 掩码\n>    - 强制所有流量走 L3\n>\n> 2. **路由转发**：\n>    - Pod 默认路由指向 169.254.1.1\n>    - Host 路由表有到每个 Pod 的明细路由\n>    - 出接口就是对应的 cali 网卡\n>\n> 3. **Proxy ARP**：\n>    - cali 网卡开启 proxy_arp\n>    - 代替 169.254.1.1 响应 ARP\n>    - 返回自己的 MAC（全 1）\n>\n> 4. **全 1 MAC**：\n>    - 所有 cali 网卡使用相同 MAC\n>    - 点对点链路，本地有效\n>    - 不与厂商 OUI 冲突\n>\n> 5. **与 Flannel 对比**：\n>    - Calico: L3 路由，无广播\n>    - Flannel: L2 交换，有广播\n>\n> 6. **排查技巧**：\n>    - 不懂就查路由表 `ip route`\n>    - 确认 ARP 缓存 `ip neigh`\n>    - 抓包验证 `tcpdump`\n\n---", "subs": ["31.1 背景与概述", "31.2 网络拓扑结构", "31.3 路由转发原理", "31.4 数据包转发流程", "31.5 Proxy ARP 机制", "31.6 全 1 MAC 地址的原因", "31.7 与 Flannel 对比", "31.8 抓包验证", "31.9 章节小结"]}, {"title": "第三十二章 Calico-Proxy-ARP 实践", "content": "本章通过手工实现 Proxy ARP 来深入理解 Calico 同节点通信的核心机制。通过实践，你将掌握 veth pair、路由配置、Proxy ARP 开关等关键技术点。\n\n#### 32.1 背景与目标\n\n##### 32.1.1 实验目标\n\n```mermaid\ngraph LR\n    subgraph \"Namespace (ns1)\"\n        Pod[\"1.1.1.2/24\"]\n    end\n    \n    subgraph \"Root Namespace\"\n        Host[\"Host\"]\n    end\n    \n    subgraph \"External\"\n        Internet[\"外网\"]\n    end\n    \n    Pod -->|\"1. Proxy ARP\"| Host\n    Host -->|\"2. 路由转发\"| Internet\n```\n\n| 目标 | 说明 |\n|:---|:---|\n| **理解 Proxy ARP** | 手工实现虚拟网关 169.254.1.1 |\n| **掌握路由配置** | 先配网关路由，再配默认路由 |\n| **解决回程问题** | 添加回程路由确保双向通信 |\n| **外网访问** | 通过 SNAT 实现出公网 |\n\n##### 32.1.2 实验拓扑\n\n```mermaid\ngraph TB\n    subgraph \"Namespace: ns1\"\n        NS1[\"c-eth0<br/>1.1.1.2/24\"]\n    end\n    \n    subgraph \"Root Namespace\"\n        Veth[\"veth\"]\n        Route[\"路由表\"]\n        SNAT[\"SNAT\"]\n    end\n    \n    subgraph \"External\"\n        GW[\"网关\"]\n        Ext[\"外网 114.114.114.114\"]\n    end\n    \n    NS1 ---|\"veth pair\"| Veth\n    Veth --> Route\n    Route --> SNAT\n    SNAT --> GW\n    GW --> Ext\n```\n\n#### 32.2 查看 Calico Proxy ARP 配置\n\n##### 32.2.1 Proxy ARP 开关位置\n\n```bash\n# 查看 cali 网卡的 proxy_arp 状态\ncat /proc/sys/net/ipv4/conf/cali*/proxy_arp\n# 输出: 1  (已启用)\n\n# 查看 eth0 的 proxy_arp 状态\ncat /proc/sys/net/ipv4/conf/eth0/proxy_arp\n# 输出: 0  (未启用)\n```\n\n> [!NOTE]\n> Proxy ARP 是针对**单个网卡**的配置：\n>\n> - `cali*` 网卡开启了 proxy_arp（值为 1）\n> - `eth0` 等其他网卡默认关闭\n\n##### 32.2.2 开关含义\n\n| 值 | 含义 |\n|:---|:---|\n| `0` | 禁用 Proxy ARP |\n| `1` | 启用 Proxy ARP |\n\n#### 32.3 手工实现 Proxy ARP\n\n##### 32.3.1 第一步：创建网络命名空间\n\n```bash\n# 创建命名空间 ns1\nip netns add ns1\n\n# 验证\nip netns list\n```\n\n##### 32.3.2 第二步：创建 veth pair\n\n```bash\n# 创建 veth pair\n# 一端: veth (留在 root namespace)\n# 另一端: c-eth0 (放入 ns1)\nip link add veth type veth peer name c-eth0\n\n# 启用两端网卡\nip link set c-eth0 up\nip link set veth up\n\n# 将 c-eth0 移入 ns1\nip link set c-eth0 netns ns1\n\n# 在 ns1 中启用并配置 IP\nip netns exec ns1 ip link set c-eth0 up\nip netns exec ns1 ip addr add 1.1.1.2/24 dev c-eth0\n```\n\n```mermaid\nsequenceDiagram\n    participant Root as Root Namespace\n    participant NS1 as ns1 Namespace\n    \n    Root->>Root: 创建 veth pair (veth + c-eth0)\n    Root->>NS1: 移动 c-eth0 到 ns1\n    Root->>Root: 启用 veth\n    NS1->>NS1: 启用 c-eth0\n    NS1->>NS1: 配置 IP 1.1.1.2/24\n```\n\n##### 32.3.3 第三步：配置路由（关键！）\n\n> [!IMPORTANT]\n> **路由配置顺序非常重要**：必须先配置到网关的路由，再配置默认路由！\n\n```bash\n# 进入 ns1\nip netns exec ns1 bash\n\n# 第一步：配置到网关 169.254.1.1 的路由\nip route add 169.254.1.1 dev c-eth0 scope link\n\n# 第二步：配置默认路由，指向网关\nip route add default via 169.254.1.1 dev c-eth0\n\n# 查看路由表\nip route\n# default via 169.254.1.1 dev c-eth0\n# 169.254.1.1 dev c-eth0 scope link\n```\n\n**为什么必须先配置网关路由？**\n\n```mermaid\ngraph TB\n    subgraph \"正确顺序\"\n        A1[\"1. 配置 169.254.1.1 路由\"] --> B1[\"系统知道如何到达网关\"]\n        B1 --> C1[\"2. 配置 default via 169.254.1.1\"]\n        C1 --> D1[\"成功！\"]\n    end\n    \n    subgraph \"错误顺序\"\n        A2[\"1. 直接配置 default via 169.254.1.1\"] --> B2[\"系统不知道如何到达网关\"]\n        B2 --> C2[\"报错！\"]\n    end\n```\n\n| 错误示例 | 原因 |\n|:---|:---|\n| `ip route add default via 169.254.1.1` | 系统不知道 169.254.1.1 怎么走 |\n\n##### 32.3.4 第四步：启用 Proxy ARP\n\n```bash\n# 在 root namespace 中对 veth 启用 proxy_arp\necho 1 > /proc/sys/net/ipv4/conf/veth/proxy_arp\n\n# 验证\ncat /proc/sys/net/ipv4/conf/veth/proxy_arp\n# 输出: 1\n```\n\n##### 32.3.5 第五步：验证 ARP 响应\n\n```bash\n# 在 ns1 中测试 ARP\nip netns exec ns1 arping -I c-eth0 169.254.1.1\n\n# 输出示例\n# ARPING 169.254.1.1 from 1.1.1.2 c-eth0\n# Unicast reply from 169.254.1.1 [9B:12:0C:xx:xx:xx] ...\n```\n\n至此，第一跳（Pod → Host）已经打通！\n\n#### 32.4 解决回程路由问题\n\n##### 32.4.1 问题现象\n\n```bash\n# 在 ns1 中 ping Host 地址\nip netns exec ns1 ping -I 1.1.1.2 192.168.2.66\n\n# 结果：不通！\n```\n\n##### 32.4.2 抓包分析\n\n```bash\n# 在 veth 上抓包\ntcpdump -i veth icmp -n\n\n# 输出\n# ICMP echo request 1.1.1.2 -> 192.168.2.66\n# (无 reply)\n\n# 在 eth0 上抓包\ntcpdump -i eth0 icmp -n\n\n# 输出\n# ICMP echo request 1.1.1.2 -> 192.168.2.66\n# ICMP echo reply 192.168.2.66 -> 1.1.1.2  (发往默认网关！)\n```\n\n##### 32.4.3 问题原因\n\n```mermaid\ngraph LR\n    NS1[\"ns1<br/>1.1.1.2\"] -->|\"request\"| Host[\"Host<br/>192.168.2.66\"]\n    Host -->|\"reply\"| GW[\"默认网关\"]\n    GW -->|\"???\"| Lost[\"包丢失\"]\n```\n\n**原因**：Host 收到包后，要回复给 `1.1.1.2`，但 Host 路由表没有到 `1.1.1.2` 的路由，匹配默认路由发给了外部网关。\n\n##### 32.4.4 解决方案：添加回程路由\n\n```bash\n# 在 root namespace 添加到 1.1.1.2 的路由\nip route add 1.1.1.2 dev veth scope link\n\n# 或添加整个网段\nip route add 1.1.1.0/24 dev veth scope link\n\n# 验证路由表\nip route | grep 1.1.1\n# 1.1.1.2 dev veth scope link\n```\n\n```bash\n# 再次测试\nip netns exec ns1 ping -I 1.1.1.2 192.168.2.66\n\n# 结果：通了！\n```\n\n#### 32.5 实现外网访问\n\n##### 32.5.1 问题：无法访问外网\n\n```bash\nip netns exec ns1 ping 114.114.114.114\n# 不通\n```\n\n**原因**：缺少 SNAT，外部网络不知道如何回复私有 IP `1.1.1.2`\n\n##### 32.5.2 解决方案：配置 SNAT\n\n```bash\n# 启用 IP 转发\necho 1 > /proc/sys/net/ipv4/ip_forward\n\n# 添加 SNAT 规则\niptables -t nat -A POSTROUTING -s 1.1.1.0/24 -j MASQUERADE\n\n# 或指定出接口\niptables -t nat -A POSTROUTING -s 1.1.1.0/24 -o eth0 -j MASQUERADE\n```\n\n```bash\n# 测试外网访问\nip netns exec ns1 ping 114.114.114.114\n# 通了！\n```\n\n#### 32.6 完整实现脚本\n\n```bash\n#!/bin/bash\n# proxy-arp-demo.sh - 手工实现 Proxy ARP\n\n# 1. 创建命名空间\nip netns add ns1\n\n# 2. 创建 veth pair\nip link add veth type veth peer name c-eth0\nip link set veth up\nip link set c-eth0 netns ns1\nip netns exec ns1 ip link set c-eth0 up\nip netns exec ns1 ip addr add 1.1.1.2/24 dev c-eth0\n\n# 3. 配置路由（顺序重要！）\nip netns exec ns1 ip route add 169.254.1.1 dev c-eth0 scope link\nip netns exec ns1 ip route add default via 169.254.1.1 dev c-eth0\n\n# 4. 启用 Proxy ARP\necho 1 > /proc/sys/net/ipv4/conf/veth/proxy_arp\n\n# 5. 添加回程路由\nip route add 1.1.1.2 dev veth scope link\n\n# 6. 启用 IP 转发和 SNAT（如需外网访问）\necho 1 > /proc/sys/net/ipv4/ip_forward\niptables -t nat -A POSTROUTING -s 1.1.1.0/24 -j MASQUERADE\n\necho \"Proxy ARP 配置完成！\"\necho \"测试：ip netns exec ns1 ping 114.114.114.114\"\n```\n\n#### 32.7 与 Calico 实现对比\n\n```mermaid\ngraph TB\n    subgraph \"手工实现\"\n        M1[\"创建 veth pair\"] --> M2[\"配置路由\"]\n        M2 --> M3[\"启用 proxy_arp\"]\n        M3 --> M4[\"添加回程路由\"]\n        M4 --> M5[\"配置 SNAT\"]\n    end\n    \n    subgraph \"Calico 自动实现\"\n        C1[\"CNI 创建 cali* 网卡\"] --> C2[\"注入 Pod 路由\"]\n        C2 --> C3[\"Felix 启用 proxy_arp\"]\n        C3 --> C4[\"自动维护路由表\"]\n        C4 --> C5[\"iptables 规则\"]\n    end\n```\n\n| 步骤 | 手工实现 | Calico 实现 |\n|:---|:---|:---|\n| **创建 veth** | `ip link add` | CNI 插件自动创建 |\n| **配置路由** | `ip route add` | Felix 自动注入 |\n| **Proxy ARP** | 写 `/proc/sys` | Felix 自动配置 |\n| **回程路由** | 手动添加 | Felix 监听并维护 |\n| **SNAT** | iptables 规则 | Felix 管理 iptables |\n\n#### 32.8 扩展：东西向流量\n\n##### 32.8.1 实验思路\n\n要实现两个节点上的命名空间互通（东西向流量）：\n\n```mermaid\ngraph LR\n    subgraph \"Node 1\"\n        NS1[\"ns1<br/>1.1.1.2/24\"]\n    end\n    \n    subgraph \"Node 2\"\n        NS2[\"ns1<br/>1.1.2.2/24\"]\n    end\n    \n    NS1 <-->|\"跨节点通信\"| NS2\n```\n\n**需要添加的配置**：\n\n1. **Node 1**：添加到 `1.1.2.0/24` 的路由，下一跳为 Node 2\n2. **Node 2**：添加到 `1.1.1.0/24` 的路由，下一跳为 Node 1\n3. 两边都配置 Proxy ARP\n\n> [!TIP]\n> 这就是 Calico Host-GW 模式的原理！通过路由表实现跨节点通信。\n\n#### 32.9 关键技术总结\n\n| 技术 | 作用 | 命令 |\n|:---|:---|:---|\n| **veth pair** | 连接命名空间 | `ip link add type veth peer` |\n| **网关路由** | 定义如何到达网关 | `ip route add 169.254.1.1 dev xxx scope link` |\n| **默认路由** | 定义默认出口 | `ip route add default via 169.254.1.1` |\n| **Proxy ARP** | 代理 ARP 响应 | `echo 1 > /proc/sys/.../proxy_arp` |\n| **回程路由** | 解决回包问题 | `ip route add x.x.x.x dev xxx` |\n| **SNAT** | 外网访问 | `iptables -t nat -A POSTROUTING -j MASQUERADE` |\n\n#### 32.10 章节小结\n\n```mermaid\nmindmap\n  root((Proxy ARP 实践))\n    基础配置\n      创建 netns\n      创建 veth pair\n      配置 IP\n    路由配置\n      先配网关路由\n      再配默认路由\n      添加回程路由\n    Proxy ARP\n      /proc/sys 开关\n      针对单个网卡\n      返回自己 MAC\n    外网访问\n      IP 转发\n      SNAT/MASQUERADE\n    扩展\n      东西向流量\n      Host-GW 原理\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **Proxy ARP 开关**：\n>    - 位置：`/proc/sys/net/ipv4/conf/<iface>/proxy_arp`\n>    - 值 1 启用，值 0 禁用\n>    - 针对单个网卡配置\n>\n> 2. **路由配置顺序**：\n>    - **必须先配置网关路由**：`ip route add 169.254.1.1 dev xxx scope link`\n>    - **再配置默认路由**：`ip route add default via 169.254.1.1`\n>    - 顺序错误会报错！\n>\n> 3. **回程路由**：\n>    - Host 需要知道如何回到 Pod\n>    - 否则包会走默认路由发到外部网关\n>    - 解决：添加到 Pod IP 的明细路由\n>\n> 4. **外网访问四要素**：\n>    - veth pair 连接\n>    - Proxy ARP 响应\n>    - 路由表配置\n>    - SNAT 地址转换\n>\n> 5. **与 Calico 对比**：\n>    - 手工实现帮助理解原理\n>    - Calico 通过 Felix 自动化这些配置\n>    - 核心技术完全相同\n\n---", "subs": ["32.1 背景与目标", "32.2 查看 Calico Proxy ARP 配置", "32.3 手工实现 Proxy ARP", "32.4 解决回程路由问题", "32.5 实现外网访问", "32.6 完整实现脚本", "32.7 与 Calico 实现对比", "32.8 扩展：东西向流量", "32.9 关键技术总结", "32.10 章节小结"]}, {"title": "第三十三章 Calico-IPIP 跨节点通信", "content": "本章详细讲解 Calico 在 IPIP 模式下如何实现跨节点 Pod 通信。IPIP 是一种 IP-in-IP 的 Overlay 封装技术，通过在原始 IP 包外再封装一层 IP 头来实现隧道传输。\n\n#### 33.1 背景与概述\n\n##### 33.1.1 为什么需要 IPIP\n\n```mermaid\ngraph LR\n    subgraph \"Node 1 (172.18.0.4)\"\n        Pod1[\"Pod A<br/>10.24.197.x\"]\n    end\n    \n    subgraph \"Node 2 (172.18.0.2)\"\n        Pod2[\"Pod B<br/>10.24.79.x\"]\n    end\n    \n    Pod1 -->|\"跨节点通信\"| Pod2\n```\n\n| 场景 | 问题 | 解决方案 |\n|:---|:---|:---|\n| **同节点** | L3 路由 + Proxy ARP | 直接转发 |\n| **跨节点** | 节点间网络不认识 Pod IP | IPIP 隧道封装 |\n\n##### 33.1.2 IPIP 模式特点\n\n| 特性 | 说明 |\n|:---|:---|\n| **封装方式** | IP-in-IP（协议号 4） |\n| **额外开销** | 20 字节（外层 IP 头） |\n| **二层信息** | 无（只有 IP 头） |\n| **隧道设备** | `tunl0` |\n\n#### 33.2 跨节点通信流程\n\n##### 33.2.1 整体数据流\n\n```mermaid\nsequenceDiagram\n    participant PodA as Pod A (10.24.197.x)\n    participant Node1 as Node 1 (172.18.0.4)\n    participant tunl0_1 as tunl0\n    participant Network as 物理网络\n    participant tunl0_2 as tunl0\n    participant Node2 as Node 2 (172.18.0.2)\n    participant PodB as Pod B (10.24.79.x)\n    \n    PodA->>Node1: 1. 原始包发送\n    Note over PodA,Node1: SRC: 10.24.197.x<br/>DST: 10.24.79.x\n    Node1->>tunl0_1: 2. 查路由表匹配 tunl0\n    tunl0_1->>Network: 3. IPIP 封装\n    Note over tunl0_1,Network: 外层: 172.18.0.4 -> 172.18.0.2<br/>内层: 10.24.197.x -> 10.24.79.x\n    Network->>tunl0_2: 4. 物理网络传输\n    tunl0_2->>Node2: 5. IPIP 解封装\n    Node2->>PodB: 6. 原始包送达\n```\n\n##### 33.2.2 详细步骤\n\n| 步骤 | 位置 | 动作 |\n|:---|:---|:---|\n| 1 | Pod A | 发送 ICMP 包，DST 为 Pod B IP |\n| 2 | Node 1 路由表 | 匹配到 Pod B 网段，下一跳 172.18.0.2，出接口 tunl0 |\n| 3 | tunl0 设备 | IPIP 封装，外层 IP: 172.18.0.4 → 172.18.0.2 |\n| 4 | eth0 | 二层封装 MAC，发送到物理网络 |\n| 5 | Node 2 eth0 | 接收 IPIP 包 |\n| 6 | Node 2 tunl0 | 解封装，露出原始包 |\n| 7 | Node 2 路由表 | 匹配 Pod B 的 /32 路由，转发到 cali 网卡 |\n| 8 | Pod B | 收到原始包 |\n\n#### 33.3 路由表分析\n\n##### 33.3.1 Node 1 路由表\n\n```bash\n# 查看 Node 1 路由表\nip route\n\n# 输出示例\n10.24.79.0/26 via 172.18.0.2 dev tunl0 proto bird onlink\n10.24.197.0/26 dev cali-xxx scope link\n```\n\n| 路由条目 | 含义 |\n|:---|:---|\n| `10.24.79.0/26 via 172.18.0.2 dev tunl0` | 到 Node 2 Pod 网段，下一跳 172.18.0.2，出接口 tunl0 |\n| `proto bird` | 由 BIRD 协议注入 |\n| `onlink` | 下一跳在链路上（不需 ARP） |\n\n##### 33.3.2 路由匹配流程\n\n```mermaid\ngraph TB\n    Start[\"Pod A 发包<br/>DST: 10.24.79.1\"] --> Route[\"查路由表\"]\n    Route --> Match[\"匹配 10.24.79.0/26\"]\n    Match --> Gateway[\"下一跳: 172.18.0.2\"]\n    Gateway --> Dev[\"出接口: tunl0\"]\n    Dev --> IPIP[\"IPIP 封装\"]\n```\n\n#### 33.4 tunl0 设备详解\n\n##### 33.4.1 查看 tunl0 设备\n\n```bash\nip link show tunl0\n\n# 输出示例\ntunl0@NONE: <NOARP,UP,LOWER_UP> mtu 1480 qdisc noqueue state UNKNOWN\n    link/ipip 0.0.0.0 brd 0.0.0.0\n```\n\n| 属性 | 说明 |\n|:---|:---|\n| `NOARP` | 不处理 ARP（三层设备） |\n| `link/ipip` | IPIP 类型隧道 |\n| `mtu 1480` | MTU = 1500 - 20（IPIP 头） |\n\n##### 33.4.2 tunl0 配置\n\n```bash\nip -d link show tunl0\n\n# 输出示例\ntunl0@NONE: ...\n    ipip remote any local any ttl inherit nopmtudisc\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| `remote any` | 远端 IP 不固定（动态） |\n| `local any` | 本端 IP 不固定（使用默认路由出接口 IP） |\n| `ttl inherit` | TTL 继承自原始包 |\n\n> [!NOTE]\n> 当 `local` 和 `remote` 为 `any` 时，实际使用的 IP 由路由表决定：\n>\n> - **local**: 默认路由对应的接口 IP（如 eth0 的 IP）\n> - **remote**: 路由条目中指定的下一跳 IP\n\n#### 33.5 IPIP 封装原理\n\n##### 33.5.1 IP-in-IP 结构\n\n```mermaid\ngraph LR\n    subgraph \"IPIP 封装后\"\n        subgraph \"外层 IP 头\"\n            OuterIP[\"SRC: 172.18.0.4<br/>DST: 172.18.0.2<br/>Protocol: 4 (IPIP)\"]\n        end\n        subgraph \"内层 IP 头\"\n            InnerIP[\"SRC: 10.24.197.x<br/>DST: 10.24.79.x<br/>Protocol: ICMP\"]\n        end\n        subgraph \"Payload\"\n            Data[\"ICMP 数据\"]\n        end\n    end\n    \n    OuterIP --> InnerIP --> Data\n```\n\n| 字段 | 外层 IP | 内层 IP |\n|:---|:---|:---|\n| **Source IP** | 172.18.0.4（Node 1） | 10.24.197.x（Pod A） |\n| **Dest IP** | 172.18.0.2（Node 2） | 10.24.79.x（Pod B） |\n| **Protocol** | 4（IPIP） | 1（ICMP）等 |\n\n##### 33.5.2 协议号\n\n| 协议号 | 协议名 |\n|:---|:---|\n| 1 | ICMP |\n| 4 | IPIP |\n| 6 | TCP |\n| 17 | UDP |\n\n#### 33.6 抓包验证\n\n##### 33.6.1 在 tunl0 上抓包\n\n```bash\n# 在 tunl0 上抓包\ntcpdump -i tunl0 -nn -e\n\n# 输出示例\nIP 10.24.197.x > 10.24.79.x: ICMP echo request\n```\n\n> [!NOTE]\n> 在 tunl0 上抓包显示的是 **Raw IP**（裸 IP），没有 MAC 地址。\n> 这是因为 tunl0 是三层设备，不处理二层信息。\n\n##### 33.6.2 在 eth0 上抓包\n\n```bash\n# 过滤 IPIP 协议\ntcpdump -i eth0 -nn 'ip proto 4'\n\n# 输出示例\nIP 172.18.0.4 > 172.18.0.2: IP 10.24.197.x > 10.24.79.x: ICMP echo request\n```\n\n**抓包结果说明**：\n\n| 层次 | 源地址 | 目的地址 |\n|:---|:---|:---|\n| **外层 IP** | 172.18.0.4（Node 1） | 172.18.0.2（Node 2） |\n| **内层 IP** | 10.24.197.x（Pod A） | 10.24.79.x（Pod B） |\n\n##### 33.6.3 Wireshark 分析\n\n```bash\n# 导出抓包文件\ntcpdump -i eth0 -nn 'ip proto 4' -w ipip.pcap\n```\n\n在 Wireshark 中可以看到：\n\n```\nEthernet II\n  ├── IPv4 (外层): 172.18.0.4 -> 172.18.0.2, Protocol: IPIP (4)\n  │     └── IPv4 (内层): 10.24.197.x -> 10.24.79.x, Protocol: ICMP\n  │           └── ICMP: Echo request\n```\n\n#### 33.7 IPIP vs VXLAN\n\n```mermaid\ngraph TB\n    subgraph \"IPIP 封装 (20 字节开销)\"\n        IPIP_Outer[\"外层 IP 头<br/>20 bytes\"]\n        IPIP_Inner[\"内层 IP 头\"]\n        IPIP_Data[\"Payload\"]\n        IPIP_Outer --> IPIP_Inner --> IPIP_Data\n    end\n    \n    subgraph \"VXLAN 封装 (50 字节开销)\"\n        VXLAN_Outer[\"外层 IP 头<br/>20 bytes\"]\n        VXLAN_UDP[\"UDP 头<br/>8 bytes\"]\n        VXLAN_Header[\"VXLAN 头<br/>8 bytes\"]\n        VXLAN_Inner[\"内层 MAC<br/>14 bytes\"]\n        VXLAN_InnerIP[\"内层 IP 头\"]\n        VXLAN_Data[\"Payload\"]\n        VXLAN_Outer --> VXLAN_UDP --> VXLAN_Header --> VXLAN_Inner --> VXLAN_InnerIP --> VXLAN_Data\n    end\n```\n\n| 对比项 | IPIP | VXLAN |\n|:---|:---|:---|\n| **额外开销** | 20 字节 | 50 字节 |\n| **二层信息** | 无 | 有（内层 MAC） |\n| **VNI 隔离** | 无 | 有 |\n| **协议类型** | IP 协议 4 | UDP 端口 4789 |\n| **适用场景** | 简单隧道 | 多租户隔离 |\n\n#### 33.8 手工创建 IPIP 设备\n\n##### 33.8.1 创建 IPIP 隧道\n\n```bash\n# 在 Node 1 上创建\nip link add ipip0 type ipip local 172.18.0.4 remote 172.18.0.2\nip link set ipip0 up\nip addr add 1.1.1.1/24 dev ipip0\n\n# 在 Node 2 上创建\nip link add ipip0 type ipip local 172.18.0.2 remote 172.18.0.4\nip link set ipip0 up\nip addr add 1.1.1.2/24 dev ipip0\n```\n\n##### 33.8.2 验证\n\n```bash\n# 查看设备\nip -d link show ipip0\n\n# 输出示例\nipip0@NONE: <NOARP,UP,LOWER_UP> mtu 1480\n    link/ipip 172.18.0.4 peer 172.18.0.2\n\n# 测试连通性\nping 1.1.1.2\n```\n\n##### 33.8.3 与 Calico tunl0 对比\n\n| 对比项 | 手工创建 | Calico tunl0 |\n|:---|:---|:---|\n| **local/remote** | 指定固定 IP | any（动态） |\n| **路由** | 手动添加 | BIRD 自动注入 |\n| **管理** | 手动 | Felix 自动 |\n\n#### 33.9 kind 环境 MAC 地址规律\n\n> [!TIP]\n> 在 kind 创建的集群中，容器的 MAC 地址有规律：\n>\n> - 格式：`02:42:ac:xx:xx:xx`\n> - 最后一位与 IP 地址最后一位相同\n> - 例如：IP `172.18.0.4` 对应 MAC `02:42:ac:xx:xx:04`\n\n#### 33.10 章节小结\n\n```mermaid\nmindmap\n  root((IPIP 跨节点通信))\n    路由表\n      目标网段匹配\n      下一跳为对端节点 IP\n      出接口为 tunl0\n    tunl0 设备\n      NOARP 三层设备\n      local/remote any\n      MTU 1480\n    IPIP 封装\n      外层 IP 头 20 字节\n      协议号 4\n      无二层信息\n    抓包验证\n      tunl0 显示 Raw IP\n      eth0 过滤 ip proto 4\n      两层 IP 地址\n    对比 VXLAN\n      开销更小\n      无 VNI 隔离\n      无内层 MAC\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **IPIP 封装原理**：\n>    - IP-in-IP，在原始 IP 包外再封装一层 IP 头\n>    - 外层 IP：Node IP（local → remote）\n>    - 内层 IP：Pod IP（src → dst）\n>    - 协议号 4 表示 IPIP\n>\n> 2. **tunl0 设备**：\n>    - Calico 自动创建的 IPIP 隧道设备\n>    - `NOARP`：三层设备，不处理 ARP\n>    - `local any remote any`：动态选择 IP\n>    - MTU 1480（1500 - 20）\n>\n> 3. **路由决策**：\n>    - 目标 Pod 网段匹配对应路由\n>    - 下一跳为目标节点 IP\n>    - 出接口为 tunl0 触发 IPIP 封装\n>\n> 4. **抓包技巧**：\n>    - `tcpdump -i tunl0`：显示 Raw IP\n>    - `tcpdump -i eth0 'ip proto 4'`：过滤 IPIP 包\n>    - Wireshark 可看到两层 IP\n>\n> 5. **与 VXLAN 对比**：\n>    - IPIP 开销 20 字节 < VXLAN 50 字节\n>    - IPIP 无二层信息、无 VNI\n>    - IPIP 更简单，VXLAN 支持多租户\n\n---", "subs": ["33.1 背景与概述", "33.2 跨节点通信流程", "33.3 路由表分析", "33.4 tunl0 设备详解", "33.5 IPIP 封装原理", "33.6 抓包验证", "33.7 IPIP vs VXLAN", "33.8 手工创建 IPIP 设备", "33.9 kind 环境 MAC 地址规律", "33.10 章节小结"]}, {"title": "第三十四章 Calico-IPIP CrossSubnet 模式", "content": "本章详细讲解 Calico IPIP 的 CrossSubnet 模式，这是一种智能混合模式：**同网段节点间走纯路由**，**跨网段节点间走 IPIP 封装**，从而在性能和兼容性之间取得平衡。\n\n#### 34.1 背景与概述\n\n##### 34.1.1 什么是 CrossSubnet\n\n```mermaid\ngraph TB\n    subgraph \"子网 1: 10.1.5.0/24\"\n        Node1[\"Node 1<br/>10.1.5.10\"]\n        Node2[\"Node 2<br/>10.1.5.11\"]\n        SW1[\"交换机 br-pro0\"]\n    end\n    \n    subgraph \"子网 2: 10.1.8.0/24\"\n        Node3[\"Node 3<br/>10.1.8.10\"]\n        Node4[\"Node 4<br/>10.1.8.11\"]\n        SW2[\"交换机 br-pro1\"]\n    end\n    \n    GW[\"网关 Gateway<br/>eth1: 10.1.5.1<br/>eth2: 10.1.8.1\"]\n    \n    Node1 --- SW1\n    Node2 --- SW1\n    Node3 --- SW2\n    Node4 --- SW2\n    SW1 --- GW\n    SW2 --- GW\n    \n    Node1 -.->|\"同网段: 纯路由\"| Node2\n    Node1 ==>|\"跨网段: IPIP 封装\"| Node3\n```\n\n| 通信场景 | 模式 | 性能 |\n|:---|:---|:---|\n| **同网段节点** | 纯路由转发 | 高（无封装开销） |\n| **跨网段节点** | IPIP 封装 | 中（20 字节开销） |\n\n##### 34.1.2 三种 ipipMode 对比\n\n| ipipMode | 同网段 | 跨网段 | 适用场景 |\n|:---|:---|:---|:---|\n| **Never** | 路由 | 路由 | 底层网络支持 Pod IP 路由 |\n| **Always** | IPIP | IPIP | 所有场景都封装 |\n| **CrossSubnet** | 路由 | IPIP | 混合场景，性能优化 |\n\n#### 34.2 CrossSubnet 工作原理\n\n##### 34.2.1 决策流程\n\n```mermaid\nflowchart TD\n    Start[\"Pod A 发送数据包\"] --> Check[\"检查目标 Pod 所在节点\"]\n    Check --> Same{\"源节点与目标节点<br/>在同一子网？\"}\n    Same -->|\"是\"| Route[\"纯路由转发<br/>无 Overlay\"]\n    Same -->|\"否\"| IPIP[\"IPIP 封装<br/>通过 tunl0\"]\n    Route --> Dest[\"目标 Pod\"]\n    IPIP --> Dest\n```\n\n##### 34.2.2 路由表差异\n\n**同网段路由条目**：\n\n```bash\n# Node 1 (10.1.5.10) 到 Node 2 (10.1.5.11) 的 Pod 网段\n10.24.x.x/26 via 10.1.5.11 dev net0\n```\n\n**跨网段路由条目**：\n\n```bash\n# Node 1 (10.1.5.10) 到 Node 3 (10.1.8.10) 的 Pod 网段\n10.24.x.x/26 via 10.1.8.10 dev tunl0 onlink\n```\n\n| 关键差异 | 同网段 | 跨网段 |\n|:---|:---|:---|\n| **出接口** | `net0`（物理网卡） | `tunl0`（IPIP 隧道） |\n| **封装** | 无 | IPIP |\n| **下一跳可达性** | 直接可达 | `onlink`（不检查） |\n\n#### 34.3 配置 CrossSubnet 模式\n\n##### 34.3.1 IPPool 配置\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: IPPool\nmetadata:\n  name: default-ipv4-ippool\nspec:\n  cidr: 10.24.0.0/16\n  ipipMode: CrossSubnet    # 关键配置\n  vxlanMode: Never\n  natOutgoing: true\n  nodeSelector: all()\n```\n\n| 参数 | 值 | 说明 |\n|:---|:---|:---|\n| `ipipMode` | `CrossSubnet` | 跨网段时使用 IPIP |\n| `vxlanMode` | `Never` | 不使用 VXLAN |\n\n##### 34.3.2 修改现有 IPPool\n\n```bash\n# 查看当前配置\ncalicoctl get ippool default-ipv4-ippool -o yaml\n\n# 修改 ipipMode\ncalicoctl patch ippool default-ipv4-ippool -p '{\"spec\":{\"ipipMode\":\"CrossSubnet\"}}'\n```\n\n#### 34.4 ContainerLab 跨网段拓扑\n\n##### 34.4.1 拓扑架构\n\n```mermaid\ngraph TB\n    subgraph \"Kind 集群\"\n        subgraph \"子网 10.1.5.0/24\"\n            Control[\"control-plane<br/>10.1.5.10\"]\n            Worker1[\"worker<br/>10.1.5.11\"]\n        end\n        subgraph \"子网 10.1.8.0/24\"\n            Worker2[\"worker2<br/>10.1.8.10\"]\n            Worker3[\"worker3<br/>10.1.8.11\"]\n        end\n    end\n    \n    subgraph \"ContainerLab\"\n        BR0[\"br-pro0<br/>Linux Bridge\"]\n        BR1[\"br-pro1<br/>Linux Bridge\"]\n        GW[\"Gateway (VyOS)<br/>eth1: 10.1.5.1<br/>eth2: 10.1.8.1\"]\n    end\n    \n    Control --- BR0\n    Worker1 --- BR0\n    Worker2 --- BR1\n    Worker3 --- BR1\n    BR0 --- GW\n    BR1 --- GW\n```\n\n##### 34.4.2 Kind 集群配置\n\n```yaml\nkind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnodes:\n- role: control-plane\n  kubeadmConfigPatches:\n  - |\n    kind: InitConfiguration\n    nodeRegistration:\n      kubeletExtraArgs:\n        node-ip: 10.1.5.10\n- role: worker\n  kubeadmConfigPatches:\n  - |\n    kind: JoinConfiguration\n    nodeRegistration:\n      kubeletExtraArgs:\n        node-ip: 10.1.5.11\n- role: worker\n  kubeadmConfigPatches:\n  - |\n    kind: JoinConfiguration\n    nodeRegistration:\n      kubeletExtraArgs:\n        node-ip: 10.1.8.10\n- role: worker\n  kubeadmConfigPatches:\n  - |\n    kind: JoinConfiguration\n    nodeRegistration:\n      kubeletExtraArgs:\n        node-ip: 10.1.8.11\n```\n\n##### 34.4.3 网关配置要点\n\n网关需要配置 SNAT 以确保集群能访问外网：\n\n```bash\n# VyOS 网关配置\nset interfaces ethernet eth1 address '10.1.5.1/24'\nset interfaces ethernet eth2 address '10.1.8.1/24'\n\n# SNAT 配置\nset nat source rule 100 outbound-interface 'eth0'\nset nat source rule 100 source address '10.1.0.0/16'\nset nat source rule 100 translation address 'masquerade'\n```\n\n#### 34.5 通信验证\n\n##### 34.5.1 同网段通信（纯路由）\n\n```bash\n# 在 Node 1 (10.1.5.10) 上的 Pod 访问 Node 2 (10.1.5.11) 上的 Pod\n\n# 查看路由表\nip route | grep \"10.1.5.11\"\n# 10.24.x.x/26 via 10.1.5.11 dev net0  <- 出接口是 net0\n\n# 抓包验证\ntcpdump -i net0 -nn icmp\n```\n\n**抓包结果**：\n\n```\nIP 10.24.x.x > 10.24.y.y: ICMP echo request\n```\n\n> [!NOTE]\n> 同网段通信时，数据包是普通的 IP 包，**没有 IPIP 封装**。\n> MAC 地址会逐跳变化，IP 地址保持不变。\n\n##### 34.5.2 跨网段通信（IPIP 封装）\n\n```bash\n# 在 Node 1 (10.1.5.10) 上的 Pod 访问 Node 3 (10.1.8.10) 上的 Pod\n\n# 查看路由表\nip route | grep \"10.1.8.10\"\n# 10.24.x.x/26 via 10.1.8.10 dev tunl0 onlink  <- 出接口是 tunl0\n\n# 抓包验证\ntcpdump -i net0 -nn 'ip proto 4'\n```\n\n**抓包结果**：\n\n```\nIP 10.1.5.10 > 10.1.8.10: IP 10.24.x.x > 10.24.y.y: ICMP echo request\n```\n\n> [!NOTE]\n> 跨网段通信时，数据包有两层 IP：\n>\n> - **外层 IP**：10.1.5.10 → 10.1.8.10（Node IP）\n> - **内层 IP**：10.24.x.x → 10.24.y.y（Pod IP）\n\n#### 34.6 MAC 地址变化分析\n\n##### 34.6.1 跨网段通信的 MAC 地址\n\n```mermaid\nsequenceDiagram\n    participant Pod as Pod A\n    participant Node1 as Node 1 (10.1.5.10)\n    participant GW as Gateway\n    participant Node3 as Node 3 (10.1.8.10)\n    participant PodB as Pod B\n    \n    Pod->>Node1: IPIP 封装\n    Note over Node1: SRC MAC: Node1 net0<br/>DST MAC: 10.1.5.1 (GW)\n    Node1->>GW: 包发往网关\n    Note over GW: SRC MAC: GW eth1<br/>DST MAC: 10.1.8.10\n    GW->>Node3: 包发往 Node 3\n    Node3->>PodB: IPIP 解封装\n```\n\n**关键点**：\n\n1. **Node 1 发包时**：\n   - SRC MAC：Node 1 net0 的 MAC\n   - DST MAC：网关 10.1.5.1 的 MAC（因为 10.1.8.10 不在同网段）\n\n2. **网关转发时**：\n   - SRC MAC：网关 eth2 的 MAC\n   - DST MAC：Node 3 net0 的 MAC\n\n3. **IP 地址不变**：外层 IP 始终是 10.1.5.10 → 10.1.8.10\n\n##### 34.6.2 为什么 ARP 表没有对端 IP\n\n```bash\n# 在 Node 1 上查看 ARP 表\narp -n | grep 10.1.8.10\n# 无结果！\n```\n\n**原因**：Node 1 (10.1.5.10) 和 Node 3 (10.1.8.10) 不在同一子网，无法直接 ARP 解析。\n\n实际过程：\n\n1. Node 1 查路由，发现 10.1.8.10 的下一跳是网关 10.1.5.1\n2. Node 1 ARP 解析 10.1.5.1 的 MAC\n3. 数据包发给网关，由网关负责后续转发\n\n#### 34.7 Always vs CrossSubnet\n\n```mermaid\ngraph LR\n    subgraph \"Always 模式\"\n        A1[\"Node 1\"] -->|\"IPIP\"| A2[\"Node 2\"]\n        A1 -->|\"IPIP\"| A3[\"Node 3\"]\n    end\n    \n    subgraph \"CrossSubnet 模式\"\n        C1[\"Node 1\"] -->|\"路由\"| C2[\"Node 2 (同网段)\"]\n        C1 -->|\"IPIP\"| C3[\"Node 3 (跨网段)\"]\n    end\n```\n\n| 对比项 | Always | CrossSubnet |\n|:---|:---|:---|\n| **同网段开销** | 20 字节 | 0 字节 |\n| **跨网段开销** | 20 字节 | 20 字节 |\n| **配置复杂度** | 低 | 中 |\n| **适用场景** | 简单环境 | 大规模混合环境 |\n| **性能** | 一般 | 同网段更优 |\n\n#### 34.8 章节小结\n\n```mermaid\nmindmap\n  root((IPIP CrossSubnet))\n    模式原理\n      同网段走路由\n      跨网段走 IPIP\n      智能判断子网\n    配置方式\n      ipipMode: CrossSubnet\n      IPPool 资源配置\n    路由表特征\n      同网段: dev net0\n      跨网段: dev tunl0 onlink\n    抓包验证\n      同网段: 普通 IP 包\n      跨网段: 两层 IP\n      过滤: ip proto 4\n    MAC 地址\n      跨网段先发给网关\n      逐跳 MAC 变化\n      IP 地址不变\n```\n\n> [!IMPORTANT]\n> **核心要点总结**：\n>\n> 1. **CrossSubnet 模式**：\n>    - 同网段节点：纯路由转发，无封装开销\n>    - 跨网段节点：IPIP 封装，20 字节开销\n>    - 配置：`ipipMode: CrossSubnet`\n>\n> 2. **路由表识别**：\n>    - 同网段：`dev net0`（物理网卡）\n>    - 跨网段：`dev tunl0 onlink`（隧道设备）\n>\n> 3. **抓包验证**：\n>    - 同网段：`tcpdump -i net0 icmp`\n>    - 跨网段：`tcpdump -i net0 'ip proto 4'`\n>\n> 4. **MAC 地址规律**：\n>    - 跨网段时，DST MAC 是**网关的 MAC**\n>    - ARP 表中不会有对端节点的 MAC\n>    - 每一跳 MAC 变化，IP 不变\n>\n> 5. **适用场景**：\n>    - 大规模集群，节点分布在多个子网\n>    - 同机房节点走高速路由\n>    - 跨机房节点走 IPIP 穿透\n\n---", "subs": ["34.1 背景与概述", "34.2 CrossSubnet 工作原理", "34.3 配置 CrossSubnet 模式", "34.4 ContainerLab 跨网段拓扑", "34.5 通信验证", "34.6 MAC 地址变化分析", "34.7 Always vs CrossSubnet", "34.8 章节小结"]}, {"title": "第三十五章 Calico-IPIP 手工实践", "content": "本章通过手工创建 IPIP 隧道设备，深入理解 IPIP 封装的底层原理。同时介绍 SBR（Source-Based Routing）策略路由的概念，为理解复杂网络场景打下基础。\n\n#### 35.1 背景与目标\n\n##### 35.1.1 为什么要手工实践\n\n手工创建 IPIP 隧道的目的：\n\n1. **加深理解**：通过亲手操作，理解 Calico 自动创建 `tunl0` 设备的底层机制\n2. **排障能力**：掌握 IPIP 设备的配置方式，便于问题排查\n3. **扩展思维**：理解如何将 Pod 流量引导至 Overlay 设备\n\n##### 35.1.2 实验拓扑\n\n```mermaid\ngraph LR\n    subgraph \"Node 1 (172.18.0.4)\"\n        IPIP1[\"ipip0<br/>1.1.1.1/24\"]\n    end\n    \n    subgraph \"Node 2 (172.18.0.2)\"\n        IPIP2[\"ipip0<br/>1.1.2.1/24\"]\n    end\n    \n    IPIP1 <-->|\"IPIP Tunnel<br/>Outer: 172.18.0.x\"| IPIP2\n```\n\n| 节点 | 物理 IP | IPIP 接口地址 | Local | Remote |\n|:---|:---|:---|:---|:---|\n| Node 1 | 172.18.0.4 | 1.1.1.1/24 | 172.18.0.4 | 172.18.0.2 |\n| Node 2 | 172.18.0.2 | 1.1.2.1/24 | 172.18.0.2 | 172.18.0.4 |\n\n#### 35.2 手工创建 IPIP 隧道\n\n##### 35.2.1 Node 1 配置\n\n```bash\n# 1. 创建 IPIP 设备\nip link add ipip0 type ipip local 172.18.0.4 remote 172.18.0.2\n\n# 2. 启用接口\nip link set ipip0 up\n\n# 3. 配置隧道内部地址\nip addr add 1.1.1.1/24 dev ipip0\n\n# 4. 添加到对端网段的路由\nip route add 1.1.2.0/24 dev ipip0\n```\n\n##### 35.2.2 Node 2 配置\n\n```bash\n# 1. 创建 IPIP 设备（local/remote 互换）\nip link add ipip0 type ipip local 172.18.0.2 remote 172.18.0.4\n\n# 2. 启用接口\nip link set ipip0 up\n\n# 3. 配置隧道内部地址\nip addr add 1.1.2.1/24 dev ipip0\n\n# 4. 添加到对端网段的路由\nip route add 1.1.1.0/24 dev ipip0\n```\n\n##### 35.2.3 配置命令详解\n\n| 参数 | 说明 | 示例 |\n|:---|:---|:---|\n| `type ipip` | 设备类型为 IPIP | - |\n| `local` | 本端物理 IP | 172.18.0.4 |\n| `remote` | 对端物理 IP | 172.18.0.2 |\n| 隧道地址 | 隧道内部通信地址 | 1.1.1.1/24 |\n| 路由 | 指向对端隧道网段 | 1.1.2.0/24 |\n\n#### 35.3 验证与抓包\n\n##### 35.3.1 连通性测试\n\n```bash\n# 在 Node 1 上 ping Node 2 的隧道地址\nping -I 1.1.1.1 1.1.2.1\n```\n\n##### 35.3.2 抓包验证\n\n```bash\n# 在 Node 1 的物理网卡上抓包\ntcpdump -i eth0 -nn 'ip proto 4'\n```\n\n**抓包结果**：\n\n```\nIP 172.18.0.4 > 172.18.0.2: IP 1.1.1.1 > 1.1.2.1: ICMP echo request\nIP 172.18.0.2 > 172.18.0.4: IP 1.1.2.1 > 1.1.1.1: ICMP echo reply\n```\n\n```mermaid\ngraph LR\n    subgraph \"IPIP 封装包结构\"\n        Outer[\"外层 IP<br/>SRC: 172.18.0.4<br/>DST: 172.18.0.2<br/>Protocol: 4\"]\n        Inner[\"内层 IP<br/>SRC: 1.1.1.1<br/>DST: 1.1.2.1\"]\n        Payload[\"ICMP Data\"]\n    end\n    Outer --> Inner --> Payload\n```\n\n##### 35.3.3 查看设备信息\n\n```bash\n# 查看 IPIP 设备详情\nip -d link show ipip0\n\n# 输出示例\n# ipip0@NONE: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1480 ...\n#     link/ipip 172.18.0.4 peer 172.18.0.2\n```\n\n| 属性 | 含义 |\n|:---|:---|\n| `link/ipip` | 设备类型为 IPIP |\n| `172.18.0.4 peer 172.18.0.2` | Local 和 Remote IP |\n| `mtu 1480` | MTU = 1500 - 20 (IPIP Header) |\n| `NOARP` | 三层设备，无 ARP |\n\n#### 35.4 IPIP vs VXLAN 配置对比\n\n```mermaid\ngraph TB\n    subgraph \"IPIP 配置\"\n        I1[\"ip link add ipip0 type ipip\"]\n        I2[\"local/remote\"]\n        I3[\"完成！\"]\n        I1 --> I2 --> I3\n    end\n    \n    subgraph \"VXLAN 配置\"\n        V1[\"ip link add vxlan0 type vxlan\"]\n        V2[\"id (VNI)\"]\n        V3[\"dstport 4789\"]\n        V4[\"local/remote\"]\n        V5[\"FDB 表\"]\n        V6[\"完成！\"]\n        V1 --> V2 --> V3 --> V4 --> V5 --> V6\n    end\n```\n\n| 对比项 | IPIP | VXLAN |\n|:---|:---|:---|\n| **配置复杂度** | 简单 | 较复杂 |\n| **VNI** | 无 | 需要 |\n| **端口** | 无 | 4789/8472 |\n| **FDB 表** | 无 | 需要 |\n| **封装开销** | 20 字节 | 50 字节 |\n| **多租户** | 不支持 | 支持 |\n\n#### 35.5 生产环境扩展思考\n\n##### 35.5.1 Pod 流量如何到达 IPIP 设备\n\n在实际生产环境中，Pod 的流量需要被引导到 IPIP 设备进行封装：\n\n```mermaid\nflowchart LR\n    Pod[\"Pod<br/>(Network NS)\"]\n    VethPod[\"veth (Pod 端)\"]\n    VethHost[\"veth (Host 端)\"]\n    Route[\"路由表\"]\n    IPIP[\"IPIP 设备\"]\n    Physical[\"物理网卡\"]\n    \n    Pod --> VethPod\n    VethPod --> VethHost\n    VethHost --> Route\n    Route -->|\"目标 Pod CIDR\"| IPIP\n    IPIP -->|\"封装\"| Physical\n```\n\n**关键步骤**：\n\n1. **Pod 到 Host**：通过 veth pair + Proxy ARP\n2. **Host 到 IPIP**：通过路由表（Calico 自动注入）\n3. **IPIP 封装**：设备自动封装外层 IP\n\n##### 35.5.2 Calico 的自动化\n\nCalico 自动完成的工作：\n\n- 创建 `tunl0` 设备（`remote any local any`）\n- 通过 BGP 学习其他节点的 Pod CIDR\n- 注入路由：`10.24.x.x/26 via <Node IP> dev tunl0 onlink`\n- 根据 `ipipMode` 决定是否走隧道\n\n#### 35.6 SBR (Source-Based Routing) 策略路由\n\n##### 35.6.1 什么是 SBR\n\n传统路由基于**目的地址 (DST)**，而 SBR 基于**源地址 (SRC)**：\n\n```mermaid\ngraph TB\n    subgraph \"传统路由 (DST-Based)\"\n        D1[\"查目的 IP\"] --> D2[\"查路由表\"] --> D3[\"转发\"]\n    end\n    \n    subgraph \"策略路由 (SRC-Based)\"\n        S1[\"查源 IP\"] --> S2[\"匹配 Rule\"] --> S3[\"选择路由表\"] --> S4[\"转发\"]\n    end\n```\n\n##### 35.6.2 SBR 配置示例\n\n```bash\n# 创建策略路由规则\nip rule add from 192.168.1.0/24 table 100\n\n# 在表 100 中添加默认路由\nip route add default via 10.0.0.1 table 100\n\n# 查看规则\nip rule show\n```\n\n**输出示例**：\n\n```\n0:      from all lookup local\n32765:  from 192.168.1.0/24 lookup 100\n32766:  from all lookup main\n32767:  from all lookup default\n```\n\n##### 35.6.3 SBR 应用场景\n\n| 场景 | 说明 |\n|:---|:---|\n| **多网卡 (Multi-Homing)** | 不同网卡的流量走不同出口 |\n| **Cilium CNI** | 使用 SBR 实现复杂策略 |\n| **VPN 分流** | 特定源走 VPN 隧道 |\n| **多 ISP** | 根据源选择出口 |\n\n##### 35.6.4 多网卡场景的回程路由问题\n\n```mermaid\nsequenceDiagram\n    participant Client as 客户端\n    participant eth0 as eth0 (192.168.1.10)\n    participant eth1 as eth1 (10.0.0.10)\n    \n    Note over Client,eth1: 请求从 eth0 进来\n    Client->>eth0: 请求 192.168.1.10\n    \n    Note over eth0,eth1: 没有 SBR 时，可能从 eth1 回复\n    eth1--xClient: 回复可能走错接口！\n    \n    Note over eth0,eth1: 有 SBR 时，确保从 eth0 回复\n    eth0->>Client: 回复走正确接口 ✓\n```\n\n**问题**：没有 SBR 时，回复包可能从错误的接口发出\n\n**解决**：为每个接口配置 SBR，确保回程路径正确\n\n#### 35.7 CNI 网络实现套路总结\n\n```mermaid\nmindmap\n  root((CNI 网络套路))\n    设备创建\n      veth pair\n      bridge\n      ipip/vxlan\n      tun/tap\n    流量引导\n      路由表 DST\n      策略路由 SBR\n      iptables/nftables\n      eBPF\n    封装方式\n      IPIP\n      VXLAN\n      GRE\n      Geneve\n      WireGuard\n    路由协议\n      BGP\n      OSPF\n      静态路由\n    网关机制\n      Proxy ARP\n      Bridge\n      L3 Routing\n```\n\n> [!IMPORTANT]\n> **核心套路**：\n>\n> 1. **创建设备**：赋予封装能力（IPIP/VXLAN/GRE）\n> 2. **引导流量**：通过路由表将流量导向设备\n> 3. **封装转发**：设备自动封装 Overlay 包\n> 4. **对端解封**：对端设备解封装后路由到目标\n\n#### 35.8 章节小结\n\n```mermaid\nmindmap\n  root((IPIP 手工实践))\n    创建设备\n      ip link add type ipip\n      local/remote 参数\n      MTU 自动 1480\n    配置流程\n      创建设备\n      启用接口\n      配置地址\n      添加路由\n    抓包验证\n      ip proto 4\n      两层 IP 头\n    对比 VXLAN\n      IPIP 更简单\n      无 VNI/Port/FDB\n    SBR 策略路由\n      基于源地址\n      多网卡场景\n      回程路由问题\n```\n\n> [!TIP]\n> **实践要点总结**：\n>\n> 1. **IPIP 设备创建**：\n>\n>    ```bash\n>    ip link add ipip0 type ipip local <本端IP> remote <对端IP>\n>    ```\n>\n> 2. **三步配置**：\n>    - 启用接口：`ip link set ipip0 up`\n>    - 配置地址：`ip addr add x.x.x.x/24 dev ipip0`\n>    - 添加路由：`ip route add <对端网段> dev ipip0`\n>\n> 3. **抓包验证**：`tcpdump -i eth0 'ip proto 4'`\n>\n> 4. **生产扩展**：\n>    - Pod → veth → 路由表 → IPIP 设备\n>    - Calico 自动完成设备创建和路由注入\n>\n> 5. **SBR 策略路由**：\n>    - 基于源地址选择路由表\n>    - 解决多网卡回程路由问题\n>    - Cilium 中有广泛应用\n\n---", "subs": ["35.1 背景与目标", "35.2 手工创建 IPIP 隧道", "35.3 验证与抓包", "35.4 IPIP vs VXLAN 配置对比", "35.5 生产环境扩展思考", "35.6 SBR (Source-Based Routing) 策略路由", "35.7 CNI 网络实现套路总结", "35.8 章节小结"]}, {"title": "第三十六章 Calico-VxLAN 模式", "content": "本章介绍 Calico 的 VxLAN 封装模式，重点讲解 FDB（Forwarding Database）表机制以及与 IPIP 模式的区别。\n\n#### 36.1 背景与概述\n\n##### 36.1.1 VxLAN vs IPIP\n\n| 对比项 | IPIP | VxLAN |\n|:---|:---|:---|\n| **封装层级** | Layer 3 (IP-in-IP) | Layer 2 over Layer 3 |\n| **协议号** | IP Protocol 4 | UDP 4789 |\n| **封装开销** | 20 字节 | 50 字节 |\n| **BGP 依赖** | 需要（bird 组件） | 不需要 |\n| **FDB 表** | 不需要 | 需要 |\n| **多租户** | 不支持 | 支持（VNI） |\n| **防火墙友好** | 可能被阻挡 | UDP 更易穿透 |\n\n##### 36.1.2 何时选择 VxLAN\n\n- **网络限制**：底层网络不支持 IP Protocol 4\n- **防火墙穿透**：UDP 端口更易开放\n- **无 BGP 需求**：不想维护 BGP 组件\n- **大二层网络**：需要二层可达的场景\n\n#### 36.2 VxLAN 模式配置\n\n##### 36.2.1 IPPool 配置\n\n```yaml\napiVersion: crd.projectcalico.org/v1\nkind: IPPool\nmetadata:\n  name: default-pool\nspec:\n  cidr: 10.244.0.0/16\n  ipipMode: Never          # 禁用 IPIP\n  vxlanMode: Always        # 启用 VxLAN\n  natOutgoing: true\n```\n\n> [!IMPORTANT]\n> **关键配置**：\n>\n> - `ipipMode` 和 `vxlanMode` 只能选一个\n> - VxLAN 模式下需禁用 bird 相关组件\n\n##### 36.2.2 禁用 BGP/bird 组件\n\nVxLAN 模式不依赖 BGP，需要修改 Calico 部署配置：\n\n```yaml\n# calico-node DaemonSet 中\nenv:\n  - name: CALICO_NETWORKING_BACKEND\n    value: \"vxlan\"  # 原来是 \"bird\"\n\n# 移除或注释 bird 相关探针\nlivenessProbe:\n  exec:\n    command:\n      # - /bin/calico-node\n      # - -bird-live\nreadinessProbe:\n  exec:\n    command:\n      # - /bin/calico-node  \n      # - -bird-ready\n```\n\n##### 36.2.3 网卡自动检测（Auto-Detect）\n\n多网卡环境需指定业务网卡：\n\n```yaml\nenv:\n  - name: IP_AUTODETECTION_METHOD\n    value: \"interface=eth1\"  # 指定网卡\n    # 或使用 CIDR\n    # value: \"cidr=10.1.0.0/16\"\n```\n\n**检测方法**：\n\n| 方法 | 示例 | 说明 |\n|:---|:---|:---|\n| `first-found` | 默认 | 自动选择默认路由网卡 |\n| `interface=` | `eth1` | 指定网卡名 |\n| `cidr=` | `10.1.0.0/16` | 匹配 CIDR |\n| `can-reach=` | `8.8.8.8` | 能到达的地址 |\n\n#### 36.3 MTU 配置\n\n##### 36.3.1 不同模式的 MTU\n\n```mermaid\ngraph LR\n    subgraph \"物理网卡 MTU 1500\"\n        IPIP[\"IPIP<br/>MTU 1480<br/>(-20 字节)\"]\n        VxLAN[\"VxLAN<br/>MTU 1450<br/>(-50 字节)\"]\n        WG[\"WireGuard<br/>MTU 1440<br/>(-60 字节)\"]\n    end\n```\n\n| 模式 | MTU 计算 | 结果 |\n|:---|:---|:---|\n| IPIP | 1500 - 20 | 1480 |\n| VxLAN | 1500 - 50 | 1450 |\n| WireGuard + VxLAN | 1500 - 60 | 1440 |\n| IPv6 + VxLAN | 1500 - 70 | 1430 |\n\n##### 36.3.2 巨型帧环境\n\n数据中心常用 9000 MTU 巨型帧：\n\n```bash\n# 通过 calicoctl 修改 MTU\ncalicoctl patch felixconfiguration default \\\n  --patch='{\"spec\": {\"mtu\": 8981}}'\n\n# 验证\nip -d link show vxlan.calico\n# mtu 8950 ...\n```\n\n#### 36.4 VxLAN 设备与 FDB 表\n\n##### 36.4.1 vxlan.calico 设备\n\n```bash\n# 查看 VxLAN 设备\nip -d link show vxlan.calico\n\n# 输出示例\n# vxlan.calico: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 ...\n#     link/ether 66:c0:d0:7a:17:07 brd ff:ff:ff:ff:ff:ff\n#     vxlan id 4096 local 172.18.0.3 dev eth0 srcport 0 0 dstport 4789 ...\n```\n\n| 属性 | 含义 |\n|:---|:---|\n| `vxlan id 4096` | VNI (VxLAN Network Identifier) |\n| `local 172.18.0.3` | 本端 VTEP IP |\n| `dstport 4789` | VxLAN UDP 端口 |\n| `mtu 1450` | 1500 - 50 |\n\n##### 36.4.2 FDB 表详解\n\n**FDB (Forwarding Database)** 是 VxLAN 的核心机制，用于解决 **外层目的 IP** 的问题：\n\n```mermaid\nflowchart TB\n    subgraph \"路由表\"\n        Route[\"10.244.17.64/26 via 10.244.17.64<br/>dev vxlan.calico onlink\"]\n    end\n    \n    subgraph \"ARP 表\"\n        ARP[\"10.244.17.64 -> 66:c0:d0:7a:xx:xx\"]\n    end\n    \n    subgraph \"FDB 表\"\n        FDB[\"66:c0:d0:7a:xx:xx -> 172.18.0.4<br/>(outer dst IP)\"]\n    end\n    \n    Route --> ARP --> FDB\n    FDB -->|\"封装外层 IP\"| VxLAN[\"VxLAN 封装\"]\n```\n\n**查看 FDB 表**：\n\n```bash\n# 方法 1: bridge fdb show\nbridge fdb show dev vxlan.calico | grep -v permanent\n\n# 方法 2: ip monitor 观察动态添加\nip monitor all\n\n# 输出示例\n# 66:c0:d0:7a:17:07 dev vxlan.calico dst 172.18.0.4 self permanent\n```\n\n##### 36.4.3 FDB 表的核心含义\n\n```mermaid\ngraph LR\n    MAC[\"MAC 地址<br/>66:c0:d0:7a:xx:xx\"] -->|\"belongs to\"| Host[\"Host IP<br/>172.18.0.4\"]\n    \n    subgraph \"VxLAN 封装\"\n        Inner[\"内层 DST MAC\"]\n        Outer[\"外层 DST IP\"]\n    end\n    \n    MAC --> Inner\n    Host --> Outer\n```\n\n> [!IMPORTANT]\n> **FDB 表的作用**：\n>\n> 1. **回答问题**：这个 MAC 地址属于哪个主机？\n> 2. **解决问题**：VxLAN 封装时，外层 DST IP 用谁？\n> 3. **自动学习**：类似 ARP，系统自动维护\n\n**两层理解**：\n\n1. **深层理解**：FDB 表示 MAC 地址与主机的映射，该 MAC 不一定是主机物理网卡的 MAC，只要在该主机的任意网卡上存在即可\n2. **简单理解**：FDB 是自动维护的，可通过 `ip monitor all` 观察添加过程\n\n#### 36.5 VxLAN 包封装分析\n\n##### 36.5.1 完整封装结构\n\n```mermaid\ngraph LR\n    subgraph \"外层 Ethernet\"\n        OMac[\"Outer MAC<br/>SRC: Node1 eth0<br/>DST: Node2 eth0\"]\n    end\n    \n    subgraph \"外层 IP\"\n        OIP[\"Outer IP<br/>SRC: 172.18.0.3<br/>DST: 172.18.0.4\"]\n    end\n    \n    subgraph \"UDP\"\n        UDP[\"UDP<br/>SRC: random<br/>DST: 4789\"]\n    end\n    \n    subgraph \"VxLAN Header\"\n        VH[\"VNI: 4096\"]\n    end\n    \n    subgraph \"内层 Ethernet\"\n        IMac[\"Inner MAC<br/>SRC: vxlan.calico local<br/>DST: vxlan.calico remote\"]\n    end\n    \n    subgraph \"内层 IP\"\n        IIP[\"Inner IP<br/>SRC: Pod1 IP<br/>DST: Pod2 IP\"]\n    end\n    \n    OMac --> OIP --> UDP --> VH --> IMac --> IIP\n```\n\n##### 36.5.2 内层 MAC 地址变化\n\n```mermaid\nsequenceDiagram\n    participant Pod as Pod (10.244.1.69)\n    participant Veth as veth (Host 端)\n    participant Route as 路由表\n    participant VxLAN as vxlan.calico\n    participant Eth as eth0\n    \n    Pod->>Veth: SRC MAC: Pod MAC<br/>DST MAC: 网关 MAC (ee:ee:ee...)\n    Veth->>Route: 查路由表\n    Route->>VxLAN: 下一跳: 10.244.17.64<br/>dev vxlan.calico\n    Note over VxLAN: MAC 地址重写！\n    VxLAN->>Eth: Inner SRC MAC: 本地 vxlan.calico MAC<br/>Inner DST MAC: 远端 vxlan.calico MAC\n```\n\n> [!WARNING]\n> **关键点**：内层 MAC 地址不是原始 Pod 的 MAC！\n>\n> - **Inner SRC MAC**：本地 `vxlan.calico` 接口的 MAC\n> - **Inner DST MAC**：远端 `vxlan.calico` 接口的 MAC（通过 ARP 表获取）\n\n##### 36.5.3 抓包验证\n\n```bash\n# 在 eth0 上抓 VxLAN 包\ntcpdump -i eth0 -nn udp port 4789 -w vxlan.pcap\n\n# 或直接查看\ntcpdump -i eth0 -nn -e udp port 4789\n\n# 输出示例\n# 02:42:ac:12:00:03 > 02:42:ac:12:00:04, IP 172.18.0.3.random > 172.18.0.4.4789: VXLAN...\n#   66:c0:d0:xx > 66:c0:d0:yy, IP 10.244.1.69 > 10.244.17.65: ICMP...\n```\n\n#### 36.6 VxLAN vs IPIP 路由表对比\n\n```bash\n# IPIP 模式\n10.244.17.64/26 via 172.18.0.4 dev tunl0 proto bird onlink\n\n# VxLAN 模式  \n10.244.17.64/26 via 10.244.17.64 dev vxlan.calico onlink\n```\n\n| 对比项 | IPIP | VxLAN |\n|:---|:---|:---|\n| **下一跳** | 物理节点 IP | Pod CIDR 网关 |\n| **设备** | tunl0 | vxlan.calico |\n| **extern IP 来源** | 路由表直接给出 | FDB 表查询 |\n| **proto** | bird (BGP) | 无 |\n\n#### 36.7 同节点通信\n\nVxLAN 模式下，**同节点 Pod 通信与 IPIP 模式完全相同**：\n\n```mermaid\nflowchart LR\n    Pod1[\"Pod1\"] --> Veth1[\"veth\"]\n    Veth1 --> Route[\"路由表\"]\n    Route -->|\"目的 Pod 在本机\"| Veth2[\"veth\"]\n    Veth2 --> Pod2[\"Pod2\"]\n```\n\n- 无 VxLAN 封装\n- 纯三层路由 + Proxy ARP\n\n#### 36.8 章节小结\n\n```mermaid\nmindmap\n  root((Calico VxLAN 模式))\n    配置\n      vxlanMode Always\n      ipipMode Never\n      禁用 bird\n    FDB 表\n      MAC to Host IP\n      自动学习\n      bridge fdb show\n    封装\n      50 字节开销\n      UDP 4789\n      VNI 4096\n    内层 MAC\n      不是 Pod MAC\n      vxlan.calico MAC\n    MTU\n      1500 - 50 = 1450\n      巨型帧 9000\n```\n\n> [!TIP]\n> **VxLAN 模式要点总结**：\n>\n> 1. **配置**：\n>    - `vxlanMode: Always`，`ipipMode: Never`\n>    - 需禁用 bird 相关组件\n>\n> 2. **FDB 表核心**：\n>    - 解决：外层 DST IP 用谁？\n>    - 查询：`bridge fdb show dev vxlan.calico`\n>    - 机制：MAC 地址 → 主机 IP\n>\n> 3. **内层 MAC 变化**：\n>    - 不是原始 Pod MAC\n>    - SRC: 本地 `vxlan.calico` MAC\n>    - DST: 远端 `vxlan.calico` MAC\n>\n> 4. **抓包**：`tcpdump -i eth0 udp port 4789`\n>\n> 5. **MTU**：1500 - 50 = 1450\n\n---", "subs": ["36.1 背景与概述", "36.2 VxLAN 模式配置", "36.3 MTU 配置", "36.4 VxLAN 设备与 FDB 表", "36.5 VxLAN 包封装分析", "36.6 VxLAN vs IPIP 路由表对比", "36.7 同节点通信", "36.8 章节小结"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

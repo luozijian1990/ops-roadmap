@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 容器网络学习笔记 · 第七册：Multus 与 IPAM · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 容器网络学习笔记 · 第七册：Multus 与 IPAM</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 容器网络学习笔记 · 第七册：Multus 与 IPAM", "intro": "", "parts": [{"title": "Multus 与 IPAM", "sections": [{"title": "第五十二章 Multus 多网卡方案", "content": "本章深入讲解 Multus CNI 多网卡方案，包括核心架构、组件体系、NetworkAttachmentDefinition 配置、Pod 注解使用方式，以及典型应用场景。\n\n#### 52.1 背景与概述\n\n##### 52.1.1 为什么需要多网卡\n\n传统 Pod 只有一个网卡（eth0），在以下场景存在局限：\n\n```mermaid\ngraph TB\n    subgraph \"单网卡限制\"\n        A[\"所有流量混合\"] --> B[\"控制面 + 数据面\"]\n        B --> C[\"无法隔离\"]\n        C --> D[\"性能瓶颈\"]\n    end\n```\n\n**多网卡需求场景**：\n\n| 场景 | 说明 |\n|:---|:---|\n| 转控分离 | 控制平面和数据平面使用不同网卡 |\n| 高性能网络 | SR-IOV/DPDK 直通网卡 |\n| 多租户隔离 | 不同业务使用不同网络 |\n| 电信/金融 | NFV、流媒体处理 |\n\n##### 52.1.2 Multus 定位\n\n```mermaid\ngraph TB\n    subgraph \"Multus CNI 架构\"\n        Pod[\"Pod\"]\n        eth0[\"eth0<br/>默认 CNI\"]\n        eth1[\"net1<br/>IPVLAN\"]\n        eth2[\"net2<br/>MACVLAN\"]\n        eth3[\"net3<br/>SR-IOV\"]\n        \n        Pod --> eth0\n        Pod --> eth1\n        Pod --> eth2\n        Pod --> eth3\n    end\n    \n    Calico[\"Calico/Flannel\"] --> eth0\n    Multus[\"Multus CNI\"] --> eth1\n    Multus --> eth2\n    Multus --> eth3\n```\n\n> [!IMPORTANT]\n> **Multus 核心功能**\n>\n> Multus CNI 是一个 **Meta CNI**，不直接提供网络功能，而是协调多个 CNI 插件为 Pod 添加多张网卡。\n\n#### 52.2 核心组件\n\n##### 52.2.1 组件架构\n\n```mermaid\nflowchart TB\n    subgraph \"k8s-network-plumbing-wg 项目\"\n        Multus[\"Multus CNI<br/>多网卡编排\"]\n        SRIOV_DP[\"SR-IOV Device Plugin<br/>VF 资源管理\"]\n        SRIOV_CNI[\"SR-IOV CNI<br/>网络通路搭建\"]\n        WhereAbouts[\"WhereAbouts<br/>集群级 IPAM\"]\n    end\n    \n    Multus --> |\"调用\"| SRIOV_CNI\n    Multus --> |\"调用\"| MACVlan[\"macvlan/ipvlan\"]\n    SRIOV_DP --> |\"分配 VF\"| Pod\n    WhereAbouts --> |\"分配 IP\"| Pod\n```\n\n##### 52.2.2 组件职责\n\n| 组件 | 职责 | 说明 |\n|:---|:---|:---|\n| **Multus CNI** | 多网卡编排 | Meta CNI，协调多个 CNI 插件 |\n| **SR-IOV Device Plugin** | VF 资源管理 | 发现和通告 VF/PF 资源 |\n| **SR-IOV CNI** | 网络通路搭建 | 构建 SR-IOV 网络连接 |\n| **WhereAbouts** | 集群级 IPAM | 跨节点 IP 地址管理 |\n\n##### 52.2.3 SR-IOV 概念\n\n```mermaid\ngraph TB\n    subgraph \"物理网卡\"\n        PF[\"PF (Physical Function)<br/>物理功能<br/>真实网口\"]\n        VF1[\"VF0\"]\n        VF2[\"VF1\"]\n        VF3[\"VF2\"]\n        VFn[\"VF...\"]\n    end\n    \n    PF --> VF1\n    PF --> VF2\n    PF --> VF3\n    PF --> VFn\n    \n    VF1 --> Pod1[\"Pod 1\"]\n    VF2 --> Pod2[\"Pod 2\"]\n    VF3 --> Pod3[\"Pod 3\"]\n```\n\n| 术语 | 全称 | 说明 |\n|:---|:---|:---|\n| PF | Physical Function | 物理网卡功能 |\n| VF | Virtual Function | 虚拟化子网卡 |\n\n#### 52.3 NetworkAttachmentDefinition\n\n##### 52.3.1 NAD 概念\n\nNetworkAttachmentDefinition（NAD）是 Multus 的核心 CRD：\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: macvlan-conf\n  namespace: default\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"type\": \"macvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"bridge\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"192.168.1.0/24\"\n    }\n  }'\n```\n\n##### 52.3.2 NAD 结构解析\n\n```mermaid\nflowchart LR\n    subgraph \"NetworkAttachmentDefinition\"\n        A[\"metadata.name<br/>网络名称\"]\n        B[\"spec.config<br/>CNI 配置\"]\n    end\n    \n    subgraph \"CNI 配置内容\"\n        C[\"type<br/>CNI 类型\"]\n        D[\"master<br/>父接口\"]\n        E[\"mode<br/>模式\"]\n        F[\"ipam<br/>IP 分配\"]\n    end\n    \n    B --> C\n    B --> D\n    B --> E\n    B --> F\n```\n\n#### 52.4 Pod 多网卡配置\n\n##### 52.4.1 注解方式\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: multi-net-pod\n  annotations:\n    k8s.v1.cni.cncf.io/networks: macvlan-conf\nspec:\n  containers:\n  - name: app\n    image: nginx\n```\n\n##### 52.4.2 多网卡配置\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: multi-net-pod\n  annotations:\n    # 添加多张网卡\n    k8s.v1.cni.cncf.io/networks: |\n      [\n        {\"name\": \"macvlan-conf\"},\n        {\"name\": \"ipvlan-conf\", \"interface\": \"net2\"}\n      ]\nspec:\n  containers:\n  - name: app\n    image: nginx\n```\n\n##### 52.4.3 Pod 网络结构\n\n```mermaid\nflowchart TB\n    subgraph \"Pod multi-net-pod\"\n        lo[\"lo<br/>127.0.0.1\"]\n        eth0[\"eth0<br/>10.244.0.5<br/>默认 CNI\"]\n        net1[\"net1<br/>192.168.1.10<br/>macvlan\"]\n        net2[\"net2<br/>192.168.2.10<br/>ipvlan\"]\n    end\n    \n    Calico[\"默认 CNI<br/>(Calico/Flannel)\"] --> eth0\n    NAD1[\"NAD: macvlan-conf\"] --> net1\n    NAD2[\"NAD: ipvlan-conf\"] --> net2\n```\n\n#### 52.5 安装部署\n\n##### 52.5.1 安装 Multus\n\n```bash\n# 克隆项目\ngit clone https://github.com/k8snetworkplumbingwg/multus-cni.git\ncd multus-cni\n\n# 安装\nkubectl apply -f deployments/multus-daemonset.yml\n```\n\n##### 52.5.2 安装 WhereAbouts\n\n```bash\n# 安装 WhereAbouts IPAM\nkubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/whereabouts/master/doc/crds/whereabouts.cni.cncf.io_ippools.yaml\nkubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/whereabouts/master/doc/crds/whereabouts.cni.cncf.io_overlappingrangeipreservations.yaml\n```\n\n##### 52.5.3 验证安装\n\n```bash\n# 检查 Multus DaemonSet\nkubectl get pods -n kube-system | grep multus\n\n# 检查 CNI 插件\nls /opt/cni/bin/ | grep -E \"macvlan|ipvlan|multus\"\n```\n\n#### 52.6 使用场景\n\n##### 52.6.1 常用后端 CNI\n\n| CNI 类型 | 特点 | 适用场景 |\n|:---|:---|:---|\n| **macvlan** | 虚拟 MAC 地址 | 裸机环境 |\n| **ipvlan** | 共享 MAC 地址 | 云环境/OpenStack |\n| **SR-IOV** | 硬件直通 | 高性能/DPDK |\n| **bridge** | 软件桥接 | 通用场景 |\n\n##### 52.6.2 macvlan vs ipvlan\n\n```mermaid\ngraph TB\n    subgraph \"macvlan\"\n        M_Parent[\"父接口 eth0<br/>MAC: aa:bb:cc:dd:ee:ff\"]\n        M_Sub1[\"子接口 1<br/>MAC: 11:22:33:44:55:66\"]\n        M_Sub2[\"子接口 2<br/>MAC: aa:bb:cc:11:22:33\"]\n        M_Parent --> M_Sub1\n        M_Parent --> M_Sub2\n    end\n    \n    subgraph \"ipvlan\"\n        I_Parent[\"父接口 eth0<br/>MAC: aa:bb:cc:dd:ee:ff\"]\n        I_Sub1[\"子接口 1<br/>MAC: 共享父接口\"]\n        I_Sub2[\"子接口 2<br/>MAC: 共享父接口\"]\n        I_Parent --> I_Sub1\n        I_Parent --> I_Sub2\n    end\n```\n\n| 对比项 | macvlan | ipvlan |\n|:---|:---|:---|\n| MAC 地址 | 每个子接口独立 MAC | 共享父接口 MAC |\n| 云环境 | ❌ 可能被拦截 | ✅ 推荐 |\n| 裸机环境 | ✅ 推荐 | ✅ 可用 |\n| 性能 | 高 | 更高 |\n\n#### 52.7 章节小结\n\n```mermaid\nmindmap\n  root((Multus 多网卡))\n    定位\n      Meta CNI\n      多网卡编排\n      英特尔开源\n    组件\n      Multus CNI\n      SR-IOV Device Plugin\n      SR-IOV CNI\n      WhereAbouts IPAM\n    配置\n      NetworkAttachmentDefinition\n      Pod 注解\n      多网卡列表\n    后端\n      macvlan\n      ipvlan\n      SR-IOV\n      bridge\n    场景\n      转控分离\n      高性能网络\n      电信/金融\n```\n\n> [!TIP]\n> **Multus 多网卡方案要点总结**：\n>\n> 1. **核心概念**：\n>    - Multus 是 **Meta CNI**，协调多个 CNI 插件\n>    - 为 Pod 添加除 eth0 外的额外网卡\n>\n> 2. **核心组件**：\n>    - **Multus CNI**：多网卡编排\n>    - **SR-IOV Device Plugin**：VF 资源管理\n>    - **WhereAbouts**：集群级 IPAM\n>\n> 3. **配置方式**：\n>    - 创建 **NetworkAttachmentDefinition** CRD\n>    - Pod 通过 **注解** 引用 NAD\n>\n> 4. **常用后端**：\n>    - **macvlan**：裸机环境\n>    - **ipvlan**：云环境（共享 MAC）\n>    - **SR-IOV**：高性能直通\n>\n> 5. **典型场景**：\n>    - 转控分离（控制面/数据面隔离）\n>    - 电信 NFV、金融高频交易\n>    - 流媒体处理\n\n---", "subs": ["52.1 背景与概述", "52.2 核心组件", "52.3 NetworkAttachmentDefinition", "52.4 Pod 多网卡配置", "52.5 安装部署", "52.6 使用场景", "52.7 章节小结"]}, {"title": "第五十三章 Multus IPVLAN L2 模式", "content": "本章深入讲解 IPVLAN L2 模式的工作原理、配置方法、适用场景，以及与 MACVLAN 的区别。\n\n#### 53.1 背景与概述\n\n##### 53.1.1 IPVLAN 简介\n\nIPVLAN 是一种网卡复用技术，区别于 MACVLAN 的核心特点是：**子接口与父接口共享同一 MAC 地址**。\n\n```mermaid\ngraph TB\n    subgraph \"IPVLAN 特性\"\n        Parent[\"父接口 eth0<br/>MAC: aa:bb:cc:dd:ee:ff\"]\n        Sub1[\"子接口 ipvl0<br/>MAC: aa:bb:cc:dd:ee:ff<br/>IP: 172.18.0.200\"]\n        Sub2[\"子接口 ipvl1<br/>MAC: aa:bb:cc:dd:ee:ff<br/>IP: 172.18.0.201\"]\n        \n        Parent --> Sub1\n        Parent --> Sub2\n    end\n```\n\n> [!IMPORTANT]\n> **IPVLAN 核心特性**\n>\n> - 子接口与父接口 **MAC 地址相同**\n> - 不同子接口通过 **IP 地址** 区分\n> - 内核要求：**Linux 4.18+**\n\n##### 53.1.2 IPVLAN 命名由来\n\n| 类型 | 区分方式 | MAC 地址 | IP 地址 |\n|:---|:---|:---|:---|\n| **IPVLAN** | IP 区分 | 相同 | 不同 |\n| **MACVLAN** | MAC 区分 | 不同 | 不同 |\n\n##### 53.1.3 云环境适配\n\nIPVLAN 在 **公有云/OpenStack** 环境中特别适用：\n\n```mermaid\nflowchart TB\n    subgraph \"OpenStack 安全机制\"\n        Port[\"虚拟机端口\"]\n        Security[\"安全组<br/>allow_address_pair\"]\n        Check[\"MAC 地址校验\"]\n    end\n    \n    Port --> Security\n    Security --> Check\n    \n    subgraph \"IPVLAN 优势\"\n        Same[\"子接口 MAC = 父接口 MAC\"]\n        Pass[\"无需修改 allow_address_pair\"]\n        Work[\"正常通信\"]\n    end\n    \n    Same --> Pass --> Work\n    Check -.->|\"不拦截\"| Same\n```\n\n> [!NOTE]\n> **云环境兼容性**\n>\n> OpenStack 默认只允许与端口 MAC 匹配的流量通过。IPVLAN 由于 MAC 相同，无需额外配置即可正常工作。MACVLAN 则需要设置 `allow_address_pair` 为 `0.0.0.0/0`。\n\n#### 53.2 L2 模式原理\n\n##### 53.2.1 L2 模式工作方式\n\n在 L2 模式下，父接口相当于一个 **虚拟交换机**：\n\n```mermaid\ngraph TB\n    subgraph \"节点 Node1\"\n        eth0[\"父接口 eth0<br/>(虚拟交换机)\"]\n        pod1[\"Pod1<br/>ipvl0<br/>172.18.0.200\"]\n        pod2[\"Pod2<br/>ipvl1<br/>172.18.0.201\"]\n        \n        eth0 --> pod1\n        eth0 --> pod2\n    end\n    \n    subgraph \"节点 Node2\"\n        eth0_2[\"父接口 eth0<br/>(虚拟交换机)\"]\n        pod3[\"Pod3<br/>ipvl0<br/>172.18.0.202\"]\n        \n        eth0_2 --> pod3\n    end\n    \n    eth0 <-->|\"二层交换\"| eth0_2\n```\n\n##### 53.2.2 L2 vs L3 模式\n\n| 对比项 | L2 模式 | L3 模式 |\n|:---|:---|:---|\n| 工作层级 | 二层（交换） | 三层（路由） |\n| 父接口角色 | 虚拟交换机 | 虚拟路由器 |\n| 广播域 | 共享 | 隔离 |\n| 适用场景 | 同子网通信 | 跨子网通信 |\n\n#### 53.3 配置实现\n\n##### 53.3.1 NetworkAttachmentDefinition\n\n创建 IPVLAN L2 模式的 NAD：\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: ipvlan-l2-whereabouts-conf\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"ipvlan-l2-whereabouts\",\n    \"type\": \"ipvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"l2\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"172.18.0.200/24\",\n      \"range_start\": \"172.18.0.200\",\n      \"range_end\": \"172.18.0.205\"\n    }\n  }'\n```\n\n##### 53.3.2 NAD 配置解析\n\n```mermaid\nflowchart LR\n    subgraph \"网络配置\"\n        type[\"type: ipvlan<br/>网络类型\"]\n        master[\"master: eth0<br/>父接口\"]\n        mode[\"mode: l2<br/>L2 模式\"]\n    end\n    \n    subgraph \"IPAM 配置\"\n        ipam_type[\"type: whereabouts<br/>集群级 IPAM\"]\n        range[\"range: 172.18.0.200/24<br/>地址范围\"]\n    end\n    \n    type --> master --> mode\n    ipam_type --> range\n```\n\n##### 53.3.3 Pod 配置\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: ipvlan-pod1\n  annotations:\n    k8s.v1.cni.cncf.io/networks: ipvlan-l2-whereabouts-conf@eth1\nspec:\n  containers:\n  - name: app\n    image: busybox\n    command: [\"sleep\", \"3600\"]\n```\n\n##### 53.3.4 注解语法\n\n```mermaid\ngraph LR\n    A[\"k8s.v1.cni.cncf.io/networks\"] --> B[\"NAD 名称\"]\n    B --> C[\"@\"]\n    C --> D[\"接口名称<br/>(可选)\"]\n    \n    E[\"示例\"] --> F[\"ipvlan-l2-conf@eth1\"]\n```\n\n| 语法 | 说明 |\n|:---|:---|\n| `nad-name` | 使用默认接口名（net0, net1...） |\n| `nad-name@eth1` | 指定接口名为 eth1 |\n\n#### 53.4 通信验证\n\n##### 53.4.1 验证 MAC 地址\n\n```bash\n# 查看节点 eth0 的 MAC\nip link show eth0\n# 输出: link/ether 02:42:ac:12:00:02\n\n# 进入 Pod 查看 eth1 的 MAC\nkubectl exec ipvlan-pod1 -- ip link show eth1\n# 输出: link/ether 02:42:ac:12:00:02  (与父接口相同)\n```\n\n##### 53.4.2 同节点通信\n\n```bash\n# Pod1 ping Pod2 (同节点)\nkubectl exec ipvlan-pod1 -- ping -I eth1 172.18.0.201\n```\n\n##### 53.4.3 跨节点通信\n\n```bash\n# Pod1 ping Pod3 (跨节点)\nkubectl exec ipvlan-pod1 -- ping -I eth1 172.18.0.202\n```\n\n> [!WARNING]\n> **多网卡环境下的 ping 命令**\n>\n> 在多网卡环境中，务必使用 `-I <interface>` 指定源接口，否则可能走错网络路径。\n\n##### 53.4.4 ARP 表验证\n\n```bash\n# 查看 ARP 表\nkubectl exec ipvlan-pod1 -- arp -n\n\n# 同节点 Pod：MAC 相同\n# 172.18.0.201  02:42:ac:12:00:02\n\n# 跨节点 Pod：MAC 为对端节点的父接口\n# 172.18.0.202  02:42:ac:12:00:03\n```\n\n#### 53.5 IPVLAN vs MACVLAN\n\n##### 53.5.1 对比总结\n\n```mermaid\ngraph TB\n    subgraph \"MACVLAN\"\n        M_Parent[\"父接口<br/>MAC: aa:bb:cc:dd\"]\n        M_Sub1[\"子接口<br/>MAC: 11:22:33:44\"]\n        M_Sub2[\"子接口<br/>MAC: 55:66:77:88\"]\n        M_Parent --> M_Sub1\n        M_Parent --> M_Sub2\n    end\n    \n    subgraph \"IPVLAN\"\n        I_Parent[\"父接口<br/>MAC: aa:bb:cc:dd\"]\n        I_Sub1[\"子接口<br/>MAC: aa:bb:cc:dd\"]\n        I_Sub2[\"子接口<br/>MAC: aa:bb:cc:dd\"]\n        I_Parent --> I_Sub1\n        I_Parent --> I_Sub2\n    end\n```\n\n| 对比项 | MACVLAN | IPVLAN |\n|:---|:---|:---|\n| MAC 地址 | 子接口独立 | 子接口相同 |\n| 云环境 | 可能被拦截 | ✅ 兼容 |\n| 适用场景 | 裸机环境 | 云/虚拟化环境 |\n| 内核要求 | 3.x+ | 4.18+ |\n| 区分方式 | MAC | IP |\n\n#### 53.6 章节小结\n\n```mermaid\nmindmap\n  root((IPVLAN L2 模式))\n    核心特性\n      MAC 相同\n      IP 区分\n      内核 4.18+\n    适用场景\n      公有云\n      OpenStack\n      虚拟化环境\n    L2 模式\n      二层交换\n      父接口=交换机\n      同子网通信\n    配置\n      NAD 定义\n      type=ipvlan\n      mode=l2\n      master=父接口\n    验证\n      MAC 检查\n      ARP 表\n      指定源接口 ping\n```\n\n> [!TIP]\n> **IPVLAN L2 模式要点总结**：\n>\n> 1. **核心特性**：\n>    - 子接口与父接口 **MAC 地址相同**\n>    - 通过 **IP 地址** 区分不同子接口\n>\n> 2. **适用场景**：\n>    - **云环境**（OpenStack、公有云）\n>    - 避免 MAC 地址被安全策略拦截\n>\n> 3. **L2 模式**：\n>    - 父接口充当 **虚拟交换机**\n>    - 子接口在同一广播域\n>\n> 4. **配置要点**：\n>    - `type: ipvlan`\n>    - `mode: l2`\n>    - `master: eth0`（父接口）\n>\n> 5. **注意事项**：\n>    - 多网卡环境下 ping 需指定 `-I <interface>`\n>    - 内核版本要求 **Linux 4.18+**\n\n---", "subs": ["53.1 背景与概述", "53.2 L2 模式原理", "53.3 配置实现", "53.4 通信验证", "53.5 IPVLAN vs MACVLAN", "53.6 章节小结"]}, {"title": "第五十四章 Multus IPVLAN L3 模式", "content": "本章讲解 IPVLAN L3 模式的工作原理、配置方法、回程路由设置，以及与 L2 模式的区别。\n\n#### 54.1 背景与概述\n\n##### 54.1.1 L3 模式简介\n\n在 L3 模式下，父接口充当 **虚拟路由器**，子接口可以配置 **不同子网** 的 IP 地址。\n\n```mermaid\ngraph TB\n    subgraph \"L3 模式架构\"\n        Parent[\"父接口 eth0<br/>(虚拟路由器)\"]\n        Sub1[\"子接口 ipvl0<br/>15.1.1.10/24\"]\n        Sub2[\"子接口 ipvl1<br/>15.1.2.20/24\"]\n        \n        Parent --> Sub1\n        Parent --> Sub2\n    end\n```\n\n> [!IMPORTANT]\n> **L3 模式核心特性**\n>\n> - 父接口充当 **路由器**（L2 模式是交换机）\n> - 子接口可配置 **不同子网** 的地址\n> - 需要添加 **回程路由** 实现跨子网通信\n\n##### 54.1.2 L2 vs L3 模式对比\n\n| 对比项 | L2 模式 | L3 模式 |\n|:---|:---|:---|\n| 父接口角色 | 虚拟交换机 | 虚拟路由器 |\n| 子接口子网 | 必须相同 | 可以不同 |\n| 通信方式 | 二层交换 | 三层路由 |\n| 广播域 | 共享 | 隔离 |\n| 路由配置 | 无需 | 需要回程路由 |\n\n#### 54.2 L3 模式原理\n\n##### 54.2.1 工作方式\n\n```mermaid\nflowchart TB\n    subgraph \"节点 Node1\"\n        eth0[\"父接口 eth0<br/>(路由器)\"]\n        pod1[\"Pod1<br/>15.1.1.10/24\"]\n        pod2[\"Pod2<br/>15.1.2.20/24\"]\n        \n        eth0 --> pod1\n        eth0 --> pod2\n        \n        pod1 -.->|\"回程路由\"| pod2\n    end\n```\n\n##### 54.2.2 路由查找过程\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>15.1.1.10\n    participant Router as 父接口<br/>(路由器)\n    participant Pod2 as Pod2<br/>15.1.2.20\n    \n    Pod1->>Pod1: 查路由表\n    Note over Pod1: 目的: 15.1.2.20\n    Pod1->>Router: 从 eth1 出接口发出\n    Router->>Router: 三层路由转发\n    Router->>Pod2: 送达目的 Pod\n```\n\n##### 54.2.3 无网关路由\n\nL3 模式的一个关键特性是 **无网关路由**（仅指定出接口）：\n\n```bash\n# 传统路由（带网关）\nip route add 15.1.2.0/24 via 15.1.1.1 dev eth1\n\n# 无网关路由（仅出接口）\nip route add 15.1.2.0/24 dev eth1\n```\n\n> [!NOTE]\n> **无网关路由原理**\n>\n> 当出接口直连路由器时，只需指定出接口，无需指定下一跳网关。数据包从出接口发出后，直接到达路由器进行转发。\n\n#### 54.3 配置实现\n\n##### 54.3.1 NetworkAttachmentDefinition\n\n创建 IPVLAN L3 模式的 NAD：\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: ipvlan-l3-conf-1\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"ipvlan-l3-net1\",\n    \"type\": \"ipvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"l3\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"15.1.1.0/24\",\n      \"range_start\": \"15.1.1.10\",\n      \"range_end\": \"15.1.1.20\"\n    }\n  }'\n---\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: ipvlan-l3-conf-2\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"ipvlan-l3-net2\",\n    \"type\": \"ipvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"l3\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"15.1.2.0/24\",\n      \"range_start\": \"15.1.2.10\",\n      \"range_end\": \"15.1.2.20\"\n    }\n  }'\n```\n\n##### 54.3.2 配置要点\n\n```mermaid\nflowchart LR\n    subgraph \"L3 模式配置\"\n        mode[\"mode: l3<br/>三层模式\"]\n        net1[\"NAD-1: 15.1.1.0/24\"]\n        net2[\"NAD-2: 15.1.2.0/24\"]\n    end\n    \n    mode --> net1\n    mode --> net2\n```\n\n| 配置项 | 说明 |\n|:---|:---|\n| `mode: l3` | 启用 L3 路由模式 |\n| 不同 NAD | 配置不同子网 |\n| 同一 master | 共享父接口 |\n\n##### 54.3.3 Pod 配置\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: ipvlan-l3-pod1\n  annotations:\n    k8s.v1.cni.cncf.io/networks: ipvlan-l3-conf-1@eth1\nspec:\n  nodeName: node1  # 确保同节点\n  containers:\n  - name: app\n    image: busybox\n    command: [\"sleep\", \"3600\"]\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: ipvlan-l3-pod2\n  annotations:\n    k8s.v1.cni.cncf.io/networks: ipvlan-l3-conf-2@eth1\nspec:\n  nodeName: node1  # 确保同节点\n  containers:\n  - name: app\n    image: busybox\n    command: [\"sleep\", \"3600\"]\n```\n\n#### 54.4 回程路由配置\n\n##### 54.4.1 为什么需要回程路由\n\n默认情况下，Pod 只知道自己所在子网的路由：\n\n```bash\n# Pod1 (15.1.1.10) 默认路由表\n15.1.1.0/24 dev eth1  # 只知道本子网\n\n# Pod2 (15.1.2.20) 默认路由表\n15.1.2.0/24 dev eth1  # 只知道本子网\n```\n\nPod1 无法直接访问 Pod2，因为没有去往 `15.1.2.0/24` 的路由。\n\n##### 54.4.2 添加回程路由\n\n```bash\n# 在 Pod1 中添加去往 Pod2 子网的路由\nkubectl exec ipvlan-l3-pod1 -- ip route add 15.1.2.0/24 dev eth1\n\n# 在 Pod2 中添加去往 Pod1 子网的路由\nkubectl exec ipvlan-l3-pod2 -- ip route add 15.1.1.0/24 dev eth1\n```\n\n##### 54.4.3 验证通信\n\n```bash\n# Pod1 ping Pod2（需指定源接口）\nkubectl exec ipvlan-l3-pod1 -- ping -I eth1 15.1.2.20\n```\n\n> [!WARNING]\n> **关键注意事项**\n>\n> 1. 必须使用 `-I eth1` 指定源接口\n> 2. L3 模式需要 **手动添加回程路由**\n> 3. **同节点** 才可通过回程路由互通\n\n#### 54.5 同节点 vs 跨节点\n\n##### 54.5.1 限制说明\n\n```mermaid\ngraph TB\n    subgraph \"同节点 ✅\"\n        N1_eth0[\"Node1 eth0<br/>(共享路由器)\"]\n        N1_Pod1[\"Pod1<br/>15.1.1.10\"]\n        N1_Pod2[\"Pod2<br/>15.1.2.20\"]\n        \n        N1_eth0 --> N1_Pod1\n        N1_eth0 --> N1_Pod2\n        N1_Pod1 <-->|\"回程路由\"| N1_Pod2\n    end\n    \n    subgraph \"跨节点 ❌\"\n        N2_eth0[\"Node2 eth0<br/>(独立路由器)\"]\n        N2_Pod3[\"Pod3<br/>15.1.3.30\"]\n        \n        N2_eth0 --> N2_Pod3\n    end\n    \n    N1_Pod1 -.->|\"无法通信\"| N2_Pod3\n```\n\n> [!CAUTION]\n> **跨节点限制**\n>\n> L3 模式下，不同节点的 Pod **无法直接通过回程路由通信**，因为：\n>\n> - 每个节点的父接口是独立的路由器\n> - 没有统一的路由平面\n>\n> 如需跨节点通信，需要额外的 **Underlay 网络** 或 **BGP 路由宣告**。\n\n##### 54.5.2 适用场景\n\n| 场景 | 是否支持 |\n|:---|:---|\n| 同节点不同子网 Pod | ✅ 支持（需回程路由） |\n| 跨节点不同子网 Pod | ❌ 不支持（需额外配置） |\n| 同节点同子网 Pod | ✅ 支持（使用 L2 模式更佳） |\n\n#### 54.6 章节小结\n\n```mermaid\nmindmap\n  root((IPVLAN L3 模式))\n    核心特性\n      父接口=路由器\n      子接口可跨子网\n      需回程路由\n    配置要点\n      mode=l3\n      不同 NAD 不同子网\n      同一 master\n    回程路由\n      ip route add\n      仅出接口即可\n      无需指定网关\n    限制\n      仅同节点有效\n      跨节点不通\n      需额外 Underlay\n```\n\n> [!TIP]\n> **IPVLAN L3 模式要点总结**：\n>\n> 1. **核心原理**：\n>    - 父接口充当 **虚拟路由器**\n>    - 子接口可配置 **不同子网** IP\n>\n> 2. **回程路由**：\n>    - 必须手动添加 `ip route add <对端子网> dev eth1`\n>    - 无需指定网关，仅需出接口\n>\n> 3. **限制**：\n>    - 仅 **同节点** Pod 可通过回程路由通信\n>    - 跨节点需要额外网络配置\n>\n> 4. **与 L2 对比**：\n>    - L2：交换机，同子网\n>    - L3：路由器，跨子网\n\n---", "subs": ["54.1 背景与概述", "54.2 L3 模式原理", "54.3 配置实现", "54.4 回程路由配置", "54.5 同节点 vs 跨节点", "54.6 章节小结"]}, {"title": "第五十五章 Multus IPVLAN SBR 模式", "content": "本章讲解 IPVLAN 的 SBR（Source-Based Routing，源地址路由）模式，实现多网卡同时访问外网的场景。\n\n#### 55.1 背景与概述\n\n##### 55.1.1 什么是 SBR\n\n**SBR（Source-Based Routing）** 是一种基于 **源地址** 进行路由决策的技术，也称为\"原地路由\"或\"策略路由\"。\n\n```mermaid\ngraph LR\n    subgraph \"传统路由\"\n        Dst[\"基于目的地址\"]\n    end\n    \n    subgraph \"SBR 路由\"\n        Src[\"基于源地址\"]\n    end\n    \n    Dst --> D1[\"所有流量走默认网关\"]\n    Src --> S1[\"不同源地址走不同网关\"]\n```\n\n> [!IMPORTANT]\n> **SBR 核心价值**\n>\n> - 允许 Pod 拥有 **多张网卡同时访问外网**\n> - 根据 **源 IP** 决定出口路由\n> - 适用于 **多网络接入** 场景\n\n##### 55.1.2 应用场景\n\n| 场景 | 说明 |\n|:---|:---|\n| 多网卡上网 | 不同网卡走不同出口 |\n| 网络隔离 | 内网/外网分离访问 |\n| 流量分流 | 按源地址分配带宽 |\n\n#### 55.2 SBR 原理\n\n##### 55.2.1 核心组件\n\nSBR 依赖 Linux 的 **策略路由** 机制，包含两个关键组件：\n\n```mermaid\ngraph TB\n    subgraph \"SBR 组件\"\n        Rule[\"ip rule<br/>路由策略\"]\n        Table[\"ip route table<br/>路由表\"]\n    end\n    \n    Rule --> Table\n    Table --> GW[\"网关出口\"]\n```\n\n| 组件 | 命令 | 作用 |\n|:---|:---|:---|\n| ip rule | `ip rule add from <src> table <n>` | 定义策略：源地址 → 路由表 |\n| ip route table | `ip route add default via <gw> table <n>` | 定义路由表内容 |\n\n##### 55.2.2 工作流程\n\n```mermaid\nsequenceDiagram\n    participant Pod as Pod<br/>172.18.0.200\n    participant Rule as ip rule\n    participant Table as table 100\n    participant GW as 网关<br/>172.18.0.1\n    \n    Pod->>Rule: 发包 src=172.18.0.200\n    Rule->>Rule: 匹配 from 172.18.0.0/24\n    Rule->>Table: 查询 table 100\n    Table->>Table: default via 172.18.0.1\n    Table->>GW: 发送到网关\n    GW->>Pod: SNAT 后访问外网\n```\n\n##### 55.2.3 优先级机制\n\n```mermaid\ngraph TB\n    subgraph \"路由查找顺序\"\n        Step1[\"1. 检查 ip rule\"]\n        Step2[\"2. SBR 匹配则走对应 table\"]\n        Step3[\"3. 否则走默认路由表 main\"]\n    end\n    \n    Step1 --> Step2\n    Step2 --> Step3\n```\n\n> [!NOTE]\n> **SBR 优先级更高**\n>\n> 当配置了 SBR 后，即使目的地址在 **同一子网**，也会优先走 SBR 指定的网关，而非直接二层通信。\n\n#### 55.3 配置实现\n\n##### 55.3.1 手动配置 SBR\n\n在 Pod 内手动添加 SBR 规则：\n\n```bash\n# 1. 添加路由表（table 100）\nip route add default via 172.18.0.1 dev eth1 table 100\n\n# 2. 添加路由策略（从 172.18.0.0/24 来的包走 table 100）\nip rule add from 172.18.0.0/24 table 100\n```\n\n验证配置：\n\n```bash\n# 查看路由策略\nip rule show\n# 输出: from 172.18.0.0/24 lookup 100\n\n# 查看路由表\nip route show table 100\n# 输出: default via 172.18.0.1 dev eth1\n```\n\n##### 55.3.2 NAD 自动配置 SBR\n\n通过 NetworkAttachmentDefinition 自动配置 SBR：\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: ipvlan-sbr\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"ipvlan-sbr-net\",\n    \"type\": \"ipvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"l2\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"172.18.0.0/24\"\n    },\n    \"plugins\": [\n      {\n        \"type\": \"sbr\"\n      }\n    ]\n  }'\n```\n\n##### 55.3.3 配置对比\n\n```mermaid\nflowchart LR\n    subgraph \"手动配置\"\n        M1[\"ip route add\"]\n        M2[\"ip rule add\"]\n    end\n    \n    subgraph \"自动配置(NAD)\"\n        A1[\"plugins: sbr\"]\n    end\n    \n    M1 --> Result[\"Pod 多网卡上外网\"]\n    M2 --> Result\n    A1 --> Result\n```\n\n| 方式 | 优点 | 缺点 |\n|:---|:---|:---|\n| 手动配置 | 灵活可控 | 需要 init 容器或手动执行 |\n| NAD 自动 | 自动化，无需干预 | 需要 SBR CNI 插件支持 |\n\n#### 55.4 多网卡上外网验证\n\n##### 55.4.1 场景说明\n\n```mermaid\ngraph TB\n    subgraph \"Pod\"\n        eth0[\"eth0<br/>默认网卡\"]\n        eth1[\"eth1<br/>IPVLAN 网卡\"]\n    end\n    \n    subgraph \"网关\"\n        GW0[\"默认网关\"]\n        GW1[\"IPVLAN 网关<br/>172.18.0.1\"]\n    end\n    \n    eth0 --> GW0\n    eth1 --> GW1\n    \n    GW0 --> Internet[\"互联网\"]\n    GW1 --> Internet\n```\n\n##### 55.4.2 验证步骤\n\n```bash\n# 1. 从 eth0 访问外网（默认路由）\nping 114.114.114.114\n\n# 2. 从 eth1 访问外网（SBR 路由）\nping -I 172.18.0.200 114.114.114.114\n\n# 3. 抓包验证\ntcpdump -i eth1 icmp\n```\n\n> [!TIP]\n> **指定源地址的重要性**\n>\n> 使用 `ping -I <IP地址>` 而非 `ping -I <接口名>`，确保 SBR 规则正确匹配。\n\n##### 55.4.3 抓包分析\n\n```bash\n# 在 eth1 上抓包\ntcpdump -i eth1 -n icmp\n\n# 预期输出（走 SBR）：\n# 172.18.0.200 > 114.114.114.114: ICMP echo request\n# 114.114.114.114 > 172.18.0.200: ICMP echo reply\n```\n\n#### 55.5 SBR 与 ARP 缓存交互\n\n##### 55.5.1 首包行为\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>172.18.0.200\n    participant SBR as SBR 规则\n    participant GW as 网关<br/>172.18.0.1\n    participant Pod2 as Pod2<br/>172.18.0.201\n    \n    Note over Pod1: 无 ARP 缓存\n    Pod1->>SBR: 发包 dst=172.18.0.201\n    SBR->>GW: 优先走网关\n    GW->>Pod2: 转发\n    Pod2->>Pod1: 回包（携带真实 MAC）\n    Note over Pod1: 学习到 Pod2 MAC\n```\n\n##### 55.5.2 后续包行为\n\n当 ARP 缓存存在后，行为可能改变：\n\n| 情况 | 首包 | 后续包 |\n|:---|:---|:---|\n| 无 ARP 缓存 | 走 SBR → 网关 | 走 SBR → 网关 |\n| 有 ARP 缓存 | 走 SBR → 网关 | 可能直接二层（ARP 优先级更高） |\n\n> [!WARNING]\n> **ARP 缓存影响**\n>\n> 当 Pod 学习到对端的真实 MAC 地址后，后续包可能 **绕过 SBR** 直接走二层。这是因为：\n>\n> - 本地 ARP 缓存优先级高于 SBR\n> - 已知 MAC 时无需查询路由策略\n>\n> **清除 ARP 缓存验证**：\n>\n> ```bash\n> ip neigh del 172.18.0.201 dev eth1\n> ```\n\n##### 55.5.3 双端 SBR 配置\n\n当两端都配置 SBR 时：\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>172.18.0.200\n    participant GW as 网关\n    participant Pod2 as Pod2<br/>172.18.0.201\n    \n    Pod1->>GW: SBR → 网关\n    GW->>Pod2: 转发\n    Pod2->>GW: SBR → 网关\n    GW->>Pod1: 转发\n```\n\n两端都会经过网关，确保 SBR 策略生效。\n\n#### 55.6 章节小结\n\n```mermaid\nmindmap\n  root((IPVLAN SBR))\n    核心概念\n      Source-Based Routing\n      基于源地址路由\n      策略路由\n    关键命令\n      ip rule add\n      ip route table\n    配置方式\n      手动配置\n      NAD 自动配置\n    应用场景\n      多网卡上外网\n      网络隔离\n      流量分流\n    注意事项\n      SBR 优先级高\n      ARP 缓存影响\n      指定源 IP\n```\n\n> [!TIP]\n> **IPVLAN SBR 模式要点总结**：\n>\n> 1. **SBR 机制**：\n>    - `ip rule`：定义源地址 → 路由表映射\n>    - `ip route table`：定义路由表内容\n>\n> 2. **配置方式**：\n>    - 手动：`ip route add` + `ip rule add`\n>    - 自动：NAD 中 `plugins: [{\"type\": \"sbr\"}]`\n>\n> 3. **验证方法**：\n>    - `ping -I <源IP>` 指定源地址\n>    - `tcpdump -i eth1` 抓包确认\n>\n> 4. **注意事项**：\n>    - SBR 优先级高于普通路由\n>    - ARP 缓存可能影响后续包路径\n>    - 双端配置 SBR 可确保策略生效\n\n---", "subs": ["55.1 背景与概述", "55.2 SBR 原理", "55.3 配置实现", "55.4 多网卡上外网验证", "55.5 SBR 与 ARP 缓存交互", "55.6 章节小结"]}, {"title": "第五十六章 IPVLAN-SBR 深度解析", "content": "本章深入分析 SBR 的底层行为机制，包括首包处理、ICMP Redirect、单边与双边 SBR 差异，以及典型应用场景。\n\n#### 56.1 背景与问题\n\n##### 56.1.1 上章回顾\n\n上一章介绍了 SBR 的基本配置和使用，但在实际抓包分析中发现了一些 **意外行为**：\n\n- 首包发往网关，但后续包可能直接二层通信\n- 存在 ICMP Redirect 消息\n- 不同网络环境行为不同\n\n##### 56.1.2 本章目标\n\n```mermaid\nmindmap\n  root((SBR 深度解析))\n    首包行为\n      为什么走网关\n      MAC 地址封装\n    ICMP Redirect\n      什么是重定向\n      何时触发\n    单边 vs 双边\n      行为差异\n      抓包分析\n    环境差异\n      Linux Bridge\n      真实交换机\n    应用场景\n      多网卡多网关\n      管理/业务分离\n```\n\n#### 56.2 SBR 首包行为分析\n\n##### 56.2.1 首包封装过程\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>172.18.0.200\n    participant SBR as SBR 规则\n    participant GW as 网关<br/>172.18.0.1\n    participant Pod2 as Pod2<br/>172.18.0.201\n    \n    Note over Pod1: 查路由：dst=172.18.0.201\n    Pod1->>SBR: 匹配 from 172.18.0.0/24\n    SBR->>Pod1: 走 table 100 → via 172.18.0.1\n    Pod1->>Pod1: 发 ARP 请求网关 MAC\n    Pod1->>GW: 封装: dst_mac=网关MAC\n    GW->>Pod2: 转发到 Pod2\n```\n\n##### 56.2.2 为什么首包走网关\n\n| 阶段 | 说明 |\n|:---|:---|\n| 无 ARP 缓存 | Pod1 不知道 Pod2 的 MAC |\n| SBR 规则生效 | 指向 via 172.18.0.1 |\n| ARP 请求网关 | 而非请求 Pod2 |\n| 封装网关 MAC | dst_mac = 网关 MAC |\n\n> [!NOTE]\n> **关键点**\n>\n> SBR 规则指定了下一跳网关，因此 Pod1 会 **ARP 解析网关的 MAC**，而非目的 Pod 的 MAC。\n\n##### 56.2.3 抓包验证\n\n```bash\n# Pod1 发送首包\ntcpdump -i eth1 -en\n\n# 首包内容：\n# src_mac: 12:00:00:02 (Pod1)\n# dst_mac: dc:cd:40:xx (网关)\n# src_ip: 172.18.0.200\n# dst_ip: 172.18.0.201\n```\n\n#### 56.3 ICMP Redirect 机制\n\n##### 56.3.1 什么是 ICMP Redirect\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1\n    participant GW as 网关\n    participant Pod2 as Pod2\n    \n    Pod1->>GW: ICMP Echo Request\n    GW->>Pod2: 转发\n    GW-->>Pod1: ICMP Redirect\n    Note over GW: 告诉 Pod1：以后直接发给 Pod2\n    Pod2->>Pod1: ICMP Echo Reply\n```\n\n**ICMP Redirect**（重定向）是网关发送的一种通知消息：\n\n> \"你发给我的包，目的地和你在同一网段，你应该直接发给它，不需要经过我。\"\n\n##### 56.3.2 Redirect 消息格式\n\n```\nICMP Type: 5 (Redirect)\nCode: 1 (Redirect for Host)\nMessage: Redirect to 172.18.0.201\n```\n\n##### 56.3.3 Redirect 触发条件\n\n| 条件 | 说明 |\n|:---|:---|\n| 源和目的同子网 | 172.18.0.200 ↔ 172.18.0.201 |\n| 包经过网关 | 网关发现\"绕路\" |\n| 网关启用 Redirect | Linux Bridge 默认启用 |\n\n> [!WARNING]\n> **ICMP Redirect 对 SBR 的影响**\n>\n> 收到 Redirect 后，Pod 可能 **绕过 SBR 策略**，直接二层通信。这可能不是期望的行为！\n\n#### 56.4 单边 vs 双边 SBR\n\n##### 56.4.1 单边 SBR（仅 Pod1 配置）\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>有 SBR\n    participant GW as 网关\n    participant Pod2 as Pod2<br/>无 SBR\n    \n    Pod1->>GW: ① 首包走网关\n    GW->>Pod2: 转发\n    GW-->>Pod1: ② ICMP Redirect\n    Pod2->>Pod1: ③ 回包（直接二层）\n    Note over Pod2: 发 ARP 请求 Pod1 MAC\n    Note over Pod1: 后续包直接二层\n```\n\n**行为特点**：\n\n- 首包：Pod1 → 网关 → Pod2\n- 回包：Pod2 直接发给 Pod1（无 SBR）\n- 后续：可能绕过 SBR\n\n##### 56.4.2 双边 SBR（两端都配置）\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>有 SBR\n    participant GW as 网关\n    participant Pod2 as Pod2<br/>有 SBR\n    \n    Pod1->>GW: ① 首包走网关\n    GW->>Pod2: 转发\n    GW-->>Pod1: ② Redirect #1\n    Pod2->>GW: ③ 回包也走网关\n    GW->>Pod1: 转发\n    GW-->>Pod2: ④ Redirect #2\n    Note over Pod1,Pod2: 两次 Redirect 后恢复直接通信\n```\n\n**行为特点**：\n\n- 首包：双方都走网关\n- 两次 Redirect：各触发一次\n- 后续：恢复直接通信\n\n##### 56.4.3 对比总结\n\n| 场景 | 首包路径 | Redirect 次数 | 后续包路径 |\n|:---|:---|:---|:---|\n| 单边 SBR | Pod1→GW→Pod2 | 1 次 | 可能直接二层 |\n| 双边 SBR | 双方都走网关 | 2 次 | 恢复直接通信 |\n\n#### 56.5 Linux Bridge vs 真实交换机\n\n##### 56.5.1 行为差异\n\n```mermaid\ngraph TB\n    subgraph \"Linux Bridge\"\n        LB_GW[\"网关\"]\n        LB_R[\"发送 ICMP Redirect\"]\n        LB_D[\"后续包直接二层\"]\n        \n        LB_GW --> LB_R\n        LB_R --> LB_D\n    end\n    \n    subgraph \"真实交换机(H3C等)\"\n        HW_GW[\"网关\"]\n        HW_F[\"每包都转发\"]\n        HW_N[\"无 Redirect\"]\n        \n        HW_GW --> HW_F\n        HW_F --> HW_N\n    end\n```\n\n##### 56.5.2 差异对比\n\n| 特性 | Linux Bridge | 真实交换机（H3C） |\n|:---|:---|:---|\n| ICMP Redirect | ✅ 启用 | ❌ 通常不发 |\n| SBR 首包 | 走网关 | 走网关 |\n| SBR 后续包 | 可能绕过 | 始终走网关 |\n| 行为一致性 | 可能变化 | 稳定可预期 |\n\n> [!CAUTION]\n> **生产环境注意**\n>\n> Linux Bridge 环境下的 SBR 行为可能与真实交换机不同。测试时需要在 **目标生产环境** 中验证！\n\n#### 56.6 SBR 典型应用场景\n\n##### 56.6.1 多网卡多网关\n\n```mermaid\ngraph TB\n    subgraph \"Pod/虚拟机\"\n        eth0[\"eth0<br/>管理网卡\"]\n        eth1[\"eth1<br/>业务网卡\"]\n    end\n    \n    subgraph \"网关\"\n        GW0[\"管理网关<br/>10.0.0.1\"]\n        GW1[\"业务网关<br/>192.168.0.1\"]\n    end\n    \n    eth0 --> GW0\n    eth1 --> GW1\n    \n    GW0 --> OM[\"SSH/运维管理\"]\n    GW1 --> BIZ[\"业务流量\"]\n```\n\n##### 56.6.2 问题：多网关冲突\n\n**场景**：一台机器有两张网卡，只能配置一个默认路由。\n\n```bash\n# 默认路由只能有一个出接口\nip route add default via 192.168.0.1 dev eth1\n\n# SSH 从 eth0 进来，回包却走 eth1\n# 导致：非对称路由，连接失败！\n```\n\n##### 56.6.3 SBR 解决方案\n\n```bash\n# 1. eth0（管理网）使用 SBR\nip route add default via 10.0.0.1 dev eth0 table 100\nip rule add from 10.0.0.0/24 table 100\n\n# 2. eth1（业务网）使用默认路由\nip route add default via 192.168.0.1 dev eth1\n```\n\n```mermaid\nflowchart LR\n    subgraph \"SBR 路由策略\"\n        SSH[\"SSH 请求<br/>from 10.0.0.x\"]\n        BIZ[\"业务请求<br/>from 192.168.x\"]\n    end\n    \n    SSH --> T100[\"table 100\"]\n    BIZ --> Main[\"default route\"]\n    \n    T100 --> GW0[\"eth0 网关\"]\n    Main --> GW1[\"eth1 网关\"]\n```\n\n##### 56.6.4 典型使用场景\n\n| 场景 | eth0 (管理网) | eth1 (业务网) |\n|:---|:---|:---|\n| 运维管理 | SSH、监控 | - |\n| 业务流量 | - | 应用数据 |\n| 告警上报 | SBR 路由 | - |\n| 外网访问 | - | 默认路由 |\n\n#### 56.7 章节小结\n\n```mermaid\nmindmap\n  root((SBR 深度解析))\n    首包行为\n      SBR 优先\n      ARP 解析网关\n      封装网关 MAC\n    ICMP Redirect\n      网关发送\n      通知直连\n      可能绕过 SBR\n    单边 vs 双边\n      单边=1 次 Redirect\n      双边=2 次 Redirect\n      后续恢复直连\n    环境差异\n      Linux Bridge 有 Redirect\n      真实交换机无 Redirect\n    应用场景\n      多网卡多网关\n      管理/业务分离\n      解决非对称路由\n```\n\n> [!TIP]\n> **IPVLAN-SBR 深度解析要点总结**：\n>\n> 1. **首包行为**：\n>    - SBR 优先于普通路由\n>    - 首包 ARP 解析网关 MAC\n>\n> 2. **ICMP Redirect**：\n>    - 网关发现同子网绕路时发送\n>    - 可能导致后续包绕过 SBR\n>\n> 3. **单边 vs 双边**：\n>    - 单边 SBR：1 次 Redirect\n>    - 双边 SBR：2 次 Redirect\n>\n> 4. **环境差异**：\n>    - Linux Bridge：有 Redirect\n>    - 真实交换机：通常无 Redirect\n>\n> 5. **应用场景**：\n>    - 多网卡多网关\n>    - SSH 管理 + 业务分离\n>    - 解决非对称路由问题\n\n---", "subs": ["56.1 背景与问题", "56.2 SBR 首包行为分析", "56.3 ICMP Redirect 机制", "56.4 单边 vs 双边 SBR", "56.5 Linux Bridge vs 真实交换机", "56.6 SBR 典型应用场景", "56.7 章节小结"]}, {"title": "第五十七章 MACVLAN-SBR 实践", "content": "本章介绍 MACVLAN 与 SBR 结合的实践配置，包括 MACVLAN 与 IPVLAN 的差异、NAD 配置方法、以及生产级多网卡环境的搭建。\n\n#### 57.1 背景与概述\n\n##### 57.1.1 MACVLAN vs IPVLAN 核心差异\n\n```mermaid\ngraph TB\n    subgraph \"MACVLAN\"\n        MV_M[\"Master 接口\"]\n        MV_S1[\"子接口1<br/>MAC: AA:BB:CC:01\"]\n        MV_S2[\"子接口2<br/>MAC: AA:BB:CC:02\"]\n        MV_M --> MV_S1\n        MV_M --> MV_S2\n    end\n    \n    subgraph \"IPVLAN\"\n        IV_M[\"Master 接口<br/>MAC: AA:BB:CC:00\"]\n        IV_S1[\"子接口1<br/>MAC: AA:BB:CC:00\"]\n        IV_S2[\"子接口2<br/>MAC: AA:BB:CC:00\"]\n        IV_M --> IV_S1\n        IV_M --> IV_S2\n    end\n```\n\n| 特性 | MACVLAN | IPVLAN |\n|:---|:---|:---|\n| MAC 地址 | **各不相同** | 共享父接口 MAC |\n| 内核支持 | 3.x 早期版本 | 4.x+ |\n| 理解难度 | 简单（传统模式） | 需理解共享 MAC |\n| 公有云兼容 | 可能受限（MAC 检查） | 更友好 |\n| 典型场景 | 传统网卡复用 | 云原生环境 |\n\n> [!NOTE]\n> **关键区别**\n>\n> - MACVLAN：每个子接口有 **独立的 MAC 地址**\n> - IPVLAN：所有子接口 **共享父接口的 MAC 地址**\n\n##### 57.1.2 MACVLAN 工作模式\n\n| 模式 | 说明 | 使用场景 |\n|:---|:---|:---|\n| **bridge** | 子接口间可直接通信（最常用） | 生产环境默认 |\n| private | 子接口间完全隔离 | 安全隔离 |\n| vepa | 流量必须经过外部交换机 | 硬件卸载 |\n| passthrough | 直通模式 | SR-IOV |\n\n#### 57.2 基础 MACVLAN 配置\n\n##### 57.2.1 NAD 配置示例\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: macvlan-basic\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"macvlan-net\",\n    \"type\": \"macvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"bridge\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"15.15.1.0/24\"\n    }\n  }'\n```\n\n##### 57.2.2 配置要点\n\n```mermaid\nflowchart LR\n    subgraph \"NAD 配置\"\n        type[\"type: macvlan\"]\n        master[\"master: eth0\"]\n        mode[\"mode: bridge\"]\n    end\n    \n    type --> |网卡复用类型| macvlan[\"MACVLAN\"]\n    master --> |父接口| eth0[\"物理/虚拟网卡\"]\n    mode --> |工作模式| bridge[\"Bridge 模式\"]\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| type | `macvlan` - 网卡复用类型 |\n| master | 父接口名称（复用哪张网卡） |\n| mode | 工作模式，通常用 `bridge` |\n| ipam | IP 地址管理，通常用 whereabouts |\n\n#### 57.3 MACVLAN 基础验证\n\n##### 57.3.1 创建测试 Pod\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: macvlan-pod1\n  annotations:\n    k8s.v1.cni.cncf.io/networks: macvlan-basic\nspec:\n  containers:\n  - name: test\n    image: nicolaka/netshoot\n    command: [\"sleep\", \"infinity\"]\n```\n\n##### 57.3.2 验证网络\n\n```bash\n# 查看 Pod 网卡\nkubectl exec macvlan-pod1 -- ip a\n\n# 输出示例：\n# eth1: <BROADCAST,MULTICAST,UP>\n#   link/ether 2a:b7:78:7c:xx:xx\n#   inet 15.15.1.20/24\n\n# MACVLAN 的 MAC 地址与父接口不同！\n```\n\n##### 57.3.3 同网段通信验证\n\n```mermaid\nsequenceDiagram\n    participant Pod1 as Pod1<br/>15.15.1.20\n    participant Pod2 as Pod2<br/>15.15.1.21\n    \n    Pod1->>Pod1: ARP: 谁是 15.15.1.21?\n    Pod2->>Pod1: ARP Reply: 我是 2a:99:66:xx\n    Pod1->>Pod2: ICMP Echo Request\n    Pod2->>Pod1: ICMP Echo Reply\n```\n\n> [!TIP]\n> **MACVLAN 同网段通信**\n>\n> MACVLAN 子接口之间的通信走 **二层直连**，因为 MAC 地址不同，可以正常 ARP 解析。\n\n#### 57.4 MACVLAN + SBR 高级配置\n\n##### 57.4.1 为什么需要 SBR\n\n```mermaid\ngraph TB\n    subgraph \"问题场景\"\n        Pod[\"Pod<br/>eth0: 默认网卡<br/>eth1: MACVLAN\"]\n        Default[\"默认路由 - eth0\"]\n        External[\"外网 114.114.114.114\"]\n        \n        Pod --> Default\n        Default -.-> |\"eth1 无法上外网\"| External\n    end\n```\n\n**问题**：MACVLAN 接口默认没有默认路由，无法访问外网。\n\n**解决**：使用 SBR 为 MACVLAN 接口添加专属路由表。\n\n##### 57.4.2 NAD + SBR 插件配置\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: macvlan-sbr\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"macvlan-sbr-net\",\n    \"plugins\": [\n      {\n        \"type\": \"macvlan\",\n        \"master\": \"eth1\",\n        \"mode\": \"bridge\",\n        \"ipam\": {\n          \"type\": \"whereabouts\",\n          \"range\": \"15.15.1.0/24\",\n          \"gateway\": \"15.15.1.1\",\n          \"routes\": [\n            {\"dst\": \"0.0.0.0/0\"}\n          ]\n        }\n      },\n      {\n        \"type\": \"sbr\"\n      }\n    ]\n  }'\n```\n\n##### 57.4.3 plugins 链式配置\n\n```mermaid\nflowchart LR\n    subgraph \"plugins 链式调用\"\n        P1[\"Plugin 1<br/>macvlan\"]\n        P2[\"Plugin 2<br/>sbr\"]\n    end\n    \n    P1 --> |创建网卡| P2\n    P2 --> |添加原地路由| Result[\"完成配置\"]\n```\n\n| 插件 | 作用 |\n|:---|:---|\n| macvlan | 创建 MACVLAN 子接口 |\n| sbr | 自动添加 `ip rule` + `ip route table` |\n\n> [!IMPORTANT]\n> **自动化 SBR**\n>\n> 通过 `plugins` 数组配置 `sbr` 插件，Pod 启动时 **自动** 添加原地路由，无需手动配置！\n\n#### 57.5 Kind + ContainerLab 多网卡环境\n\n##### 57.5.1 架构设计\n\n```mermaid\ngraph TB\n    subgraph \"ContainerLab\"\n        GW[\"Gateway<br/>VyOS 路由器\"]\n        BR[\"Bridge\"]\n        \n        GW --> BR\n    end\n    \n    subgraph \"Kind K8s 集群\"\n        M[\"Master<br/>eth0 + eth1\"]\n        W1[\"Worker1<br/>eth0 + eth1\"]\n        W2[\"Worker2<br/>eth0 + eth1\"]\n    end\n    \n    BR --> M\n    BR --> W1\n    BR --> W2\n    \n    subgraph \"网卡来源\"\n        eth0_src[\"eth0 - Kind 网络\"]\n        eth1_src[\"eth1 - ContainerLab\"]\n    end\n```\n\n##### 57.5.2 多网段设计\n\n| 网卡 | 网段 | 网关 | 用途 |\n|:---|:---|:---|:---|\n| eth0 | 172.20.20.0/24 | Kind 默认 | K8s 集群通信 |\n| eth1 | 15.15.1.0/24 | 15.15.1.1 | MACVLAN 网络1 |\n| eth2 | 16.16.1.0/24 | 16.16.1.1 | MACVLAN 网络2 |\n\n#### 57.6 多网卡 Pod 配置\n\n##### 57.6.1 三网卡 Pod 示例\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: multi-nic-pod\n  annotations:\n    k8s.v1.cni.cncf.io/networks: macvlan-sbr-net1, macvlan-sbr-net2\nspec:\n  containers:\n  - name: test\n    image: nicolaka/netshoot\n    command: [\"sleep\", \"infinity\"]\n```\n\n##### 57.6.2 Pod 网络结构\n\n```mermaid\ngraph TB\n    subgraph \"Pod: multi-nic-pod\"\n        eth0[\"eth0<br/>K8s 默认网络<br/>10.244.x.x\"]\n        eth1[\"eth1<br/>MACVLAN 网络1<br/>15.15.1.2\"]\n        eth2[\"eth2<br/>MACVLAN 网络2<br/>16.16.1.2\"]\n    end\n    \n    eth0 --> K8s[\"K8s 集群通信\"]\n    eth1 --> Net1[\"业务网络1\"]\n    eth2 --> Net2[\"业务网络2\"]\n```\n\n##### 57.6.3 验证 SBR 自动配置\n\n```bash\n# 查看路由规则\nkubectl exec multi-nic-pod -- ip rule\n# 输出：\n# 0:     from all lookup local\n# 100:   from 15.15.1.0/24 lookup 100\n# 101:   from 16.16.1.0/24 lookup 101\n# 32766: from all lookup main\n# 32767: from all lookup default\n\n# 查看路由表\nkubectl exec multi-nic-pod -- ip route show table 100\n# 输出：\n# 15.15.1.0/24 dev eth1 scope link\n# default via 15.15.1.1 dev eth1\n```\n\n#### 57.7 多网卡通信验证\n\n##### 57.7.1 验证场景\n\n```mermaid\nflowchart TB\n    subgraph \"验证项目\"\n        T1[\"同网段 Pod 互通\"]\n        T2[\"跨网段 Pod 互通\"]\n        T3[\"每张网卡上外网\"]\n        T4[\"网关可达性\"]\n    end\n```\n\n##### 57.7.2 验证命令\n\n```bash\n# 同网段 Pod 互通\nping -I 15.15.1.2 15.15.1.3\n\n# 跨网段 Pod 互通（通过网关）\nping -I 15.15.1.2 16.16.1.3\n\n# 每张网卡上外网\nping -I 15.15.1.2 114.114.114.114\nping -I 16.16.1.2 114.114.114.114\n```\n\n#### 57.8 生产应用场景\n\n##### 57.8.1 网卡功能分离\n\n```mermaid\ngraph LR\n    subgraph \"Pod 多网卡\"\n        eth0[\"eth0<br/>O&M 管理\"]\n        eth1[\"eth1<br/>Data 业务\"]\n        eth2[\"eth2<br/>Media 媒体\"]\n    end\n    \n    eth0 --> OM[\"SSH/监控/运维\"]\n    eth1 --> Data[\"数据处理\"]\n    eth2 --> Media[\"流媒体传输\"]\n```\n\n##### 57.8.2 典型行业应用\n\n| 行业 | 网卡用途 | 说明 |\n|:---|:---|:---|\n| 电信 | Control/Data 分离 | 控制面与数据面隔离 |\n| 流媒体 | Media/Signal 分离 | 媒体流与信令分离 |\n| 金融 | Trade/Admin 分离 | 交易网络与管理网络隔离 |\n\n#### 57.9 性能对比\n\n| 方案 | 性能级别 | 说明 |\n|:---|:---|:---|\n| MACVLAN Bridge | ⭐⭐⭐⭐ | 接近物理网卡性能 |\n| IPVLAN L2 | ⭐⭐⭐⭐ | 与 MACVLAN 相当 |\n| SR-IOV + DPDK | ⭐⭐⭐⭐⭐ | 最高性能（硬件虚拟化） |\n| Overlay (VxLAN) | ⭐⭐ | 封装开销较大 |\n\n#### 57.10 章节小结\n\n```mermaid\nmindmap\n  root((MACVLAN-SBR 实践))\n    MACVLAN 特点\n      独立 MAC 地址\n      早期内核支持\n      Bridge 模式最常用\n    与 IPVLAN 对比\n      MAC 独立 vs 共享\n      理解难度\n      云环境兼容性\n    SBR 配置\n      plugins 链式调用\n      sbr 插件自动配置\n      无需手动添加路由\n    多网卡环境\n      Kind + ContainerLab\n      VyOS 网关\n      多网段设计\n    生产应用\n      O&M/Data/Media 分离\n      电信/流媒体/金融\n```\n\n> [!TIP]\n> **MACVLAN-SBR 实践要点总结**：\n>\n> 1. **MACVLAN 特点**：每个子接口有独立 MAC 地址，Bridge 模式最常用\n>\n> 2. **与 IPVLAN 区别**：MACVLAN MAC 独立，IPVLAN MAC 共享\n>\n> 3. **SBR 自动配置**：使用 `plugins` 数组添加 `{\"type\": \"sbr\"}`\n>\n> 4. **多网卡环境**：Kind + ContainerLab 集成，多网卡可同时上外网\n>\n> 5. **生产应用**：网卡功能分离（管理/业务/媒体），电信、流媒体、金融行业常用\n\n---", "subs": ["57.1 背景与概述", "57.2 基础 MACVLAN 配置", "57.3 MACVLAN 基础验证", "57.4 MACVLAN + SBR 高级配置", "57.5 Kind + ContainerLab 多网卡环境", "57.6 多网卡 Pod 配置", "57.7 多网卡通信验证", "57.8 生产应用场景", "57.9 性能对比", "57.10 章节小结"]}, {"title": "第五十八章 Multus-with-SRIOV-Kernel", "content": "本章介绍 SR-IOV Kernel 模式在 Kubernetes 中的应用，包括 SR-IOV 原理、硬件虚拟化技术、组件配置及与 Multus 的集成。\n\n#### 58.1 背景与概述\n\n##### 58.1.1 高性能网络需求\n\n```mermaid\ngraph TB\n    subgraph \"传统网络路径\"\n        App[\"应用\"]\n        Socket[\"Socket 层\"]\n        TCPIP[\"TCP/IP 协议栈\"]\n        Driver[\"网卡驱动\"]\n        NIC[\"物理网卡\"]\n        \n        App --> Socket --> TCPIP --> Driver --> NIC\n    end\n```\n\n**问题**：当网卡带宽超过 10G 时，传统内核协议栈成为性能瓶颈。\n\n**解决方案**：Kernel Bypass（内核旁路）技术。\n\n##### 58.1.2 SR-IOV 核心概念\n\n| 术语 | 说明 |\n|:---|:---|\n| **PF (Physical Function)** | 物理网卡，完整的 PCIe 功能 |\n| **VF (Virtual Function)** | 虚拟网卡，PF 划分出的轻量级功能 |\n| **SR-IOV** | Single Root I/O Virtualization，硬件虚拟化标准 |\n\n```mermaid\ngraph TB\n    subgraph \"SR-IOV 架构\"\n        PF[\"PF - 物理网卡<br/>10G/25G/40G\"]\n        VF1[\"VF0\"]\n        VF2[\"VF1\"]\n        VF3[\"VF2\"]\n        VFn[\"VF...\"]\n        \n        PF --> VF1\n        PF --> VF2\n        PF --> VF3\n        PF --> VFn\n    end\n    \n    subgraph \"Pod\"\n        Pod1[\"Pod1<br/>使用 VF0\"]\n        Pod2[\"Pod2<br/>使用 VF1\"]\n    end\n    \n    VF1 --> Pod1\n    VF2 --> Pod2\n```\n\n> [!NOTE]\n> **SR-IOV 优势**\n>\n> - **硬件虚拟化**：VF 直接由硬件提供，不经过 Host OS 协议栈\n> - **高性能**：接近物理网卡性能\n> - **资源隔离**：每个 VF 独立的带宽和资源\n\n#### 58.2 SR-IOV vs DPDK\n\n##### 58.2.1 Kernel Bypass 层次\n\n```mermaid\ngraph TB\n    subgraph \"裸机环境 - 双层 Bypass\"\n        Pod[\"Pod\"]\n        PodStack[\"Pod 协议栈\"]\n        HostStack[\"Host OS 协议栈\"]\n        HW[\"物理网卡\"]\n        \n        Pod --> |\"DPDK/VPP Bypass\"| PodStack\n        PodStack -.-> |\"SR-IOV Bypass\"| HostStack\n        HostStack --> HW\n    end\n    \n    style PodStack stroke-dasharray: 5 5\n    style HostStack stroke-dasharray: 5 5\n```\n\n| 技术 | Bypass 层级 | 说明 |\n|:---|:---|:---|\n| **SR-IOV Kernel** | Host OS 协议栈 | VF 直通到 Pod |\n| **DPDK/VPP** | Pod 协议栈 | 用户态协议栈处理 |\n| **SR-IOV + DPDK** | 双层 Bypass | 最高性能 |\n\n##### 58.2.2 适用场景\n\n```mermaid\nflowchart LR\n    subgraph \"SR-IOV Kernel\"\n        K1[\"通用高性能场景\"]\n        K2[\"简单配置\"]\n        K3[\"保留内核协议栈\"]\n    end\n    \n    subgraph \"SR-IOV + DPDK\"\n        D1[\"极致性能场景\"]\n        D2[\"流媒体处理\"]\n        D3[\"电信 NFV\"]\n    end\n```\n\n#### 58.3 BIOS/内核预设置\n\n##### 58.3.1 BIOS 设置\n\n| 设置项 | 说明 |\n|:---|:---|\n| **VT-d** | Intel 虚拟化技术，必须开启 |\n| **SR-IOV** | 网卡 SR-IOV 功能，必须开启 |\n\n##### 58.3.2 内核参数\n\n```bash\n# 编辑 GRUB 配置\nvi /etc/default/grub\n\n# 添加内核参数\nGRUB_CMDLINE_LINUX=\"intel_iommu=on iommu=pt\"\n\n# 更新 GRUB\ngrub2-mkconfig -o /boot/grub2/grub.cfg\n\n# 重启生效\nreboot\n```\n\n##### 58.3.3 HugePages（大页内存）配置\n\n```bash\n# 编辑配置\nvi /etc/sysctl.d/hugepages.conf\n\n# 添加内容\nvm.nr_hugepages = 16\nvm.hugetlb_shm_group = 0\n\n# 应用配置\nsysctl -p /etc/sysctl.d/hugepages.conf\n```\n\n| 参数 | 说明 |\n|:---|:---|\n| nr_hugepages | 大页数量（1G 页 x 16 = 16G） |\n| 用途 | 提高内存命中率，减少 TLB miss |\n\n> [!IMPORTANT]\n> **HugePages 注意事项**\n>\n> - HugePages 是从系统内存中划分的\n> - 例如：800G 内存，配置 300G HugePages，剩余 500G 可用\n> - 需要根据 Pod 数量和单 Pod 内存需求规划\n\n#### 58.4 VF 创建与管理\n\n##### 58.4.1 创建 VF\n\n```bash\n# 查看网卡\nip link show\n\n# 创建 VF（例如：eth2 创建 8 个 VF）\necho 8 > /sys/class/net/eth2/device/sriov_numvfs\n\n# 验证\nip -d link show eth2\n# 输出会显示 vf 0, vf 1, ..., vf 7\n```\n\n##### 58.4.2 VF 数量规划\n\n| 网卡带宽 | VF 数量 | 单 VF 带宽 |\n|:---|:---|:---|\n| 10G | 8 | ~1.25G |\n| 25G | 8 | ~3G |\n| 40G | 16 | ~2.5G |\n\n#### 58.5 SR-IOV Network Device Plugin\n\n##### 58.5.1 组件作用\n\n```mermaid\ngraph TB\n    subgraph \"SR-IOV 组件栈\"\n        DP[\"SR-IOV Network Device Plugin<br/>VF 管理、资源上报\"]\n        CNI[\"SR-IOV CNI<br/>网络通路搭建\"]\n        Multus[\"Multus CNI<br/>多网卡管理\"]\n    end\n    \n    DP --> |\"发现 VF\"| K8s[\"K8s 资源\"]\n    CNI --> |\"注入 VF\"| Pod[\"Pod\"]\n    Multus --> |\"调度网卡\"| CNI\n```\n\n##### 58.5.2 安装 Device Plugin\n\n```bash\n# 部署 SR-IOV Network Device Plugin\nkubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/sriov-network-device-plugin/master/deployments/k8s-v1.16/sriovdp-daemonset.yaml\n```\n\n##### 58.5.3 ConfigMap 配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: sriovdp-config\n  namespace: kube-system\ndata:\n  config.json: |\n    {\n      \"resourceList\": [\n        {\n          \"resourceName\": \"sriov_netdevice\",\n          \"selectors\": {\n            \"vendors\": [\"8086\"],\n            \"devices\": [\"154c\"],\n            \"drivers\": [\"i40evf\"],\n            \"pfNames\": [\"eth2\", \"eth3\"]\n          }\n        }\n      ]\n    }\n```\n\n| 字段 | 说明 |\n|:---|:---|\n| resourceName | K8s 资源名称 |\n| vendors | 网卡厂商 ID（如 8086 = Intel） |\n| devices | 设备 ID |\n| drivers | VF 驱动名称 |\n| pfNames | PF 网卡名称 |\n\n##### 58.5.4 验证资源\n\n```bash\n# 查看节点资源\nkubectl describe node <node-name> | grep -A 10 \"Allocatable\"\n\n# 输出示例：\n# intel.com/sriov_netdevice: 16\n# hugepages-1Gi: 64Gi\n```\n\n#### 58.6 SR-IOV CNI\n\n##### 58.6.1 安装 SR-IOV CNI\n\n```bash\n# 部署 SR-IOV CNI\nkubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/sriov-cni/master/images/sriov-cni-daemonset.yaml\n```\n\n##### 58.6.2 CNI 工作原理\n\n```mermaid\nsequenceDiagram\n    participant Kubelet\n    participant Multus\n    participant SRIOV_CNI as SR-IOV CNI\n    participant Pod\n    \n    Kubelet->>Multus: 创建 Pod 请求\n    Multus->>Multus: 解析 NAD 注解\n    Multus->>SRIOV_CNI: 调用 SR-IOV CNI\n    SRIOV_CNI->>SRIOV_CNI: 分配 VF\n    SRIOV_CNI->>Pod: 注入 VF 网卡\n    SRIOV_CNI->>Multus: 返回结果\n    Multus->>Kubelet: 完成\n```\n\n#### 58.7 NAD 配置\n\n##### 58.7.1 完整 NAD 示例\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: sriov-net\n  annotations:\n    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_netdevice\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"sriov-network\",\n    \"type\": \"sriov\",\n    \"spoofchk\": \"on\",\n    \"trust\": \"on\",\n    \"vlan\": 100,\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"192.168.100.0/24\",\n      \"range_start\": \"192.168.100.10\",\n      \"range_end\": \"192.168.100.200\"\n    }\n  }'\n```\n\n##### 58.7.2 关键参数说明\n\n| 参数 | 说明 |\n|:---|:---|\n| **spoofchk** | MAC 欺骗检查，`on` 开启 |\n| **trust** | 信任模式，`on` 允许接收 GARP |\n| **vlan** | VLAN ID，可选 |\n| resourceName | 引用 Device Plugin 定义的资源 |\n\n> [!TIP]\n> **trust 参数**\n>\n> - 开启后 VF 可以接收 GARP（Gratuitous ARP）消息\n> - 避免 Pod 重启后因 MAC 地址变化导致的短暂不可达\n\n#### 58.8 Pod 配置\n\n##### 58.8.1 Pod 示例\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: sriov-pod\n  annotations:\n    k8s.v1.cni.cncf.io/networks: sriov-net\nspec:\n  containers:\n  - name: app\n    image: nicolaka/netshoot\n    command: [\"sleep\", \"infinity\"]\n    resources:\n      requests:\n        intel.com/sriov_netdevice: \"1\"\n      limits:\n        intel.com/sriov_netdevice: \"1\"\n```\n\n##### 58.8.2 资源声明\n\n```mermaid\nflowchart LR\n    subgraph \"资源声明\"\n        A[\"resources.requests\"]\n        B[\"intel.com/sriov_netdevice: 1\"]\n    end\n    \n    A --> B\n    B --> |\"调度器检查\"| Node[\"有 VF 的节点\"]\n    Node --> |\"分配 VF\"| Pod[\"Pod\"]\n```\n\n> [!IMPORTANT]\n> **必须声明资源**\n>\n> 与 MACVLAN/IPVLAN 不同，SR-IOV 必须在 Pod 中声明资源请求，否则调度器无法分配 VF。\n\n#### 58.9 验证与调试\n\n##### 58.9.1 验证命令\n\n```bash\n# 查看 Pod 网卡\nkubectl exec sriov-pod -- ip a\n\n# 查看网卡驱动\nkubectl exec sriov-pod -- ethtool -i net1\n# driver: i40evf\n\n# 查看 VF 分配\nip -d link show eth2 | grep vf\n```\n\n##### 58.9.2 常见问题\n\n| 问题 | 原因 | 解决 |\n|:---|:---|:---|\n| VF 数量为 0 | 未创建 VF | `echo N > sriov_numvfs` |\n| 资源不可见 | ConfigMap 配置错误 | 检查 pfNames、drivers |\n| Pod 无法调度 | VF 不足 | 增加 VF 或减少 Pod |\n\n#### 58.10 章节小结\n\n```mermaid\nmindmap\n  root((SR-IOV Kernel))\n    原理\n      PF 到 VF 映射\n      硬件虚拟化\n      Bypass Host OS\n    预设置\n      BIOS VT-d\n      内核 IOMMU\n      HugePages\n    组件\n      Device Plugin\n      SR-IOV CNI\n      Multus\n    配置\n      ConfigMap 资源定义\n      NAD 网络配置\n      Pod 资源声明\n    关键参数\n      spoofchk\n      trust\n      vlan\n```\n\n> [!TIP]\n> **SR-IOV Kernel 要点总结**：\n>\n> 1. **原理**：PF 划分为多个 VF，VF 直通到 Pod，Bypass Host OS 协议栈\n>\n> 2. **预设置**：BIOS 开启 VT-d/SR-IOV，内核配置 IOMMU，配置 HugePages\n>\n> 3. **组件**：\n>    - Device Plugin：管理 VF，上报资源\n>    - SR-IOV CNI：搭建网络通路\n>    - Multus：多网卡管理\n>\n> 4. **配置流程**：\n>    - 创建 VF → 部署 Device Plugin → 部署 SR-IOV CNI → 创建 NAD → 创建 Pod\n>\n> 5. **关键参数**：`spoofchk`、`trust`、`vlan`、资源请求\n\n---", "subs": ["58.1 背景与概述", "58.2 SR-IOV vs DPDK", "58.3 BIOS/内核预设置", "58.4 VF 创建与管理", "58.5 SR-IOV Network Device Plugin", "58.6 SR-IOV CNI", "58.7 NAD 配置", "58.8 Pod 配置", "58.9 验证与调试", "58.10 章节小结"]}, {"title": "第五十九章 Multus-with-SRIOV-DPDK-VPP", "content": "本章介绍 SR-IOV 结合 DPDK/VPP 的高性能网络方案，涵盖驱动配置、PMD 原理、CPU 绑核隔离等关键技术。\n\n#### 59.1 背景与概述\n\n##### 59.1.1 SR-IOV Kernel vs SR-IOV DPDK\n\n```mermaid\ngraph TB\n    subgraph \"SR-IOV Kernel\"\n        K_VF[\"VF\"]\n        K_Kernel[\"内核协议栈\"]\n        K_Pod[\"Pod\"]\n        \n        K_VF --> K_Kernel --> K_Pod\n    end\n    \n    subgraph \"SR-IOV DPDK\"\n        D_VF[\"VF\"]\n        D_VPP[\"VPP 用户态协议栈\"]\n        D_Pod[\"Pod\"]\n        \n        D_VF --> D_VPP --> D_Pod\n    end\n```\n\n| 对比项 | SR-IOV Kernel | SR-IOV DPDK |\n|:---|:---|:---|\n| 协议栈 | 内核协议栈 | 用户态协议栈（VPP） |\n| Bypass 层级 | Host OS | Host OS + Pod 内核 |\n| 驱动 | 原生驱动（i40evf, sfc_efx） | vfio-pci, igb_uio |\n| 性能 | 高 | 极高 |\n| 复杂度 | 低 | 高 |\n\n##### 59.1.2 双层 Bypass 架构\n\n```mermaid\ngraph TB\n    subgraph \"裸机 DPDK 完整架构\"\n        APP[\"应用\"]\n        VPP[\"VPP 用户态协议栈<br/>（DPDK Bypass Pod 内核）\"]\n        VF[\"VF（SR-IOV）<br/>（Bypass Host OS 内核）\"]\n        PF[\"物理网卡 PF\"]\n        \n        APP --> VPP\n        VPP --> VF\n        VF --> PF\n    end\n```\n\n> [!TIP]\n> **双层 Bypass 理解**\n>\n> - **第一层**：SR-IOV VF 直通，Bypass Host OS 内核协议栈\n> - **第二层**：DPDK/VPP 用户态协议栈，Bypass Pod 内核协议栈\n\n#### 59.2 DPDK 驱动类型\n\n##### 59.2.1 驱动对比\n\n| 驱动 | 说明 | 推荐 |\n|:---|:---|:---|\n| **vfio-pci** | 现代推荐驱动，安全性好 | ✅ 生产推荐 |\n| **igb_uio** | 早期驱动，需要更高权限 | ❌ 不推荐 |\n| **uio_generic** | 通用驱动，性能较低 | ❌ 备选 |\n\n##### 59.2.2 驱动选择原因\n\n```mermaid\nflowchart TD\n    A[\"选择 DPDK 驱动\"] --> B{\"是否支持非特权模式?\"}\n    B -->|\"是\"| C[\"vfio-pci ✅\"]\n    B -->|\"否\"| D[\"igb_uio\"]\n    \n    C --> E[\"安全性好<br/>capabilities 要求少\"]\n    D --> F[\"需要 privileged: true<br/>安全风险\"]\n```\n\n> [!IMPORTANT]\n> **生产环境驱动选择**\n>\n> - 优先使用 `vfio-pci`，支持非特权模式运行\n> - 避免使用 `igb_uio`，需要更高权限\n> - `vfio-pci` 对 capabilities 要求更少，更安全\n\n#### 59.3 驱动绑定操作\n\n##### 59.3.1 加载驱动模块\n\n```bash\n# 加载 vfio-pci 驱动\nmodprobe vfio-pci\n```\n\n##### 59.3.2 绑定 VF 到 DPDK 驱动\n\n```bash\n# 查看 VF 的 PCI 地址\nlspci | grep -i ethernet\n\n# 使用 dpdk-devbind 脚本绑定驱动\n# 解绑原有驱动并绑定到 vfio-pci\nfor pci_addr in <VF_PCI_ADDR_LIST>; do\n    dpdk-devbind.py -u $pci_addr\n    dpdk-devbind.py -b vfio-pci $pci_addr\ndone\n\n# 验证驱动绑定\ndpdk-devbind.py --status\n```\n\n##### 59.3.3 验证 VF 配置\n\n```bash\n# 查看 VF 状态\nip -d link show eth6\n\n# 输出示例：\n# eth6: ... link/ether ...\n#     vf 0 MAC ... spoof check on, trust on\n#     vf 1 MAC ... spoof check on, trust on\n#     ...\n```\n\n#### 59.4 DPDK PMD 原理\n\n##### 59.4.1 中断模式 vs 轮询模式\n\n```mermaid\nsequenceDiagram\n    participant NIC as 网卡\n    participant Kernel as 内核\n    participant App as 应用\n    \n    Note over NIC, App: 传统中断模式\n    NIC->>Kernel: 硬中断\n    Kernel->>Kernel: 软中断处理\n    Kernel->>App: 数据包\n    \n    Note over NIC, App: DPDK PMD 轮询模式\n    loop 持续轮询\n        App->>NIC: 主动查询\n        NIC-->>App: 返回数据包\n    end\n```\n\n| 模式 | 中断模式 | PMD 轮询模式 |\n|:---|:---|:---|\n| 触发方式 | 被动（中断触发） | 主动（持续轮询） |\n| CPU 使用 | 按需 | 100% 占用 |\n| 延迟 | 较高 | 极低 |\n| 适用场景 | 通用场景 | 高性能转发 |\n\n##### 59.4.2 PMD 工作原理\n\n```mermaid\ngraph LR\n    subgraph \"PMD Poll Mode Driver\"\n        CPU[\"专用 CPU<br/>100% 占用\"]\n        Ring[\"Ring Buffer\"]\n        VF[\"VF 网卡\"]\n        \n        CPU --> |\"持续轮询\"| Ring\n        VF --> Ring\n        Ring --> VF\n    end\n```\n\n> [!TIP]\n> **PMD 核心特点**\n>\n> - CPU 持续轮询，不依赖中断\n> - CPU 显示 100% 使用率（正常现象）\n> - 实现纳秒级延迟\n\n#### 59.5 CPU 绑核与隔离\n\n##### 59.5.1 为什么需要 CPU 绑核\n\n```mermaid\nflowchart TD\n    A[\"PMD 需要 CPU 持续轮询\"] --> B[\"问题：CPU 被其他进程抢占\"]\n    B --> C[\"后果：数据包丢失/延迟\"]\n    C --> D[\"解决：CPU 绑核隔离\"]\n```\n\n**问题**：PMD 需要 CPU 24 小时持续轮询，如果 CPU 被其他进程抢占，会导致数据包丢失。\n\n**解决**：CPU 绑核隔离，确保 PMD 专用 CPU 不被抢占。\n\n##### 59.5.2 禁用 irqbalance\n\n```bash\n# 停止 irqbalance 服务\nsystemctl stop irqbalance\nsystemctl disable irqbalance\n```\n\n> [!IMPORTANT]\n> **irqbalance 说明**\n>\n> - irqbalance 会动态分配中断到不同 CPU\n> - 对于 PMD 专用场景，必须禁用\n> - 禁用后 CPU 使用更可控\n\n##### 59.5.3 配置 CPU 隔离\n\n```bash\n# 编辑 GRUB 配置\nvi /etc/default/grub\n\n# 添加 isolcpus 参数\nGRUB_CMDLINE_LINUX=\"intel_iommu=on iommu=pt isolcpus=4-51,56-103\"\n\n# 更新 GRUB\ngrub2-mkconfig -o /boot/grub2/grub.cfg\n\n# 重启生效\nreboot\n```\n\n##### 59.5.4 CPU 分配策略\n\n```mermaid\ngraph LR\n    subgraph \"NUMA 0\"\n        SYS0[\"CPU 0-3<br/>系统预留\"]\n        APP0[\"CPU 4-51<br/>Pod 专用\"]\n    end\n    \n    subgraph \"NUMA 1\"\n        SYS1[\"CPU 52-55<br/>系统预留\"]\n        APP1[\"CPU 56-103<br/>Pod 专用\"]\n    end\n```\n\n| CPU 范围 | 用途 |\n|:---|:---|\n| 0-3, 52-55 | 系统预留（K8s、基础服务） |\n| 4-51, 56-103 | Pod 专用（PMD、VPP） |\n\n#### 59.6 NAD 配置差异\n\n##### 59.6.1 DPDK NAD 特点\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: sriov-dpdk-net\n  annotations:\n    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov_dpdk\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"sriov-dpdk-network\",\n    \"type\": \"sriov\",\n    \"vlan\": 100\n  }'\n```\n\n> [!WARNING]\n> **DPDK 模式 IPAM 注意事项**\n>\n> - DPDK 模式下，VPP 接管协议栈\n> - 传统 IPAM（如 whereabouts）**无法直接使用**\n> - IP 配置需通过 VPP 内部机制完成\n\n##### 59.6.2 ConfigMap 驱动配置\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: sriovdp-config\n  namespace: kube-system\ndata:\n  config.json: |\n    {\n      \"resourceList\": [\n        {\n          \"resourceName\": \"sriov_dpdk\",\n          \"selectors\": {\n            \"vendors\": [\"8086\"],\n            \"drivers\": [\"vfio-pci\"],\n            \"pfNames\": [\"eth2\", \"eth3\"]\n          }\n        },\n        {\n          \"resourceName\": \"sriov_kernel\",\n          \"selectors\": {\n            \"vendors\": [\"8086\"],\n            \"drivers\": [\"i40evf\"],\n            \"pfNames\": [\"eth4\", \"eth5\"]\n          }\n        }\n      ]\n    }\n```\n\n#### 59.7 Fast Path vs Slow Path\n\n##### 59.7.1 概念对比\n\n```mermaid\ngraph TB\n    subgraph \"Slow Path - 传统路径\"\n        S_App[\"应用\"]\n        S_Kernel[\"内核协议栈\"]\n        S_Driver[\"网卡驱动\"]\n        S_NIC[\"网卡\"]\n        \n        S_App --> S_Kernel --> S_Driver --> S_NIC\n    end\n    \n    subgraph \"Fast Path - DPDK 路径\"\n        F_App[\"应用\"]\n        F_VPP[\"VPP/DPDK\"]\n        F_NIC[\"网卡 VF\"]\n        \n        F_App --> F_VPP --> F_NIC\n    end\n```\n\n| 路径 | 延迟 | 吞吐量 | 适用场景 |\n|:---|:---|:---|:---|\n| Slow Path | 高 | 一般 | 通用场景 |\n| Fast Path | 极低 | 极高 | NFV、流媒体、金融 |\n\n#### 59.8 生产应用场景\n\n##### 59.8.1 典型应用领域\n\n```mermaid\nmindmap\n  root((SR-IOV DPDK 应用))\n    电信 NFV\n      虚拟路由器\n      虚拟防火墙\n      vBNG\n    流媒体处理\n      视频转码\n      CDN 边缘节点\n      直播推流\n    金融交易\n      高频交易\n      低延迟网关\n      行情分发\n    网络安全\n      DDoS 防护\n      流量清洗\n      深度包检测\n```\n\n#### 59.9 章节小结\n\n```mermaid\nmindmap\n  root((SR-IOV DPDK VPP))\n    驱动选择\n      vfio-pci 推荐\n      igb_uio 不推荐\n      dpdk-devbind 绑定\n    PMD 原理\n      轮询模式\n      CPU 100%\n      纳秒延迟\n    CPU 隔离\n      禁用 irqbalance\n      isolcpus\n      NUMA 感知\n    配置差异\n      IPAM 不适用\n      VPP 配置 IP\n      驱动区分资源\n    性能优势\n      双层 Bypass\n      Fast Path\n      极致性能\n```\n\n> [!TIP]\n> **SR-IOV DPDK VPP 要点总结**：\n>\n> 1. **驱动选择**：优先 `vfio-pci`，安全且支持非特权模式\n>\n> 2. **PMD 原理**：Poll Mode Driver 持续轮询，CPU 100% 占用但延迟极低\n>\n> 3. **CPU 隔离**：\n>    - 禁用 irqbalance\n>    - 配置 isolcpus 参数\n>    - NUMA 感知分配\n>\n> 4. **配置差异**：\n>    - DPDK 模式下传统 IPAM 不适用\n>    - 驱动类型区分 Kernel 和 DPDK 资源\n>\n> 5. **性能优势**：双层 Bypass + Fast Path = 极致性能\n\n---", "subs": ["59.1 背景与概述", "59.2 DPDK 驱动类型", "59.3 驱动绑定操作", "59.4 DPDK PMD 原理", "59.5 CPU 绑核与隔离", "59.6 NAD 配置差异", "59.7 Fast Path vs Slow Path", "59.8 生产应用场景", "59.9 章节小结"]}, {"title": "第六十章 K8s-CNI-IPAM 机制详解", "content": "本章系统介绍 Kubernetes CNI 中的 IPAM（IP Address Management）机制，涵盖各种 IPAM 类型、适用场景和选型建议。\n\n#### 60.1 背景与概述\n\n##### 60.1.1 CNI 的两大核心功能\n\n```mermaid\ngraph LR\n    subgraph \"CNI 核心功能\"\n        NL[\"Network Links<br/>网络通路搭建\"]\n        IPAM[\"IPAM<br/>IP 地址管理\"]\n    end\n    \n    CNI[\"CNI 插件\"] --> NL\n    CNI --> IPAM\n```\n\n| 功能 | 说明 | 示例技术 |\n|:---|:---|:---|\n| Network Links | 搭建网络通路 | VXLAN, IPIP, BGP, VLAN |\n| IPAM | IP 地址分配与管理 | host-local, whereabouts, DHCP |\n\n> [!IMPORTANT]\n> **CNI = Network Links + IPAM**\n>\n> 任何 CNI 方案都包含这两部分：\n>\n> - **Network Links**：解决 Pod 之间如何通信\n> - **IPAM**：解决 Pod 如何获取 IP 地址\n\n##### 60.1.2 为什么需要 IPAM\n\n```mermaid\nflowchart TD\n    A[\"Pod 创建\"] --> B[\"需要 IP 地址\"]\n    B --> C{\"如何分配?\"}\n    C --> D[\"IPAM 机制\"]\n    D --> E[\"分配唯一 IP\"]\n    D --> F[\"避免 IP 冲突\"]\n    D --> G[\"管理 IP 生命周期\"]\n```\n\n#### 60.2 IPAM 类型概述\n\n##### 60.2.1 四种标准 IPAM\n\n```mermaid\ngraph TB\n    subgraph \"CNI 标准 IPAM\"\n        DHCP[\"DHCP<br/>动态主机配置协议\"]\n        HL[\"host-local<br/>节点本地分配\"]\n        ST[\"static<br/>静态 IP\"]\n        WA[\"whereabouts<br/>集群级分配\"]\n    end\n```\n\n| IPAM 类型 | 分配范围 | 适用场景 | 使用频率 |\n|:---|:---|:---|:---|\n| **DHCP** | 外部 DHCP 服务器 | 传统网络对接 | 少 |\n| **host-local** | 节点本地 | Flannel 等通用场景 | 高 |\n| **static** | 手动指定 | 多网卡固定 IP | 中 |\n| **whereabouts** | 集群级别 | Multus 多网卡 | 中 |\n\n#### 60.3 host-local IPAM\n\n##### 60.3.1 工作原理\n\n```mermaid\ngraph TB\n    subgraph \"Node 1\"\n        N1_Range[\"子网: 10.244.0.0/24\"]\n        N1_Pod1[\"Pod1: 10.244.0.2\"]\n        N1_Pod2[\"Pod2: 10.244.0.3\"]\n    end\n    \n    subgraph \"Node 2\"\n        N2_Range[\"子网: 10.244.1.0/24\"]\n        N2_Pod1[\"Pod1: 10.244.1.2\"]\n        N2_Pod2[\"Pod2: 10.244.1.3\"]\n    end\n    \n    subgraph \"Node 3\"\n        N3_Range[\"子网: 10.244.2.0/24\"]\n        N3_Pod1[\"Pod1: 10.244.2.2\"]\n        N3_Pod2[\"Pod2: 10.244.2.3\"]\n    end\n```\n\n**核心特点**：\n\n- 每个节点分配一个固定子网（如 /24）\n- Pod IP 从节点子网中分配\n- IP 与节点强关联\n\n##### 60.3.2 配置示例\n\n```json\n{\n  \"ipam\": {\n    \"type\": \"host-local\",\n    \"subnet\": \"10.244.0.0/16\",\n    \"rangeStart\": \"10.244.0.10\",\n    \"rangeEnd\": \"10.244.0.250\",\n    \"routes\": [\n      { \"dst\": \"0.0.0.0/0\" }\n    ],\n    \"dataDir\": \"/var/lib/cni/networks\"\n  }\n}\n```\n\n##### 60.3.3 优缺点分析\n\n| 优点 | 缺点 |\n|:---|:---|\n| 简单易用 | IP 与节点绑定 |\n| 性能好（本地分配） | 节点故障 IP 不可迁移 |\n| 无外部依赖 | 每节点 IP 数量有限 |\n\n> [!TIP]\n> **Flannel 默认使用 host-local**\n>\n> - 每节点分配 /24 子网（254 个可用 IP）\n> - 满足大多数场景（K8s 默认每节点最多 110 个 Pod）\n\n#### 60.4 static IPAM\n\n##### 60.4.1 适用场景\n\n```mermaid\nflowchart TD\n    A[\"多网卡场景\"] --> B[\"Pod 需要固定 IP\"]\n    B --> C[\"使用 static IPAM\"]\n    \n    D[\"重型容器/VM 风格\"]\n    D --> E[\"多容器多进程\"]\n    E --> F[\"固定 IP 便于管理\"]\n```\n\n**典型场景**：\n\n- 多网卡环境（Multus）\n- VM 风格的 Pod\n- 需要固定 IP 对接外部系统\n\n##### 60.4.2 配置示例\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: static-ip-net\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"static-network\",\n    \"type\": \"macvlan\",\n    \"master\": \"eth0\",\n    \"mode\": \"bridge\",\n    \"ipam\": {\n      \"type\": \"static\",\n      \"addresses\": [\n        {\n          \"address\": \"192.168.1.100/24\",\n          \"gateway\": \"192.168.1.1\"\n        }\n      ],\n      \"routes\": [\n        { \"dst\": \"0.0.0.0/0\" }\n      ]\n    }\n  }'\n```\n\n##### 60.4.3 为什么原生 K8s 不太需要 static IP\n\n```mermaid\nflowchart TD\n    A[\"Pod 重启 IP 变化\"] --> B{\"影响访问?\"}\n    B -->|\"否\"| C[\"Service 抽象层\"]\n    C --> D[\"Endpoints 自动更新\"]\n    D --> E[\"iptables/IPVS 规则更新\"]\n    E --> F[\"外部访问不受影响\"]\n```\n\n> [!NOTE]\n> **Service 机制解耦了 IP 变化问题**\n>\n> - Pod IP 变化 → Endpoints 自动更新\n> - Service ClusterIP/NodePort 保持不变\n> - 外部通过 Service 访问，无需关心 Pod IP\n\n#### 60.5 whereabouts IPAM\n\n##### 60.5.1 Cluster-Wide vs Host-Local\n\n```mermaid\ngraph TB\n    subgraph \"host-local\"\n        HL_N1[\"Node1: 10.244.0.0/24\"]\n        HL_N2[\"Node2: 10.244.1.0/24\"]\n        HL_N3[\"Node3: 10.244.2.0/24\"]\n    end\n    \n    subgraph \"whereabouts\"\n        WA_Pool[\"集群 IP 池: 10.10.0.0/16\"]\n        WA_P1[\"Pod1: 10.10.0.1（任意节点）\"]\n        WA_P2[\"Pod2: 10.10.0.2（任意节点）\"]\n        WA_P3[\"Pod3: 10.10.0.3（任意节点）\"]\n        \n        WA_Pool --> WA_P1\n        WA_Pool --> WA_P2\n        WA_Pool --> WA_P3\n    end\n```\n\n| 特性 | host-local | whereabouts |\n|:---|:---|:---|\n| IP 分配范围 | 单节点 | 整个集群 |\n| IP 迁移性 | 不支持 | 支持 |\n| 实现复杂度 | 低 | 中 |\n| 外部依赖 | 无 | 需要 CR 存储 |\n\n##### 60.5.2 配置示例\n\n```yaml\napiVersion: \"k8s.cni.cncf.io/v1\"\nkind: NetworkAttachmentDefinition\nmetadata:\n  name: whereabouts-net\nspec:\n  config: '{\n    \"cniVersion\": \"0.3.1\",\n    \"name\": \"whereabouts-network\",\n    \"type\": \"macvlan\",\n    \"master\": \"eth1\",\n    \"mode\": \"bridge\",\n    \"ipam\": {\n      \"type\": \"whereabouts\",\n      \"range\": \"192.168.100.0/24\",\n      \"exclude\": [\n        \"192.168.100.0/32\",\n        \"192.168.100.1/32\",\n        \"192.168.100.255/32\"\n      ]\n    }\n  }'\n```\n\n#### 60.6 Cilium IPAM\n\n##### 60.6.1 块分配机制\n\n```mermaid\ngraph TB\n    subgraph \"Cilium IPAM\"\n        Pool[\"集群 Pod CIDR: 10.0.0.0/8\"]\n        \n        B1[\"Block 1: 10.0.0.0/26<br/>（64 个 IP）\"]\n        B2[\"Block 2: 10.0.0.64/26<br/>（64 个 IP）\"]\n        B3[\"Block 3: 10.0.0.128/26<br/>（64 个 IP）\"]\n        \n        Pool --> B1\n        Pool --> B2\n        Pool --> B3\n        \n        B1 --> N1[\"Node 1\"]\n        B2 --> N2[\"Node 2\"]\n        B3 --> N3[\"Node 3\"]\n    end\n```\n\n**Cilium 特点**：\n\n- 使用 /26 块（64 个 IP）而非 /24\n- 块可以动态扩展\n- 支持更灵活的 IP 管理\n\n##### 60.6.2 与 host-local 对比\n\n| 特性 | host-local (/24) | Cilium (/26 块) |\n|:---|:---|:---|\n| 每节点 IP 数 | 254 | 可扩展（多块） |\n| IP 利用率 | 可能浪费 | 更高效 |\n| 灵活性 | 低 | 高 |\n\n#### 60.7 公有云 VPC IPAM\n\n##### 60.7.1 云厂商方案\n\n```mermaid\ngraph LR\n    subgraph \"公有云方案\"\n        AWS[\"AWS VPC CNI\"]\n        Ali[\"阿里云 Terway\"]\n        GCP[\"GCP VPC-native\"]\n        Tencent[\"腾讯云 TKE CNI\"]\n    end\n    \n    VPC[\"VPC 网络\"] --> AWS\n    VPC --> Ali\n    VPC --> GCP\n    VPC --> Tencent\n```\n\n**特点**：\n\n- 直接使用 VPC 子网 IP\n- Pod IP 与 VPC 路由互通\n- 无需 Overlay 封装\n\n##### 60.7.2 阿里云 Terway 示例\n\n```mermaid\ngraph TB\n    subgraph \"Terway 架构\"\n        VPC[\"VPC 网络\"]\n        ENI[\"弹性网卡 ENI\"]\n        Pod[\"Pod\"]\n        \n        VPC --> ENI\n        ENI --> Pod\n    end\n    \n    subgraph \"组件\"\n        Terway[\"Terway CNI<br/>Network Links\"]\n        Cilium[\"Cilium<br/>Network Policy\"]\n    end\n```\n\n> [!TIP]\n> **Terway = VPC Network Links + Cilium Policy**\n>\n> - Network Links：基于 ENI 实现 VPC 互通\n> - Policy：使用 Cilium 实现网络策略\n\n#### 60.8 Spiderpool IPAM\n\n##### 60.8.1 新一代集群级 IPAM\n\n```mermaid\nflowchart TD\n    A[\"Spiderpool\"] --> B[\"Cluster-Wide IPAM\"]\n    B --> C[\"多 IP 池支持\"]\n    C --> D[\"IP 固定/预留\"]\n    D --> E[\"与 whereabouts 对比增强\"]\n```\n\n**Spiderpool 特性**：\n\n- 来自 DaoCloud 开源\n- 解决 IP 固定问题\n- 支持多 IP 池定义\n- 与 whereabouts 功能对比增强\n\n##### 60.8.2 解决的问题\n\n```mermaid\nsequenceDiagram\n    participant Pod as Pod\n    participant IPAM as Spiderpool\n    participant Pool as IP Pool\n    \n    Note over Pod, Pool: 问题场景：IP 未释放时重启\n    Pod->>IPAM: 请求 IP\n    IPAM->>Pool: 从多 IP 池分配\n    Pool-->>IPAM: 返回可用 IP\n    IPAM-->>Pod: 分配 IP\n    \n    Note over Pod, Pool: 支持多 IP 池避免单点问题\n```\n\n#### 60.9 IPAM 选型建议\n\n##### 60.9.1 决策流程\n\n```mermaid\nflowchart TD\n    A[\"选择 IPAM\"] --> B{\"场景类型?\"}\n    \n    B -->|\"通用 K8s\"| C[\"host-local\"]\n    B -->|\"多网卡 Multus\"| D{\"需要固定 IP?\"}\n    B -->|\"公有云\"| E[\"云厂商 VPC IPAM\"]\n    \n    D -->|\"是\"| F[\"static / Spiderpool\"]\n    D -->|\"否\"| G[\"whereabouts\"]\n    \n    C --> H[\"简单高效<br/>Flannel 默认\"]\n    F --> I[\"多网卡固定 IP<br/>VM 风格 Pod\"]\n    G --> J[\"集群级 IP 池<br/>跨节点分配\"]\n    E --> K[\"VPC 互通<br/>无 Overlay\"]\n```\n\n##### 60.9.2 选型对照表\n\n| 场景 | 推荐 IPAM | 原因 |\n|:---|:---|:---|\n| 通用 K8s 集群 | host-local | 简单、稳定、性能好 |\n| Multus 多网卡 | whereabouts | 集群级 IP 池 |\n| 固定 IP 需求 | static / Spiderpool | 支持 IP 固定 |\n| 公有云 | 云厂商 IPAM | VPC 原生互通 |\n| NFV/电信 | whereabouts + static | 复杂网络需求 |\n\n#### 60.10 章节小结\n\n```mermaid\nmindmap\n  root((CNI IPAM))\n    IPAM 类型\n      DHCP（少用）\n      host-local（常用）\n      static（多网卡）\n      whereabouts（集群级）\n    host-local\n      节点子网分配\n      简单高效\n      Flannel 默认\n    whereabouts\n      Cluster-Wide\n      IP 可迁移\n      Multus 推荐\n    云厂商\n      VPC 互通\n      ENI 直通\n      Terway 等\n    新方案\n      Spiderpool\n      多 IP 池\n      IP 固定\n```\n\n> [!TIP]\n> **CNI IPAM 要点总结**：\n>\n> 1. **CNI 双核心**：Network Links（网络通路）+ IPAM（地址管理）\n>\n> 2. **host-local**：节点级分配，简单高效，Flannel 等通用 CNI 默认使用\n>\n> 3. **static**：固定 IP，适用于多网卡、VM 风格 Pod\n>\n> 4. **whereabouts**：集群级 IP 池，适用于 Multus 多网卡场景\n>\n> 5. **云厂商**：VPC 原生 IPAM，Pod 直接使用 VPC IP，无 Overlay\n>\n> 6. **选型原则**：根据场景选择，简单场景用 host-local，复杂多网卡用 whereabouts/Spiderpool\n\n---", "subs": ["60.1 背景与概述", "60.2 IPAM 类型概述", "60.3 host-local IPAM", "60.4 static IPAM", "60.5 whereabouts IPAM", "60.6 Cilium IPAM", "60.7 公有云 VPC IPAM", "60.8 Spiderpool IPAM", "60.9 IPAM 选型建议", "60.10 章节小结"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

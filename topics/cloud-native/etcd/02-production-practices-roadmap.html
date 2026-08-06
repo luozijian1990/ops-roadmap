@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>etcd 学习笔记 · 第二册：生产实践与参考 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>etcd 学习笔记 · 第二册：生产实践与参考</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "etcd 学习笔记 · 第二册：生产实践与参考", "intro": "", "parts": [{"title": "第三部分：实践篇", "sections": [{"title": "第13章 数据一致性问题", "content": "etcd 基于 Raft 实现数据一致性，但这并不意味着它绝对不会出现数据不一致。本章将通过真实案例，分析不一致的根本原因，并介绍预防和检测的最佳实践。\n\n#### 13.1 不一致问题概述\n\n要理解为什么\"强一致\"的 etcd 也会不一致，首先需要理解复制状态机架构。\n\n**复制状态机架构**：\n\n```mermaid\ngraph LR\n    Client[Client] --> Leader[Leader]\n    Leader --> Raft[Raft 一致性模块]\n    Raft --> Log[日志模块]\n    Log --> Apply[Apply 流程]\n    Apply --> State[状态机/boltdb]\n```\n\n**图解说明**：\n\n请求从 Client 到实际生效要经过以下步骤：\n\n1. **Raft 一致性模块**：确保日志在多数节点持久化\n2. **日志模块**：按顺序存储操作日志\n3. **Apply 流程**：将日志应用到状态机\n4. **状态机**：最终的数据存储（boltdb）\n\n**Raft 只能保证日志一致性**：\n\n| 阶段 | 一致性保证 |\n|-----|-----------|\n| 日志复制 | ✅ Raft 保证 |\n| Apply 到状态机 | ❌ 业务逻辑保证 |\n\n**要点解读**：Raft 只负责确保各节点的日志完全一致，但从日志到状态机的 Apply 过程是异步的，如果这个过程出现 bug，就会导致状态机不一致。\n\n> **核心认知**：Raft 保证的是\"日志一致\"，不是\"状态一致\"。状态一致需要 Apply 逻辑无 bug。\n\n#### 13.2 真实案例：消失的 Node\n\n这是一个真实的生产案例，帮助你理解不一致问题是如何发生的。\n\n**现象**：\n\n- Deployment 滚动更新异常\n- Node 莫名其妙消失\n- 部分 etcd 节点找不到数据\n\n**排查思路**：\n\n```mermaid\ngraph TB\n    Start[问题排查] --> Check1{集群是否分裂?}\n    Check1 --> |检查 cluster_id| C1[一致则排除]\n    \n    C1 --> Check2{Raft 日志同步?}\n    Check2 --> |etcd-dump-logs| C2[正常则排除]\n    \n    C2 --> Check3{Apply 流程?}\n    Check3 --> |检查 revision 差异| C3[发现大偏差]\n    \n    C3 --> Check4{鉴权版本号?}\n    Check4 --> Root[根因：auth revision 不一致]\n```\n\n**图解说明**：\n\n排查数据不一致需要**逐层排查**：\n\n1. 首先排除集群分裂（cluster_id 不一致）\n2. 其次确认 Raft 日志同步正常\n3. 最后检查 Apply 流程——这往往是问题根源\n\n**诊断命令**：\n\n```bash\n# 查看各节点状态\n$ etcdctl endpoint status --cluster -w json | python -m json.tool\n\n# 关键字段对比\n# - cluster_id：是否一致（排除分裂）\n# - raftIndex / raftAppliedIndex：Raft 日志同步\n# - revision：MVCC 版本号差异\n```\n\n**代码说明**：通过对比各节点的 revision，可以快速发现不一致。正常情况下各节点 revision 差异应在个位数。\n\n**根因**：\n\n1. etcd 重启时，鉴权命令未持久化 `consistent index`\n2. 导致鉴权命令重复执行\n3. `RoleGrantPermission` 接口未实现幂等\n4. 鉴权版本号不一致 → Apply 失败 → 数据不一致\n\n> **教训**：Apply 逻辑必须实现**幂等性**，否则重启可能导致状态机不一致。\n\n#### 13.3 其他典型不一致 Bug\n\n| Bug | 触发条件 | 影响版本 | 修复版本 |\n|-----|---------|---------|---------|\n| **鉴权版本号不一致** | 重启 + 鉴权操作 | 所有 v3 | v3.3.21 / v3.4.8 |\n| **Lease Revoke 鉴权** | 升级 3.2→3.3 | 混合版本 | v3.3.x |\n| **defrag 临时文件** | defrag 未正常结束 | 早期版本 | v3.2.29 / v3.3.19 / v3.4.4 |\n\n**要点解读**：从上表可以看出，不一致问题往往在**版本升级**或**重启**时触发。生产环境应尽量使用 v3.4.9 以上的稳定版本。\n\n#### 13.4 不一致的根本原因\n\n从架构层面分析，不一致的根源在于 Raft 的边界。\n\n```mermaid\ngraph TB\n    subgraph \"Raft 保证\"\n        Log[日志一致性]\n    end\n    \n    subgraph \"无法保证\"\n        Apply[Apply 逻辑错误]\n        Ops[运维操作异常<br/>如 defrag]\n        Compat[版本兼容性问题]\n    end\n    \n    Log --> |确保| OK[各节点日志一致]\n    Apply --> Fail[状态机数据不一致]\n    Ops --> Fail\n    Compat --> Fail\n```\n\n**图解说明**：\n\n- **Raft 只管日志**：日志复制到多数节点才算成功\n- **三类隐患**：Apply bug、运维操作、版本兼容——这些都不在 Raft 保证范围内\n\n**核心问题**：\n\n- Raft 算法边界：只负责日志复制\n- Apply 流程：属于业务逻辑，无重试机制\n- 运维操作：直接修改底层存储\n\n#### 13.5 最佳实践\n\n##### 13.5.1 开启数据毁坏检测\n\n```bash\n# 启动时检测\netcd --experimental-initial-corrupt-check=true\n\n# 运行时定期检测\netcd --experimental-corrupt-check-time=5m\n```\n\n**代码说明**：启动时检测可以在节点启动时发现不一致；运行时检测可以定期扫描，及时告警。\n\n**检测原理**：\n\n1. 遍历 treeIndex 所有 key\n2. 获取 boltdb 中的 value\n3. 计算 crc32 hash\n4. 比较各节点 hash 值\n\n> 推荐使用 v3.4.9 以上版本\n\n##### 13.5.2 应用层一致性检测\n\n| 检测方法 | 说明 |\n|---------|------|\n| **key 数量监控** | 定时统计各节点 key 数（带 WithCountOnly） |\n| **revision 监控** | 比较各节点 revision 差异 |\n| **MVCC metrics** | 监控 `mvcc_put_total` 等指标 |\n\n```bash\n# 统计 key 数量（高效方式）\n$ etcdctl get \"\" --prefix --count-only\n```\n\n##### 13.5.3 定时数据备份\n\n```bash\n# 手动备份\n$ etcdctl snapshot save backup.db\n\n# 定时备份（推荐每 30 分钟）\n# 可使用 etcd-operator 的 backup-operator\n```\n\n> 重要变更前务必备份！\n\n##### 13.5.4 良好的运维规范\n\n| 规范 | 说明 |\n|-----|------|\n| **版本一致** | 集群各节点版本必须一致 |\n| **使用稳定版** | 优先选择新的稳定版本 |\n| **灰度升级** | 先测试、再灰度、后全量 |\n| **查看 changelog** | 评估版本兼容性 |\n\n#### 13.6 本章小结\n\n**不一致的原因**：\n\n| 类型 | 示例 |\n|-----|------|\n| **Apply 逻辑错误** | 鉴权版本号不一致 |\n| **版本兼容问题** | 升级导致接口行为变化 |\n| **运维操作异常** | defrag 临时文件未清理 |\n\n**预防措施**：\n\n```mermaid\ngraph LR\n    Detect[数据检测] --> Backup[定时备份]\n    Backup --> Ops[规范运维]\n    Ops --> Version[版本管理]\n```\n\n| 措施 | 工具/方法 |\n|-----|---------  |\n| 启动检测 | `--experimental-initial-corrupt-check` |\n| 运行检测 | `--experimental-corrupt-check-time` |\n| 应用监控 | key 数量、revision、MVCC metrics |\n| 备份恢复 | `etcdctl snapshot save/restore` |\n\n> **一句话总结**：Raft 不等于强一致，Apply 才是隐患源。\n\n---", "subs": ["13.1 不一致问题概述", "13.2 真实案例：消失的 Node", "13.3 其他典型不一致 Bug", "13.4 不一致的根本原因", "13.5 最佳实践", "13.6 本章小结"]}, {"title": "第14章 db 大小问题", "content": "\"etcd 不建议存储超过 8GB 的数据\"——这是官方的明确建议。但为什么会有这个限制？大 db 文件会带来哪些问题？本章将深入分析 db 大小对集群各模块的影响。\n\n#### 14.1 db 大小六大影响面\n\n大 db 文件会从六个维度影响 etcd 的性能和稳定性。\n\n```mermaid\ngraph TB\n    DB[大 db 文件] --> Startup[启动耗时增加]\n    DB --> Memory[内存要求提高]\n    DB --> TreeIndex[treeIndex 性能下降]\n    DB --> Boltdb[boltdb 事务延时]\n    DB --> Stability[集群稳定性风险]\n    DB --> Snapshot[快照生成/恢复慢]\n```\n\n**图解说明**：db 大小问题是一个**系统性问题**，会影响 etcd 的各个层面，从启动、内存到日常请求、集群同步。\n\n| 影响面 | 说明 |\n|-------|------|\n| **启动耗时** | 需遍历 boltdb 重建 treeIndex |\n| **内存配置** | mmap 映射，需足够内存避免缺页中断 |\n| **treeIndex** | 百万级 key 查询延时增加 |\n| **boltdb** | freelist 管理导致事务延时抖动 |\n| **稳定性** | expensive request 易导致 OOM、丢包 |\n| **快照** | 生成慢、传输慢、可能陷入死循环 |\n\n#### 14.2 启动耗时\n\n为什么大 db 会导致启动慢？理解启动流程就能明白。\n\n**启动流程**：\n\n```mermaid\nsequenceDiagram\n    participant E as etcd\n    participant B as boltdb\n    participant T as treeIndex\n    \n    E->>B: 打开 db 文件\n    E->>B: mmap 映射到内存\n    \n    loop 遍历所有 key-value\n        E->>B: 批量读取 10000 条\n        E->>T: 构建 keyIndex\n        T->>T: 加锁插入 B-tree\n    end\n    \n    E->>E: 启动完成\n```\n\n**图解说明**：启动时需要**遍历 boltdb 中所有 key-value，重建内存中的 treeIndex**。这个过程是单线程串行的，并且需要持有全局锁。\n\n**瓶颈**：\n\n- treeIndex 插入需要全局锁\n- 单 goroutine 串行构建\n- 百万级 key 启动可能需要数分钟\n\n```text\n2021-02-15 02:25:55 | etcdmain: etcd Version: 3.4.9\n2021-02-15 02:26:58 | recovered store from snapshot  # 耗时 1 分钟\n2021-02-15 02:27:19 | ready to serve client requests\n```\n\n> 这个真实日志显示，100 万 key 的集群启动用了 1 分多钟。\n\n#### 14.3 节点内存配置\n\nboltdb 使用 mmap 将 db 文件映射到内存，因此内存配置与 db 大小密切相关。\n\n**mmap 机制**：\n\n```mermaid\ngraph LR\n    DB[db 文件] --> |mmap| Memory[物理内存]\n    Memory --> |读操作| Fast[快速响应]\n    \n    subgraph \"内存不足\"\n        Miss[缺页中断] --> Disk[磁盘 IO]\n        Disk --> Slow[延时抖动]\n    end\n```\n\n**图解说明**：当物理内存充足时，db 文件会被完全缓存，所有读操作都在内存完成。当内存不足时，系统会触发**缺页中断**，需要从磁盘加载数据，导致延时抖动。\n\n| 场景 | 行为 |\n|-----|------|\n| 内存 > db 大小 | 全部缓存，读无磁盘 IO |\n| 内存 < db 大小 | 触发缺页中断，延时抖动 |\n\n> **黄金法则**：节点内存规格 > db 文件大小\n\n#### 14.4 treeIndex 性能\n\n随着 key 数量增加，treeIndex 的查询性能会下降。\n\n**trace 日志分析**：\n\n```json\n{\n  \"msg\": \"trace range\",\n  \"duration\": \"146.432768ms\",\n  \"steps\": [\n    \"'range keys from in-memory treeIndex' (duration: 95.925033ms)\",\n    \"'range keys from bolt db' (duration: 47.932118ms)\"\n  ]\n}\n```\n\n**代码说明**：从 trace 可以看出，treeIndex 查询占用了 96ms，这在正常情况下是不可接受的。\n\n| key 数量 | 范围查询延时 |\n|---------|------------|\n| 1 万 | 毫秒级 |\n| 10 万 | 数十毫秒 |\n| 100 万 | 上百毫秒 |\n\n**开启 trace**：\n\n```bash\netcd --logger=zap  # etcd 3.4+ 需显式开启\n```\n\n#### 14.5 boltdb 性能\n\nboltdb 的 freelist 管理算法是性能的关键因素。\n\n**freelist 管理**：\n\n| 实现 | 时间复杂度 | 版本 |\n|-----|-----------|------|\n| **array** | O(N) 申请，O(NlogN) 释放 | etcd 3.4 默认 |\n| **hashmap** | O(1) | etcd 3.5 默认 |\n\n**要点解读**：array 模式下，每次事务提交都需要遍历空闲页列表。当 db 很大且碎片严重时，这个开销会非常大。\n\n**问题场景**：\n\n- 16G db，400 万 page\n- 存在大量碎片空闲页\n- 每次事务需遍历查找连续页\n\n**优化配置**：\n\n```go\n// bbolt 参数\nFreeListType: \"hashmap\"   // 使用 hashmap 管理\nNoFreelistSync: true      // 不持久化 freelist，重启时重建\n```\n\n#### 14.6 集群稳定性\n\n大 db 最严重的影响是**稳定性风险**，一个不当的查询可能导致集群不可用。\n\n**expensive request 类型**：\n\n| 类型 | 问题 | 优化版本 |\n|-----|------|---------|\n| **count only** | 遍历并追加到数组，内存暴涨 | v3.5 优化 |\n| **limit 查询** | limit 未下推到索引层 | v3.5 优化 |\n| **大包查询** | 单次返回大量数据 | 建议分页 |\n\n**trace 日志示例**：\n\n```json\n{\n  \"msg\": \"trace range\",\n  \"response_count\": 1232274,\n  \"duration\": \"9.063748801s\",\n  \"steps\": [\n    \"'range keys from in-memory index tree' (693ms)\",\n    \"'range keys from bolt db' (8.2s)\"\n  ]\n}\n```\n\n> 单次查询 123 万 key，耗时 9 秒！这期间 etcd 基本无法响应其他请求。\n\n**最佳实践**：\n\n- 避免全量查询，使用分页\n- 控制单 value 大小\n- 监控 expensive request\n\n#### 14.7 快照影响\n\n大 db 还会导致**快照相关的连锁问题**。\n\n**快照问题**：\n\n| 问题 | 说明 |\n|-----|------|\n| 备份慢 | 大 db 导致快照生成耗时长 |\n| 长事务 | 只读事务阻止 page 回收，db 持续增长 |\n| 传输慢 | Leader → Follower 消耗大量网络带宽 |\n| 死循环 | Follower 重建慢，无法追赶，持续触发快照 |\n\n```mermaid\ngraph TB\n    Slow[Follower 落后] --> Snap[Leader 生成快照]\n    Snap --> Send[发送快照]\n    Send --> Rebuild[Follower 重建]\n    Rebuild --> |重建太慢| Slow\n```\n\n**图解说明**：这是一个致命的死循环——Follower 落后 → Leader 发快照 → Follower 处理慢 → 继续落后。在极端情况下，集群可能永远无法恢复正常。\n\n#### 14.8 本章小结\n\n**db 大小影响汇总**：\n\n| 影响 | 原因 | 优化 |\n|-----|------|------|\n| 启动慢 | 重建 treeIndex | 控制 key 数量 |\n| 内存高 | mmap 映射 | 节点内存 > db |\n| 查询慢 | treeIndex 延时 | 减少范围查询 |\n| 事务抖动 | freelist O(N) | 使用 hashmap |\n| OOM 风险 | expensive request | 分页查询 |\n| 快照慢 | 大文件传输 | 控制 db 大小 |\n\n**最佳实践**：\n\n| 建议 | 说明 |\n|-----|------|\n| **db Quota** | 建议不超过 8G |\n| **key 数量** | 控制在百万级以内 |\n| **value 大小** | 尽量小，避免大 value |\n| **分页查询** | 避免全量拉取 |\n| **监控** | 关注 db 大小、key 数量增长 |\n\n> **一句话总结**：db 越大，问题越多。控制 db 大小是 etcd 运维的第一要务。\n\n---", "subs": ["14.1 db 大小六大影响面", "14.2 启动耗时", "14.3 节点内存配置", "14.4 treeIndex 性能", "14.5 boltdb 性能", "14.6 集群稳定性", "14.7 快照影响", "14.8 本章小结"]}, {"title": "第15章 延时问题分析", "content": "\"apply request took too long\"、\"request timed out\"——这些是 etcd 运维中最常见的告警。当延时问题发生时，如何快速定位原因？本章将介绍系统性的延时分析方法论。\n\n#### 15.1 延时分析思路\n\n写请求从客户端到最终生效，要经过多个阶段，任何一个都可能成为瓶颈。\n\n**写请求可能的瓶颈点**：\n\n```mermaid\ngraph LR\n    Client --> Network[网络传输]\n    Network --> WAL[WAL 持久化]\n    WAL --> Raft[Raft 日志复制]\n    Raft --> Apply[Apply 状态机]\n    Apply --> Boltdb[boltdb 事务提交]\n```\n\n**图解说明**：延时问题分析的关键是**逐个排查**以上5个阶段。\n\n| 瓶颈点 | 依赖 |\n|-------|------|\n| 网络 | 网络延时、带宽 |\n| WAL | 磁盘顺序写性能 |\n| boltdb | 磁盘随机写性能 |\n| Apply | CPU、内存资源 |\n\n#### 15.2 问题定位工具\n\n| 工具类型 | 工具 |\n|---------|------|\n| **metrics** | Prometheus 指标 |\n| **trace 日志** | 各阶段耗时详情 |\n| **etcd 日志** | 警告、错误日志 |\n| **系统工具** | iostat、blktrace、pprof |\n\n#### 15.3 网络问题\n\n**相关 metrics**：\n\n| 指标 | 说明 |\n|-----|------|\n| `etcd_network_peer_round_trip_time_seconds` | 节点间 RTT |\n| `etcd_network_peer_sent_failures_total` | 发送失败数 |\n| `etcd_network_active_peers` | 活跃连接数 |\n| `etcd_network_client_grpc_sent_bytes_total` | 出流量 |\n| `etcd_network_client_grpc_received_bytes_total` | 入流量 |\n\n**诊断命令**：\n\n```bash\n# 网络连通性\nping/traceroute/mtr\n\n# 网卡状态\nethtool eth0\nifconfig eth0  # 查看丢包\n\n# 连接状态\nnetstat -anp | grep etcd\n\n# 抓包分析\ntcpdump -i eth0 port 2380\n```\n\n**常见问题**：\n\n- expensive request 导致网卡带宽满、丢包\n- 跨可用区部署 RTT 较高\n\n#### 15.4 磁盘 I/O 问题\n\n**核心 metrics**：\n\n| 指标 | 说明 | 正常值 |\n|-----|------|-------|\n| `etcd_disk_wal_fsync_duration_seconds` | WAL fsync 延时 | P99 < 10ms |\n| `etcd_disk_backend_commit_duration_seconds` | 事务提交延时 | P99 < 120ms |\n\n**进一步细分**：\n\n| 指标 | 说明 |\n|-----|------|\n| `disk_backend_commit_rebalance_duration` | B+ tree 重平衡耗时 |\n| `disk_backend_commit_spill_duration` | B+ tree 分裂耗时 |\n\n**etcd 日志告警**：\n\n```go\n// WAL fsync 超过 1 秒会打印警告\n\"slow fdatasync\", took: 1.2s, expected: 1s\n```\n\n**诊断思路**：\n\n| 情况 | 可能原因 |\n|-----|---------|\n| wal_fsync 高 | 磁盘性能差、cgroup blkio 限制 |\n| backend_commit 高 + wal_fsync 正常 | freelist O(N) 问题、空闲页碎片化 |\n\n**工具**：\n\n```bash\n# 磁盘 I/O 分析\niostat -x 1\n\n# 块层 I/O 追踪\nblktrace -d /dev/sda\n```\n\n> **建议**：使用 SSD 磁盘，确保事务提交稳定\n\n#### 15.5 expensive request\n\n**trace 特性**（etcd 3.4+）：\n\n```bash\n# 开启 trace（需 zap logger）\netcd --logger=zap\n```\n\n**读请求 trace 日志**：\n\n```json\n{\n  \"msg\": \"trace range\",\n  \"duration\": \"318.774µs\",\n  \"steps\": [\n    \"'agreement among raft nodes before linearized reading' (255µs)\",\n    \"'get authentication metadata' (2.97µs)\",\n    \"'range keys from in-memory index tree' (44µs)\",\n    \"'range keys from bolt db' (8.6µs)\",\n    \"'filter and sort the key-value pairs' (578ns)\",\n    \"'assemble the response' (643ns)\"\n  ]\n}\n```\n\n**写请求 trace 日志**：\n\n```json\n{\n  \"msg\": \"trace put\",\n  \"duration\": \"6.826ms\",\n  \"steps\": [\n    \"'process raft request' (6.65ms)\",\n    \"'get key's previous created_revision and leaseID' (23µs)\",\n    \"'marshal mvccpb.KeyValue' (1.8µs)\",\n    \"'store kv pair into bolt db' (30µs)\",\n    \"'attach lease to kv pair' (661ns)\"\n  ]\n}\n```\n\n**expensive request 示例**：\n\n```json\n{\n  \"msg\": \"apply request took too long\",\n  \"took\": \"1.84s\",\n  \"request\": \"key:\\\"vip\\\" range_end:\\\"viq\\\"\",\n  \"response\": \"range_response_count:250 size:262150651\"\n}\n// 250 条 key，250MB 数据，1.63 秒在 boltdb 遍历\n```\n\n#### 15.6 gRPC 接口级 metrics\n\n```bash\n# 开启详细 metrics\netcd --metrics=extensive\n```\n\n**示例 metrics**：\n\n```text\ngrpc_server_handled_total{grpc_code=\"OK\",grpc_method=\"Put\"} 251\n\ngrpc_server_handling_seconds_bucket{grpc_method=\"Put\",le=\"0.1\"} 240\n# 251 个 Put 请求，240 个在 100ms 内完成\n```\n\n#### 15.7 容量与资源瓶颈\n\n**线性读延时高的 trace**：\n\n```json\n{\n  \"msg\": \"trace linearizableReadLoop\",\n  \"duration\": \"855ms\",\n  \"steps\": [\n    \"'read index received' (824µs)\",\n    \"'applied index is now lower than readState.Index' (854ms)\"\n  ]\n}\n// 等待 applied index 追赶 Leader 耗时 854ms\n```\n\n**原因**：写请求过多，本节点追赶 Leader 慢\n\n**诊断指标**：\n\n| 指标 | 说明 |\n|-----|------|\n| `etcd_server_slow_apply_total` | 慢 apply 请求数 |\n| `etcd_server_proposals_pending` | 待处理提案数 |\n\n**系统资源分析**：\n\n```bash\n# CPU 分析\nps aux | grep etcd\ntop -p <pid>\nmpstat 1\nperf top\n\n# 内存分析\nfree -h\n\n# pprof 分析\ncurl http://localhost:2379/debug/pprof/profile > cpu.prof\ncurl http://localhost:2379/debug/pprof/heap > heap.prof\n```\n\n#### 15.8 本章小结\n\n**延时原因汇总**：\n\n| 原因 | 表现 | 工具 |\n|-----|------|-----|\n| **网络** | RTT 高、丢包 | ping、netstat、metrics |\n| **磁盘** | fsync/commit 慢 | iostat、blktrace |\n| **expensive request** | 大包查询、全量遍历 | trace 日志 |\n| **容量** | 写请求过多 | slow_apply metrics |\n| **资源** | CPU/内存不足 | pprof、top |\n\n**关键 metrics**：\n\n```text\n# 磁盘\netcd_disk_wal_fsync_duration_seconds\netcd_disk_backend_commit_duration_seconds\n\n# 网络\netcd_network_peer_round_trip_time_seconds\n\n# 容量\netcd_server_slow_apply_total\n```\n\n**最佳实践**：\n\n- 使用 SSD 磁盘\n- 避免 expensive request\n- 监控磁盘、网络 metrics\n- 开启 trace 日志定位问题\n\n---", "subs": ["15.1 延时分析思路", "15.2 问题定位工具", "15.3 网络问题", "15.4 磁盘 I/O 问题", "15.5 expensive request", "15.6 gRPC 接口级 metrics", "15.7 容量与资源瓶颈", "15.8 本章小结"]}, {"title": "第16章 内存问题分析", "content": "\"明明只存了 1 个 1MB 的 key，为什么 etcd 内存占用几个 G？\"——这是一个常见疑问。答案在于 etcd 的多版本存储、日志保留和 mmap 机制。本章将深入分析内存占用来源。\n\n#### 16.1 内存分析思路\n\n写请求流程中多个模块都会消耗内存，理解这个流程是分析内存问题的基础。\n\n**写请求流程中的内存占用**：\n\n```mermaid\ngraph TB\n    Client[Client 连接] --> gRPC[gRPC Server]\n    gRPC --> RaftLog[raftLog 内存数组]\n    RaftLog --> TreeIndex[treeIndex B-tree]\n    TreeIndex --> Boltdb[boltdb mmap]\n    \n    subgraph \"其他内存开销\"\n        Watcher[Watcher]\n        Lease[Lease Heap]\n        Query[expensive request]\n    end\n```\n\n| 模块 | 内存占用因素 |\n|-----|-------------|\n| **raftLog** | 日志条目数量和大小 |\n| **treeIndex** | key 数量、历史版本数 |\n| **boltdb** | db 文件大小（mmap） |\n| **watcher** | 连接数、Stream 数、watcher 数 |\n| **expensive request** | 查询结果大小 |\n\n#### 16.2 raftLog 内存\n\n**数据结构**：\n\n```go\ntype raftLog struct {\n    storage   Storage    // 已持久化的日志（MemoryStorage）\n    unstable  unstable   // 未持久化的日志\n    committed uint64\n    applied   uint64\n}\n\ntype MemoryStorage struct {\n    ents []pb.Entry  // 内存数组存储日志条目\n}\n```\n\n**内存控制机制**：\n\n| 参数 | 默认值 | 说明 |\n|-----|-------|------|\n| `--snapshot-count` | 100000 | 每 N 次写请求触发快照 |\n| `DefaultSnapshotCatchUpEntries` | 5000 | 保留的日志条目数 |\n\n**内存估算**：\n\n- 1MB value × 5000 条 ≈ 5GB 内存\n- 保留日志用于 slow Follower 追赶\n\n#### 16.3 treeIndex 内存\n\n**数据结构**：\n\n```go\ntype keyIndex struct {\n    key         []byte\n    modified    revision\n    generations []generation  // 历史版本记录\n}\n```\n\n**内存占用因素**：\n\n- key 长度\n- 历史版本数量\n- key 总数\n\n**优化方法**：\n\n- 控制 key 长度\n- 配置合理的压缩策略（compact）\n\n#### 16.4 boltdb mmap 内存\n\n**mmap 机制**：\n\n```mermaid\ngraph LR\n    DB[db 文件] --> |mmap + MAP_POPULATE| Memory[物理内存]\n    Memory --> |读请求| Fast[直接内存访问]\n    \n    subgraph \"内存不足\"\n        Swap[页换出] --> PageFault[缺页中断]\n        PageFault --> DiskIO[磁盘 IO]\n    end\n```\n\n| 场景 | 表现 |\n|-----|------|\n| 内存充足 | 读请求无磁盘 IO |\n| 内存不足 | 缺页中断，延时抖动 |\n\n**优化方法**：\n\n- compact 回收旧版本\n- defrag 碎片整理\n- 控制 db 文件大小\n\n#### 16.5 Watcher 内存\n\n**内存公式**：\n\n```text\nmemory = c1 × connections + c2 × streams + c3 × watchers\n```\n\n**各部分开销**：\n\n| 组件 | 内存开销 |\n|-----|---------|\n| 每个连接 (c1) | ~17 KB |\n| 每个 gRPC Stream (c2) | ~18 KB |\n| 每个 watcher (c3) | ~350 bytes |\n| 每个 watcher buffer | 1024 事件 |\n\n**监控指标**：\n\n| 指标 | 说明 |\n|-----|------|\n| `etcd_debugging_mvcc_pending_events_total` | 堆积的事件数 |\n| `etcd_debugging_slow_watcher_total` | 慢 watcher 数 |\n\n#### 16.6 expensive request 内存\n\n**示例**：\n\n```go\n// 查询 100 个 1MB 的 key\nkvs := make([]mvccpb.KeyValue, limit)\nfor i, revpair := range revpairs[:len(kvs)] {\n    // 每次反序列化消耗内存\n    kvs[i].Unmarshal(vs[0])\n}\n// 至少消耗 100MB 内存 + 100MB 流量\n```\n\n**高风险操作**：\n\n- 大包查询（多 key 或大 value）\n- count-only（百万级 key）\n- limit 查询（未优化版本）\n\n#### 16.7 其他内存问题\n\n| 问题 | 说明 | 解决方案 |\n|-----|------|---------|\n| **v2 API** | v2 数据存内存树，watcher 无多路复用 | 停用 v2 API |\n| **goroutine 泄露** | 日志阻塞导致 | 监控 `go_goroutines` |\n| **etcd bug** | lease keepalive 等 | 升级版本 |\n\n**v2 监控**：\n\n```text\netcd_debugging_store_*  # v2 存储相关指标\n```\n\n#### 16.8 案例：1 key 占用数 G 内存\n\n**测试场景**：\n\n```bash\n# 1MB value，更新 1000 次\nfor i in {1..1000}; do\n  dd if=/dev/urandom bs=1024 count=1024 | etcdctl put key\ndone\n\n# compact + defrag\netcdctl compact $(etcdctl endpoint status --write-out=json | ...)\netcdctl defrag --cluster\n```\n\n**结果**：\n\n- db 大小：1MB\n- 进程内存：~2GB\n\n**原因**：raftLog 保留 5000 条日志 × 1MB = 5GB 理论上限\n\n#### 16.9 本章小结\n\n**内存占用因素**：\n\n| 模块 | 因素 | 优化 |\n|-----|------|-----|\n| **raftLog** | 日志条目 × value 大小 | 控制 value 大小 |\n| **treeIndex** | key 数 × 版本数 | compact |\n| **boltdb** | db 文件大小 | compact + defrag |\n| **watcher** | 连接数 + 事件堆积 | 监控 slow watcher |\n| **查询** | 结果集大小 | 分页查询 |\n\n**监控指标**：\n\n```text\n# 内存相关\ngo_memstats_alloc_bytes\ngo_goroutines\n\n# watcher 相关\netcd_debugging_mvcc_pending_events_total\netcd_debugging_slow_watcher_total\n\n# v2 相关\netcd_debugging_store_*\n```\n\n**最佳实践**：\n\n- 控制 key、value 大小\n- 配置合理的压缩策略\n- 监控内存和 goroutine 数量\n- 避免 expensive request\n\n---", "subs": ["16.1 内存分析思路", "16.2 raftLog 内存", "16.3 treeIndex 内存", "16.4 boltdb mmap 内存", "16.5 Watcher 内存", "16.6 expensive request 内存", "16.7 其他内存问题", "16.8 案例：1 key 占用数 G 内存", "16.9 本章小结"]}, {"title": "第17章 性能优化 - 读性能", "content": "etcd 官方压测线性读可达 14 万 QPS，但这是理想场景。实际生产中，你的读性能可能只有几千甚至几百。本章将分析各个璶颈点并给出优化方案。\n\n#### 17.1 读性能分析链路\n\n一个读请求从 Client 到响应返回要经过 8 个阶段，任何一个都可能成为璶颈。\n\n```mermaid\ngraph TB\n    Client --> LB[1. 负载均衡]\n    LB --> Auth[2. 鉴权]\n    Auth --> Read[3. 读模式选择]\n    Read --> ReadIndex[4. ReadIndex]\n    ReadIndex --> ApplyWait[5. ApplyWait]\n    ApplyWait --> RBAC[6. RBAC 权限校验]\n    RBAC --> TreeIndex[7. treeIndex 查询]\n    TreeIndex --> Boltdb[8. boltdb 读取]\n```\n\n#### 17.2 负载均衡优化\n\n| 版本 | 负载均衡策略 | 问题 |\n|-----|-------------|------|\n| etcd < 3.4 | 固定连接 | 单节点过载 |\n| etcd >= 3.4 | Round-robin | 节点负载均衡 |\n\n**建议**：\n\n- 低版本使用 Load Balancer 访问 etcd\n- 便于集群扩缩容，无需调整 client 配置\n\n#### 17.3 鉴权优化\n\n**Authenticate 接口性能**：\n\n| 版本 | 性能 | P99 延时 |\n|-----|------|---------|\n| < v3.4.9 | ~16 QPS | 18 秒 |\n| >= v3.4.9 | ~200 QPS | < 1 秒 |\n\n**优化建议**：\n\n| 建议 | 说明 |\n|-----|------|\n| **使用证书鉴权** | 避免密码计算开销，性能几乎无损 |\n| **复用 token** | 减少 Authenticate 调用 |\n| **升级版本** | 使用 v3.4.9+ 版本 |\n\n#### 17.4 读模式选择\n\n**性能对比**（1000 client，单 key）：\n\n| 读模式 | QPS | 平均延时 |\n|-------|-----|---------|\n| 串行读 | 32 万 | 2.5 ms |\n| 线性读 | 19 万 | 4.9 ms |\n\n```bash\n# 串行读压测\nbenchmark --endpoints=addr --conns=100 --clients=1000 \\\n  range hello --consistency=s --total=500000\n\n# 线性读压测\nbenchmark --endpoints=addr --conns=100 --clients=1000 \\\n  range hello --consistency=l --total=500000\n```\n\n**选择建议**：\n\n- 对一致性要求不高 → 串行读\n- Learner 节点 → 串行读实现就近访问\n\n#### 17.5 ReadIndex 与网络延时\n\n| 部署方式 | RTT | 性能影响 |\n|---------|-----|---------|\n| 同可用区 | 0.1-0.2 ms | 最佳性能 |\n| 跨可用区 | ~2 ms | 性能下降 |\n| 跨城部署 | > 10 ms | 显著下降 |\n\n**建议**：\n\n- 尽量同可用区部署\n- 使用 Learner 实现异地容灾\n\n#### 17.6 磁盘 IO 与写 QPS 影响\n\n**写 QPS 对读性能的影响**：\n\n| 写 QPS | 线性读 QPS | 下降比例 |\n|-------|-----------|---------|\n| 0 | 19 万 | - |\n| 1000 | 15 万 | 21% |\n| 5000 | 10 万 | 47% |\n| 10000 | 6 万 | 68% |\n\n> 线性读需等待本节点 applied index 追上 Leader\n\n**建议**：使用 SSD 磁盘\n\n#### 17.7 expensive request 优化\n\n**问题**：\n\n| 场景 | 影响 |\n|-----|------|\n| 查询大量 key | 遍历耗时、内存暴涨 |\n| 大 key-value | 性能剧烈下降 |\n\n**大 value 性能影响**：\n\n| value 大小 | 线性读 QPS | 平均延时 |\n|-----------|-----------|---------|\n| 小 value | 17 万 | 5 ms |\n| 1 MB | 1163 | 818 ms |\n\n**优化方案**：\n\n| 方案 | 说明 |\n|-----|------|\n| **List + Watch** | 启动时全量，后续增量 |\n| **数据分片** | 按 namespace 等拆分 |\n| **分页查询** | 避免一次拉取大量数据 |\n| **引入缓存** | 缓存 expensive 结果 |\n\n#### 17.8 锁优化\n\n| 模块 | 锁问题 | 优化 |\n|-----|-------|------|\n| **AuthStore** | 密码校验占用锁时间长 | v3.4.9 缩小锁范围 |\n| **treeIndex** | compact 遍历阻塞读 | 克隆 treeIndex |\n| **boltdb** | 读写锁竞争 | etcd 3.1-3.4 多次优化 |\n\n#### 17.9 本章小结\n\n**读性能优化核心思路**：\n\n```mermaid\ngraph LR\n    LB[负载均衡] --> Auth[证书鉴权]\n    Auth --> Mode[选择读模式]\n    Mode --> Deploy[同可用区部署]\n    Deploy --> SSD[使用 SSD]\n    SSD --> Avoid[避免 expensive request]\n```\n\n| 优化点 | 方法 |\n|-------|------|\n| **负载均衡** | Round-robin 或 Load Balancer |\n| **鉴权** | 优先证书鉴权，复用 token |\n| **读模式** | 评估是否可用串行读 |\n| **部署** | 同可用区，使用 SSD |\n| **请求** | 避免大量 key、大 value 查询 |\n| **架构** | List + Watch，数据分片 |\n\n---", "subs": ["17.1 读性能分析链路", "17.2 负载均衡优化", "17.3 鉴权优化", "17.4 读模式选择", "17.5 ReadIndex 与网络延时", "17.6 磁盘 IO 与写 QPS 影响", "17.7 expensive request 优化", "17.8 锁优化", "17.9 本章小结"]}, {"title": "第18章 性能优化 - 写性能与稳定性", "content": "写入大量数据时遇到 \"etcdserver: too many requests\" 错误？本章将分析写性能瓶颈并介绍 gRPC proxy 扩展方案。\n\n#### 18.1 写性能分析链路\n\n```mermaid\ngraph TB\n    Client --> LB[1. 负载均衡]\n    LB --> Quota[2. db quota 检查]\n    Quota --> KV[3. KVServer 限速]\n    KV --> Raft[4. Raft Leader]\n    Raft --> Network[5. 网络同步]\n    Raft --> WAL[6. WAL 持久化]\n    WAL --> Snapshot[7. 快照]\n    \n    subgraph \"Apply 流程\"\n        RBAC[8. RBAC] --> TreeIndex[9. treeIndex]\n        TreeIndex --> Boltdb[10. boltdb]\n    end\n```\n\n#### 18.2 db quota 配置\n\n| 配置项 | 默认值 | 建议 |\n|-------|-------|------|\n| `--quota-backend-bytes` | 2 GB | 根据业务调整，不超过 8G |\n| 压缩策略 | - | 5 分钟以上压缩一次 |\n\n> 超过 quota 后集群只读，无法写入\n\n#### 18.3 限速机制\n\n**限速条件**：\n\n```text\ncommitted index - applied index > 5000\n→ 返回 \"etcdserver: too many requests\"\n```\n\n**触发原因**：\n\n| 原因 | 说明 |\n|-----|------|\n| **long expensive read** | 持有读锁导致写阻塞 |\n| **磁盘慢** | boltdb 事务提交慢 |\n| **defrag 操作** | 持有锁导致写阻塞 |\n\n#### 18.4 心跳与选举参数\n\n**相关参数**：\n\n| 参数 | 默认值 | 建议 |\n|-----|-------|------|\n| `--heartbeat-interval` | 100 ms | 100-400 ms |\n| `--election-timeout` | 1000 ms | >= 10 × heartbeat |\n\n**Leader 不稳定的原因**：\n\n| 原因 | 解决方案 |\n|-----|---------|\n| 磁盘 IO 慢 | 使用 SSD |\n| CPU 过高 | 扩容节点 |\n| 网络延时大 | 同可用区部署 |\n\n**监控指标**：\n\n```text\netcd_server_leader_changes_seen_total  # Leader 切换次数\netcd_wal_fsync_durations_seconds_bucket  # WAL 延时\n```\n\n#### 18.5 网络与磁盘 IO\n\n**SSD vs 非 SSD 性能对比**：\n\n| 磁盘类型 | 写 QPS | 平均延时 |\n|---------|--------|---------|\n| SSD | 51298 | 189 ms |\n| 非 SSD | 35255 | 279 ms |\n\n**压测命令**：\n\n```bash\nbenchmark --endpoints=addr --conns=100 --clients=1000 \\\n  put --key-size=8 --sequential-keys --total=10000000 --val-size=256\n```\n\n#### 18.6 快照参数优化\n\n| 参数 | 版本 | 默认值 |\n|-----|------|-------|\n| `--snapshot-count` | < 3.2 | 10000 |\n| `--snapshot-count` | >= 3.2 | 100000 |\n\n**权衡**：\n\n- 值过大：内存消耗高\n- 值过小：频繁触发快照重建\n\n> 快照重建代价高昂，应尽量避免\n\n#### 18.7 大 value 问题\n\n**1 MB value 写性能**：\n\n| 场景 | 写 QPS | P99 延时 |\n|-----|-------|---------|\n| 小 value | 51298 | 189 ms |\n| 100 KB | 1119 | 324 ms |\n| 1 MB | 几乎不可用 | 4 秒 |\n\n**问题**：\n\n- 频繁更新大 key → db 快速膨胀 → 超 quota\n- boltdb COW 机制导致空间放大\n\n**优化方案**：\n\n| 方案 | 说明 |\n|-----|------|\n| 减少更新频率 | 增量更新 |\n| 拆分数据 | 细粒度 key |\n| K8s 实践 | Node 心跳优化，拆分状态 |\n\n#### 18.8 boltdb 锁优化历史\n\n| 版本 | 优化 |\n|-----|------|\n| 3.0 | Raft log read 线性读 |\n| 3.1 | ReadIndex 线性读 |\n| 3.2 | 互斥锁 → 读写锁 |\n| 3.4 | 全并发读，去除 buffer 锁 |\n\n#### 18.9 gRPC Proxy 扩展\n\n```mermaid\ngraph LR\n    Clients --> Proxy[gRPC Proxy]\n    Proxy --> Etcd1[etcd 1]\n    Proxy --> Etcd2[etcd 2]\n    Proxy --> Etcd3[etcd 3]\n```\n\n**功能**：\n\n| 功能 | 说明 |\n|-----|------|\n| **扩展读** | 读缓存，降低连接数 |\n| **扩展 Watch** | 合并相同 key 的 watcher |\n| **扩展 Lease** | 合并 keepalive 心跳 |\n| **故障切换** | 自动切换到正常节点 |\n\n#### 18.10 本章小结\n\n**写性能优化层次**：\n\n| 层次 | 优化项 |\n|-----|-------|\n| **应用层** | 避免大 value、增量更新 |\n| **etcd 参数** | quota、心跳、快照参数 |\n| **操作系统** | 磁盘调度、内存配置 |\n| **硬件** | SSD 磁盘、同可用区网络 |\n| **扩展** | gRPC Proxy |\n\n**关键建议**：\n\n| 建议 | 说明 |\n|-----|------|\n| 使用 SSD | 写性能提升 45% |\n| 控制 value 大小 | 避免频繁更新大 key |\n| 调整心跳参数 | 避免频繁 Leader 切换 |\n| gRPC Proxy | 扩展读、Watch、Lease |\n\n---", "subs": ["18.1 写性能分析链路", "18.2 db quota 配置", "18.3 限速机制", "18.4 心跳与选举参数", "18.5 网络与磁盘 IO", "18.6 快照参数优化", "18.7 大 value 问题", "18.8 boltdb 锁优化历史", "18.9 gRPC Proxy 扩展", "18.10 本章小结"]}, {"title": "第19章 分布式 KV 服务实战", "content": "在学习了 etcd 的核心原理后，你是否想亲手构建一个简单的分布式 KV 服务？本章将基于 etcd 的 `raftexample` 项目，带你从零构建一个支持多存储引擎的分布式 KV 服务（metcd）。通过这个实战项目，你将深入理解 Raft 算法在工程中的应用，以及存储引擎的选型原则。\n\n#### 19.1 整体架构\n\n我们首先需要设计 metcd 的整体架构。一个典型的分布式 KV 服务需要包含以下核心组件：\n\n```mermaid\ngraph TB\n    Client --> API[API 层]\n    API --> Raft[Raft 共识模块]\n    Raft --> WAL[WAL 日志]\n    Raft --> SM[状态机]\n    \n    subgraph \"状态机\"\n        SM --> Memory[内存 map]\n        SM --> Boltdb[boltdb]\n        SM --> Leveldb[leveldb]\n    end\n```\n\n**图解说明**：\n\n上图展示了 metcd 的分层架构，自上而下分为四个层次：\n\n1. **API 层**：接收客户端的读写请求，提供 HTTP REST 接口\n2. **Raft 共识模块**：负责在多个节点间达成一致，确保数据可靠性\n3. **WAL 日志**：Write-Ahead Log，持久化 Raft 日志条目，保证 crash 后数据不丢失\n4. **状态机**：存储实际的 key-value 数据，支持多种存储引擎切换\n\n> **设计亮点**：通过接口抽象，状态机可以灵活切换不同的存储引擎（内存、boltdb、leveldb），满足不同业务场景的性能需求。\n\n#### 19.2 API 设计\n\n在设计分布式 KV 服务的 API 时，我们需要综合考虑多个因素。不同的选择会对系统的性能、易用性和安全性产生显著影响。\n\n**设计考虑因素**：\n\n| 因素 | 说明 |\n|-----|------|\n| 性能 | gRPC vs HTTP |\n| 易用性 | 调试方便 |\n| 开发效率 | Protobuf 跨平台 |\n| 安全性 | HTTPS |\n| 幂等性 | 降低使用复杂度 |\n\n**要点解读**：\n\n对于学习项目而言，我们选择 HTTP REST 接口。虽然 gRPC 在性能上更优，但 HTTP 接口更容易调试和测试，可以直接用 `curl` 命令验证功能。在生产环境中，建议使用 gRPC 以获得更好的性能。\n\n**metcd API 示例**：\n\n```bash\n# Put 接口 - 写入数据\ncurl -L http://127.0.0.1:3379/hello -XPUT -d world\n\n# Get 接口 - 读取数据\ncurl -L http://127.0.0.1:3379/hello\nworld\n```\n\n**代码说明**：上述命令展示了 metcd 最基本的读写操作。URL 路径即为 key，请求体为 value。这种设计简洁直观，符合 RESTful 风格。\n\n#### 19.3 复制状态机\n\nRaft 算法的核心是复制状态机模型。理解这个模型对于构建分布式系统至关重要。下面我们通过一个写请求的完整流程来理解它的工作原理。\n\n```mermaid\nsequenceDiagram\n    participant Client\n    participant Server\n    participant Raft\n    participant WAL\n    participant Storage\n    \n    Client->>Server: Put hello=world\n    Server->>Raft: Propose\n    Raft->>WAL: 持久化日志\n    Raft->>Raft: 广播给 Follower\n    Raft-->>Server: Committed\n    Server->>Storage: Apply\n    Server-->>Client: OK\n```\n\n**图解说明**：\n\n上图展示了一个写请求从发起到完成的 6 个关键步骤：\n\n1. **Client 发起请求**：客户端向 Server 发送 Put hello=world 请求\n2. **Server 提交提案**：将请求封装成 Raft 提案（Propose）\n3. **持久化日志**：Raft 模块先将日志持久化到 WAL，防止数据丢失\n4. **复制到 Follower**：Leader 广播日志给其他 Follower 节点\n5. **确认提交**：多数节点确认后，日志标记为已提交（Committed）\n6. **应用到状态机**：将数据写入存储引擎，返回成功给客户端\n\n> **关键理解**：只有当日志被多数节点持久化后才算提交成功。这确保了即使 Leader 崩溃，新选出的 Leader 也一定拥有这条日志，数据不会丢失。\n\n#### 19.4 多存储引擎\n\n为了让 metcd 能够适应不同的业务场景，我们设计了一个抽象的存储接口，支持多种存储引擎。\n\n**KVStore 接口抽象**：\n\n```go\ntype KVStore interface {\n    Lookup(key string) (string, bool)\n    Propose(k, v string)\n    ReadCommits(commitC <-chan *string, errorC <-chan error)\n    Snapshot() ([]byte, error)\n    RecoverFromSnapshot(snapshot []byte) error\n    Close() error\n}\n```\n\n**代码说明**：\n\n- `Lookup`：查询 key 对应的 value\n- `Propose`：提交写请求\n- `ReadCommits`：从 Raft 模块读取已提交的日志并应用\n- `Snapshot/RecoverFromSnapshot`：支持快照和恢复\n\n**存储引擎选择**：\n\n| 场景 | 推荐引擎 | 原因 |\n|-----|---------|------|\n| 读多写少 | boltdb | B+ tree 读快 |\n| 写多读少 | leveldb | LSM tree 写快 |\n\n**要点解读**：选择存储引擎时，关键要分析业务的读写比例。etcd 本身选择 boltdb 是因为它主要用于存储元数据，读操作远多于写操作。如果你的场景是日志收集、时序数据等写密集型，leveldb 会是更好的选择。\n\n#### 19.5 boltdb vs leveldb\n\n两种存储引擎的底层数据结构完全不同，这决定了它们各自的性能特点。\n\n**boltdb（B+ tree）**：\n\n| 特点 | 说明 |\n|-----|------|\n| 数据结构 | B+ tree |\n| 读性能 | 直接从内存读取 |\n| 写性能 | 随机写磁盘，较慢 |\n\nboltdb 使用 B+ tree 组织数据，所有数据通过 mmap 映射到内存，读取时直接访问内存，速度极快。但写入需要更新 B+ tree 节点并 fsync 到磁盘，存在随机写，性能较低。\n\n**leveldb（LSM tree）**：\n\n```mermaid\ngraph TB\n    Write[写请求] --> WAL[WAL 日志]\n    Write --> Mem[Memtable-skiplist]\n    Mem --> Imm[Immutable Memtable]\n    Imm --> L0[Level 0 SST]\n    L0 --> L1[Level 1 SST]\n    L1 --> L2[Level 2+ SST]\n```\n\n**图解说明**：\n\nLSM tree 的核心思想是将随机写转换为顺序写，显著提升写性能：\n\n1. **写入 WAL**：先写 WAL 保证持久性\n2. **写入 Memtable**：数据写入内存中的 skiplist\n3. **转为 Immutable**：Memtable 满后变为只读\n4. **Flush 到 Level 0**：Immutable 刷写为 SST 文件\n5. **Compaction**：后台逐层合并 SST 文件\n\n| 特点 | 说明 |\n|-----|------|\n| 写优化 | 随机写 → 顺序写 WAL + 内存 |\n| 读流程 | Memtable → Immutable → Level 0 → Level N |\n| Compaction | 后台合并 SST 文件 |\n\n> **性能对比**：leveldb 写性能可达 boltdb 的 5-10 倍，但读性能可能更低，因为数据可能分布在多个 Level 的 SST 文件中。\n\n#### 19.6 Raft 算法库\n\netcd 提供了一个高度抽象的 Raft 库，允许开发者灵活定制网络和存储模块。理解 Node API 是使用这个库的关键。\n\n**Node API**：\n\n| 接口 | 说明 |\n|-----|------|\n| `Propose` | 提交提案 |\n| `Ready` | 获取状态机输出 |\n| `Advance` | 通知已处理 Ready |\n| `Step` | 提交收到的消息 |\n| `Campaign` | 发起选举 |\n| `ReadIndex` | 线性读 |\n\n**要点解读**：\n\n- `Propose` 和 `Ready` 是最核心的两个接口，分别代表输入和输出\n- 应用层需要在一个循环中不断调用 `Ready()` 获取输出，处理后调用 `Advance()` 通知 Raft 模块\n\n**Ready 结构**：\n\n| 字段 | 说明 | 持久化 |\n|-----|------|-------|\n| `HardState` | Term、Vote | WAL |\n| `Entries` | 待持久化日志 | WAL |\n| `Messages` | 待发送消息 | - |\n| `CommittedEntries` | 已提交日志 | 状态机 |\n| `Snapshot` | 快照 | 存储 |\n\n**要点解读**：\n\nReady 结构包含了 Raft 模块所有需要处理的输出。其中 `HardState` 和 `Entries` 必须持久化到 WAL，`Messages` 需要通过网络发送给其他节点，`CommittedEntries` 需要应用到状态机。\n\n#### 19.7 raftNode 结构\n\nraftNode 是 metcd 中连接 Raft 库和应用逻辑的核心结构。\n\n```go\ntype raftNode struct {\n    proposeC    <-chan string       // 提案输入\n    confChangeC <-chan ConfChange   // 配置变更\n    commitC     chan<- *string      // 已提交日志输出\n    \n    node        raft.Node           // Raft 核心\n    raftStorage *raft.MemoryStorage // 日志存储\n    wal         *wal.WAL            // WAL 模块\n    transport   *rafthttp.Transport // 网络模块\n}\n```\n\n**代码说明**：\n\n- `proposeC`：从 HTTP 层接收写请求\n- `commitC`：向状态机发送已提交的日志\n- `node`：etcd Raft 库的核心对象\n- `wal`：使用 etcd 的 WAL 模块持久化日志\n- `transport`：使用 etcd 的 rafthttp 模块进行节点间通信\n\n#### 19.8 核心循环\n\nserveChannels 是 raftNode 的主循环，负责处理提案和 Ready 输出。\n\n```go\nfunc (rc *raftNode) serveChannels() {\n    // 处理提案\n    go func() {\n        for {\n            select {\n            case prop := <-rc.proposeC:\n                rc.node.Propose(ctx, []byte(prop))\n            case cc := <-rc.confChangeC:\n                rc.node.ProposeConfChange(ctx, cc)\n            }\n        }\n    }()\n    \n    // 处理 Ready\n    for {\n        select {\n        case <-ticker.C:\n            rc.node.Tick()\n        case rd := <-rc.node.Ready():\n            rc.wal.Save(rd.HardState, rd.Entries)\n            rc.transport.Send(rd.Messages)\n            rc.publishEntries(rd.CommittedEntries)\n            rc.node.Advance()\n        }\n    }\n}\n```\n\n**代码说明**：\n\n这段代码展示了 Raft 应用的标准模式：\n\n1. **提案处理 goroutine**：监听 proposeC 通道，将请求提交给 Raft\n2. **主循环**：\n   - 定期调用 `Tick()` 驱动 Raft 内部计时器（心跳、选举超时）\n   - 从 `Ready()` 获取输出并处理：持久化日志、发送消息、应用已提交日志\n   - 调用 `Advance()` 通知处理完成\n\n> **注意**：必须先持久化日志，再发送消息，这是 Raft 算法正确性的保证。\n\n#### 19.9 存储引擎实现\n\n最后，我们来看具体的存储引擎实现。不同引擎的 API 风格有所不同。\n\n**boltdb Put**：\n\n```go\nfunc (s *boltdbKVStore) Put(key, value string) error {\n    tx, _ := s.db.Begin(true)\n    defer tx.Rollback()\n    \n    bucket, _ := tx.CreateBucketIfNotExists([]byte(\"keys\"))\n    bucket.Put([]byte(key), []byte(value))\n    return tx.Commit()\n}\n```\n\n**代码说明**：boltdb 使用事务模型。每次写入需要开启事务、获取 Bucket、写入数据、提交事务。`defer tx.Rollback()` 确保异常时事务正确回滚。\n\n**leveldb Put**：\n\n```go\nfunc (s *leveldbKVStore) Put(key, value string) error {\n    return s.db.Put([]byte(key), []byte(value), nil)\n}\n```\n\n**代码说明**：leveldb 的 API 更加简洁，一行代码即可完成写入。这也体现了写优化设计——写入操作只需追加到 WAL 和 Memtable，不需要复杂的事务管理。\n\n#### 19.10 本章小结\n\n通过本章的学习，我们从零构建了一个分布式 KV 服务 metcd，涵盖了 API 设计、Raft 集成、存储引擎选型等核心环节。\n\n**metcd 架构总结**：\n\n| 层次 | 组件 |\n|-----|------|\n| API | HTTP REST |\n| 共识 | etcd Raft 库 |\n| 日志 | WAL 模块 |\n| 网络 | rafthttp |\n| 存储 | boltdb / leveldb / memory |\n\n**核心要点**：\n\n| 要点 | 说明 |\n|-----|------|\n| 接口抽象 | KVStore 接口支持多引擎 |\n| boltdb | 适合读多写少 |\n| leveldb | 适合写多读少（LSM tree） |\n| Raft 库 | Node API + Ready 结构 |\n\n> **进一步学习**：建议你 clone etcd 的 raftexample 项目，动手运行并扩展它，这是理解 Raft 工程实现的最佳方式。\n\n---", "subs": ["19.1 整体架构", "19.2 API 设计", "19.3 复制状态机", "19.4 多存储引擎", "19.5 boltdb vs leveldb", "19.6 Raft 算法库", "19.7 raftNode 结构", "19.8 核心循环", "19.9 存储引擎实现", "19.10 本章小结"]}, {"title": "第20章 Kubernetes 中的 etcd", "content": "Kubernetes 是 etcd 最重要的应用场景之一。作为 K8s 的唯一数据存储后端，etcd 承载着整个集群的状态数据。本章将以创建 Pod 为例，深入分析 etcd 在 Kubernetes 集群中的作用和工作机制。\n\n#### 20.1 Kubernetes 架构\n\n理解 etcd 在 K8s 中的角色，首先需要了解 Kubernetes 的整体架构。\n\n```mermaid\ngraph TB\n    subgraph \"Master 节点\"\n        API[kube-apiserver]\n        Scheduler[kube-scheduler]\n        Controller[kube-controller-manager]\n        etcd[(etcd)]\n        API --> etcd\n    end\n    \n    subgraph \"Node 节点\"\n        Kubelet[kubelet]\n        Proxy[kube-proxy]\n    end\n    \n    Scheduler --> API\n    Controller --> API\n    Kubelet --> API\n    Proxy --> API\n```\n\n**图解说明**：\n\n上图展示了 Kubernetes 的核心架构，关键点包括：\n\n1. **kube-apiserver 是唯一与 etcd 交互的组件**。Scheduler、Controller、Kubelet 等都通过 API Server 间接访问 etcd\n2. **Master 节点**：运行 API Server、Scheduler、Controller Manager 和 etcd\n3. **Node 节点**：运行 Kubelet 和 Kube-proxy，负责实际的 Pod 运行\n\n> **设计原则**：通过 API Server 统一管理对 etcd 的访问，可以实现细粒度的权限控制、缓存优化和一致性保障。\n\n#### 20.2 资源存储格式\n\nK8s 将所有资源以特定的 key 格式存储在 etcd 中。理解这个格式对于排查问题至关重要。\n\n**etcd key 格式**：\n\n```text\n/registry/{资源类型}/{namespace}/{资源名}\n```\n\n**示例**：\n\n```text\n/registry/pods/kube-system/coredns-7fcc6d65dc-jvj26\n/registry/deployments/default/nginx-deployment\n/registry/configmaps/kube-system/coredns\n```\n\n**代码说明**：从 key 格式可以看出，K8s 使用层级前缀组织资源，这使得可以高效地查询特定命名空间下的所有资源。\n\n**查询方式性能**：\n\n| 查询方式 | 实现 | 性能 |\n|---------|------|------|\n| 按名称 | key-value 查询 | 最快 |\n| 按 namespace | 范围查询 | 快 |\n| 按标签 | 遍历后过滤 | 慢 |\n\n**要点解读**：\n\n按标签查询是最慢的操作，因为 etcd 不支持二级索引。kubectl 获取带标签筛选的资源时，API Server 需要先从 etcd 拉取所有资源，然后在内存中过滤。这就是为什么**应避免频繁的标签查询**，尤其是在大规模集群中。\n\n#### 20.3 kube-apiserver 请求链路\n\n当一个请求到达 API Server 时，会经过多个处理阶段。\n\n```mermaid\ngraph LR\n    Request --> Auth[认证]\n    Auth --> Limit[限速]\n    Limit --> Audit[审计]\n    Audit --> RBAC[授权]\n    RBAC --> Admission[准入控制]\n    Admission --> Storage[存储]\n```\n\n**图解说明**：\n\nAPI Server 的请求处理链路包含 6 个核心模块：\n\n1. **认证（Authentication）**：验证请求者身份（证书、Token 等）\n2. **限速（Rate Limiting）**：防止 API Server 过载\n3. **审计（Audit）**：记录操作日志，便于安全审计\n4. **授权（Authorization）**：检查是否有权限执行操作\n5. **准入控制（Admission）**：校验/修改请求内容\n6. **存储（Storage）**：与 etcd 交互\n\n| 模块 | 说明 |\n|-----|------|\n| 认证 | x509证书、token、webhook |\n| 限速 | 默认读400/s 写200/s |\n| 授权 | RBAC（1.12+ 默认） |\n| 准入 | 静态/动态扩展 |\n\n> **性能考虑**：默认限速对于大规模集群可能不足，需要根据实际情况调整 `--max-requests-inflight` 和 `--max-mutating-requests-inflight` 参数。\n\n#### 20.4 资源安全创建（Txn）\n\n在高并发场景下，如何确保资源创建的安全性？\n\n**问题**：如果使用简单的 Put 接口，两个客户端同时创建同名资源，后者会覆盖前者，造成数据丢失而不是报错。\n\n**解决方案**：kube-apiserver 使用 etcd 的 **Txn 事务接口**进行资源创建。\n\n```go\ntxnResp, err := s.client.KV.Txn(ctx).If(\n    notFound(key),  // mod_revision:0\n).Then(\n    clientv3.OpPut(key, string(newData), opts...),\n).Commit()\n```\n\n**代码说明**：\n\n- `If(notFound(key))`：检查 key 的 mod_revision 是否为 0（即不存在）\n- `Then(OpPut(...))`：如果不存在则创建\n- 如果 key 已存在，事务失败，返回冲突错误\n\n**etcd 日志示例**：\n\n```text\nrequest_content: \"compare:<target:MOD \n  key:\\\"/registry/deployments/default/nginx-deployment\\\" \n  mod_revision:0 > \n  success:<request_put:<key:\\\"...\\\" value_size:421 >> \n  failure:<>\"\n```\n\n通过 etcd 的审计日志，可以清晰看到 K8s 使用 Txn 进行安全创建的细节。\n\n#### 20.5 ResourceVersion\n\nResourceVersion 是 K8s 乐观锁的核心。理解它与 etcd 版本号的关系非常重要。\n\n**Get 请求中的取值**：\n\n| ResourceVersion | 含义 | 数据来源 |\n|-----------------|------|---------|\n| 未指定（空） | 线性读 | etcd 最新数据 |\n| \"0\" | 任意版本 | kube-apiserver 缓存 |\n| 非 0 | 精确版本 | 缓存（等待版本匹配） |\n\n**要点解读**：\n\n使用 `ResourceVersion=0` 可以从 API Server 缓存读取，显著降低 etcd 负载。这在 Informer 等组件中被广泛使用。\n\n**Watch 请求中的取值**：\n\n| ResourceVersion | 含义 |\n|-----------------|------|\n| 未指定 | 返回当前状态 + 监听新变更 |\n| \"0\" | 从任意版本开始监听 |\n| 非 0 | 从精确版本开始监听 |\n\n**与 etcd 版本号的关系**：\n\n- Get：使用 key 的 ModRevision\n- List：使用 etcd 当前版本号\n\n#### 20.6 创建 Pod 完整流程\n\n现在让我们通过一个完整的 Pod 创建流程，观察 etcd 在其中扮演的角色。\n\n```mermaid\nsequenceDiagram\n    participant kubectl\n    participant API as kube-apiserver\n    participant etcd\n    participant DC as Deployment Controller\n    participant RSC as ReplicaSet Controller\n    participant Scheduler\n    participant Kubelet\n    \n    kubectl->>API: Create Deployment\n    API->>etcd: Txn Put Deployment\n    DC->>API: Watch Deployment\n    DC->>API: Create ReplicaSet\n    API->>etcd: Txn Put ReplicaSet\n    RSC->>API: Watch ReplicaSet\n    RSC->>API: Create Pod\n    API->>etcd: Txn Put Pod\n    Scheduler->>API: Watch Pod\n    Scheduler->>API: Bind Pod to Node\n    Kubelet->>API: Watch Pod\n    Kubelet->>Kubelet: Create Container\n```\n\n**图解说明**：\n\n这个流程展示了 Kubernetes 声明式 API 的精髓：\n\n1. **用户创建 Deployment**：kubectl → API Server → etcd\n2. **Deployment Controller 响应**：Watch 到新 Deployment，创建 ReplicaSet\n3. **ReplicaSet Controller 响应**：Watch 到新 ReplicaSet，创建 Pod\n4. **Scheduler 响应**：Watch 到未调度的 Pod，选择 Node 并绑定\n5. **Kubelet 响应**：Watch 到分配给自己的 Pod，创建容器\n\n> **核心机制**：整个流程基于 Watch 机制实现松耦合的异步协调。各个 Controller 独立工作，通过 etcd 作为协调中心。\n\n#### 20.7 Lease 复用\n\nK8s 中有大量短生命周期资源（如 Event），如果每个资源都创建独立的 Lease，会给 etcd 带来巨大压力。\n\n**问题**：大量 Event 等资源产生大量 Lease，每个 Lease 都需要 KeepAlive 续约。\n\n**解决方案**：\n\n- TTL 差异在 1 分钟内的 key 共享同一个 Lease\n- 通过 Bucket 机制将 TTL 相近的资源聚合\n\n这个优化显著减少了 etcd 需要管理的 Lease 数量，降低了 KeepAlive 的网络开销。\n\n#### 20.8 本章小结\n\n通过本章的学习，我们深入了解了 etcd 在 Kubernetes 中的核心作用。\n\n**etcd 在 K8s 中的核心作用**：\n\n| 功能 | 说明 |\n|-----|------|\n| 资源存储 | prefix + 资源类型 + namespace + 名称 |\n| 安全写入 | Txn 事务（mod_revision:0 检查） |\n| 数据监听 | Watch 机制（ResourceVersion） |\n| 生命周期 | Lease 复用 |\n\n**最佳实践**：\n\n| 建议 | 说明 |\n|-----|------|\n| 避免频繁标签查询 | 导致 etcd 范围遍历 |\n| 使用缓存 | ResourceVersion=0 从缓存读取 |\n| 避免 kubectl 高频查询 | 可能产生 expensive request |\n\n> **延伸阅读**：建议深入学习 kube-apiserver 的 Cacher 机制，了解它如何在 API Server 层面缓存 etcd 数据。\n\n---", "subs": ["20.1 Kubernetes 架构", "20.2 资源存储格式", "20.3 kube-apiserver 请求链路", "20.4 资源安全创建（Txn）", "20.5 ResourceVersion", "20.6 创建 Pod 完整流程", "20.7 Lease 复用", "20.8 本章小结"]}, {"title": "第21章 分布式锁", "content": "在软件开发过程中，我们经常需要对共享资源进行互斥操作，否则系统数据一致性就会出现问题。典型场景如商品库存操作、Kubernetes 调度器为 Pod 分配 Node 等。\n\n在单节点多线程环境中，使用本地互斥锁即可。但在分布式架构中，你需要使用**分布式锁**来解决资源互斥问题。本章将对比 Redis 和 etcd 分布式锁实现，分析 etcd 锁为何更安全。\n\n#### 21.1 分布式锁核心要素\n\n一个可靠的分布式锁必须具备以下三个核心要素：\n\n| 要素 | 说明 | 重要性 |\n|-----|------|-------|\n| **互斥性/安全性** | 同一时间只允许一个 client 持有锁 | ⭐⭐⭐ 最重要 |\n| **活性** | 避免死锁，支持超时自动释放 | ⭐⭐⭐ 防止服务中断 |\n| **高可用/高性能** | 加锁释放锁过程性能高、服务可用 | ⭐⭐ 业务需求 |\n\n> **核心原则**：无论遭遇高负载、宕机、还是网络分区，都需确保锁的互斥性和安全性。\n\n#### 21.2 真实案例：茅台超卖事故\n\n让我们从一个真实的 P0 级生产事故说起。某电商平台在茅台秒杀活动中，因 Redis 分布式锁实现问题导致严重超卖。\n\n**Redis 简易分布式锁实现**：\n\n```bash\nSET key value EX 10 NX  # 加锁（10秒过期，key不存在时才创建）\nDel key                  # 释放锁\n```\n\n**事故原因分析**：\n\n```mermaid\nsequenceDiagram\n    participant Client as 抢购Client\n    participant Auth as 用户认证服务\n    participant Redis as Redis\n    participant Stock as 库存服务\n    \n    Client->>Redis: SET lock EX 10 NX\n    Redis-->>Client: OK（获得锁）\n    Client->>Auth: 校验用户身份\n    Note over Auth: 服务高负载<br/>阻塞30秒\n    Note over Redis: 10秒后锁过期\n    Note over Redis: 其他Client获得锁\n    Auth-->>Client: 校验通过\n    Client->>Stock: 扣减库存\n    Client->>Redis: Del lock\n    Note over Redis: 删除了别人的锁！\n```\n\n**问题根因**：\n\n| 问题 | 说明 | 后果 |\n|-----|------|------|\n| 锁过期时间不合理 | 业务执行时间超过锁TTL | 锁提前释放 |\n| 释放他人的锁 | 未校验锁的持有者 | 恶性循环 |\n| 库存校验不原子 | get and compare 方式 | 无法防止超卖 |\n\n**正确做法**：\n\n1. 写入锁时使用**唯一标识**（如 UUID）作为 value\n2. 释放锁时用 Lua 脚本**原子校验**持有者\n3. 库存操作使用**原子命令**（如 Decr 并检查返回值）\n\n#### 21.3 Redis 分布式锁问题\n\n除了实现层面的问题，Redis 分布式锁本身也存在架构层面的安全隐患。\n\n**问题1：主备切换丢锁**\n\nRedis 采用**异步复制**协议，Master 写入成功后立即返回给 client，但数据可能还未同步到 Slave。\n\n```mermaid\nsequenceDiagram\n    participant ClientA\n    participant ClientB\n    participant Master\n    participant Slave\n    \n    ClientA->>Master: SET key EX 10 NX\n    Master-->>ClientA: OK（获得锁）\n    Note over Master: 尚未同步到Slave\n    Master-xMaster: Crash!\n    Note over Slave: 升级为Master\n    ClientB->>Slave: SET key EX 10 NX\n    Slave-->>ClientB: OK（也获得锁！）\n    Note over ClientA,ClientB: 两个Client都持有锁\n```\n\n**问题2：网络分区脑裂**\n\n当发生网络分区时，Redis Sentinel 可能将 Slave 提升为新 Master，导致集群出现两个 Master。\n\n**问题3：RedLock 的局限性**\n\nRedis 作者提出的 RedLock 算法基于多个独立 Redis Master（通常5个），需要多数节点加锁成功。但它**依赖系统时钟**，当时钟发生跳跃时仍可能出现安全问题。\n\n| 方案 | 原理 | 问题 |\n|-----|------|------|\n| 单节点 | SET NX | 单点故障 |\n| 主备 | 异步复制 | 主备切换丢锁 |\n| Sentinel | 自动切换 | 脑裂风险 |\n| RedLock | 多节点投票 | 依赖时钟 |\n\n#### 21.4 etcd 分布式锁优势\n\n相比 Redis，etcd 基于 **Raft 强一致性协议**，从根本上解决了数据丢失问题。\n\n| 对比项 | Redis | etcd |\n|-------|-------|------|\n| **一致性协议** | 异步复制 | Raft 强一致 |\n| **数据安全** | 可能丢失 | 多数节点确认 |\n| **活性检测** | TTL 被动过期 | Lease 主动续约 |\n| **变更通知** | 无原生支持 | Watch 实时推送 |\n| **锁等待** | 需要轮询 | Watch 阻塞等待 |\n\n> **核心差异**：Redis 为了性能牺牲了一致性，etcd 为了安全性选择了 Raft。\n\n#### 21.5 etcd 锁实现原理\n\netcd 分布式锁通过 **Txn + Lease + Watch** 三大机制确保安全性、活性和高可用。\n\n##### 21.5.1 Txn 保证安全性（互斥）\n\n事务机制确保加锁操作的原子性，检查 key 不存在时才写入：\n\n```go\n// 事务：key不存在时创建，否则获取当前值\ntxn := client.Txn(ctx).If(\n    v3.Compare(v3.CreateRevision(key), \"=\", 0),  // key不存在\n).Then(\n    v3.OpPut(key, val, v3.WithLease(lease)),    // 创建并关联Lease\n).Else(\n    v3.OpGet(key),                               // 获取已存在的锁信息\n)\nresp, _ := txn.Commit()\n```\n\n**为什么用 CreateRevision 而不是 ModRevision？**\n\n- `CreateRevision = 0` 表示 key 从未被创建过\n- `ModRevision` 只表示最后修改版本，无法判断 key 是否存在\n\n##### 21.5.2 Lease 保证活性（避免死锁）\n\nLease 机制确保即使 client 崩溃，锁也能自动释放：\n\n```mermaid\ngraph LR\n    subgraph \"正常流程\"\n        C1[Client] --> L1[创建Lease TTL=10s]\n        L1 --> K1[Put锁Key关联Lease]\n        K1 --> KA[KeepAlive续约]\n        KA --> U1[Unlock释放]\n    end\n    \n    subgraph \"异常流程\"\n        C2[Client] --> L2[创建Lease]\n        L2 --> K2[Put锁Key]\n        K2 --> CR[Client Crash]\n        CR --> EX[Lease过期]\n        EX --> DEL[锁自动删除]\n    end\n```\n\n**关键点**：\n\n1. 锁 key 绑定到 Lease，Lease 过期时 key 自动删除\n2. Client 通过 KeepAlive 定期续约，保持锁持有\n3. Crash 后无法续约，Lease 过期后锁自动释放\n\n##### 21.5.3 Watch 提升可用性（高效等待）\n\n当锁被他人持有时，Watch 机制允许 client 高效等待：\n\n```go\n// 监听锁key的变化\nwch := client.Watch(ctx, key, v3.WithRev(rev))\nfor wr := range wch {\n    for _, ev := range wr.Events {\n        if ev.Type == mvccpb.DELETE {\n            // 锁已释放，尝试重新获取\n            tryAcquireLock()\n        }\n    }\n}\n```\n\n**对比轮询方式**：\n\n| 方式 | 实时性 | 资源消耗 | 实现复杂度 |\n|-----|-------|---------|-----------|\n| 轮询 | 依赖间隔 | 高（持续请求） | 简单 |\n| Watch | 实时 | 低（长连接） | 略复杂 |\n\n#### 21.6 concurrency 包使用\n\netcd 官方提供了 `concurrency` 包，封装了分布式锁的完整实现：\n\n```go\nimport \"go.etcd.io/etcd/clientv3/concurrency\"\n\nfunc main() {\n    cli, _ := clientv3.New(clientv3.Config{...})\n    defer cli.Close()\n    \n    // 创建 Session（内部管理 Lease 和 KeepAlive）\n    s, _ := concurrency.NewSession(cli, concurrency.WithTTL(10))\n    defer s.Close()\n    \n    // 创建 Mutex\n    m := concurrency.NewMutex(s, \"/my-lock/\")\n    \n    // 加锁（阻塞直到获得锁）\n    if err := m.Lock(context.TODO()); err != nil {\n        log.Fatal(err)\n    }\n    \n    // 执行业务逻辑...\n    fmt.Println(\"持有锁，执行临界区代码\")\n    \n    // 释放锁\n    if err := m.Unlock(context.TODO()); err != nil {\n        log.Fatal(err)\n    }\n}\n```\n\n**内部实现原理**：\n\n| 步骤 | 操作 | 说明 |\n|-----|------|------|\n| 1 | 创建 key | 写入 `/my-lock/{LeaseID}`，每个 client 有唯一 key |\n| 2 | 事务检查 | If CreateRevision=0 Then Put，确保安全 |\n| 3 | 获取最小 revision | 遍历前缀下所有 key，revision 最小者获得锁 |\n| 4 | Watch 等待 | 如果不是最小，Watch 比自己 revision 小的 key |\n\n**为什么这样设计？**\n\n这种设计实现了**公平锁**：按 revision 顺序排队，先到先得，避免饥饿。\n\n#### 21.7 本章小结\n\n**etcd 分布式锁安全性保障**：\n\n```mermaid\ngraph TB\n    subgraph \"三大核心机制\"\n        Txn[Txn 事务] --> Safe[互斥性/安全性]\n        Lease[Lease 租约] --> Live[活性/防死锁]\n        Watch[Watch 监听] --> HA[高可用/高效等待]\n    end\n    \n    subgraph \"底层保障\"\n        Raft[Raft 强一致] --> Data[数据不丢失]\n    end\n```\n\n| 机制 | 作用 | 解决的问题 |\n|-----|------|-----------|\n| **Raft** | 多数节点确认后才返回成功 | Redis 主备切换丢锁 |\n| **Txn** | 原子检查并创建 | 并发加锁冲突 |\n| **Lease** | 故障后自动释放锁 | Client 崩溃导致死锁 |\n| **Watch** | 快速感知锁释放 | 低效轮询 |\n\n**分布式锁方案对比总结**：\n\n| 方案 | 一致性 | 性能 | 可靠性 | 适用场景 |\n|-----|-------|------|-------|---------|\n| Redis 单节点 | 弱 | ⭐⭐⭐ | ⭐ | 临时测试 |\n| Redis 主备 | 弱 | ⭐⭐⭐ | ⭐⭐ | 可容忍偶发不一致 |\n| RedLock | 中 | ⭐⭐ | ⭐⭐ | 对时钟要求不高 |\n| ZooKeeper | 强 | ⭐⭐ | ⭐⭐⭐ | Java 技术栈 |\n| **etcd** | 强 | ⭐⭐ | ⭐⭐⭐ | Go/K8s/金融等严格场景 |\n\n> **选型建议**：如果业务对数据一致性要求极高（如金融、交易场景），推荐使用 etcd 分布式锁。如果对性能要求极高且可容忍极端情况下的不一致，可以考虑 Redis。\n\n---", "subs": ["21.1 分布式锁核心要素", "21.2 真实案例：茅台超卖事故", "21.3 Redis 分布式锁问题", "21.4 etcd 分布式锁优势", "21.5 etcd 锁实现原理", "21.6 concurrency 包使用", "21.7 本章小结"]}, {"title": "第22章 配置与服务发现", "content": "在微服务架构中，服务实例动态扩缩、配置实时变更是常态。如何让服务之间相互发现？如何让配置变更实时生效？本章以 Apache APISIX 为例，介绍 etcd 在配置系统和服务发现中的应用。\n\n#### 22.1 架构演进\n\n软件架构经历了从单体到微服务的演进过程，每次演进都带来了新的挑战。\n\n```mermaid\ngraph LR\n    A[单体架构] --> B[分布式架构]\n    B --> C[微服务架构]\n```\n\n| 架构 | 特点 | 问题 |\n|-----|------|------|\n| 单体 | 简单、开发快 | 耦合高、扩展差 |\n| 分布式 | 垂直拆分 | 模块间通信 |\n| 微服务 | 细粒度拆分 | 服务发现复杂 |\n\n**要点解读**：随着架构演进，服务发现成为核心挑战。单体架构时代，所有功能在一个进程内直接调用。到了微服务时代，服务可能有几十上百个实例，且实例 IP 动态变化。这时就需要一个**注册中心**来协调服务发现。\n\n#### 22.2 服务发现原理\n\n服务发现的核心是让服务提供者自动注册，让服务消费者实时感知。\n\n```mermaid\ngraph TB\n    Client --> Proxy[Proxy/Gateway]\n    Proxy --> S1[Service 1]\n    Proxy --> S2[Service 2]\n    Proxy --> S3[Service 3]\n    \n    S1 --> etcd[(etcd)]\n    S2 --> etcd\n    S3 --> etcd\n    Proxy --> etcd\n```\n\n**图解说明**：\n\n上图展示了基于 etcd 的服务发现架构：\n\n1. **服务注册**：S1/S2/S3 启动时向 etcd 注册自己的地址\n2. **服务发现**：Proxy 从 etcd 获取后端服务列表\n3. **请求路由**：Client 请求 Proxy，Proxy 根据服务列表转发\n\n**工作流程**：\n\n| 组件 | 行为 |\n|-----|------|\n| **服务启动** | Txn/Put 注册地址，关联 Lease |\n| **服务运行** | KeepAlive 续约 Lease |\n| **服务异常** | Lease 过期，自动删除 |\n| **Proxy** | Range 获取初始配置，Watch 监听变化 |\n\n> **为什么用 Lease？** 如果服务崩溃而不主动注销，其他服务如何知道它已不可用？通过 Lease 自动过期机制，etcd 能自动删除失联服务的注册信息。\n\n#### 22.3 Apache APISIX 架构\n\nApache APISIX 是一个高性能 API 网关，它是 etcd 在服务发现领域最成功的应用之一。\n\n```mermaid\ngraph TB\n    subgraph \"控制面\"\n        Admin[Admin API]\n        Admin --> etcd[(etcd)]\n    end\n    \n    subgraph \"数据面\"\n        APISIX[APISIX Gateway]\n        APISIX --> etcd\n    end\n    \n    Client --> APISIX\n    APISIX --> Backend[后端服务]\n```\n\n**图解说明**：\n\nAPISIX 采用控制面与数据面分离的架构：\n\n- **控制面**（Admin API）：管理员通过 Admin API 下发路由、服务配置到 etcd\n- **数据面**（APISIX Gateway）：网关从 etcd Watch 配置变更，实时更新路由规则\n\n**功能**：\n\n| 功能 | 说明 |\n|-----|------|\n| 服务发现 | 动态路由配置 |\n| 限速 | 请求频率控制 |\n| 鉴权 | 用户认证授权 |\n| 日志 | 访问日志记录 |\n| 监控 | 性能指标收集 |\n\n#### 22.4 etcd 数据存储格式\n\n理解 APISIX 在 etcd 中的数据存储格式，对排查配置问题非常有帮助。\n\n```bash\netcdctl get \"/apisix\" --prefix --keys-only\n```\n\n```text\n/apisix/routes/12\n/apisix/routes/22\n/apisix/services/1\n/apisix/services/2\n/apisix/ssl/1\n/apisix/upstreams/\n```\n\n**代码说明**：APISIX 使用 `/apisix/{功能类型}/{id}` 的 key 格式组织数据。这种设计使得可以按功能类型批量查询，例如获取所有路由：`/apisix/routes/`。\n\n**Value 示例**：\n\n```json\n{\n  \"id\": \"1\",\n  \"upstream\": {\n    \"type\": \"roundrobin\",\n    \"nodes\": {\"172.18.5.12:80\": 1},\n    \"scheme\": \"http\"\n  }\n}\n```\n\n服务配置以 JSON 格式存储，包含负载均衡算法、后端节点地址等信息。\n\n#### 22.5 Watch 机制应用\n\nAPISIX 通过 Watch 机制实现配置的实时更新，这是其核心竞争力之一。\n\n**工作流程**：\n\n1. 启动时 Range 获取配置\n2. Watch 监听增量变化\n3. 实时更新路由规则\n\n**常见问题**：\n\n| 问题 | 原因 | 解决 |\n|-----|------|------|\n| 配置不更新 | 未处理 ErrCompacted | 重建 watcher |\n\n**要点解读**：`ErrCompacted` 是 Watch 使用中最常见的错误。当 Watch 的 revision 已被 etcd 压缩时会触发此错误。正确做法是捕获这个错误，然后重新创建 Watcher。APISIX 早期版本就因为未正确处理此错误而导致配置不更新的问题。\n\n#### 22.6 鉴权机制应用\n\n在多租户环境中，APISIX 使用 etcd 鉴权机制保证配置的安全性。\n\n**常见问题**：\n\n| 问题 | 原因 | 解决 |\n|-----|------|------|\n| etcd 高负载 | 频繁 Authenticate | 复用 token 和 client |\n\n**要点解读**：etcd 的 Authenticate 接口使用 bcrypt 算法验证密码，这是一个 CPU 密集型操作。如果每次请求都调用 Authenticate，会严重影响 etcd 性能。正确做法是**复用认证后的 token 和 client 连接**。\n\n#### 22.7 Lease 特性应用\n\nAPISIX 支持创建带 TTL 的路由，这通过 etcd Lease 实现。\n\n**TTL 路由示例**：\n\n```bash\ncurl http://127.0.0.1:9080/apisix/admin/routes/2?ttl=60 \\\n  -H 'X-API-KEY: xxx' -X PUT -d '{\n    \"uri\": \"/api/v1\",\n    \"upstream\": {\n      \"type\": \"roundrobin\",\n      \"nodes\": {\"127.0.0.1:80\": 1}\n    }\n  }'\n```\n\n**代码说明**：`ttl=60` 表示这个路由将在 60 秒后自动删除。这对于临时测试、蓝绿发布等场景非常有用。\n\n**实现**：\n\n```lua\nlocal data = etcd_cli:grant(ttl)\netcd_cli:set(key, value, {lease = data.body.ID})\n```\n\n先创建 Lease 获取 ID，再将 key 与 Lease 关联。\n\n#### 22.8 事务特性应用\n\nAPISIX 使用 etcd 事务防止并发写冲突，实现乐观锁。\n\n**目的**：防止并发写冲突\n\n```lua\nlocal compare = {{\n    key = key,\n    target = \"MOD\",\n    result = \"EQUAL\",\n    mod_revision = mod_revision,\n}}\nlocal success = {{\n    requestPut = {key = key, value = value}\n}}\netcd_cli:txn(compare, success)\n```\n\n**代码说明**：\n\n- `compare`：检查当前 mod_revision 是否与预期一致\n- `success`：如果一致则执行 Put\n- 如果不一致说明有其他客户端修改过，事务失败\n\n这种**乐观锁**机制避免了多人同时修改配置导致的覆盖问题。\n\n#### 22.9 本章小结\n\n通过本章的学习，我们了解了 etcd 在 API 网关和服务发现场景中的应用。\n\n**etcd 在 APISIX 中的应用**：\n\n| 特性 | 应用 |\n|-----|------|\n| **Key-Value** | 存储路由、服务配置 |\n| **Watch** | 实时配置更新 |\n| **鉴权** | 多租户安全访问 |\n| **Lease** | 服务自动过期剔除 |\n| **Txn** | 防止并发写冲突 |\n\n**最佳实践**：\n\n| 建议 | 说明 |\n|-----|------|\n| 处理 ErrCompacted | 重建 watcher |\n| 复用 token | 避免频繁 Authenticate |\n| 使用 Lease | 服务异常自动剔除 |\n| 使用 Txn | mod_revision 乐观锁 |\n\n> **延伸阅读**：如果你正在使用或考虑使用 APISIX，建议阅读其官方文档中关于 etcd 部署和优化的章节。\n\n---", "subs": ["22.1 架构演进", "22.2 服务发现原理", "22.3 Apache APISIX 架构", "22.4 etcd 数据存储格式", "22.5 Watch 机制应用", "22.6 鉴权机制应用", "22.7 Lease 特性应用", "22.8 事务特性应用", "22.9 本章小结"]}, {"title": "第23章 分布式协调服务选型", "content": "在构建分布式系统时，选择合适的协调服务是关键决策之一。etcd、ZooKeeper、Consul 是业界最主流的三个选择。本章将从多个维度对比这三者，帮助你根据实际场景做出合适的选型决策。\n\n#### 23.1 架构对比\n\n三个系统在设计理念上有着显著差异。\n\n| 组件 | 共识算法 | 存储 | 特点 |\n|-----|---------|------|------|\n| **etcd** | Raft | boltdb | Go 生态 |\n| **ZooKeeper** | Zab | 内存 ConcurrentHashMap | Java 生态 |\n| **Consul** | Raft + Gossip | Radix Tree | 多数据中心 |\n\n**要点解读**：\n\n- **etcd** 使用 Raft 算法和 boltdb 持久化存储，设计简洁，是 Kubernetes 的标配\n- **ZooKeeper** 使用 Zab 协议，数据主要存储在内存中，依赖快照持久化，适合 Java/大数据生态\n- **Consul** 混合使用 Raft（Server 间强一致）和 Gossip（Server-Client 最终一致），原生支持多数据中心\n\n#### 23.2 Zab 协议\n\nZooKeeper 使用的 Zab（ZooKeeper Atomic Broadcast）协议与 Raft 类似，但细节有所不同。\n\n**四个阶段**：\n\n| 阶段 | 说明 |\n|-----|------|\n| Phase 0 | Leader 选举 |\n| Phase 1 | 发现（收集数据） |\n| Phase 2 | 同步（复制数据） |\n| Phase 3 | 广播（处理请求） |\n\n**ZooKeeper 实现**：\n\n- **Fast Leader Election**：合并 Phase 0 和 1，加速选举\n- **Recovery Phase**：新 Leader 与 Follower 同步数据\n- **Broadcast Phase**：正常处理读写请求\n\n> **与 Raft 对比**：Zab 的 epoch 对应 Raft 的 term，ZXID 对应 Raft 的日志索引。两者核心思想相似，但 Zab 更复杂，这也是 Raft 诞生的原因之一——可理解性。\n\n#### 23.3 Gossip 协议\n\nConsul 的一个独特设计是使用 Gossip 协议进行节点发现和健康检查。\n\n**原理**：节点周期性选择部分节点同步消息，消息像病毒一样逐步扩散\n\n**应用**：\n\n- Consul 节点发现\n- Redis Cluster\n- Apache Cassandra\n\nGossip 的优点是去中心化、扩展性好，缺点是最终一致性，不适合需要强一致的场景。\n\n#### 23.4 读模式对比\n\n三个系统对读一致性的默认行为不同，这对业务场景选型非常重要。\n\n| 组件 | 默认读 | 强一致读 | 弱一致读 |\n|-----|-------|---------|---------|\n| etcd | 线性读 | ✅ | 串行读 |\n| ZooKeeper | 可能 stale | sync() 后读 | 默认 |\n| Consul | 基于 Lease | consistent | stale |\n\n**要点解读**：\n\n- **etcd** 默认提供线性读（强一致），如需更高性能可使用串行读\n- **ZooKeeper** 默认可能读到 stale 数据，需要调用 `sync()` 后再读才能保证一致性\n- **Consul** 的 `consistent` 模式需要转发到 Leader 读取\n\n#### 23.5 功能特性对比\n\n从功能丰富度看，Consul 内置功能最多，etcd/ZooKeeper 更偏底层。\n\n| 特性 | etcd | ZooKeeper | Consul |\n|-----|------|-----------|--------|\n| **分布式锁** | concurrency 包 | Curator 库 | 原生支持 |\n| **服务发现** | 应用层实现 | 应用层实现 | 原生框架 |\n| **健康检查** | Lease | 临时节点 | 分布式 Agent |\n| **多数据中心** | ❌ | ❌ | ✅ |\n| **线性读** | ✅ | ❌ | ✅ |\n| **事务** | ✅ 完整 | 版本检查 | ✅ |\n| **权限** | RBAC | ACL | ACL |\n\n**要点解读**：\n\n- 如果需要**多数据中心**支持，Consul 是唯一选择\n- 如果需要**原生服务发现**，Consul 最方便\n- 如果只需要可靠的 KV 存储 + Watch，etcd 最简洁\n\n#### 23.6 数据模型对比\n\n数据模型的差异会影响 API 设计和使用方式。\n\n| 组件 | 模型 | 存储限制 |\n|-----|------|---------|\n| etcd | 扁平 Key-Value | 几 GB |\n| ZooKeeper | 层次树状（Znode） | 几百 MB |\n| Consul | Key-Value | value ≤ 512B |\n\n**要点解读**：\n\n- etcd 使用扁平 KV 模型，通过 key 前缀模拟层次结构\n- ZooKeeper 使用树状结构，更适合表达层级关系\n- Consul 对单个 value 大小限制最严格（512B）\n\n**ZooKeeper 节点类型**：\n\n| 类型 | 说明 |\n|-----|------|\n| 持久节点 | 永久存在 |\n| 临时节点 | 会话结束删除 |\n| 顺序节点 | 带序号 |\n\n#### 23.7 Watch 特性对比\n\nWatch 机制的差异对实现配置热更新等场景影响很大。\n\n| 组件 | 实现 | 特点 |\n|-----|------|------|\n| etcd | MVCC | 支持范围监听 |\n| ZooKeeper | 一次性触发器 | 需重新设置 |\n| Consul | 滑动窗口 | 仅前缀监听 |\n\n**要点解读**：\n\n- **etcd** 的 Watch 基于 MVCC，支持从任意历史版本开始监听，不会丢失事件\n- **ZooKeeper** 的 Watch 是一次性的，触发后需要重新设置，可能丢失事件\n- **Consul** 使用 blocking query，类似长轮询\n\n#### 23.8 选型建议\n\n根据不同场景，给出以下选型建议。\n\n| 场景 | 推荐 |\n|-----|------|\n| Go 语言项目 | **etcd** |\n| Java/大数据 | **ZooKeeper** |\n| 多数据中心 | **Consul** |\n| 国内项目 | etcd（文档丰富） |\n| 国外项目 | Consul |\n| Java 微服务 | Nacos |\n\n> **选型思路**：优先考虑团队技术栈和生态，其次考虑功能需求，最后考虑性能。三个系统性能差异不大，主要差异在功能和生态。\n\n#### 23.9 本章小结\n\n**CAP 角度**：etcd、ZooKeeper、Consul 都是 CP 系统，在网络分区时优先保证一致性\n\n**核心差异**：\n\n| 方面 | etcd | ZooKeeper | Consul |\n|-----|------|-----------|--------|\n| 算法 | Raft | Zab | Raft+Gossip |\n| 原生锁/服务发现 | ❌ | ❌ | ✅ |\n| 多数据中心 | ❌ | ❌ | ✅ |\n| 健康检查 | Lease | 临时节点 | 分布式 |\n| 生态 | Go/K8s | Java/大数据 | HashiCorp |\n\n> **一句话总结**：etcd 最简洁、ZooKeeper 最成熟、Consul 功能最全。\n\n---", "subs": ["23.1 架构对比", "23.2 Zab 协议", "23.3 Gossip 协议", "23.4 读模式对比", "23.5 功能特性对比", "23.6 数据模型对比", "23.7 Watch 特性对比", "23.8 选型建议", "23.9 本章小结"]}, {"title": "第24章 高可靠运维体系", "content": "etcd 作为分布式系统的核心组件，其稳定性直接决定了上层应用的可用性。本章将介绍如何构建一套完整的高可靠 etcd 集群运维体系，涵盖部署、监控、备份、巡检到混沌工程的全生命周期管理。\n\n#### 24.1 运维体系概览\n\n一个完整的 etcd 运维体系应该包含以下六个环节：\n\n```mermaid\ngraph TB\n    Deploy[集群部署] --> Member[成员管理]\n    Member --> Monitor[监控告警]\n    Monitor --> Backup[备份还原]\n    Backup --> Inspect[巡检]\n    Inspect --> HA[高可用]\n    HA --> Chaos[混沌工程]\n```\n\n**图解说明**：\n\n这六个环节形成闭环，持续提升 etcd 集群的可靠性：\n\n1. **集群部署**：选择合适的部署方式和环境\n2. **成员管理**：集群扩缩容、节点替换\n3. **监控告警**：实时感知集群状态\n4. **备份还原**：数据安全兜底\n5. **巡检**：主动发现问题\n6. **混沌工程**：验证故障恢复能力\n\n#### 24.2 集群部署方案\n\n选择合适的部署环境是运维的第一步。\n\n| 方案 | 优点 | 缺点 |\n|-----|------|------|\n| 物理机 | 性能最佳 | 成本高、扩容慢 |\n| 虚拟机 | 稳定、隔离好 | 虚拟化开销 |\n| 裸容器 | 交付快 | 无调度自愈 |\n| Kubernetes | 自愈、弹性扩容 | 依赖较重 |\n\n**要点解读**：对于大多数场景，推荐使用 Kubernetes 部署。虽然引入了 K8s 依赖，但获得的自愈能力和弹性扩容能力远超成本。\n\n**Kubernetes 部署方案**：\n\n| 方案 | 特点 |\n|-----|------|\n| bitnami/etcd | helm 一键部署，基于 StatefulSet |\n| kubeadm | Static Pod，用于 K8s 集群 etcd |\n| etcd-operator | 已废弃，仅用备份功能 |\n\n```bash\nhelm repo add bitnami https://charts.bitnami.com/bitnami\nhelm install my-etcd bitnami/etcd\n```\n\n**代码说明**：bitnami/etcd 是目前最推荐的 Helm Chart，默认配置已包含持久化和安全相关设置。\n\n#### 24.3 集群组建\n\n理解集群组建参数对于排查启动问题非常重要。\n\n**initial-cluster-state 参数**：\n\n| 值 | 说明 |\n|---|------|\n| new | 新建集群 |\n| existing | 加入已有集群 |\n\n> **常见错误**：新节点加入已有集群时忘记改为 `existing`，导致数据冲突。\n\n**发现机制**：\n\n| 方式 | 说明 |\n|-----|------|\n| Static | 节点信息已知固定 |\n| Dynamic | 通过服务发现组件 |\n\n对于生产环境，推荐使用 Static 方式配置初始集群，更加可控。\n\n#### 24.4 监控告警体系\n\n有效的监控是运维的眼睛。etcd 暴露了丰富的 Prometheus 指标。\n\n**核心 Metrics 分类**：\n\n| 分类 | 示例 |\n|-----|------|\n| 磁盘 | wal_fsync_duration, backend_commit_duration |\n| 网络 | peer_round_trip_time |\n| MVCC | db_total_size, keys_total |\n| Server | has_leader, leader_changes_total |\n\n**要点解读**：\n\n- `wal_fsync_duration`：大于 10ms 需要关注磁盘性能\n- `leader_changes_total`：频繁变化说明集群不稳定\n- `db_total_size`：接近 quota 需要及时压缩\n\n**Prometheus 配置**：\n\n```yaml\nscrape_configs:\n  - job_name: etcd\n    static_configs:\n    - targets: ['10.0.0.1:2379','10.0.0.2:2379']\n```\n\n**ServiceMonitor（动态配置）**：\n\n```yaml\napiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\nmetadata:\n  name: etcd-monitor\nspec:\n  endpoints:\n  - port: http-metrics\n    scheme: https\n  selector:\n    matchLabels:\n      app: etcd\n```\n\n#### 24.5 备份与还原\n\n备份是数据安全的最后一道防线。\n\n**备份方式**：\n\n| 方式 | 说明 |\n|-----|------|\n| 手动 | `etcdctl snapshot save` |\n| 定时任务 | cron 每小时备份 |\n| Operator | EtcdBackup CRD |\n| Learner | 跨地域热备 |\n\n**要点解读**：\n\n- 至少每小时备份一次\n- 备份应存储到独立存储系统（如 S3）\n- 定期验证备份可恢复\n\n```bash\netcdctl snapshot save backup.db\netcdctl snapshot status backup.db --write-out=table\n```\n\n#### 24.6 巡检\n\n主动巡检能在问题影响业务前发现隐患。\n\n**巡检项**：\n\n| 检查项 | 说明 |\n|-------|------|\n| 数据一致性 | 各节点 key 数差异 |\n| 大 Key-Value | 影响性能 |\n| Key 数量 | 异常增长 |\n| 写入 QPS | 异常高频写入 |\n\n**要点解读**：\n\n大 Key-Value 会导致内存和网络双重压力。建议设置告警：单个 value 超过 1MB 需要关注。\n\n#### 24.7 高可用建议\n\n以下是生产环境的高可用最佳实践。\n\n| 建议 | 说明 |\n|-----|------|\n| 多可用区部署 | 3节点分布3个AZ |\n| 容器化自愈 | K8s 故障恢复 |\n| 合理 quota | 避免 db quota 满 |\n| 压缩策略 | 定期清理历史版本 |\n\n> **黄金规则**：永远不要把所有 etcd 节点部署在同一个可用区。\n\n#### 24.8 混沌工程\n\n混沌工程用于验证系统在故障场景下的表现。\n\n**chaos-mesh 资源类型**：\n\n| 类型 | 说明 |\n|-----|------|\n| IOChaos | 磁盘IO延时/错误 |\n| NetworkChaos | 网络延时/丢包 |\n| PodChaos | Pod异常重启 |\n| StressChaos | CPU/内存压测 |\n\n**IO 延时注入示例**：\n\n```yaml\napiVersion: chaos-mesh.org/v1alpha1\nkind: IoChaos\nmetadata:\n  name: io-delay\nspec:\n  action: latency\n  selector:\n    labelSelectors:\n      app: etcd\n  delay: '100ms'\n  duration: '400s'\n```\n\n**代码说明**：这会向 etcd Pod 注入 100ms 的 IO 延时，持续 400 秒。通过观察 etcd 在此期间的表现，验证监控告警是否及时触发。\n\n#### 24.9 本章小结\n\n本章介绍了 etcd 高可靠运维体系的六大核心要素。\n\n**运维体系核心要素**：\n\n| 要素 | 工具/方法 |\n|-----|---------  |\n| 部署 | ansible / helm / kubeadm |\n| 监控 | Prometheus + Grafana |\n| 告警 | Alertmanager |\n| 备份 | snapshot / Operator |\n| 巡检 | CRD + Operator |\n| 混沌 | chaos-mesh |\n\n> **运维口诀**：「部署要多 AZ，监控要全面，备份要定时，巡检要主动，混沌要常做」\n\n---", "subs": ["24.1 运维体系概览", "24.2 集群部署方案", "24.3 集群组建", "24.4 监控告警体系", "24.5 备份与还原", "24.6 巡检", "24.7 高可用建议", "24.8 混沌工程", "24.9 本章小结"]}]}, {"title": "附录", "sections": [{"title": "附录A: etcd 常用命令速查", "content": "#### 集群操作\n\n```bash\n# 查看集群状态\netcdctl endpoint status --write-out=table\netcdctl endpoint health\n\n# 查看成员列表\netcdctl member list --write-out=table\n\n# 添加成员\netcdctl member add <name> --peer-urls=<urls>\n\n# 删除成员\netcdctl member remove <member-id>\n```\n\n#### 键值操作\n\n```bash\n# 写入\netcdctl put key value\netcdctl put key value --lease=<lease-id>\n\n# 读取\netcdctl get key\netcdctl get key --rev=<revision>\netcdctl get \"\" --prefix --keys-only  # 获取所有key\n\n# 删除\netcdctl del key\netcdctl del \"\" --prefix  # 删除所有key\n\n# 范围查询\netcdctl get key1 key2  # [key1, key2)\n```\n\n#### Watch 操作\n\n```bash\n# 监听单个key\netcdctl watch key\n\n# 监听前缀\netcdctl watch --prefix /foo/\n\n# 从指定版本开始监听\netcdctl watch key --rev=<revision>\n```\n\n#### Lease 操作\n\n```bash\n# 创建租约\netcdctl lease grant <ttl>\n\n# 续约\netcdctl lease keep-alive <lease-id>\n\n# 撤销租约\netcdctl lease revoke <lease-id>\n\n# 查看租约\netcdctl lease timetolive <lease-id>\n```\n\n#### 备份还原\n\n```bash\n# 备份\netcdctl snapshot save backup.db\n\n# 查看备份状态\netcdctl snapshot status backup.db --write-out=table\n\n# 还原\netcdctl snapshot restore backup.db --data-dir=/var/lib/etcd-new\n```\n\n---", "subs": ["集群操作", "键值操作", "Watch 操作", "Lease 操作", "备份还原"]}, {"title": "附录B: 关键 Metrics 速查", "content": "#### 集群健康\n\n| Metric | 说明 |\n|--------|------|\n| `etcd_server_has_leader` | 是否有leader (1=有) |\n| `etcd_server_leader_changes_seen_total` | leader切换次数 |\n| `etcd_server_proposals_failed_total` | 失败的proposal数 |\n| `etcd_server_proposals_pending` | 待处理proposal数 |\n\n#### 磁盘性能\n\n| Metric | 说明 |\n|--------|------|\n| `etcd_disk_wal_fsync_duration_seconds` | WAL fsync延时 |\n| `etcd_disk_backend_commit_duration_seconds` | 后端提交延时 |\n\n#### 存储状态\n\n| Metric | 说明 |\n|--------|------|\n| `etcd_mvcc_db_total_size_in_bytes` | db文件总大小 |\n| `etcd_mvcc_db_total_size_in_use_in_bytes` | db实际使用大小 |\n| `etcd_debugging_mvcc_keys_total` | key总数 |\n| `etcd_mvcc_pending_compactions` | 待压缩数 |\n\n#### 网络\n\n| Metric | 说明 |\n|--------|------|\n| `etcd_network_peer_round_trip_time_seconds` | 节点间RTT |\n| `etcd_network_peer_sent_bytes_total` | 节点间发送字节 |\n\n#### gRPC\n\n| Metric | 说明 |\n|--------|------|\n| `grpc_server_handled_total` | gRPC请求总数 |\n| `grpc_server_handling_seconds` | 请求处理延时 |\n\n---", "subs": ["集群健康", "磁盘性能", "存储状态", "网络", "gRPC"]}, {"title": "附录C: 常见问题 FAQ", "content": "#### Q1: etcd 适合存储多大的数据？\n\n官方建议：\n\n- 单个 value ≤ 1.5MB\n- db 总大小 ≤ 8GB\n- etcd 用于存储元数据，不适合大数据存储\n\n#### Q2: 如何选择节点数量？\n\n| 节点数 | 容错 | 建议 |\n|-------|------|------|\n| 1 | 0 | 仅测试 |\n| 3 | 1 | 生产最小 |\n| 5 | 2 | 推荐生产 |\n| 7 | 3 | 大规模 |\n\n#### Q3: 线性读和串行读如何选择？\n\n| 类型 | 一致性 | 性能 | 场景 |\n|-----|-------|------|------|\n| 线性读 | 强 | 低 | 默认，关键数据 |\n| 串行读 | 弱 | 高 | 可容忍短暂不一致 |\n\n#### Q4: db quota 满了怎么办？\n\n1. 压缩旧版本: `etcdctl compact <revision>`\n2. 碎片整理: `etcdctl defrag`\n3. 增加 quota: `--quota-backend-bytes`\n4. 解除告警: `etcdctl alarm disarm`\n\n#### Q5: 如何判断 etcd 性能问题？\n\n检查以下指标：\n\n- `etcd_disk_wal_fsync_duration_seconds` > 10ms\n- `etcd_disk_backend_commit_duration_seconds` > 25ms\n- `etcd_network_peer_round_trip_time_seconds` > 100ms\n\n#### Q6: etcd vs ZooKeeper vs Consul 如何选择？\n\n| 场景 | 推荐 |\n|-----|------|\n| Go/Kubernetes | etcd |\n| Java/大数据 | ZooKeeper |\n| 多数据中心 | Consul |\n\n---\n\n> **文档版本**: v1.0  \n> **最后更新**: 2025-12-19  \n> **作者**: etcd 学习笔记", "subs": ["Q1: etcd 适合存储多大的数据？", "Q2: 如何选择节点数量？", "Q3: 线性读和串行读如何选择？", "Q4: db quota 满了怎么办？", "Q5: 如何判断 etcd 性能问题？", "Q6: etcd vs ZooKeeper vs Consul 如何选择？"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

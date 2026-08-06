@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Consul 学习笔记 · 第二册：安全、集成与故障排除 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Consul 学习笔记 · 第二册：安全、集成与故障排除</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Consul 学习笔记 · 第二册：安全、集成与故障排除", "intro": "", "parts": [{"title": "第7章 安全", "sections": [{"title": "7.1 安全概述", "content": "本章介绍 Consul 的安全机制，包括 Gossip 加密、TLS 配置、ACL 系统和安全模型。\n\n---\n\n\n#### Consul 不是默认安全的\n\n> **重要**: Consul **不是默认安全的**。必须显式启用以下机制才能保护集群。\n\n#### 安全机制层次\n\n```mermaid\ngraph TD\n    subgraph Security[\"Consul 安全层次\"]\n        Gossip[Gossip 加密]\n        TLS[TLS/mTLS]\n        ACL[ACL 访问控制]\n        Namespace[Namespace 隔离]\n        Sentinel[Sentinel 策略]\n    end\n    \n    Gossip -->|UDP 通信| Encrypt1[AES-256 对称加密]\n    TLS -->|RPC/HTTP| Encrypt2[X.509 证书]\n    ACL -->|授权| Token[Token 认证]\n    Namespace -->|Enterprise| MultiTenant[多租户隔离]\n    Sentinel -->|Enterprise| Policy[策略即代码]\n```\n\n#### 安全组件\n\n| 组件 | 功能 | 适用场景 |\n|------|------|---------|\n| **Gossip 加密** | 保护节点间 UDP 通信 | 所有部署 |\n| **TLS** | 保护 RPC/HTTP 通信 | 所有部署 |\n| **mTLS** | 双向 TLS 认证 | 生产环境 |\n| **ACL** | 访问控制和授权 | 所有部署 |\n| **Namespace** | 多租户隔离 | Enterprise |\n| **Sentinel** | KV 策略控制 | Enterprise |\n\n---", "subs": ["Consul 不是默认安全的", "安全机制层次", "安全组件"]}, {"title": "7.2 Gossip 加密", "content": "#### 什么是 Gossip 加密\n\nGossip 协议使用 UDP 进行节点间通信，需要使用对称密钥加密保护。\n\n```mermaid\ngraph LR\n    subgraph Cluster[\"Consul 集群\"]\n        A[Agent A] <-->|Encrypted UDP| B[Agent B]\n        B <-->|Encrypted UDP| C[Agent C]\n        C <-->|Encrypted UDP| A\n    end\n    \n    Key[对称密钥 AES-256] --> A\n    Key --> B\n    Key --> C\n```\n\n#### 生成加密密钥\n\n```bash\n# 生成 32 字节 Base64 编码的密钥\nconsul keygen\n\n# 输出示例\n# pUqJrVyVRj5jsiYEkM/tFQYfWyJIv4s3XkvDwy7Cu5s=\n```\n\n#### 配置 Gossip 加密\n\n**Server 和 Client 配置:**\n\n```json\n{\n  \"encrypt\": \"pUqJrVyVRj5jsiYEkM/tFQYfWyJIv4s3XkvDwy7Cu5s=\",\n  \"encrypt_verify_incoming\": true,\n  \"encrypt_verify_outgoing\": true\n}\n```\n\n| 参数 | 说明 | 默认值 |\n|------|------|--------|\n| `encrypt` | 加密密钥 | 无 |\n| `encrypt_verify_incoming` | 验证入站加密 | true |\n| `encrypt_verify_outgoing` | 验证出站加密 | true |\n\n#### 密钥轮换\n\n```bash\n# 1. 安装新密钥 (不作为主密钥)\nconsul keyring -install=\"新密钥\"\n\n# 2. 列出所有密钥\nconsul keyring -list\n\n# 3. 设置新密钥为主密钥\nconsul keyring -use=\"新密钥\"\n\n# 4. 移除旧密钥\nconsul keyring -remove=\"旧密钥\"\n```\n\n#### WAN 联邦注意事项\n\n> **重要**: 多数据中心 WAN 联邦必须使用**相同的加密密钥**。\n\n---", "subs": ["什么是 Gossip 加密", "生成加密密钥", "配置 Gossip 加密", "密钥轮换", "WAN 联邦注意事项"]}, {"title": "7.3 TLS 加密", "content": "#### TLS 概述\n\nTLS 用于保护 RPC 和 HTTP API 通信，支持单向和双向 (mTLS) 认证。\n\n```mermaid\ngraph TD\n    subgraph TLS[\"TLS 保护范围\"]\n        RPC[RPC 8300]\n        HTTP[HTTP API 8500]\n        HTTPS[HTTPS API 8501]\n        gRPC[gRPC 8502]\n    end\n    \n    CA[CA 证书] --> Server[Server 证书]\n    CA --> Client[Client 证书]\n    \n    Server --> RPC\n    Server --> HTTPS\n    Client --> RPC\n    Client --> HTTPS\n```\n\n#### 证书要求\n\n| 要求 | 说明 |\n|------|------|\n| **CA 证书** | 所有节点共享同一 CA |\n| **服务器证书** | SAN 必须包含 `server.<dc>.<domain>` |\n| **客户端证书** | 用于 mTLS 认证 |\n| **扩展密钥用法** | clientAuth + serverAuth |\n\n#### TLS 配置参数\n\n```json\n{\n  \"tls\": {\n    \"defaults\": {\n      \"ca_file\": \"/etc/consul.d/certs/ca.pem\",\n      \"cert_file\": \"/etc/consul.d/certs/server.pem\",\n      \"key_file\": \"/etc/consul.d/certs/server-key.pem\",\n      \"verify_incoming\": true,\n      \"verify_outgoing\": true\n    },\n    \"internal_rpc\": {\n      \"verify_server_hostname\": true\n    }\n  }\n}\n```\n\n#### TLS 配置详解\n\n| 参数 | 说明 | 推荐值 |\n|------|------|--------|\n| `verify_incoming` | 验证入站连接证书 | true |\n| `verify_outgoing` | 验证出站连接证书 | true |\n| `verify_server_hostname` | 验证服务器主机名 | true |\n| `tls_min_version` | 最低 TLS 版本 | TLSv1_2 |\n\n#### Server TLS 配置示例\n\n```hcl\ntls {\n  defaults {\n    ca_file   = \"/etc/consul.d/certs/consul-agent-ca.pem\"\n    cert_file = \"/etc/consul.d/certs/dc1-server-consul-0.pem\"\n    key_file  = \"/etc/consul.d/certs/dc1-server-consul-0-key.pem\"\n    \n    verify_incoming = true\n    verify_outgoing = true\n  }\n  \n  internal_rpc {\n    verify_server_hostname = true\n  }\n}\n\nauto_encrypt {\n  allow_tls = true\n}\n```\n\n#### Client TLS 配置示例\n\n```hcl\ntls {\n  defaults {\n    ca_file = \"/etc/consul.d/certs/consul-agent-ca.pem\"\n    \n    verify_incoming = false  # 仅限 localhost 访问\n    verify_outgoing = true\n  }\n  \n  internal_rpc {\n    verify_server_hostname = true\n  }\n}\n\nauto_encrypt {\n  tls = true\n}\n```\n\n#### Auto Encrypt\n\n自动加密功能简化 Client 证书分发：\n\n```mermaid\nsequenceDiagram\n    participant Client\n    participant Server\n    participant CA as Connect CA\n    \n    Client->>Server: 请求证书 (带 ACL Token)\n    Server->>CA: 签发客户端证书\n    CA-->>Server: 返回证书\n    Server-->>Client: 分发证书\n    Client->>Client: 自动配置 TLS\n```\n\n---", "subs": ["TLS 概述", "证书要求", "TLS 配置参数", "TLS 配置详解", "Server TLS 配置示例", "Client TLS 配置示例", "Auto Encrypt"]}, {"title": "7.4 ACL 系统", "content": "#### ACL 概述\n\nACL (Access Control List) 提供基于 Token 的访问控制。\n\n```mermaid\ngraph TD\n    subgraph ACL[\"ACL 系统组件\"]\n        Token[Token 令牌]\n        Policy[Policy 策略]\n        Role[Role 角色]\n        Identity[Service/Node Identity]\n    end\n    \n    Token -->|关联| Policy\n    Token -->|关联| Role\n    Role -->|包含| Policy\n    Identity -->|预定义| Policy\n```\n\n#### ACL 组件\n\n| 组件 | 说明 |\n|------|------|\n| **Token** | 认证凭据，绑定策略或角色 |\n| **Policy** | 权限规则集 |\n| **Role** | 策略集合 |\n| **Service Identity** | 服务预定义策略 |\n| **Node Identity** | 节点预定义策略 |\n\n#### 启用 ACL\n\n```json\n{\n  \"acl\": {\n    \"enabled\": true,\n    \"default_policy\": \"deny\",\n    \"enable_token_persistence\": true,\n    \"tokens\": {\n      \"initial_management\": \"root-token-uuid\"\n    }\n  }\n}\n```\n\n#### ACL 初始化\n\n```bash\n# 1. 初始化 ACL 系统 (生成 bootstrap token)\nconsul acl bootstrap\n\n# 输出示例\n# AccessorID:       b3e4f67c-5a2b-9d0e-8c7f-6a1e3d4b5c6a\n# SecretID:         e7f8a9b0-1c2d-3e4f-5a6b-7c8d9e0f1a2b\n# Description:      Bootstrap Token (Global Management)\n# ...\n\n# 2. 设置 Token 环境变量\nexport CONSUL_HTTP_TOKEN=\"e7f8a9b0-1c2d-3e4f-5a6b-7c8d9e0f1a2b\"\n```\n\n#### 策略规则语法\n\n```hcl\n# Agent 策略\nagent_prefix \"\" {\n  policy = \"read\"\n}\n\nagent \"web-server\" {\n  policy = \"write\"\n}\n\n# KV 策略\nkey_prefix \"\" {\n  policy = \"deny\"\n}\n\nkey_prefix \"config/\" {\n  policy = \"read\"\n}\n\nkey_prefix \"config/app/\" {\n  policy = \"write\"\n}\n\n# Service 策略\nservice_prefix \"\" {\n  policy = \"read\"\n}\n\nservice \"web\" {\n  policy = \"write\"\n}\n\n# Node 策略\nnode_prefix \"\" {\n  policy = \"read\"\n}\n```\n\n#### 权限级别\n\n| 权限 | 说明 |\n|------|------|\n| `deny` | 拒绝访问 |\n| `read` | 只读访问 |\n| `write` | 读写访问 |\n| `list` | 列表访问 (仅 KV) |\n\n#### 创建策略和 Token\n\n```bash\n# 1. 创建策略文件\ncat > web-policy.hcl << 'EOF'\nservice \"web\" {\n  policy = \"write\"\n}\nservice_prefix \"\" {\n  policy = \"read\"\n}\nnode_prefix \"\" {\n  policy = \"read\"\n}\nEOF\n\n# 2. 创建策略\nconsul acl policy create \\\n  -name=\"web-service\" \\\n  -rules=@web-policy.hcl\n\n# 3. 创建 Token\nconsul acl token create \\\n  -description=\"Web Service Token\" \\\n  -policy-name=\"web-service\"\n```\n\n#### Service Identity\n\nService Identity 是预定义的服务策略快捷方式：\n\n```bash\n# 创建带 Service Identity 的 Token\nconsul acl token create \\\n  -description=\"Web Service Token\" \\\n  -service-identity=\"web\"\n```\n\n等效于:\n\n```hcl\nservice \"web\" {\n  policy = \"write\"\n}\nservice_prefix \"\" {\n  policy = \"read\"\n  intentions = \"read\"\n}\n```\n\n---", "subs": ["ACL 概述", "ACL 组件", "启用 ACL", "ACL 初始化", "策略规则语法", "权限级别", "创建策略和 Token", "Service Identity"]}, {"title": "7.5 安全模型", "content": "#### 威胁模型\n\n```mermaid\ngraph TD\n    subgraph InScope[\"威胁模型范围内\"]\n        A[Agent 间通信窃听]\n        B[数据传输篡改]\n        C[未授权访问]\n        D[状态数据破坏]\n        E[DoS 攻击]\n        F[Service Mesh 通信]\n    end\n    \n    subgraph OutOfScope[\"威胁模型范围外\"]\n        X[数据目录访问]\n        Y[配置目录访问]\n        Z[进程内存访问]\n    end\n```\n\n#### 安全边界\n\n| 边界 | 保护机制 |\n|------|---------|\n| **Agent 通信** | Gossip 加密 + TLS |\n| **API 访问** | TLS + ACL |\n| **服务间通信** | mTLS (Service Mesh) |\n| **数据持久化** | 文件系统权限 |\n\n#### 用户角色\n\n| 角色 | 信任级别 | 访问权限 |\n|------|---------|---------|\n| **System Admin** | 完全信任 | 系统级访问 |\n| **Consul Admin** | 高度信任 | 管理 Token |\n| **Consul Operator** | 受限信任 | 命名空间内操作 |\n| **Developer** | 有限信任 | 应用相关 |\n| **End User** | 不信任 | 无直接访问 |\n\n#### 内部威胁\n\n| 威胁 | 缓解措施 |\n|------|---------|\n| **恶意操作员** | Namespace 隔离、Sentinel 策略 |\n| **被入侵应用** | 最小权限 Token、mTLS |\n| **RPC 滥用** | mTLS 验证、ACL |\n| **HTTP 滥用** | ACL + HTTPS |\n| **DNS 滥用** | ACL Token |\n| **Gossip 滥用** | 加密 + 定期轮换密钥 |\n\n#### 外部威胁\n\n| 威胁 | 缓解措施 |\n|------|---------|\n| **网络窃听** | 全链路加密 |\n| **中间人攻击** | mTLS + 主机名验证 |\n| **未授权访问** | ACL + 防火墙 |\n| **凭据泄露** | 定期轮换、最小权限 |\n\n---", "subs": ["威胁模型", "安全边界", "用户角色", "内部威胁", "外部威胁"]}, {"title": "7.6 安全配置检查清单", "content": "#### 必须配置\n\n```mermaid\ngraph TD\n    A{Gossip 加密?} -->|Yes| B{TLS 启用?}\n    B -->|Yes| C{ACL 启用?}\n    C -->|Yes| D{默认策略 deny?}\n    D -->|Yes| E[基本安全]\n    \n    A -->|No| X[不安全]\n    B -->|No| X\n    C -->|No| X\n    D -->|No| X\n```\n\n#### 生产环境完整配置\n\n```json\n{\n  \"datacenter\": \"dc1\",\n  \"data_dir\": \"/opt/consul/data\",\n  \"log_level\": \"INFO\",\n  \n  \"encrypt\": \"密钥\",\n  \"encrypt_verify_incoming\": true,\n  \"encrypt_verify_outgoing\": true,\n  \n  \"tls\": {\n    \"defaults\": {\n      \"ca_file\": \"/etc/consul.d/certs/ca.pem\",\n      \"cert_file\": \"/etc/consul.d/certs/server.pem\",\n      \"key_file\": \"/etc/consul.d/certs/server-key.pem\",\n      \"verify_incoming\": true,\n      \"verify_outgoing\": true,\n      \"tls_min_version\": \"TLSv1_2\"\n    },\n    \"internal_rpc\": {\n      \"verify_server_hostname\": true\n    }\n  },\n  \n  \"acl\": {\n    \"enabled\": true,\n    \"default_policy\": \"deny\",\n    \"enable_token_persistence\": true\n  },\n  \n  \"enable_script_checks\": false,\n  \"enable_local_script_checks\": true,\n  \"disable_remote_exec\": true\n}\n```\n\n#### 安全建议\n\n| 类别 | 建议 |\n|------|------|\n| **证书** | 定期轮换、使用短 TTL |\n| **Token** | 最小权限原则 |\n| **密钥** | 定期轮换 Gossip 密钥 |\n| **运行权限** | 非 root 用户运行 |\n| **日志** | 启用审计日志 |\n| **脚本检查** | 禁用远程脚本检查 |\n| **远程执行** | 禁用 remote exec |\n\n---", "subs": ["必须配置", "生产环境完整配置", "安全建议"]}, {"title": "7.7 本章小结", "content": "#### 安全层次总览\n\n```mermaid\ngraph TD\n    subgraph Layer1[\"传输层安全\"]\n        Gossip[Gossip 加密]\n        TLS[TLS/mTLS]\n    end\n    \n    subgraph Layer2[\"应用层安全\"]\n        ACL[ACL 系统]\n        Token[Token 认证]\n    end\n    \n    subgraph Layer3[\"隔离层\"]\n        NS[Namespace]\n        Sentinel[Sentinel]\n    end\n    \n    Layer1 --> Layer2 --> Layer3\n```\n\n#### 快速配置指南\n\n| 阶段 | 操作 |\n|------|------|\n| 1. 加密 | 启用 Gossip 加密 |\n| 2. TLS | 配置 CA 和证书 |\n| 3. ACL | 启用 ACL，默认 deny |\n| 4. Token | 创建服务专用 Token |\n| 5. 轮换 | 定期轮换密钥和证书 |\n\n#### 最佳实践\n\n1. **纵深防御** - 启用所有安全层\n2. **最小权限** - Token 只授予必要权限\n3. **定期轮换** - 密钥、证书、Token\n4. **监控审计** - 启用日志和监控\n5. **隔离运行** - 非 root、专用用户\n\n---\n\n> **下一章**: [第8章 ACL 详解](#第8章-acl-详解) - 深入了解 ACL 策略配置\n\n---", "subs": ["安全层次总览", "快速配置指南", "最佳实践"]}]}, {"title": "第8章 ACL 详解", "sections": [{"title": "8.1 ACL 系统概述", "content": "本章深入介绍 Consul ACL 系统的各个组件，包括 Token、Policy、Role、Service Identity、Node Identity 和 Auth Methods。\n\n---\n\n\n#### ACL 工作流程\n\n```mermaid\ngraph TD\n    Admin[ACL 管理员] --> Policy[1. 定义 Policy]\n    Policy --> Role[2. 创建 Role 可选]\n    Role --> Token[3. 生成 Token]\n    Token --> Distribute[4. 分发 Token]\n    Distribute --> User[5. 用户/服务使用]\n    User --> Request[6. 请求携带 Token]\n    Request --> Consul[7. Consul 验证]\n    Consul --> Grant{授权?}\n    Grant -->|Yes| Allow[允许访问]\n    Grant -->|No| Deny[拒绝访问]\n```\n\n#### ACL 组件关系\n\n```mermaid\ngraph TD\n    subgraph ACLSystem[\"ACL 系统\"]\n        Token[Token 令牌]\n        Policy[Policy 策略]\n        Role[Role 角色]\n        ServiceIdentity[Service Identity]\n        NodeIdentity[Node Identity]\n        AuthMethod[Auth Method]\n    end\n    \n    Token -->|直接关联| Policy\n    Token -->|关联| Role\n    Role -->|包含| Policy\n    Role -->|包含| ServiceIdentity\n    Role -->|包含| NodeIdentity\n    AuthMethod -->|动态生成| Token\n```\n\n#### 核心组件\n\n| 组件 | 说明 |\n|------|------|\n| **Token** | 认证凭据，包含 SecretID 用于 API 调用 |\n| **Policy** | 权限规则集，定义对资源的访问权限 |\n| **Role** | 策略集合，简化 Token 管理 |\n| **Service Identity** | 服务预定义策略，自动生成服务所需权限 |\n| **Node Identity** | 节点预定义策略，自动生成节点所需权限 |\n| **Auth Method** | 外部认证方法，支持 K8s、JWT、AWS IAM |\n\n---", "subs": ["ACL 工作流程", "ACL 组件关系", "核心组件"]}, {"title": "8.2 Tokens 令牌", "content": "#### Token 属性\n\n| 属性 | 说明 |\n|------|------|\n| `AccessorID` | 公开标识符，用于审计 |\n| `SecretID` | 私密标识符，用于 API 认证 |\n| `Description` | Token 描述 |\n| `Policies` | 关联的策略列表 |\n| `Roles` | 关联的角色列表 |\n| `ServiceIdentities` | 关联的服务身份 |\n| `NodeIdentities` | 关联的节点身份 |\n| `Local` | 是否为本地 Token |\n| `ExpirationTime` | 过期时间 |\n\n#### 内置 Token\n\n| Token | AccessorID | 说明 |\n|-------|------------|------|\n| **Anonymous** | `00000000-0000-0000-0000-000000000002` | 匿名请求使用 |\n| **Initial Management** | 自定义 | Bootstrap Token，拥有全部权限 |\n| **Agent Recovery** | 配置定义 | Agent 恢复使用 |\n\n#### Token 使用方式\n\n**服务配置:**\n\n```json\n{\n  \"service\": {\n    \"id\": \"redis\",\n    \"name\": \"redis\",\n    \"token\": \"233b604b-b92e-48c8-a253-5f11514e4b50\"\n  }\n}\n```\n\n**CLI 命令:**\n\n```bash\n# 使用 -token 参数\nconsul kv get -token=\"secret-id\" config/app\n\n# 使用环境变量 (推荐)\nexport CONSUL_HTTP_TOKEN=\"secret-id\"\nconsul kv get config/app\n```\n\n**HTTP API:**\n\n```bash\ncurl --header \"X-Consul-Token: $CONSUL_HTTP_TOKEN\" \\\n  http://localhost:8500/v1/agent/members\n```\n\n#### Agent Token 配置\n\n```json\n{\n  \"acl\": {\n    \"tokens\": {\n      \"default\": \"agent-default-token\",\n      \"agent\": \"agent-token\",\n      \"agent_recovery\": \"recovery-token\",\n      \"replication\": \"replication-token\"\n    }\n  }\n}\n```\n\n| Token 类型 | 用途 |\n|-----------|------|\n| `default` | 默认 Token，用于一般请求 |\n| `agent` | Agent 内部操作 (节点注册、Anti-Entropy) |\n| `agent_recovery` | Agent 恢复用 Token |\n| `replication` | ACL 复制用 Token |\n\n---", "subs": ["Token 属性", "内置 Token", "Token 使用方式", "Agent Token 配置"]}, {"title": "8.3 Policies 策略", "content": "#### Policy 结构\n\n```mermaid\ngraph TD\n    Policy[Policy] --> Rules[Rules 规则集]\n    Rules --> Resource[资源类型]\n    Resource --> Label[资源标签]\n    Label --> Disposition[权限级别]\n```\n\n#### 规则语法\n\n**基本语法:**\n\n```hcl\n<resource> \"<label>\" {\n  policy = \"<disposition>\"\n}\n```\n\n**无标签资源:**\n\n```hcl\n<resource> = \"<disposition>\"\n```\n\n#### 权限级别\n\n| 权限 | 说明 |\n|------|------|\n| `deny` | 拒绝访问 |\n| `read` | 只读 |\n| `write` | 读写 |\n| `list` | 列表 (仅 KV，需 acl.enable_key_list_policy=true) |\n\n#### 资源类型\n\n| 资源 | 说明 | 示例 |\n|------|------|------|\n| `acl` | ACL 系统 | `acl = \"write\"` |\n| `agent` | Agent 操作 | `agent \"node1\" { policy = \"read\" }` |\n| `event` | 用户事件 | `event_prefix \"\" { policy = \"read\" }` |\n| `key` | KV 存储 | `key_prefix \"config/\" { policy = \"write\" }` |\n| `keyring` | Gossip 密钥 | `keyring = \"write\"` |\n| `node` | 节点目录 | `node_prefix \"\" { policy = \"read\" }` |\n| `operator` | 集群操作 | `operator = \"read\"` |\n| `mesh` | 服务网格 | `mesh = \"write\"` |\n| `service` | 服务目录 | `service \"web\" { policy = \"write\" }` |\n| `session` | Session 操作 | `session_prefix \"\" { policy = \"write\" }` |\n| `query` | Prepared Query | `query_prefix \"\" { policy = \"read\" }` |\n\n#### 前缀匹配\n\n```hcl\n# 精确匹配\nservice \"web\" {\n  policy = \"write\"\n}\n\n# 前缀匹配 - 所有以 web- 开头的服务\nservice_prefix \"web-\" {\n  policy = \"read\"\n}\n\n# 空前缀 - 匹配所有\nservice_prefix \"\" {\n  policy = \"read\"\n}\n```\n\n#### 匹配优先级\n\n1. **精确匹配** > 前缀匹配\n2. **最长前缀** > 短前缀\n3. `deny` > `read` > `write` (同等匹配时)\n\n#### Policy 示例\n\n**完整示例:**\n\n```hcl\n# KV 策略\nkey_prefix \"\" {\n  policy = \"read\"\n}\n\nkey_prefix \"config/app/\" {\n  policy = \"write\"\n}\n\nkey \"config/app/secret\" {\n  policy = \"deny\"\n}\n\n# 服务策略\nservice \"web\" {\n  policy = \"write\"\n}\n\nservice_prefix \"\" {\n  policy = \"read\"\n}\n\n# 节点策略\nnode_prefix \"\" {\n  policy = \"read\"\n}\n\n# 集群操作\noperator = \"read\"\n```\n\n#### 创建 Policy\n\n**CLI:**\n\n```bash\nconsul acl policy create \\\n  -name=\"web-service\" \\\n  -description=\"Policy for web service\" \\\n  -rules=@web-policy.hcl\n```\n\n**API:**\n\n```bash\ncurl -X PUT http://localhost:8500/v1/acl/policy \\\n  -H \"X-Consul-Token: $CONSUL_HTTP_TOKEN\" \\\n  -d '{\n    \"Name\": \"web-service\",\n    \"Rules\": \"service \\\"web\\\" { policy = \\\"write\\\" }\"\n  }'\n```\n\n#### 内置 Policy\n\n| Policy | ID | 说明 |\n|--------|-----|------|\n| `global-management` | `00000000-0000-0000-0000-000000000001` | 全局管理权限 |\n| `global-read-only` | `00000000-0000-0000-0000-000000000002` | 全局只读权限 |\n\n---", "subs": ["Policy 结构", "规则语法", "权限级别", "资源类型", "前缀匹配", "匹配优先级", "Policy 示例", "创建 Policy", "内置 Policy"]}, {"title": "8.4 Roles 角色", "content": "#### Role 概述\n\nRole 是策略的集合，便于复用和管理。\n\n```mermaid\ngraph TD\n    Role[Role] --> Policy1[Policy A]\n    Role --> Policy2[Policy B]\n    Role --> SI[Service Identity]\n    Role --> NI[Node Identity]\n    \n    Token1[Token 1] --> Role\n    Token2[Token 2] --> Role\n```\n\n#### 创建 Role\n\n**CLI:**\n\n```bash\nconsul acl role create \\\n  -name=\"web-role\" \\\n  -description=\"Role for web services\" \\\n  -policy-name=\"web-policy\" \\\n  -service-identity=\"web\"\n```\n\n**API:**\n\n```bash\ncurl -X PUT http://localhost:8500/v1/acl/role \\\n  -H \"X-Consul-Token: $CONSUL_HTTP_TOKEN\" \\\n  -d '{\n    \"Name\": \"web-role\",\n    \"Policies\": [{\"Name\": \"web-policy\"}],\n    \"ServiceIdentities\": [{\"ServiceName\": \"web\"}]\n  }'\n```\n\n#### Role 属性\n\n| 属性 | 说明 |\n|------|------|\n| `ID` | 自动生成的 ID |\n| `Name` | 角色名称 |\n| `Description` | 描述 |\n| `Policies` | 关联的策略 |\n| `ServiceIdentities` | 服务身份 |\n| `NodeIdentities` | 节点身份 |\n\n---", "subs": ["Role 概述", "创建 Role", "Role 属性"]}, {"title": "8.5 Service Identity", "content": "#### 什么是 Service Identity\n\nService Identity 是一种快捷方式，自动为服务生成所需的策略。\n\n#### 自动生成的策略\n\n当使用 Service Identity 时，Consul 自动生成以下策略：\n\n```hcl\n# 允许服务注册\nservice \"<service-name>\" {\n  policy = \"write\"\n}\n\n# 允许 sidecar proxy 注册\nservice \"<service-name>-sidecar-proxy\" {\n  policy = \"write\"\n}\n\n# 允许发现其他服务\nservice_prefix \"\" {\n  policy = \"read\"\n}\n\n# 允许读取节点信息\nnode_prefix \"\" {\n  policy = \"read\"\n}\n```\n\n#### 使用 Service Identity\n\n**CLI:**\n\n```bash\nconsul acl token create \\\n  -description=\"Service token for web\" \\\n  -service-identity=\"web\"\n```\n\n**API:**\n\n```bash\ncurl -X PUT http://localhost:8500/v1/acl/token \\\n  -H \"X-Consul-Token: $CONSUL_HTTP_TOKEN\" \\\n  -d '{\n    \"ServiceIdentities\": [\n      {\"ServiceName\": \"web\"}\n    ]\n  }'\n```\n\n#### 限制数据中心\n\n```bash\nconsul acl token create \\\n  -service-identity=\"web:dc1,dc2\"\n```\n\n---", "subs": ["什么是 Service Identity", "自动生成的策略", "使用 Service Identity", "限制数据中心"]}, {"title": "8.6 Node Identity", "content": "#### 什么是 Node Identity\n\nNode Identity 为节点自动生成所需的策略。\n\n#### 自动生成的策略\n\n```hcl\n# 允许节点注册\nnode \"<node-name>\" {\n  policy = \"write\"\n}\n\n# 允许读取服务信息 (Anti-Entropy)\nservice_prefix \"\" {\n  policy = \"read\"\n}\n```\n\n#### 使用 Node Identity\n\n**CLI:**\n\n```bash\nconsul acl token create \\\n  -description=\"Agent token for node1\" \\\n  -node-identity=\"node1:dc1\"\n```\n\n---", "subs": ["什么是 Node Identity", "自动生成的策略", "使用 Node Identity"]}, {"title": "8.7 Auth Methods 认证方法", "content": "#### Auth Methods 概述\n\nAuth Methods 允许从外部系统动态创建 Token。\n\n```mermaid\nsequenceDiagram\n    participant App as 应用\n    participant Consul as Consul\n    participant External as 外部系统(K8s/JWT/AWS)\n    \n    App->>Consul: consul login (bearer token)\n    Consul->>External: 验证 bearer token\n    External-->>Consul: 身份信息\n    Consul->>Consul: 匹配 Binding Rules\n    Consul-->>App: 返回 Consul Token\n```\n\n#### 支持的认证方法\n\n| 类型 | 说明 | 用例 |\n|------|------|------|\n| **Kubernetes** | K8s ServiceAccount Token | Pod 自动获取 Token |\n| **JWT** | JSON Web Token | 通用 JWT 认证 |\n| **AWS IAM** | AWS IAM 凭证 | EC2/Lambda 自动认证 |\n| **OIDC** | OpenID Connect (Enterprise) | 浏览器 SSO |\n\n#### Binding Rules\n\nBinding Rules 定义如何将外部身份映射到 Consul 角色或服务身份：\n\n```json\n{\n  \"AuthMethod\": \"kubernetes\",\n  \"Selector\": \"serviceaccount.namespace==default\",\n  \"BindType\": \"service\",\n  \"BindName\": \"${serviceaccount.name}\"\n}\n```\n\n#### Kubernetes Auth Method\n\n**创建 Auth Method:**\n\n```bash\nconsul acl auth-method create \\\n  -type=kubernetes \\\n  -name=k8s-auth \\\n  -kubernetes-host=\"https://kubernetes.default.svc\" \\\n  -kubernetes-ca-cert=@ca.crt \\\n  -kubernetes-service-account-jwt=@token\n```\n\n**创建 Binding Rule:**\n\n```bash\nconsul acl binding-rule create \\\n  -method=k8s-auth \\\n  -bind-type=service \\\n  -bind-name='${serviceaccount.name}' \\\n  -selector='serviceaccount.namespace==default'\n```\n\n**应用登录:**\n\n```bash\nconsul login -method=k8s-auth -bearer-token-file=/var/run/secrets/kubernetes.io/serviceaccount/token\n```\n\n#### JWT Auth Method\n\n**创建 Auth Method:**\n\n```bash\nconsul acl auth-method create \\\n  -type=jwt \\\n  -name=jwt-auth \\\n  -config='{\n    \"JWTValidationPubKeys\": [\"-----BEGIN PUBLIC KEY-----...\"],\n    \"BoundAudiences\": [\"consul\"],\n    \"ClaimMappings\": {\n      \"sub\": \"user_id\"\n    }\n  }'\n```\n\n#### AWS IAM Auth Method\n\n**创建 Auth Method:**\n\n```bash\nconsul acl auth-method create \\\n  -type=aws-iam \\\n  -name=aws-auth \\\n  -config='{\n    \"BoundIAMPrincipalARNs\": [\n      \"arn:aws:iam::123456789012:role/ConsulClient\"\n    ]\n  }'\n```\n\n**EC2 实例登录:**\n\n```bash\nconsul login -method=aws-auth -aws-auto-bearer-token\n```\n\n---", "subs": ["Auth Methods 概述", "支持的认证方法", "Binding Rules", "Kubernetes Auth Method", "JWT Auth Method", "AWS IAM Auth Method"]}, {"title": "8.8 常用 Token 创建示例", "content": "#### Service Token\n\n```bash\nconsul acl token create \\\n  -description=\"Token for web service\" \\\n  -service-identity=\"web\"\n```\n\n#### Agent Token\n\n```bash\nconsul acl token create \\\n  -description=\"Agent token for node1\" \\\n  -node-identity=\"node1:dc1\"\n```\n\n#### DNS Token\n\n```hcl\n# dns-policy.hcl\nnode_prefix \"\" {\n  policy = \"read\"\n}\nservice_prefix \"\" {\n  policy = \"read\"\n}\nquery_prefix \"\" {\n  policy = \"read\"\n}\n```\n\n```bash\nconsul acl policy create -name=dns-policy -rules=@dns-policy.hcl\nconsul acl token create -description=\"DNS Token\" -policy-name=dns-policy\n```\n\n#### Replication Token\n\n```hcl\nacl = \"write\"\noperator = \"write\"\nservice_prefix \"\" {\n  policy = \"read\"\n  intentions = \"read\"\n}\n```\n\n---", "subs": ["Service Token", "Agent Token", "DNS Token", "Replication Token"]}, {"title": "8.9 本章小结", "content": "#### ACL 组件关系图\n\n```mermaid\ngraph TD\n    subgraph Creation[\"Token 创建方式\"]\n        Manual[手动创建]\n        AuthMethod[Auth Method]\n    end\n    \n    subgraph Components[\"ACL 组件\"]\n        Token[Token]\n        Policy[Policy]\n        Role[Role]\n        SI[Service Identity]\n        NI[Node Identity]\n    end\n    \n    subgraph Resources[\"保护资源\"]\n        KV[KV Store]\n        Service[Services]\n        Node[Nodes]\n        ACL[ACL]\n        Operator[Operator]\n    end\n    \n    Manual --> Token\n    AuthMethod --> Token\n    Token --> Policy\n    Token --> Role\n    Role --> Policy\n    Role --> SI\n    Role --> NI\n    Policy --> Resources\n    SI --> Resources\n    NI --> Resources\n```\n\n#### Token 类型选择\n\n| 场景 | 推荐方案 |\n|------|---------|\n| 服务注册 | Service Identity |\n| Agent 配置 | Node Identity |\n| 自定义权限 | Custom Policy |\n| K8s 环境 | Kubernetes Auth Method |\n| 云环境 | AWS IAM / JWT Auth Method |\n\n#### 最佳实践\n\n1. **最小权限原则** - 只授予必要权限\n2. **使用 Identity** - Service/Node Identity 简化配置\n3. **使用 Role** - 复用策略，简化管理\n4. **Token 过期** - 设置过期时间\n5. **Auth Method** - 自动化 Token 管理\n6. **定期审计** - 检查 Token 和 Policy\n\n#### ACL 配置检查清单\n\n```mermaid\ngraph TD\n    A{ACL 启用?} -->|Yes| B{默认 deny?}\n    B -->|Yes| C{Bootstrap 完成?}\n    C -->|Yes| D{Agent Token 配置?}\n    D -->|Yes| E{服务 Token 创建?}\n    E -->|Yes| F[ACL 系统就绪]\n    \n    A -->|No| X[启用 ACL]\n    B -->|No| Y[设置 default_policy=deny]\n```\n\n---\n\n> **下一章**: [第9章 Agent 配置](#第9章-agent-配置) - 了解 Consul Agent 的详细配置选项\n\n---", "subs": ["ACL 组件关系图", "Token 类型选择", "最佳实践", "ACL 配置检查清单"]}]}, {"title": "第9章 Agent 配置", "sections": [{"title": "9.1 Agent 概述", "content": "本章介绍 Consul Agent 的配置选项、CLI 参数、遥测监控、流量限制和实验性功能。\n\n---\n\n\n#### Agent 类型\n\n```mermaid\ngraph TD\n    subgraph Cluster[\"Consul 集群\"]\n        Server1[Server Agent]\n        Server2[Server Agent]\n        Server3[Server Agent]\n        Client1[Client Agent]\n        Client2[Client Agent]\n        Client3[Client Agent]\n    end\n    \n    Server1 <--> Server2\n    Server2 <--> Server3\n    Server3 <--> Server1\n    \n    Client1 --> Server1\n    Client2 --> Server2\n    Client3 --> Server3\n```\n\n| 类型 | 角色 | 资源需求 | 数量建议 |\n|------|------|---------|---------|\n| **Server** | 存储集群状态、参与 Raft 共识 | 高 | 3-5 个/DC |\n| **Client** | 转发请求、本地服务注册 | 低 | 每节点 1 个 |\n\n#### Agent 生命周期\n\n```mermaid\nstateDiagram-v2\n    [*] --> Starting: consul agent\n    Starting --> Running: 加入集群\n    Running --> Failed: 网络故障/崩溃\n    Failed --> Running: 恢复\n    Running --> Left: 优雅退出\n    Left --> [*]\n    Failed --> [*]: reaping (72h)\n```\n\n#### 端口要求\n\n| 端口 | 协议 | 用途 |\n|------|------|------|\n| 8300 | TCP | Server RPC |\n| 8301 | TCP/UDP | Serf LAN |\n| 8302 | TCP/UDP | Serf WAN |\n| 8500 | TCP | HTTP API |\n| 8501 | TCP | HTTPS API |\n| 8502 | TCP | gRPC |\n| 8600 | TCP/UDP | DNS |\n\n#### 网络延迟要求\n\n| 指标 | 要求 |\n|------|------|\n| 平均 RTT | < 50ms |\n| 99% RTT | < 100ms |\n\n---", "subs": ["Agent 类型", "Agent 生命周期", "端口要求", "网络延迟要求"]}, {"title": "9.2 配置方式", "content": "#### 配置优先级\n\n```mermaid\ngraph TD\n    A[命令行参数] --> B[配置文件]\n    B --> C[默认值]\n    \n    A -->|最高优先级| Final[最终配置]\n    B -->|中等优先级| Final\n    C -->|最低优先级| Final\n```\n\n#### 配置文件格式\n\n支持 **HCL** 和 **JSON** 格式：\n\n**HCL 格式:**\n\n```hcl\nnode_name = \"consul-server\"\nserver    = true\nbootstrap_expect = 3\n\ndatacenter = \"dc1\"\ndata_dir   = \"/opt/consul/data\"\n\nui_config {\n  enabled = true\n}\n\naddresses {\n  http = \"0.0.0.0\"\n}\n\nretry_join = [\"10.0.0.1\", \"10.0.0.2\", \"10.0.0.3\"]\n```\n\n**JSON 格式:**\n\n```json\n{\n  \"node_name\": \"consul-server\",\n  \"server\": true,\n  \"bootstrap_expect\": 3,\n  \"datacenter\": \"dc1\",\n  \"data_dir\": \"/opt/consul/data\",\n  \"ui_config\": {\n    \"enabled\": true\n  },\n  \"retry_join\": [\"10.0.0.1\", \"10.0.0.2\", \"10.0.0.3\"]\n}\n```\n\n#### 加载配置\n\n```bash\n# 单个配置文件\nconsul agent -config-file=server.hcl\n\n# 配置目录 (按字母顺序加载)\nconsul agent -config-dir=/etc/consul.d\n\n# 组合使用\nconsul agent -config-dir=/etc/consul.d -config-file=override.hcl\n```\n\n#### 热重载配置\n\n支持热重载的配置项：\n\n- ACL Tokens\n- Services/Checks\n- Log Level\n- TLS 证书\n\n```bash\n# 手动重载\nconsul reload\n\n# 或发送 SIGHUP\nkill -HUP $(pidof consul)\n```\n\n---", "subs": ["配置优先级", "配置文件格式", "加载配置", "热重载配置"]}, {"title": "9.3 核心配置参数", "content": "#### Server 配置示例\n\n```hcl\n# 基本配置\nnode_name = \"consul-server-1\"\nserver    = true\nbootstrap_expect = 3\n\ndatacenter = \"dc1\"\ndata_dir   = \"/opt/consul/data\"\nlog_level  = \"INFO\"\n\n# 地址配置\nbind_addr      = \"{{ GetPrivateIP }}\"\nclient_addr    = \"0.0.0.0\"\nadvertise_addr = \"{{ GetPrivateIP }}\"\n\n# 集群加入\nretry_join = [\"consul-server-2\", \"consul-server-3\"]\n\n# UI\nui_config {\n  enabled = true\n}\n\n# Service Mesh\nconnect {\n  enabled = true\n}\n\n# 安全配置\nencrypt = \"密钥\"\n\ntls {\n  defaults {\n    ca_file   = \"/etc/consul.d/certs/ca.pem\"\n    cert_file = \"/etc/consul.d/certs/server.pem\"\n    key_file  = \"/etc/consul.d/certs/server-key.pem\"\n    verify_incoming = true\n    verify_outgoing = true\n  }\n}\n\nacl {\n  enabled        = true\n  default_policy = \"deny\"\n}\n```\n\n#### Client 配置示例\n\n```hcl\nnode_name  = \"consul-client-1\"\nserver     = false\ndatacenter = \"dc1\"\ndata_dir   = \"/opt/consul/data\"\nlog_level  = \"INFO\"\n\nbind_addr  = \"{{ GetPrivateIP }}\"\nretry_join = [\"consul-server-1\", \"consul-server-2\", \"consul-server-3\"]\n\n# 服务注册\nservice {\n  name = \"web\"\n  port = 8080\n  check {\n    http     = \"http://localhost:8080/health\"\n    interval = \"10s\"\n  }\n}\n```\n\n#### 关键配置参数\n\n| 参数 | 说明 | 默认值 |\n|------|------|--------|\n| `node_name` | 节点名称 | hostname |\n| `server` | 是否为 Server | false |\n| `bootstrap_expect` | 期望 Server 数量 | - |\n| `datacenter` | 数据中心名称 | dc1 |\n| `data_dir` | 数据目录 | - |\n| `bind_addr` | 内部通信地址 | 0.0.0.0 |\n| `client_addr` | API 监听地址 | 127.0.0.1 |\n| `advertise_addr` | 广播地址 | bind_addr |\n| `retry_join` | 自动加入地址 | - |\n\n---", "subs": ["Server 配置示例", "Client 配置示例", "关键配置参数"]}, {"title": "9.4 CLI 常用命令", "content": "#### Agent 启动\n\n```bash\n# 开发模式\nconsul agent -dev\n\n# 生产模式\nconsul agent -config-dir=/etc/consul.d\n\n# 指定数据目录\nconsul agent -data-dir=/opt/consul/data -server -bootstrap-expect=3\n```\n\n#### 常用 CLI 参数\n\n| 参数 | 说明 |\n|------|------|\n| `-server` | 以 Server 模式运行 |\n| `-bootstrap-expect=N` | 期望的 Server 数量 |\n| `-retry-join=addr` | 自动加入地址 |\n| `-data-dir=path` | 数据目录 |\n| `-config-dir=path` | 配置目录 |\n| `-bind=addr` | 绑定地址 |\n| `-client=addr` | 客户端地址 |\n| `-ui` | 启用 Web UI |\n| `-encrypt=key` | Gossip 加密密钥 |\n| `-log-level=level` | 日志级别 |\n\n#### 动态地址模板\n\n```bash\n# 使用私有 IP\nconsul agent -bind='{{ GetPrivateIP }}'\n\n# 使用特定网卡\nconsul agent -bind='{{ GetInterfaceIP \"eth0\" }}'\n\n# 排除特定网卡\nconsul agent -bind='{{ GetPrivateInterfaces | exclude \"name\" \"docker.*\" | attr \"address\" }}'\n```\n\n---", "subs": ["Agent 启动", "常用 CLI 参数", "动态地址模板"]}, {"title": "9.5 遥测 (Telemetry)", "content": "#### 配置 Telemetry\n\n```hcl\ntelemetry {\n  disable_hostname = true\n  prometheus_retention_time = \"60s\"\n  \n  # StatsD\n  statsd_address = \"127.0.0.1:8125\"\n  \n  # DogStatsD\n  dogstatsd_addr = \"127.0.0.1:8125\"\n  dogstatsd_tags = [\"env:production\"]\n}\n```\n\n#### 关键指标\n\n| 指标 | 说明 | 告警阈值 |\n|------|------|---------|\n| `consul.raft.leader.lastContact` | Leader 最后联系时间 | > 200ms |\n| `consul.raft.state.candidate` | 选举次数 | > 0 |\n| `consul.autopilot.healthy` | 集群健康状态 | = 0 |\n| `consul.runtime.alloc_bytes` | 内存分配 | > 90% 系统内存 |\n| `consul.client.rpc.exceeded` | RPC 限流次数 | > 0 |\n\n#### Prometheus 集成\n\n```hcl\ntelemetry {\n  prometheus_retention_time = \"60s\"\n}\n```\n\n访问 `http://consul:8500/v1/agent/metrics?format=prometheus` 获取指标。\n\n#### 指标分类\n\n```mermaid\ngraph TD\n    subgraph Metrics[\"Consul 指标分类\"]\n        Raft[Raft 指标]\n        RPC[RPC 指标]\n        Catalog[Catalog 指标]\n        Runtime[运行时指标]\n        Memberlist[成员列表指标]\n    end\n    \n    Raft --> LeaderContact[lastContact]\n    Raft --> ApplyIndex[apply_index]\n    Raft --> CommitTime[commitTime]\n    \n    RPC --> Request[request]\n    RPC --> Exceeded[exceeded]\n    \n    Catalog --> Service[service.query]\n    \n    Runtime --> Memory[alloc_bytes]\n    Runtime --> GC[gc_pause]\n```\n\n---", "subs": ["配置 Telemetry", "关键指标", "Prometheus 集成", "指标分类"]}, {"title": "9.6 流量限制", "content": "#### 概述\n\n流量限制保护 Server 免受过载：\n\n```mermaid\ngraph LR\n    Request[请求] --> SourceIP{源 IP 限制?}\n    SourceIP -->|超限| Reject1[拒绝]\n    SourceIP -->|通过| Partition{分区限制?}\n    Partition -->|超限| Reject2[拒绝]\n    Partition -->|通过| Namespace{命名空间限制?}\n    Namespace -->|超限| Reject3[拒绝]\n    Namespace -->|通过| Identity{身份限制?}\n    Identity -->|超限| Reject4[拒绝]\n    Identity -->|通过| Handle[处理请求]\n```\n\n#### 配置示例\n\n```hcl\nlimits {\n  # 全局 RPC 限制\n  rpc_rate = 1000\n  rpc_max_burst = 2000\n  \n  # 每客户端限制\n  rpc_max_conns_per_client = 100\n}\n```\n\n#### 配置条目方式 (Enterprise)\n\n```hcl\nKind = \"control-plane-request-limit\"\nName = \"global-limit\"\nMode = \"enforcing\"\n\nread_rate  = 1000\nwrite_rate = 500\n\nkv {\n  read_rate  = 500\n  write_rate = 200\n}\n\nacl {\n  read_rate  = 100\n  write_rate = 50\n}\n```\n\n---", "subs": ["概述", "配置示例", "配置条目方式 (Enterprise)"]}, {"title": "9.7 配置条目 (Configuration Entries)", "content": "#### 概述\n\n配置条目是集中式配置，存储在 Consul 中：\n\n| 类型 | 用途 |\n|------|------|\n| `proxy-defaults` | 全局代理默认配置 |\n| `service-defaults` | 服务默认配置 |\n| `service-router` | 服务路由 |\n| `service-splitter` | 流量分割 |\n| `service-resolver` | 服务解析 |\n| `ingress-gateway` | 入口网关 |\n| `terminating-gateway` | 终止网关 |\n| `mesh` | 网格全局配置 |\n\n#### 管理配置条目\n\n```bash\n# 创建/更新\nconsul config write proxy-defaults.hcl\n\n# 读取\nconsul config read -kind service-defaults -name web\n\n# 列出\nconsul config list -kind service-defaults\n\n# 删除\nconsul config delete -kind service-defaults -name web\n```\n\n---", "subs": ["概述", "管理配置条目"]}, {"title": "9.8 实验性 WAL 日志存储", "content": "#### 概述\n\nWAL (Write-Ahead Log) 是一种替代 BoltDB 的日志存储后端：\n\n| 特性 | BoltDB | WAL |\n|------|--------|-----|\n| 写入性能 | 一般 | 更高 |\n| 文件增长 | 持续增长 | 自动清理 |\n| 空间利用 | 低效 (空闲页) | 高效 |\n| 状态 | 默认 | 实验性 |\n\n#### 启用 WAL\n\n```hcl\nraft_logstore {\n  backend = \"wal\"\n  \n  verification {\n    enabled  = true\n    interval = \"60s\"\n  }\n}\n```\n\n#### 监控 WAL\n\n关键指标：\n\n- `consul.raft.wal.log_entries_written`\n- `consul.raft.wal.segment_rotations`\n- `consul.raft.wal.last_segment_age_seconds`\n\n#### 回退到 BoltDB\n\n如需回退：\n\n1. 停止 Agent\n2. 修改配置 `backend = \"boltdb\"`\n3. 删除 WAL 文件\n4. 从快照恢复\n\n---", "subs": ["概述", "启用 WAL", "监控 WAL", "回退到 BoltDB"]}, {"title": "9.9 本章小结", "content": "#### Agent 配置层次\n\n```mermaid\ngraph TD\n    subgraph Config[\"配置层次\"]\n        CLI[命令行参数]\n        File[配置文件]\n        Entry[配置条目]\n        Default[默认值]\n    end\n    \n    CLI -->|覆盖| File\n    File -->|覆盖| Default\n    Entry -->|集中管理| Cluster[集群配置]\n```\n\n#### Server 配置检查清单\n\n| 项目 | 检查点 |\n|------|--------|\n| 基础 | node_name、datacenter、data_dir |\n| 集群 | bootstrap_expect、retry_join |\n| 安全 | encrypt、tls、acl |\n| 监控 | telemetry、log_level |\n\n#### 最佳实践\n\n1. **配置文件管理** - 使用配置目录、版本控制\n2. **地址模板** - 使用 go-sockaddr 模板\n3. **热重载** - 利用热重载减少重启\n4. **监控告警** - 配置 Telemetry、设置告警\n5. **流量保护** - 配置 RPC 限流\n6. **数据备份** - 定期快照\n\n---\n\n> **下一章**: [第10章 集成](#第10章-集成) - 了解 Consul 与其他系统的集成", "subs": ["Agent 配置层次", "Server 配置检查清单", "最佳实践"]}]}, {"title": "第10章 集成", "sections": [{"title": "概述", "content": "本章介绍 Consul 与外部系统的集成方式，包括 Consul 集成程序、NIA 网络基础设施自动化、Vault 证书管理、代理集成和社区工具。\n\n#### 10.1 Consul 集成程序 (Consul Integration Program)\n\n##### 10.1.1 集成架构概述\n\nConsul 提供了完整的生态系统集成框架，通过 RESTful HTTP API 允许合作伙伴在多个层面构建扩展集成。\n\n```mermaid\ngraph TD\n    subgraph Ecosystem[\"Consul 集成生态系统\"]\n        DataPlane[数据平面 Data Plane]\n        ControlPlane[控制平面 Control Plane]\n        Platform[平台 Platform]\n        Infrastructure[基础设施 Infrastructure]\n        NIA[网络基础设施自动化 NIA]\n    end\n    \n    DataPlane --> APM[APM/监控]\n    DataPlane --> Logging[日志告警]\n    DataPlane --> Gateway[API 网关]\n    DataPlane --> Proxy[代理扩展]\n    \n    ControlPlane --> ClientServer[Client-Server 架构]\n    \n    Platform --> Cloud[云平台 AWS/GCP/Azure]\n    Platform --> Container[容器 K8s/Docker]\n    Platform --> VM[虚拟机/裸机]\n    \n    Infrastructure --> Firewall[防火墙]\n    Infrastructure --> LB[负载均衡器]\n    Infrastructure --> SDN[软件定义网络]\n    Infrastructure --> DNS[DNS 自动化]\n    \n    NIA --> CTS[Consul-Terraform-Sync]\n    CTS --> TerraformProvider[Terraform Provider]\n```\n\n##### 10.1.2 集成分类\n\n| 集成层面 | 功能描述 | 示例集成 |\n|---------|---------|---------|\n| **数据平面** | 证书管理、ACL配置、可观测性、服务发现 | APM、日志、API网关、代理 |\n| **控制平面** | Consul Client-Server 架构 | Service Mesh 控制 |\n| **平台** | Agent 部署和配置自动化 | AWS、GCP、Azure、K8s |\n| **基础设施** | 网络设备自动化配置 | 防火墙、负载均衡、SDN |\n| **NIA** | 通过 CTS 自动化网络变更 | Terraform 模块 |\n\n##### 10.1.3 数据平面集成\n\n**APM (应用性能监控)**:\n\n- Consul Telemetry 集成\n- New Relic、Splunk SignalFX、SnappyFlow 集成\n- OpenTelemetry 集成支持\n\n**日志和告警**:\n\n- PagerDuty 集成告警\n\n**API 网关和 Ingress**:\n\n- F5 Terminating Gateway\n- Kong Ingress Controller\n- Consul Transparent Proxy\n\n##### 10.1.4 基础设施集成\n\n**防火墙自动化**:\n\n- Check Point 自动化防火墙\n- Cisco FMC 动态对象\n\n**软件定义网络 (SDN)**:\n\n- Cisco ACI 自动化\n\n**负载均衡器**:\n\n- F5 BIG-IP 跨租户配置\n\n**ADC (应用交付控制器)**:\n\n- A10 ADC 与 Consul NIA\n\n**DNS 自动化**:\n\n- DNSimple 公网 DNS 记录\n\n##### 10.1.5 集成程序流程\n\n```mermaid\ngraph LR\n    Step1[1. Engage<br/>初始接触] --> Step2[2. Enable<br/>文档和资源]\n    Step2 --> Step3[3. Develop<br/>开发和测试]\n    Step3 --> Step4[4. Review<br/>代码审查]\n    Step4 --> Step5[5. Release<br/>发布集成]\n    Step5 --> Step6[6. Support<br/>持续支持]\n    \n    Step4 -.->|迭代改进| Step3\n```\n\n##### 10.1.6 Consul 版本类型\n\n| 版本类型 | 特点 | 适用场景 |\n|---------|------|---------|\n| **Self-Managed** | 开源、永久免费 | 自托管环境 |\n| **HCP Consul** | 托管服务、云管理 | 简化运维 |\n| **Consul Enterprise** | 自托管、高级功能 | 企业定制部署 |\n\n---\n\n#### 10.2 NIA 集成程序 (Network Infrastructure Automation)\n\n##### 10.2.1 NIA 概述\n\n网络基础设施自动化 (NIA) 基于声明式、工作流和服务驱动的网络自动化架构。\n\n```mermaid\ngraph TD\n    subgraph NIA[\"NIA 架构\"]\n        Consul[Consul 服务目录]\n        CTS[Consul-Terraform-Sync]\n        TF[Terraform]\n        Provider[Terraform Provider]\n        Network[网络基础设施]\n    end\n    \n    Consul -->|服务变更| CTS\n    CTS -->|触发自动化| TF\n    TF -->|调用| Provider\n    Provider -->|配置变更| Network\n    \n    Consul -->|直接集成| DirectAPI[直接 API 集成]\n    DirectAPI -->|原生方式| Network\n```\n\n##### 10.2.2 工作原理\n\n1. **Consul 作为数据源** - 存储基础设施状态\n2. **CTS 守护进程** - 与 Consul Agent 同节点运行\n3. **服务变更触发** - 自动执行自动化任务\n4. **Terraform 模块** - 定义网络设备配置\n\n**两种集成方式**:\n\n- **Push 方式** (推荐): 使用 CTS + Terraform\n- **Pull 方式**: 直接通过 Consul API 集成\n\n##### 10.2.3 NIA 集成步骤\n\n```mermaid\ngraph LR\n    E1[1. Engage<br/>初始接触] --> E2[2. Enable<br/>开发指南]\n    E2 --> R1[3. Develop<br/>开发模块]\n    R1 --> R2[4. Review<br/>HashiCorp 审核]\n    R2 --> R3[5. Release<br/>发布到 Registry]\n    R3 --> S1[6. Support<br/>持续维护]\n    \n    R2 -.->|迭代| R1\n```\n\n##### 10.2.4 模块开发要求\n\n**前提条件**:\n\n- 拥有 Terraform Registry 上的 \"verified\" Provider\n\n**命名规范**:\n\n```\nterraform-<provider>-<type>-cts\n```\n\n**许可证要求** (必须使用以下开源许可之一):\n\n- Apache License 2.0\n- MIT\n- BSD / BSD 3-clause\n- Eclipse Public License (EPL) 1.0\n- Mozilla Public License (MPL) 2.0\n\n##### 10.2.5 开发资源\n\n| 资源类型 | 说明 |\n|---------|------|\n| CTS 文档 | 官方 Consul-Terraform-Sync 文档 |\n| 模块编写指南 | 编写兼容 CTS 的 Terraform 模块教程 |\n| 示例模块 | Simple Print Module 等参考实现 |\n| 发布指南 | Terraform Registry 发布规范 |\n\n---\n\n#### 10.3 Vault 集成 (Vault as Service Mesh CA)\n\n##### 10.3.1 概述\n\nVault 可作为 Consul Service Mesh 的证书颁发机构 (CA)，提供企业级的证书管理能力。\n\n```mermaid\ngraph TD\n    subgraph Vault[\"Vault PKI 引擎\"]\n        RootPKI[Root PKI Path<br/>根证书]\n        IntPKI[Intermediate PKI Path<br/>中间证书]\n    end\n    \n    subgraph Consul[\"Consul Service Mesh\"]\n        Server[Consul Server]\n        Leaf[叶子证书]\n    end\n    \n    RootPKI -->|签发| IntPKI\n    IntPKI -->|签发| Leaf\n    Server -->|管理| IntPKI\n    Server -->|只读| RootPKI\n```\n\n**兼容性说明**:\n\n- 支持 Vault 0.10.3 到 1.10.x\n- Vault 1.11.0+ 需要 2022年12月13日后发布的 Consul 版本\n\n##### 10.3.2 基本配置\n\n```hcl\n# Consul Server 配置\nconnect {\n  ca_provider = \"vault\"\n  \n  ca_config {\n    address             = \"http://localhost:8200\"\n    token               = \"<vault-token-with-necessary-policy>\"\n    root_pki_path       = \"connect-root\"\n    intermediate_pki_path = \"connect-dc1-intermediate\"\n  }\n}\n```\n\n```json\n{\n  \"Provider\": \"vault\",\n  \"Config\": {\n    \"Address\": \"http://localhost:8200\",\n    \"Token\": \"<vault-token>\",\n    \"RootPKIPath\": \"connect-root\",\n    \"IntermediatePKIPath\": \"connect-dc1-intermediate\"\n  }\n}\n```\n\n##### 10.3.3 配置参数\n\n| 参数 | 类型 | 说明 |\n|------|------|------|\n| `address` | string | Vault 服务器地址 (必需) |\n| `token` | string | Vault 访问令牌 (只写) |\n| `auth_method` | map | Vault 认证方法配置 |\n| `root_pki_path` | string | 根证书 PKI 路径 (必需) |\n| `intermediate_pki_path` | string | 中间证书 PKI 路径 (必需) |\n| `namespace` | string | Vault 命名空间 (Enterprise) |\n\n**TLS 配置参数**:\n\n| 参数 | 说明 |\n|------|------|\n| `ca_file` | Vault 通信 CA 证书路径 |\n| `ca_path` | CA 证书目录路径 |\n| `cert_file` | 客户端证书路径 |\n| `key_file` | 客户端私钥路径 |\n| `tls_server_name` | TLS SNI 主机名 |\n| `tls_skip_verify` | 跳过 TLS 验证 |\n\n##### 10.3.4 认证方法配置\n\n支持的认证方法类型:\n\n- `approle`\n- `aws`\n- `azure`\n- `gcp`\n- `jwt`\n- `kubernetes`\n\n```hcl\nca_config {\n  auth_method {\n    type       = \"kubernetes\"\n    mount_path = \"kubernetes\"\n    params {\n      role = \"consul-ca\"\n      jwt  = \"<service-account-token>\"\n    }\n  }\n}\n```\n\n##### 10.3.5 通用 CA 配置选项\n\n| 参数 | 默认值 | 说明 |\n|------|-------|------|\n| `leaf_cert_ttl` | 72h | 叶子证书 TTL (1h-1年) |\n| `root_cert_ttl` | 87600h (10年) | 根证书 TTL |\n| `intermediate_cert_ttl` | 8760h (1年) | 中间证书 TTL |\n| `private_key_type` | ec | 密钥类型 (ec/rsa) |\n| `private_key_bits` | 256 | 密钥位数 |\n| `csr_max_concurrent` | 0 | CSR 并发限制 |\n| `csr_max_per_second` | 50 | CSR 速率限制 |\n\n##### 10.3.6 Vault ACL 策略配置\n\n**两种 PKI 路径管理模式**:\n\n```mermaid\ngraph TD\n    subgraph VaultManaged[\"Vault 管理模式\"]\n        V1[预先创建 PKI 引擎]\n        V2[Consul 只读 + 部分写入]\n        V3[保留完全控制权]\n    end\n    \n    subgraph ConsulManaged[\"Consul 管理模式\"]\n        C1[无需预创建 PKI]\n        C2[Consul 完全自动化]\n        C3[简化运维]\n    end\n    \n    V1 --> V2 --> V3\n    C1 --> C2 --> C3\n```\n\n**Vault 管理模式策略**:\n\n```hcl\n# 读取 PKI 挂载点\npath \"/sys/mounts/<root_pki_path>\" {\n  capabilities = [ \"read\" ]\n}\n\npath \"/sys/mounts/<intermediate_pki_path>\" {\n  capabilities = [ \"read\" ]\n}\n\npath \"/sys/mounts/<intermediate_pki_path>/tune\" {\n  capabilities = [ \"update\" ]\n}\n\n# 中间证书 PKI 操作\npath \"<intermediate_pki_path>/*\" {\n  capabilities = [ \"create\", \"read\", \"update\", \"delete\", \"list\" ]\n}\n\n# 根 PKI 读取\npath \"<root_pki_path>/cert/ca\" {\n  capabilities = [ \"read\" ]\n}\n\n# Token 续期\npath \"auth/token/renew-self\" {\n  capabilities = [ \"update\" ]\n}\n\npath \"auth/token/lookup-self\" {\n  capabilities = [ \"read\" ]\n}\n```\n\n**Consul 管理模式策略**:\n\n```hcl\n# 创建和管理 PKI 引擎\npath \"/sys/mounts/<root_pki_path>\" {\n  capabilities = [ \"create\", \"read\", \"update\", \"delete\", \"list\" ]\n}\n\npath \"/sys/mounts/<intermediate_pki_path>\" {\n  capabilities = [ \"create\", \"read\", \"update\", \"delete\", \"list\" ]\n}\n\n# 完全 PKI 操作权限\npath \"<root_pki_path>/*\" {\n  capabilities = [ \"create\", \"read\", \"update\", \"delete\", \"list\" ]\n}\n\npath \"<intermediate_pki_path>/*\" {\n  capabilities = [ \"create\", \"read\", \"update\", \"delete\", \"list\" ]\n}\n```\n\n##### 10.3.7 敏感操作策略\n\n更换 CA Provider 或修改 `RootPKIPath` 时需要额外权限:\n\n```hcl\n# 临时敏感操作权限\npath \"<root_pki_path>/root/sign-self-issued\" {\n  capabilities = [ \"sudo\", \"update\" ]\n}\n```\n\n**安全操作流程**:\n\n1. 创建包含敏感权限的新 Token\n2. 更新 CA Provider 配置使用新 Token\n3. 执行 CA 变更操作\n4. 恢复使用普通权限 Token\n\n---\n\n#### 10.4 代理集成 (Proxy Integration)\n\n##### 10.4.1 概述\n\nConsul 支持扩展任何代理以集成 Service Mesh，内置代理适合开发环境，生产环境建议使用 Envoy。\n\n```mermaid\ngraph TD\n    subgraph ProxyType[\"代理集成层次\"]\n        L4[L4 层集成<br/>TCP 流量]\n        L7[L7 层集成<br/>HTTP 路由]\n    end\n    \n    L4 -->|基础功能| Security[流量加密]\n    L4 -->|简单配置| BasicRouting[基础路由]\n    \n    L7 -->|高级功能| AdvRouting[高级路由]\n    L7 -->|完整特性| Metrics[指标收集]\n    L7 -->|动态配置| Retry[重试/超时]\n    \n    L4 --> BuiltIn[内置代理]\n    L7 --> Envoy[Envoy 代理]\n```\n\n**集成要求**:\n\n- 接受入站连接能力\n- 建立出站连接能力\n- 这两种能力通常都需要以支持完整 Sidecar 功能\n\n##### 10.4.2 入站连接处理\n\n```mermaid\nsequenceDiagram\n    participant Client as 客户端\n    participant Proxy as Sidecar 代理\n    participant API as Consul API\n    participant Service as 目标服务\n    \n    Client->>Proxy: TLS 连接\n    Proxy->>API: GET /v1/agent/connect/ca/leaf/\n    API-->>Proxy: 客户端证书\n    Proxy->>API: GET /v1/agent/connect/ca/roots\n    API-->>Proxy: 根证书\n    Proxy->>Proxy: 验证客户端证书\n    Proxy->>API: POST /v1/agent/connect/authorize\n    API-->>Proxy: 授权结果\n    alt 授权通过\n        Proxy->>Service: 转发请求\n    else 授权拒绝\n        Proxy-->>Client: 拒绝连接\n    end\n```\n\n**关键 API 端点**:\n\n| 端点 | 用途 |\n|------|------|\n| `/v1/agent/connect/ca/leaf/` | 获取客户端证书 |\n| `/v1/agent/connect/ca/roots` | 获取 CA 根证书 |\n| `/v1/agent/connect/authorize` | L4 连接授权 |\n| `/v1/agent/connect/intentions/match` | L7 意图匹配 |\n\n##### 10.4.3 授权方式\n\n**L4 授权** (每连接):\n\n- 使用 `/v1/agent/connect/authorize` 端点\n- 基于服务身份 (TLS) 认证\n- 适用于 TCP 层集成\n\n**L7 授权** (每请求):\n\n- 使用 `/v1/agent/connect/intentions/match` 端点\n- 缓存意图规则到代理本地\n- 支持 HTTP 路由规则\n\n##### 10.4.4 持久连接与意图\n\n**问题**: TCP 持久连接只在建立时授权，意图变更不会终止已有连接。\n\n**解决策略**:\n\n1. **配置连接最大生命周期**\n   - 平衡连接开销与意图更新延迟\n   - 建议设置几小时的最大生命周期\n\n2. **定期重新授权**\n   - 周期性对所有连接重新授权\n   - 授权调用开销很小 (本地内存操作)\n\n```mermaid\ngraph TD\n    subgraph Strategy[\"持久连接策略\"]\n        MaxLife[最大生命周期]\n        ReAuth[定期重授权]\n    end\n    \n    MaxLife -->|建议| Hours[每小时续期]\n    ReAuth -->|建议| Minute[每分钟授权]\n    \n    Hours -->|平衡| Overhead[减少开销]\n    Minute -->|保证| Enforce[意图强制执行]\n```\n\n##### 10.4.5 出站连接处理\n\n```mermaid\nsequenceDiagram\n    participant Service as 本地服务\n    participant Proxy as Sidecar 代理\n    participant API as Consul API\n    participant Upstream as 上游服务\n    \n    Service->>Proxy: 出站请求\n    Proxy->>API: GET /v1/agent/connect/ca/leaf/\n    API-->>Proxy: 客户端证书\n    Proxy->>API: GET /v1/discovery-chain/\n    API-->>Proxy: 服务发现链\n    Proxy->>API: GET /v1/health/connect/:service\n    API-->>Proxy: 健康端点列表\n    Proxy->>Upstream: mTLS 连接 + 客户端证书\n    Upstream-->>Proxy: 响应\n    Proxy-->>Service: 转发响应\n```\n\n##### 10.4.6 服务发现\n\n**健康端点发现**:\n\n- 使用 `/v1/health/connect/:service` API\n- 支持 `cached` 查询参数\n- 使用阻塞查询保持端点列表更新\n\n**上游类型**:\n\n| 类型 | 发现方式 | 说明 |\n|------|---------|------|\n| 服务 | Discovery Chain | 推荐方式 |\n| Prepared Query | Prepared Query API | 传统方式，将被废弃 |\n\n##### 10.4.7 环境变量\n\n| 变量名 | 用途 |\n|--------|------|\n| `CONSUL_HTTP_TOKEN` | Consul ACL Token |\n| `CONSUL_HTTP_ADDR` | Consul Agent 地址 |\n| `CONSUL_CACERT` | CA 证书路径 |\n| `CONSUL_CLIENT_CERT` | 客户端证书路径 |\n| `CONSUL_CLIENT_KEY` | 客户端私钥路径 |\n\n---\n\n#### 10.5 Consul 工具\n\n##### 10.5.1 官方工具\n\n| 工具名称 | 功能描述 |\n|---------|---------|\n| **envconsul** | 从 Consul 读取环境变量并注入进程 |\n| **Consul API Gateway** | Service Mesh 专用 Ingress 解决方案 |\n| **Consul ESM** | 外部服务监控 |\n| **Consul-Migrate** | 数据迁移工具 (0.5.1+ 升级) |\n| **Consul Replicate** | 跨数据中心 KV 复制守护进程 |\n| **Consul Template** | 通用模板渲染和通知 |\n| **Consul-Terraform-Sync** | 网络基础设施自动化 |\n\n##### 10.5.2 社区工具分类\n\n```mermaid\ngraph TD\n    subgraph Tools[\"Consul 社区工具\"]\n        Config[配置管理]\n        Discovery[服务发现]\n        Template[模板工具]\n        Backup[备份恢复]\n        Container[容器集成]\n    end\n    \n    Config --> cfg4j[cfg4j]\n    Config --> confita[confita]\n    Config --> confd[confd]\n    \n    Discovery --> registrator[Registrator]\n    Discovery --> fabio[Fabio]\n    Discovery --> marathon[Marathon-Consul]\n    \n    Template --> consulTemplate[consul-templaterb]\n    Template --> consult[consult]\n    \n    Backup --> backinator[consul-backinator]\n    Backup --> git2consul[git2consul]\n    \n    Container --> dockerConsul[docker-consul]\n    Container --> mesos[mesos-consul]\n```\n\n##### 10.5.3 配置管理工具\n\n| 工具 | 语言/平台 | 功能 |\n|------|----------|------|\n| **cfg4j** | Java | 分布式应用配置库，自动从 Consul KV 读取和更新 |\n| **crypt** | Go | 加密存储和检索配置参数 |\n| **confd** | Go | 使用模板和 Consul 数据管理本地配置文件 |\n| **consul-cli** | CLI | Consul HTTP API 命令行接口 |\n| **consul-json** | Go | JSON 树与 Consul KV 对互相转换 |\n\n##### 10.5.4 模板和同步工具\n\n| 工具 | 功能 |\n|------|------|\n| **consul-templaterb** | Ruby ERB 高性能模板，支持进程管理 |\n| **consult** | Ruby ERB 模板，支持 Consul+Vault，Rails 集成 |\n| **git2consul** | Git 仓库镜像到 Consul KV |\n| **gitsync-consul** | Go 语言 Git 到 Consul 同步工具 |\n| **file2consul** | 从文件/Git 更新 Consul，支持多环境 |\n\n##### 10.5.5 服务发现和负载均衡\n\n| 工具 | 功能 |\n|------|------|\n| **Fabio** | 零配置、Consul 感知的 HTTP/HTTPS 路由器 |\n| **Registrator** | Docker 服务注册桥接器 |\n| **marathon-consul** | Marathon 到 Consul 服务注册桥接 |\n| **mesos-consul** | Mesos 到 Consul 服务注册桥接 |\n| **spring-cloud-consul** | Spring Cloud 服务发现、配置和事件 |\n\n##### 10.5.6 框架集成\n\n| 工具 | 框架 | 功能 |\n|------|------|------|\n| **dropwizard-consul** | Dropwizard | 服务发现和配置集成 |\n| **embedded-consul** | JVM | 集成测试中运行 Consul |\n| **gradle-consul-plugin** | Gradle | Consul 构建插件 |\n| **hashi-ui** | Web | Consul 和 Nomad 现代化 UI |\n\n##### 10.5.7 CI/CD 和开发工具\n\n| 工具 | 功能 |\n|------|------|\n| **jenkinsci-consul** | Jenkins 服务发现和 KV 插件 |\n| **IntelliJ Consul K/V** | IDEA K/V 存储编辑器 |\n| **kvit** | 文件系统与 Consul KV 同步 |\n| **consul-k8s-tools** | 多文件 Consul/Vault 模板处理 |\n\n##### 10.5.8 环境和部署\n\n| 工具 | 功能 |\n|------|------|\n| **docker-consul** | Docker 化 Consul Agent |\n| **HashiBox** | Vagrant 环境，模拟 HA 云 |\n| **mochimedia-digitalocean** | CentOS 7 一体化镜像 |\n| **flynnbase** | Edge proxy 配置 Envoy |\n\n#### 10.6 集成最佳实践\n\n##### 检查清单\n\n| 项目 | 检查点 |\n|------|--------|\n| 认证 | 使用适当的 Auth Method (Vault/K8s/JWT) |\n| 授权 | 最小权限原则的 ACL Token |\n| 证书 | 配置证书自动轮换 |\n| 监控 | 集成 APM/日志/告警 |\n| 自动化 | 使用 CTS 实现网络自动化 |\n\n##### 推荐集成架构\n\n```mermaid\ngraph TD\n    subgraph External[\"外部系统\"]\n        Vault[HashiCorp Vault]\n        K8s[Kubernetes]\n        TF[Terraform]\n        Monitor[监控系统]\n    end\n    \n    subgraph Consul[\"Consul 集群\"]\n        Server[Consul Server]\n        Client[Consul Client]\n        Mesh[Service Mesh]\n    end\n    \n    Vault -->|CA 证书| Server\n    K8s -->|Auth Method| Server\n    TF -->|CTS 自动化| Client\n    Mesh -->|Telemetry| Monitor\n    \n    External -->|集成| Consul\n```\n\n---\n\n> **下一章**: [第11章 故障排除](#第11章-故障排除) - 了解常见问题诊断和解决方法", "subs": ["10.1 Consul 集成程序 (Consul Integration Progr", "10.2 NIA 集成程序 (Network Infrastructure Auto", "10.3 Vault 集成 (Vault as Service Mesh CA)", "10.4 代理集成 (Proxy Integration)", "10.5 Consul 工具", "10.6 集成最佳实践"]}]}, {"title": "第11章 故障排除", "sections": [{"title": "概述", "content": "本章介绍 Consul 常见故障的诊断和解决方法，包括服务间通信问题排查、常见错误信息解析和常见问题解答。\n\n#### 11.1 服务间故障排除 (Service-to-Service Troubleshooting)\n\n##### 11.1.1 故障排除概述\n\n当 Service Mesh 中上游和下游服务之间的通信失败时，可以使用 `consul troubleshoot` 命令进行诊断。\n\n```mermaid\ngraph TD\n    subgraph Troubleshoot[\"故障排除流程\"]\n        Start[通信失败] --> Upstream[1. 获取上游信息]\n        Upstream --> Proxy[2. 验证代理通信]\n        Proxy --> Check{检查结果}\n        Check -->|通过| Success[通信正常]\n        Check -->|失败| Diagnose[诊断问题]\n        Diagnose --> Fix[修复问题]\n        Fix --> Start\n    end\n```\n\n##### 11.1.2 自动检测的问题类型\n\n| 问题类型 | 说明 |\n|---------|------|\n| 上游服务不存在 | 服务未注册到 Consul |\n| 主机不健康 | 一个或多个主机健康检查失败 |\n| 过滤器影响 | 有过滤器影响上游服务 |\n| CA 证书过期 | mTLS CA 证书已过期 |\n| 服务证书过期 | 服务的 mTLS 证书已过期 |\n\n##### 11.1.3 前提条件\n\n- Consul v1.15 或更高版本\n- Service Mesh 功能已启用\n- Kubernetes 环境需要安装 `consul-k8s` CLI\n\n##### 11.1.4 VM/裸机环境排查\n\n**步骤1: 获取上游信息**\n\n```bash\n# 获取上游服务信息\nconsul troubleshoot upstreams\n```\n\n**步骤2: 验证代理通信**\n\n```bash\n# 使用上游 IP 验证通信\nconsul troubleshoot proxy -upstream-ip 10.4.6.160\n```\n\n**示例输出**:\n\n```\n==> Validation\n✓ Certificates are valid\n✓ Envoy has 0 rejected configurations\n✓ Envoy has detected 0 connection failure(s)\n✓ Listener for upstream \"backend\" found\n✓ Cluster \"backend.default.dc1.internal.<uuid>.consul\" for upstream \"backend\" found\n✓ Healthy endpoints for cluster \"backend.default.dc1.internal.<uuid>.consul\" found\n```\n\n##### 11.1.5 Kubernetes 环境排查\n\n**步骤1: 获取上游信息**\n\n```bash\n# 获取 Pod 的上游信息\nconsul-k8s troubleshoot upstreams -pod frontend-767ccfc8f9-6f6gx\n```\n\n**示例输出**:\n\n```\n==> Upstreams IPs (transparent proxy only) (1)\n[10.4.6.160 240.0.0.3] true map[backend.default.dc1.internal.<uuid>.consul backend2.default.dc1.internal.<uuid>.consul]\n```\n\n**步骤2: 验证代理通信**\n\n```bash\n# 指定 Pod 和上游 IP 进行验证\nconsul-k8s troubleshoot proxy -pod frontend-767ccfc8f9-6f6gx -upstream-ip 10.4.6.160\n```\n\n##### 11.1.6 排查限制\n\n| 限制项 | 说明 |\n|-------|------|\n| 意图检查 | 工具不检查服务意图配置 |\n| 代理类型 | 仅验证 Sidecar 代理的 Envoy 配置 |\n| 网关 | 不验证 Mesh Gateway 或 Terminating Gateway |\n\n##### 11.1.7 透明代理排查提示\n\n如果找不到上游地址或集群:\n\n1. **检查意图配置** - 透明代理的上游基于意图配置\n2. **DNS 查询验证** - 运行 `dig backend.svc.consul` 验证 DNS 解析\n\n---\n\n#### 11.2 常见错误信息\n\n##### 11.2.1 配置文件错误\n\n**绑定地址错误**:\n\n```\nMultiple private IPv4 addresses found. Please configure one with 'bind' and/or 'advertise'.\n```\n\n**解决方案**: 添加 `bind_addr` 配置指定网络接口\n\n```hcl\n# 使用 go-sockaddr 模板\nbind_addr = \"{{ GetInterfaceIP \\\"eth0\\\" }}\"\n```\n\n**语法错误**:\n\n```\nError parsing config.hcl: At 1:12: illegal char\nError parsing config.hcl: At 1:32: key 'foo' expected start of object ('{') or assignment ('=')\nError parsing server.json: invalid character '`' looking for beginning of value\n```\n\n**解决方案**: 使用 `jq` 工具定位 JSON 语法错误\n\n```bash\njq . server.json\n```\n\n**无效主机名**:\n\n```\nNode name \"consul_client.internal\" will not be discoverable via DNS due to invalid characters.\n```\n\n**解决方案**: 配置有效的 DNS 名称作为节点名\n\n##### 11.2.2 网络连接错误\n\n**I/O 超时**:\n\n```\nFailed to join 10.0.0.99: dial tcp 10.0.0.99:8301: i/o timeout\n```\n\n**可能原因及解决方案**:\n\n| 场景 | 解决方案 |\n|------|---------|\n| 同一 LAN | 检查防火墙是否阻止 Consul 端口 |\n| 不同网络 | 检查 `retry_join` 配置是否正确 |\n\n**性能问题**:\n\n```\nRaft Timeout\nRequest rate limit reached\n```\n\n**解决方案**:\n\n- 监控 Consul Telemetry 和系统指标\n- 增加 CPU 或内存分配\n- 检查节点间网络性能\n\n##### 11.2.3 文件描述符错误\n\n```\nError accepting TCP connection: accept tcp [::]:8301: too many open files in system\nGet http://localhost:8500/: dial tcp 127.0.0.1:31643: socket: too many open files\n```\n\n**解决方案**:\n\n```bash\n# 增加文件描述符限制 (Linux)\nulimit -n 65536\n```\n\n**systemd 配置**:\n\n```ini\n[Service]\nLimitNOFILE=65536\n```\n\n##### 11.2.4 ACL 错误\n\n```\nRPC error making call: rpc error making call: ACL not found\n```\n\n**解决方案**:\n\n- 确保 Token 有正确的权限\n- 确保每次调用都提供了 Agent Token\n\n##### 11.2.5 TLS 和证书错误\n\n**证书错误**:\n\n```\nRemote error: tls: bad certificate\nX509: certificate signed by unknown authority\n```\n\n**解决方案**:\n\n- 确保客户端和服务器使用相同 CA 签发的证书\n- 检查服务器证书 SAN 包含 `server.dc1.consul`\n\n**HTTP/HTTPS 错误**:\n\n```\nNet/http: HTTP/1.x transport connection broken: malformed HTTP response \"\\x15\\x03\\x01\\x00\\x02\\x02\"\n```\n\n**解决方案**: 使用 HTTPS 而不是 HTTP 连接\n\n```bash\nexport CONSUL_HTTP_ADDR=https://127.0.0.1:8501\n```\n\n##### 11.2.6 企业版许可证警告\n\n```\nLicense: expiration time: YYYY-MM-DD HH:MM:SS -0500 EST, time left: 29m0s\n```\n\n**解决方案**:\n\n- 企业客户: 提供有效的许可证密钥\n- 非企业用户: 使用开源版本二进制文件\n\n##### 11.2.7 速率限制错误\n\n| 错误码 | 含义 | 解决方案 |\n|-------|------|---------|\n| `RESOURCE_EXHAUSTED` | 请求速率超限 | 实现指数退避重试 |\n| `503 Service Unavailable` | 服务暂不可用 | 等待 Leader 恢复容量 |\n\n##### 11.2.8 Kubernetes 常见错误\n\n**连接拒绝**:\n\n```\nPut http://10.0.0.10:8500/v1/catalog/register: dial tcp 10.0.0.10:8500: connect: connection refused\nGet http://10.0.0.10:8500/v1/status/leader: dial tcp 10.0.0.10:8500: i/o timeout\n```\n\n**可能原因**: CNI 不支持 `hostPort`\n\n**解决方案**: 启用 `hostNetwork`\n\n```yaml\n# values.yaml\nclient:\n  hostNetwork: true\n```\n\n> ⚠️ **注意**: 使用 hostNetwork 有安全隐患，建议联系 CNI 提供商添加 hostPort 支持\n\n**ACL 认证失败**:\n\n```\nconsul-server-connection-manager: ACL auth method login failed: error=\"rpc error: code = PermissionDenied desc = Permission denied\"\n```\n\n**解决方案**: 确保 Pod 的 `serviceAccountName` 与 Service 名称匹配\n\n```yaml\n# 错误配置\nserviceAccountName: does-not-match  # ❌\n\n# 正确配置  \nserviceAccountName: static-server   # ✓ 应与 Service 名称一致\n```\n\n---\n\n#### 11.3 常见问题 (FAQ)\n\n##### 11.3.1 Kubernetes 相关\n\n**Q: 升级时可以原地升级还是需要新建集群？**\n\nA: 虽然新建集群更安全，但 Consul 支持原地升级。建议:\n\n- 先在非生产环境升级\n- 升级前备份 Consul 数据\n\n**Q: 如何在 Consul Server 上运行 tcpdump？**\n\nA:\n\n1. 在 Helm values 中添加安全上下文配置\n2. 执行 `helm upgrade` 更新\n3. `kubectl exec` 进入容器\n4. 安装 tcpdump 并运行\n\n##### 11.3.2 通用问题\n\n**Q: Consul 是否会\"打电话回家\"？**\n\nA: Consul 使用 HashiCorp Checkpoint 服务检查更新和安全公告。发送的是匿名信息，可以禁用:\n\n```hcl\n# 禁用匿名签名\ndisable_anonymous_signature = true\n\n# 完全禁用 Checkpoint\ndisable_update_check = true\n```\n\n**Q: Consul 是否依赖 UDP 广播或多播？**\n\nA: Consul 有两个子系统:\n\n- **服务目录**: 强一致性，使用共识协议复制\n- **Gossip 协议**: 最终一致性，用于成员跟踪\n\n客户端 API 与服务目录交互是强一致的，但目录更新可能通过 Gossip 协议延迟传播。\n\n**Q: 失败或离开的节点会被移除吗？**\n\nA: 是的，Consul 会自动清理死亡节点（称为 reaping）:\n\n- 默认间隔: 72 小时\n- 过程类似于正常离开，会注销所有关联服务\n- 不建议仅为美观而更改此间隔\n\n**Q: Consul 支持增量更新吗？**\n\nA: 不支持。Consul 的 Watch/Blocking Query API 返回完整结果，客户端需要自己计算差异。这是设计决策，避免服务器维护复杂状态。\n\n**Q: Consul 使用哪些网络端口？**\n\n| 端口 | 协议 | 用途 |\n|------|------|------|\n| 8300 | TCP | Server RPC |\n| 8301 | TCP+UDP | Serf LAN |\n| 8302 | TCP+UDP | Serf WAN |\n| 8500 | TCP | HTTP API |\n| 8501 | TCP | HTTPS API |\n| 8502 | TCP | gRPC |\n| 8600 | TCP+UDP | DNS |\n\n**Q: Consul 有资源限制要求吗？**\n\nA: 默认 ulimits 通常足够，但需要注意:\n\n- 文件描述符用于: 客户端连接、Gossip 连接、健康检查等\n- KV 值默认最大 512KB，可通过 `kv_max_value_size` 配置调整\n\n**Q: 哪些数据在数据中心之间复制？**\n\nA: 默认不复制。跨数据中心请求通过 RPC 转发。可以使用:\n\n- Consul 内置的 ACL 复制功能\n- 外部工具如 consul-replicate\n\n**Q: Consul Docker 镜像符合 OCI 标准吗？**\n\nA: 是的，官方镜像使用 V2 格式，符合 OCI 标准。验证命令:\n\n```bash\ndocker manifest inspect consul\n```\n\n**Q: Consul UI 支持哪些浏览器？**\n\nA: 支持:\n\n- ✅ Chrome\n- ✅ Firefox  \n- ✅ Safari\n- ❌ Internet Explorer 11 (不支持)\n\n---\n\n#### 11.4 故障排除检查清单\n\n```mermaid\ngraph TD\n    subgraph Checklist[\"故障排除检查清单\"]\n        Network[网络连接]\n        Config[配置文件]\n        ACL[ACL/权限]\n        TLS[TLS/证书]\n        Health[健康检查]\n        Resource[资源限制]\n    end\n    \n    Network --> Port[端口是否开放]\n    Network --> Firewall[防火墙规则]\n    Network --> DNS[DNS 解析]\n    \n    Config --> Syntax[语法正确性]\n    Config --> Bind[绑定地址]\n    Config --> Join[集群加入配置]\n    \n    ACL --> Token[Token 有效性]\n    ACL --> Policy[策略权限]\n    \n    TLS --> CA[CA 证书]\n    TLS --> Cert[服务证书]\n    TLS --> SAN[SAN 配置]\n    \n    Health --> Agent[Agent 状态]\n    Health --> Service[服务健康]\n    \n    Resource --> FD[文件描述符]\n    Resource --> Memory[内存使用]\n```\n\n##### 快速诊断命令\n\n```bash\n# 检查集群成员\nconsul members\n\n# 检查 Leader\nconsul operator raft list-peers\n\n# 检查服务健康\nconsul catalog services\n\n# 验证 Agent 状态\nconsul info\n\n# 检查意图\nconsul intention list\n\n# 验证 ACL Token\nconsul acl token list\n```\n\n---\n\n> **恭喜！** Consul 学习笔记全部章节已完成。", "subs": ["11.1 服务间故障排除 (Service-to-Service Troublesh", "11.2 常见错误信息", "11.3 常见问题 (FAQ)", "11.4 故障排除检查清单"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
