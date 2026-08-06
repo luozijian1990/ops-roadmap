@@ -2,7 +2,7 @@
 
 # Ops Roadmap
 
-**面向运维工程师、SRE 与平台工程师的中文学习笔记和交互式路线图合集。**
+**一份持续整理的个人运维学习笔记与交互式路线图合集。**
 
 ![Topics](https://img.shields.io/badge/topics-20-1f2933?style=flat-square)
 ![Markdown notes](https://img.shields.io/badge/markdown_notes-47-1f2933?style=flat-square)
@@ -13,12 +13,16 @@
 
 </div>
 
-Ops Roadmap 收录 Linux、容器、Kubernetes、可观测性、数据系统、持续交付、Web 基础设施和 AI Agent 等主题。每份内容同时提供适合检索与编辑的 Markdown，以及适合系统学习的 Roadmap HTML。
+Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前涵盖 Linux、容器、Kubernetes、可观测性、数据系统、持续交付、Web 基础设施和 AI Agent 等主题。每份内容同时提供适合检索与编辑的 Markdown，以及适合系统学习的 Roadmap HTML。
+
+> [!NOTE]
+> 运维与平台工程涉及的领域非常广泛，本仓库不以构建完整知识体系为目标。现有内容主要反映我的个人学习路径、工作经验和关注方向，难免存在遗漏，也会随着学习进度持续补充和修订。
 
 ![Ops Roadmap 首页预览](./assets/index-preview.png)
 
 ## 核心特性
 
+- **个人学习沉淀**：围绕实际学习路径持续整理，不追求面面俱到，更关注知识之间的联系和可复习性。
 - **结构化中文笔记**：以章节和知识点组织内容，包含 Mermaid 图、表格和可复制的代码示例。
 - **交互式学习路线**：支持小节搜索、详情面板以及“待学 / 在学 / 已学”三态进度。
 - **适合长期维护**：Markdown 是内容源文件，HTML 可以通过脚本统一重新生成。
