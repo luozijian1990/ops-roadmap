@@ -11,6 +11,8 @@
 
 从 [`index.html`](./index.html) 进入全部路线图。部署到 GitHub Pages 后，它也是仓库的静态首页。
 
+![Ops Roadmap 首页预览](./assets/index-preview.png)
+
 直接双击 HTML 可以阅读；如果希望总览页和子路线图在同一个浏览器 origin 下稳定共享进度，建议在仓库根目录启动本地服务：
 
 ```bash
@@ -18,6 +20,11 @@ python3 -m http.server 8000
 ```
 
 然后访问 <http://127.0.0.1:8000/>。
+
+## 内容生成方式
+
+- Markdown 学习笔记遵循 [`learning-notes-builder`](https://github.com/luozijian1990/personal-skill/tree/main/skills/learning-notes-builder) 的结构与写作风格：以 H2/H3 组织章节和小节，结合详细中文讲解、Mermaid 图、表格与可复制的代码示例。
+- Roadmap HTML 通过 [`learning-roadmap`](https://github.com/luozijian1990/personal-skill/tree/main/skills/learning-roadmap) 从整理好的 Markdown 生成，提供章节卡片、详情面板、搜索和“待学 / 在学 / 已学”三态进度。
 
 ## 内容目录
 
@@ -71,7 +78,7 @@ topics/<category>/<topic>/
 
 ## 重新生成路线图
 
-路线图由本地 `learning-roadmap` 工作流生成。已安装对应 skill 时，可以在仓库根目录执行：
+路线图由 [`learning-roadmap`](https://github.com/luozijian1990/personal-skill/tree/main/skills/learning-roadmap) 生成。已安装对应 skill 时，可以在仓库根目录执行：
 
 ```bash
 ./scripts/build-roadmaps.sh
@@ -80,3 +87,7 @@ topics/<category>/<topic>/
 如果 skill 不在默认位置，可以通过 `LEARNING_ROADMAP_BUILDER` 指定 `build_roadmap.py` 的路径。
 
 Kubernetes 的 `full-animated-roadmap.html` 是保留的完整动画版，不应被普通批量生成命令覆盖。
+
+## License
+
+本项目采用 [MIT License](./LICENSE)。
