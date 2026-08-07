@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方向四：故障诊断、定位与根因推理 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>方向四：故障诊断、定位与根因推理</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "方向四：故障诊断、定位与根因推理", "intro": "> 本方向学习如何从症状和异常证据出发，通过历史案例、主动查询、工具、拓扑、代码、因果约束与 Agent 工作流形成可验证的根因结论。", "parts": [{"title": "📚 目录", "sections": [{"title": "阅读导航", "content": "- 方向定位与任务边界。\n- [落地之前的思考](#落地之前的思考)。\n- 诊断证据链与主动调查。\n- 历史案例、分类和生成。\n- 工具增强诊断。\n- 拓扑、代码与因果推理。\n- Agent 化诊断。\n- 可信度与 RCA 评测。\n- 阅读路线和来源。", "subs": ["方向定位与任务边界", "落地之前的思考", "诊断证据链与主动调查", "历史案例、分类和生成", "工具增强诊断", "拓扑、代码与因果推理"]}]}, {"title": "方向定位", "sections": [{"title": "RCA 研究什么", "content": "根因分析回答“为什么发生”。\n\n它需要从多个候选解释中找出与证据最一致、能够解释故障传播、并经验证支持的原因。\n\n常见输入包括：\n\n- 事件标题和描述。\n- 指标异常。\n- 日志与堆栈。\n- Trace 和服务拓扑。\n- 代码与配置。\n- 发布和变更记录。\n- 数据库、网络和 Kubernetes 状态。\n- 历史事件及其确认根因。", "subs": ["事件标题和描述", "指标异常", "日志与堆栈", "Trace 和服务拓扑", "代码与配置", "发布和变更记录"]}, {"title": "六个容易混淆的输出", "content": "| 输出 | 回答的问题 | 示例 |\n|---|---|---|\n| 症状 | 用户或系统看到了什么 | 结算请求超时 |\n| 异常实体 | 哪里表现异常 | payment-api P99 升高 |\n| 故障类型 | 属于哪类问题 | 连接耗尽 |\n| 候选根因 | 什么可能解释现象 | 发布改变连接复用 |\n| 确认根因 | 哪个原因经证据验证 | 配置值从 100 降至 10 |\n| 缓解动作 | 怎样降低影响 | 回滚发布 |\n\n症状不是根因。\n\n异常服务也不一定是起因服务。\n\n缓解成功可以支持某个假设，但不总能唯一证明根因。", "subs": []}, {"title": "与方向三和方向五的边界", "content": "方向三产生结构化信号、异常位置和候选症状。\n\n方向四建立证据链并推断根因。\n\n方向五负责建议、审批、执行、验证和回滚。\n\n```mermaid\ngraph LR\n    A[Signal anomaly] --> B[Candidate location]\n    B --> C[Hypothesis set]\n    C --> D[Evidence collection]\n    D --> E[Root cause validation]\n    E --> F[Mitigation candidate]\n    F --> G[Controlled action in direction five]\n```\n\n上图是编辑性综合。", "subs": []}, {"title": "RCA 的最低证据标准", "content": "一个根因结论至少应说明：\n\n1. 根因实体是什么。\n2. 故障机制是什么。\n3. 它怎样产生已观察症状。\n4. 哪些证据支持。\n5. 哪些反证已排除。\n6. 还有什么不确定性。\n7. 通过什么查询、实验、回滚或修复验证。", "subs": []}]}, {"title": "学习目标", "sections": [{"title": "学完后应该能回答的问题", "content": "- 定位、分类、根因生成和因果解释有什么差别？\n- 为什么一次 Prompt 不足以诊断真实云事件？\n- 历史案例怎样帮助又怎样误导？\n- 工具调用为什么需要验证？\n- 拓扑、代码和因果图分别补充什么约束？\n- Multi-Agent、规划、Reflection 和 Memory 改善了哪一环？\n- 如何识别停滞、偏置、混淆和过早收敛？\n- Top-K、MRR、执行成功率和校准各衡量什么？", "subs": ["定位、分类、根因生成和因果解释有什么差别？", "为什么一次 Prompt 不足以诊断真实云事件？", "历史案例怎样帮助又怎样误导？", "工具调用为什么需要验证？", "拓扑、代码和因果图分别补充什么约束？", "Multi-Agent、规划、Reflection 和 Memory 改善了哪一环？"]}, {"title": "学完后应该具备的能力", "content": "- 建立候选根因表。\n- 设计只读诊断工具接口。\n- 维护支持证据与反证。\n- 用拓扑和传播路径缩小候选空间。\n- 设置停止、拒答和人工升级条件。\n- 设计服务级、实例级和代码级 RCA 评测。", "subs": ["建立候选根因表", "设计只读诊断工具接口", "维护支持证据与反证", "用拓扑和传播路径缩小候选空间", "设置停止、拒答和人工升级条件", "设计服务级、实例级和代码级 RCA 评测"]}]}, {"title": "落地之前的思考", "sections": [{"title": "先明确要减少哪一种诊断不确定性", "content": "本章是工程性综合，帮助团队在建设 RCA 系统之前判断问题是否具备可诊断条件，不是论文直接结论。\n\n“我们需要 RCA”通常包含几种不同诉求：\n\n- 更快找到受影响服务。\n- 更快判断事件严重度。\n- 更快排除常见原因。\n- 给出多个可验证的根因候选。\n- 生成给专家审阅的事件报告。\n- 自动选择下一条只读查询。\n\n这些诉求的证据要求和风险完全不同。\n\n| 目标 | 可接受输出 | 不应承诺 |\n|---|---|---|\n| 影响定位 | 异常服务和时间范围 | 唯一根因 |\n| 候选排序 | 带证据的 Top-K 假设 | 排名第一必然正确 |\n| 查询推荐 | 能区分候选的下一步查询 | 自动修改系统 |\n| 事件报告 | 事实、假设、未知项分层 | 把推测写成结论 |\n| 根因确认 | 证据和验证动作闭环 | 仅凭文本相似度确认 |\n\n如果团队只需要事件摘要或服务路由，不应直接建设完整 RCA Agent。\n\n诊断粒度也必须先固定：\n\n- 服务级。\n- 实例或节点级。\n- 依赖级。\n- 代码变更级。\n- 配置参数级。\n- 业务流程级。\n\n粒度越细，对拓扑、变更、代码和实验反馈的要求越高。", "subs": ["更快找到受影响服务", "更快判断事件严重度", "更快排除常见原因", "给出多个可验证的根因候选", "生成给专家审阅的事件报告", "自动选择下一条只读查询"]}, {"title": "检查是否存在可用的诊断证据", "content": "根因推理不是凭空生成解释，而是把候选机制与观测证据对齐。\n\n落地前先为目标事件列出证据矩阵：\n\n| 证据类别 | 需要回答的问题 | 当前是否可取得 |\n|---|---|---|\n| 时间 | 异常何时开始，先后顺序是什么 | 是 / 否 |\n| 范围 | 哪些服务、实例、区域受影响 | 是 / 否 |\n| 变化 | 最近发生了什么发布、配置或流量变化 | 是 / 否 |\n| 依赖 | 上游、下游和外部依赖是否健康 | 是 / 否 |\n| 资源 | CPU、内存、连接、磁盘和网络是否异常 | 是 / 否 |\n| 代码 | 错误栈、版本差异和回归是否存在 | 是 / 否 |\n| 业务 | 用户请求、订单或 SLI 是否实际受损 | 是 / 否 |\n| 反证 | 哪些候选已经被排除 | 是 / 否 |\n\n如果关键列长期为空，模型只能提高叙事完整度，不能提高根因可靠性。\n\n还要区分“查不到”和“没有发生”：\n\n- 查询返回空结果。\n- 查询执行失败。\n- 数据尚未到达。\n- 数据被权限过滤。\n- 该系统根本没有采集。\n\n这五种状态不能在上下文中被压缩成同一个空字符串。\n\n诊断工具应提供可机器读取的状态：\n\n```json\n{\n  \"status\": \"partial\",\n  \"query\": \"http_error_rate\",\n  \"time_range\": \"2026-08-04T10:00:00Z/2026-08-04T10:15:00Z\",\n  \"data\": [],\n  \"reason\": \"telemetry_delayed\",\n  \"source\": \"metrics-cluster-a\"\n}\n```", "subs": ["查询返回空结果", "查询执行失败", "数据尚未到达", "数据被权限过滤", "该系统根本没有采集"]}, {"title": "先建立人工诊断和简单方法基线", "content": "RCA 系统至少要与三类对照比较：\n\n1. 当前值班流程。\n2. 基于规则、拓扑或变更的确定性方法。\n3. 只读检索或历史案例方法。\n\n基线记录不能只保存 Top-1 正确率。\n\n建议分层记录：\n\n| 维度 | 指标示例 |\n|---|---|\n| 定位 | 服务级、实例级和代码级命中 |\n| 排序 | Top-K、MRR、候选覆盖 |\n| 证据 | 支持证据覆盖、反证识别 |\n| 过程 | 查询数量、无效调用、停止时机 |\n| 人工 | 采纳率、修改率、复核时间 |\n| 生产 | MTTD、MTTR、重复事件和误升级 |\n\n样本还要按故障类型分层：\n\n- 已知故障。\n- 未知故障。\n- 多故障同时发生。\n- 依赖故障。\n- 配置和代码变更。\n- 数据缺失或权限受限。\n\n一个系统在已知单故障上表现很好，并不能证明它能处理并发故障或未知故障。\n\n评测答案也应保留“无法确认”的合法结果。\n\n强迫系统在所有事件中选择唯一根因，会把不确定性伪装成准确率。", "subs": ["已知故障", "未知故障", "多故障同时发生", "依赖故障", "配置和代码变更", "数据缺失或权限受限"]}, {"title": "设计可验证的诊断边界", "content": "诊断 Agent 的能力边界应写成工具和状态约束，而不是一句“只读”。\n\n最低边界包括：\n\n- 工具只读权限。\n- 可查询的服务、租户和时间范围。\n- 单次查询超时与总预算。\n- 结果大小和敏感字段过滤。\n- 工具错误、部分结果和数据延迟的表达。\n- 候选假设数量和停止条件。\n- 证据引用格式。\n- 人工升级入口。\n\n一个合理的调查循环是：\n\n```mermaid\nstateDiagram-v2\n    [*] --> Scope\n    Scope --> Observe\n    Observe --> Hypotheses\n    Hypotheses --> Discriminate\n    Discriminate --> Observe: evidence insufficient\n    Discriminate --> Report: evidence sufficient\n    Discriminate --> Escalate: budget or risk exceeded\n    Report --> [*]\n    Escalate --> [*]\n```\n\n“证据充分”必须由可检查条件定义，例如关键候选已被支持、主要反证已处理、影响范围一致，而不是由模型语气判断。\n\n高风险事件要默认停在报告或人工升级层。\n\n如果工具无法提供可靠的状态，先修工具契约，不要先扩大模型上下文。", "subs": ["工具只读权限", "可查询的服务、租户和时间范围", "单次查询超时与总预算", "结果大小和敏感字段过滤", "工具错误、部分结果和数据延迟的表达", "候选假设数量和停止条件"]}, {"title": "选择最小 RCA 试点和退出条件", "content": "第一阶段适合选择：\n\n- 服务范围明确。\n- 事件历史足够。\n- 查询工具已有审计。\n- 根因标签由专家确认。\n- 输出只读且可以复核。\n- 误判不会触发自动修复。\n\n试点可以从“下一步最有区分力的查询推荐”开始，而不是直接要求根因答案。\n\n```text\n事件输入 → 候选集合 → 查询推荐 → 证据包 → 人工判断 → 反馈回放\n```\n\n成功条件可以包括：\n\n- 在固定服务族上减少无效查询。\n- 候选根因覆盖率不低于人工基线。\n- 证据引用可复现且能标注时间范围。\n- 遇到未知或权限不足时正确升级。\n- 工程师复核时间下降而不是增加。\n\n退出条件可以包括：\n\n- 系统经常把症状写成根因。\n- 历史案例与当前版本不匹配。\n- 多故障场景下候选集合快速崩溃。\n- 工具错误被误读为空结果。\n- 专家无法在合理时间复核证据。\n- 结论无法通过回放或后续变更验证。\n\n只有当诊断证据链稳定后，才应把输出交给方向五的行动流程。\n\nRCA 的落地标准不是“模型能说出一个原因”，而是“系统知道为什么提出、还缺什么、如何验证，以及何时停止”。", "subs": ["服务范围明确", "事件历史足够", "查询工具已有审计", "根因标签由专家确认", "输出只读且可以复核", "误判不会触发自动修复"]}]}, {"title": "第一阶段：建立诊断任务和证据链", "sections": [{"title": "诊断不是一次生成", "content": "真实诊断是循环：\n\n```mermaid\nstateDiagram-v2\n    [*] --> Observe\n    Observe --> Hypothesize\n    Hypothesize --> Query\n    Query --> Validate\n    Validate --> Hypothesize: Evidence incomplete\n    Validate --> Reject: Contradiction\n    Reject --> Hypothesize\n    Validate --> Confirm: Sufficient evidence\n    Confirm --> [*]\n```\n\n每轮查询都应减少不确定性。\n\n若查询不能区分任何候选，它只是在增加上下文噪声。", "subs": []}, {"title": "候选根因表", "content": "```markdown\n| 候选 | 支持证据 | 反证 | 待查信息 | 状态 |\n|---|---|---|---|---|\n| 连接池耗尽 | pool_usage=100% | 数据库 CPU 正常 | 配置差异 | active |\n| 数据库限流 | 超时集中于 DB span | 无 throttle 日志 | 限流指标 | weak |\n| 网络丢包 | 个别重传 | 同区域其他服务正常 | 节点网络 | rejected |\n```\n\n候选集让系统能够显式比较解释。\n\n只保留一个“当前最佳答案”容易导致确认偏差。", "subs": []}, {"title": "证据分级", "content": "| 级别 | 内容 | 可信边界 |\n|---|---|---|\n| 原始观测 | 查询得到的日志、指标、Trace | 受采样和查询正确性限制 |\n| 结构化事实 | 事件、配置、拓扑和变更记录 | 受数据新鲜度限制 |\n| 历史案例 | 相似事件与确认根因 | 不能直接证明当前事件 |\n| 模型解释 | 对观测的语义总结 | 必须回到原始证据 |\n| 干预结果 | 回滚或受控实验后的变化 | 需排除同时变化因素 |", "subs": []}, {"title": "诊断输入必须带时间和范围", "content": "每份输入至少包含：\n\n- 服务和资源 ID。\n- 环境、区域、租户。\n- 事件时间窗口。\n- 数据查询时间。\n- 版本或部署 ID。\n- 来源链接。\n- 采样、聚合或过滤条件。\n\n没有时间范围的日志片段可能来自另一次事件。\n\n没有环境信息的配置可能来自预发。", "subs": ["服务和资源 ID", "环境、区域、租户", "事件时间窗口", "数据查询时间", "版本或部署 ID", "来源链接"]}, {"title": "查询推荐的价值", "content": "Xpert 研究用 LLM 推荐事件管理查询。\n\n查询推荐比直接输出根因更容易验证：\n\n- 查询是否存在。\n- 参数是否正确。\n- 结果是否与事件相关。\n- 是否缩小候选范围。\n\n它适合作为从知识助手迈向工具 Agent 的中间层。", "subs": ["查询是否存在", "参数是否正确", "结果是否与事件相关", "是否缩小候选范围"]}, {"title": "主动调查计划", "content": "一个查询计划应包含：\n\n```yaml\nstep:\n  question: \"连接池耗尽是否只发生在新版本实例\"\n  tool: metric_query\n  parameters:\n    service: checkout-api\n    deployment_id: deploy-2191\n    metric: db_pool_in_use_ratio\n    window: 10m\n  expected_if_true: \"new deployment ratio near 1.0\"\n  expected_if_false: \"all deployments similar\"\n  on_error: retry_once_then_escalate\n```\n\n预先写出真假预期能防止查询后随意解释。", "subs": []}, {"title": "FLASH 与复发事件工作流", "content": "FLASH 面向重复事件的工作流自动化诊断。\n\n复发场景适合自动化，因为：\n\n- 已知调查步骤较稳定。\n- 工具和参数可预先验证。\n- 预期证据模式明确。\n- 停止条件可定义。\n\n其边界是新故障可能落在已知工作流之外。", "subs": ["已知调查步骤较稳定", "工具和参数可预先验证", "预期证据模式明确", "停止条件可定义"]}, {"title": "NetAssistant 的对话式网络诊断", "content": "网络诊断需要拓扑、设备状态、路由、流量和配置证据。\n\n对话接口可以把工程师意图转换为查询并解释结果。\n\n但自然语言不能代替：\n\n- 设备级权限。\n- 命令白名单。\n- 配置快照。\n- 路径和时间范围。\n- 输出解析验证。", "subs": ["设备级权限", "命令白名单", "配置快照", "路径和时间范围", "输出解析验证"]}, {"title": "D-Bot 的数据库诊断启发", "content": "数据库故障常跨越工作负载、查询、锁、缓存、存储和配置。\n\n工具应返回结构化状态，而不是大段终端文本。\n\n例如：\n\n```json\n{\n  \"query\": \"top_wait_events\",\n  \"status\": \"ok\",\n  \"observed_at\": \"2026-08-03T10:10:00+08:00\",\n  \"rows\": [{\"event\": \"lock_wait\", \"share\": 0.63}],\n  \"truncated\": false\n}\n```", "subs": []}, {"title": "诊断摘要必须可逆", "content": "长日志和工具结果需要摘要。\n\nRCACopilot 使用 LLM 压缩多源诊断信息，再结合历史事件做根因预测。\n\n摘要应保留引用，使工程师能回到原始结果。\n\n摘要不能删除反证或“不知道”。", "subs": []}, {"title": "本阶段小结", "content": "- RCA 是迭代收集和验证证据的过程。\n- 候选表比单一答案更能抵抗确认偏差。\n- 查询计划应说明它区分哪些假设。\n- 复发事件适合受约束工作流。\n- 摘要必须能回到原始工具输出。", "subs": ["RCA 是迭代收集和验证证据的过程", "候选表比单一答案更能抵抗确认偏差", "查询计划应说明它区分哪些假设", "复发事件适合受约束工作流", "摘要必须能回到原始工具输出"]}]}, {"title": "第二阶段：历史案例、分类与开放生成", "sections": [{"title": "根因分类", "content": "分类从预定义标签集合中选择根因类别。\n\n优点：\n\n- 输出空间有限。\n- 容易计算准确率和 F1。\n- 便于路由和统计。\n- 可以使用历史标注事件。\n\n限制：\n\n- 新根因不在标签空间。\n- 标签粒度可能过粗。\n- 服务变化使标签含义漂移。\n- 正确类别不等于完整解释。", "subs": ["输出空间有限", "容易计算准确率和 F1", "便于路由和统计", "可以使用历史标注事件", "新根因不在标签空间", "标签粒度可能过粗"]}, {"title": "开放式根因生成", "content": "开放生成可以描述实体、机制和传播过程。\n\n它更贴近工程师报告。\n\n但评测更困难：\n\n- 同一根因有多种表述。\n- 文本相似不表示因果正确。\n- 部分正确难以量化。\n- 模型会加入未证实细节。", "subs": ["同一根因有多种表述", "文本相似不表示因果正确", "部分正确难以量化", "模型会加入未证实细节"]}, {"title": "历史案例检索", "content": "RCACopilot、GPT-4 ICL 和多篇云 RCA 研究使用相似事件。\n\n建议以以下条件过滤：\n\n- 服务和组件。\n- 环境和区域。\n- 版本范围。\n- 症状与异常模式。\n- 传播路径。\n- 事件时间和知识新鲜度。\n- 根因是否经过人工确认。", "subs": ["服务和组件", "环境和区域", "版本范围", "症状与异常模式", "传播路径", "事件时间和知识新鲜度"]}, {"title": "相似症状不等于相同根因", "content": "“5xx 升高”可能来自：\n\n- 上游超时。\n- 配置错误。\n- 容量不足。\n- 凭据过期。\n- 发布缺陷。\n- 依赖限流。\n\n案例检索是候选生成器，不是证明器。", "subs": ["上游超时", "配置错误", "容量不足", "凭据过期", "发布缺陷", "依赖限流"]}, {"title": "In-Context Learning", "content": "ICL 把历史事件、证据和确认根因放入 Prompt。\n\n模型从演示学习任务格式和领域模式。\n\n风险包括：\n\n- 近重复数据泄漏。\n- 错误案例标签。\n- 示例顺序偏差。\n- 少数服务被高频案例支配。\n- 长上下文挤压当前事件证据。", "subs": ["近重复数据泄漏", "错误案例标签", "示例顺序偏差", "少数服务被高频案例支配", "长上下文挤压当前事件证据"]}, {"title": "One-Shot 与小分类器协作", "content": "One-Shot RCA 路线探索 LLM 与小分类器协作。\n\n小模型适合稳定、重复和有限标签任务。\n\nLLM 适合解释、少样本和开放语义。\n\n组合时应定义：\n\n- 谁生成候选。\n- 谁做最终判断。\n- 冲突怎样处理。\n- 置信度怎样校准。\n- 新类别怎样进入标签体系。", "subs": ["谁生成候选", "谁做最终判断", "冲突怎样处理", "置信度怎样校准", "新类别怎样进入标签体系"]}, {"title": "根因与缓解步骤联合生成", "content": "有研究同时推荐根因和缓解步骤。\n\n两项任务不应使用同一正确性判断。\n\n根因可能正确但动作不适用于当前版本。\n\n动作可能暂时缓解却没有修复根因。\n\n输出应拆开：\n\n```yaml\nroot_cause_candidate:\n  statement: connection pool size regressed after deployment\n  evidence_status: partially_supported\nmitigation_candidate:\n  action: rollback deployment\n  execution_status: not_executed\n```", "subs": []}, {"title": "X-Lifecycle 的跨生命周期视角", "content": "事件数据不只来自诊断阶段。\n\n检测、分诊、缓解和复盘信息可以互相增强。\n\n但必须避免未来信息泄漏到历史时间点的离线评测。\n\n若模型在“事件创建时预测根因”，就不能使用事件结束后的复盘文本。", "subs": []}, {"title": "Prompt 优化", "content": "eARCO 关注高效的 Prompt 优化 RCA。\n\nPrompt 可以改善：\n\n- 任务定义。\n- 输出结构。\n- 证据引用。\n- 候选比较。\n- 停止条件。\n\nPrompt 不能补回缺失遥测，也不能证明因果。", "subs": ["任务定义", "输出结构", "证据引用", "候选比较", "停止条件"]}, {"title": "Representation-Aware RCA", "content": "同一事件可以表示为原始日志、摘要、模板序列、拓扑子图或结构化表。\n\n表示选择会改变模型能看到的关系。\n\nRepresentation-Aware RCA 提醒我们：失败可能来自输入表示，而不只是模型推理。", "subs": []}, {"title": "信息压缩的取舍", "content": "过少压缩：\n\n- 超出上下文。\n- 噪声干扰。\n- 工具结果重复。\n\n过度压缩：\n\n- 丢失反证。\n- 丢失时间顺序。\n- 丢失实体和数值。\n- 把不确定性变成确定句。", "subs": ["超出上下文", "噪声干扰", "工具结果重复", "丢失反证", "丢失时间顺序", "丢失实体和数值"]}, {"title": "本阶段小结", "content": "- 分类易评测但受标签空间限制。\n- 开放生成表达力强但更难验证。\n- 历史案例产生候选，不直接证明当前根因。\n- 联合输出必须区分根因正确性与动作正确性。\n- Prompt 和表示优化不能替代证据。", "subs": ["分类易评测但受标签空间限制", "开放生成表达力强但更难验证", "历史案例产生候选", "联合输出必须区分根因正确性与动作正确性", "Prompt 和表示优化不能替代证据"]}]}, {"title": "第三阶段：工具增强诊断", "sections": [{"title": "ReAct 循环", "content": "工具增强 Agent 常使用：\n\n```text\nThought -> Action -> Observation -> Thought\n```\n\n工程实现不必暴露内部思维文本。\n\n需要保留的是可审计轨迹：\n\n- 当前目标。\n- 选择的工具。\n- 结构化参数。\n- 工具状态。\n- 观察结果引用。\n- 更新后的候选。\n- 停止理由。", "subs": ["当前目标", "选择的工具", "结构化参数", "工具状态", "观察结果引用", "更新后的候选"]}, {"title": "RCAgent 的核心设计", "content": "RCAgent 使用本地模型和工具增强 Agent 处理隐私敏感云 RCA。\n\n它区分：\n\n- 控制器 Agent：规划和选择工具。\n- 专家 Agent：执行日志或代码分析。\n- 信息收集工具：查询云状态。\n- `finalize`：以可解析格式结束。\n\n它还处理上下文长度、动作有效性和本地模型稳定性。", "subs": ["控制器 Agent", "专家 Agent", "信息收集工具", "finalize"]}, {"title": "工具接口应语义化", "content": "不要直接把任意 SQL 或 shell 暴露给模型。\n\n更安全的接口：\n\n```json\n{\n  \"tool\": \"get_service_errors\",\n  \"arguments\": {\n    \"service_id\": \"svc-checkout\",\n    \"start\": \"2026-08-03T10:00:00+08:00\",\n    \"end\": \"2026-08-03T10:10:00+08:00\",\n    \"severity_at_least\": \"ERROR\"\n  }\n}\n```\n\n工具层负责参数校验、权限和查询构造。", "subs": []}, {"title": "工具文档", "content": "每个工具应说明：\n\n- 用途。\n- 参数类型和范围。\n- 数据源。\n- 返回模式。\n- 权限级别。\n- 成本和超时。\n- 常见错误。\n- 数据新鲜度。\n- 是否有副作用。", "subs": ["用途", "参数类型和范围", "数据源", "返回模式", "权限级别", "成本和超时"]}, {"title": "观察结果状态", "content": "```yaml\nobservation:\n  status: partial\n  data: []\n  error: null\n  warnings:\n    - \"two shards unavailable\"\n  queried_at: 2026-08-03T10:12:00+08:00\n  data_until: 2026-08-03T10:09:30+08:00\n  truncated: true\n```\n\n空数组、失败、部分结果和真实“没有异常”必须区分。", "subs": []}, {"title": "工具失败模式", "content": "#### 参数错误\n\n服务 ID 或时间范围非法。\n\n不得把错误页摘要成“无异常”。\n\n#### 权限拒绝\n\n工具没有访问某租户数据。\n\n应标为证据缺口。\n\n#### 超时\n\n查询未完成。\n\n不得用部分结果确认根因。\n\n#### 数据延迟\n\n指标只更新到事件前。\n\n结果不能代表当前状态。\n\n#### 截断\n\n日志过长只返回前 N 行。\n\nAgent 必须知道未查看全部数据。", "subs": ["参数错误", "权限拒绝", "超时", "数据延迟", "截断"]}, {"title": "日志分析工具", "content": "RCAgent 对长日志做语义分区与聚类，再由专家 Agent 分析块。\n\n这种设计减少一次性上下文，并让控制器消费摘要。\n\n日志工具仍需提供原始行引用。", "subs": []}, {"title": "代码分析工具", "content": "代码工具可以从异常类或堆栈出发：\n\n1. 找到对应文件。\n2. 摘要方法和依赖。\n3. 推荐下一批相关类。\n4. 用任务队列避免重复。\n5. 达到外部依赖或无新线索时停止。\n\n代码静态关系说明“可能路径”，不证明运行时执行。", "subs": []}, {"title": "数据库、网络和集群工具", "content": "| 领域 | 只读工具示例 | 高风险动作 |\n|---|---|---|\n| 数据库 | 等待事件、慢查询、复制状态 | kill、failover、参数修改 |\n| 网络 | 路径、路由、丢包、接口状态 | 路由和 ACL 修改 |\n| Kubernetes | events、logs、describe、metrics | delete、rollout、scale |\n| 云资源 | inventory、health、quota | replace、resize、delete |\n\n方向四默认只读。\n\n有副作用动作进入方向五的审批闭环。", "subs": []}, {"title": "动作有效性", "content": "模型可能：\n\n- 调用不存在的工具。\n- 使用错误参数名。\n- 重复同一查询。\n- 查询无关对象。\n- 在证据不足时 finalize。\n\n可用 JSON Schema、参数枚举、重试上限和轨迹检查稳定化。", "subs": ["调用不存在的工具", "使用错误参数名", "重复同一查询", "查询无关对象", "在证据不足时 finalize"]}, {"title": "观察压缩与快照键", "content": "长工具输出不应反复复制进上下文。\n\n可以保存快照并返回：\n\n```text\nOBS-17: error log clusters for checkout-api, 10:00-10:10\n```\n\n后续步骤按需读取摘要或原始片段。\n\n快照必须与事件、查询和权限绑定。", "subs": []}, {"title": "停止条件", "content": "Agent 应在以下情况停止：\n\n- 达到工具或 token 预算。\n- 连续查询没有信息增益。\n- 关键工具不可用。\n- 候选证据冲突且无法解决。\n- 找到足够证据并满足验证标准。\n- 需要写操作或更高权限。\n- 人工要求停止。", "subs": ["达到工具或 token 预算", "连续查询没有信息增益", "关键工具不可用", "候选证据冲突且无法解决", "找到足够证据并满足验证标准", "需要写操作或更高权限"]}, {"title": "工具轨迹评测", "content": "不仅评价最终答案，还评价：\n\n- 工具选择正确率。\n- 参数正确率。\n- 无效调用率。\n- 重复调用率。\n- 关键证据覆盖率。\n- 平均调用数和成本。\n- 失败后的恢复行为。\n- 停止时机。", "subs": ["工具选择正确率", "参数正确率", "无效调用率", "重复调用率", "关键证据覆盖率", "平均调用数和成本"]}, {"title": "本阶段小结", "content": "- 工具把 LLM 从静态文本推理连接到当前环境。\n- 语义化工具比任意命令接口更安全。\n- 工具状态必须区分失败、部分、截断和空结果。\n- 日志与代码专家可压缩复杂信息。\n- 最终答案和工具轨迹都需要评价。", "subs": ["工具把 LLM 从静态文本推理连接到当前环境", "语义化工具比任意命令接口更安全", "工具状态必须区分失败、部分、截断和空结果", "日志与代码专家可压缩复杂信息", "最终答案和工具轨迹都需要评价"]}]}, {"title": "第四阶段：拓扑、代码与因果推理", "sections": [{"title": "服务拓扑的作用", "content": "拓扑提供候选传播路径。\n\n若 A 调用 B，B 调用 C，C 出现故障，则 A 和 B 都可能表现异常。\n\n只按异常强度排序可能错误选择 A。\n\n传播方向有助于把候选移向下游共同依赖。", "subs": []}, {"title": "拓扑不是永远正确", "content": "拓扑可能来自：\n\n- 静态配置。\n- 服务目录。\n- Trace 聚合。\n- 网络流量。\n- 代码调用关系。\n\n动态系统中它们都可能过期或不完整。\n\n应记录拓扑来源和时间范围。", "subs": ["静态配置", "服务目录", "Trace 聚合", "网络流量", "代码调用关系"]}, {"title": "Cloud Atlas 的因果洞见", "content": "Cloud Atlas 将语言模型与因果洞见结合，用于云系统故障定位。\n\n其核心学习价值是用系统结构约束语言模型的候选空间。\n\nLLM 负责语义理解。\n\n因果或传播信息负责排除结构上不合理的解释。", "subs": []}, {"title": "故障传播图", "content": "```mermaid\ngraph LR\n    DB[Database saturation] --> P[Payment latency]\n    P --> C[Checkout timeout]\n    C --> G[Gateway errors]\n```\n\n若观测顺序和依赖方向与图一致，数据库成为强候选。\n\n仍需验证饱和原因。", "subs": []}, {"title": "Fault Propagation-Aware Benchmark", "content": "传统 benchmark 可能只检查是否命中根因节点。\n\n传播感知评测还应考虑：\n\n- 候选是否位于传播路径。\n- 错误候选离根因多远。\n- 症状节点是否被误判为根因。\n- 多故障和共同依赖如何处理。\n- 定位粒度是否一致。", "subs": ["候选是否位于传播路径", "错误候选离根因多远", "症状节点是否被误判为根因", "多故障和共同依赖如何处理", "定位粒度是否一致"]}, {"title": "OpenRCA", "content": "OpenRCA 研究 LLM 能否定位软件故障根因。\n\n阅读 benchmark 时必须记录：\n\n- 输入包含什么信号。\n- 根因标签是服务、实例、文件还是代码行。\n- 是否允许工具。\n- 是否提供拓扑。\n- 测试故障是否见过。\n- 是否有干扰异常。", "subs": ["输入包含什么信号", "根因标签是服务、实例、文件还是代码行", "是否允许工具", "是否提供拓扑", "测试故障是否见过", "是否有干扰异常"]}, {"title": "代码知识", "content": "COCA 将代码知识用于分布式系统生成式 RCA。\n\n代码可以解释：\n\n- 错误消息由哪里产生。\n- 配置怎样流入逻辑。\n- 服务调用与数据处理路径。\n- 哪些异常被捕获或重试。\n\n代码版本必须与运行部署一致。", "subs": ["错误消息由哪里产生", "配置怎样流入逻辑", "服务调用与数据处理路径", "哪些异常被捕获或重试"]}, {"title": "配置知识", "content": "配置差异经常比源代码更接近实际故障。\n\n诊断应比较：\n\n- 当前值与默认值。\n- 故障前后差异。\n- 不同实例差异。\n- 环境覆盖顺序。\n- 动态配置生效状态。\n- 密钥和权限引用。", "subs": ["当前值与默认值", "故障前后差异", "不同实例差异", "环境覆盖顺序", "动态配置生效状态", "密钥和权限引用"]}, {"title": "FVDebug 的形式验证场景", "content": "FVDebug 面向形式验证失败的自动 RCA。\n\n形式验证提供明确失败轨迹和约束。\n\n它与云生产事件不同，但展示了结构化反例如何帮助 LLM 深入到缺陷位置。", "subs": []}, {"title": "贝叶斯网络", "content": "贝叶斯网络以有向无环图表示变量依赖。\n\n联合概率可分解为：\n\n$$\nP(X_1,\\ldots,X_n)=\\prod_{i=1}^{n}P(X_i\\mid Pa(X_i))\n$$\n\n$Pa(X_i)$ 表示 $X_i$ 的父节点。\n\n观测证据后，可以更新候选根因后验概率。", "subs": []}, {"title": "贝叶斯更新", "content": "$$\nP(H\\mid E)=\\frac{P(E\\mid H)P(H)}{P(E)}\n$$\n\n- $H$ 是根因假设。\n- $E$ 是观测证据。\n- $P(H)$ 是先验。\n- $P(E\\mid H)$ 是该根因产生证据的可能性。\n- $P(H\\mid E)$ 是观察证据后的后验。\n\n先验和条件概率若来自错误数据，后验同样不可靠。", "subs": ["$H$ 是根因假设", "$E$ 是观测证据", "$P(H)$ 是先验", "$P(E\\mid H)$ 是该根因产生证据的可能性", "$P(H\\mid E)$ 是观察证据后的后验"]}, {"title": "相关、传播和因果", "content": "| 关系 | 能说明什么 | 不能说明什么 |\n|---|---|---|\n| 时间相关 | 同时或相邻变化 | 谁导致谁 |\n| 拓扑传播 | 存在可能影响路径 | 当前故障确实沿此传播 |\n| 统计因果 | 数据支持方向性关系 | 所有隐藏混杂已消除 |\n| 干预验证 | 改变原因后结果变化 | 复杂并发变化下唯一性 |", "subs": []}, {"title": "反事实问题", "content": "一个强根因解释应回答：\n\n“如果该原因不存在，症状是否仍会发生？”\n\n可以通过：\n\n- 回滚。\n- 流量切换。\n- 配置对照。\n- 故障注入。\n- 历史正常实例比较。\n\n生产干预需要方向五的安全控制。", "subs": ["回滚", "流量切换", "配置对照", "故障注入", "历史正常实例比较"]}, {"title": "多根因与共同原因", "content": "系统可能同时存在多个故障。\n\n一个共同底层原因也可能产生多条传播链。\n\nRCA 输出不应强制只有一个标签。\n\n应说明主因、促成因素和放大因素。", "subs": []}, {"title": "本阶段小结", "content": "- 拓扑约束传播路径，但可能过期。\n- 代码和配置知识能把服务级定位深入到机制。\n- 贝叶斯网络用于证据更新，不替代数据质量。\n- 相关、传播和因果必须区分。\n- 干预和反事实验证能增强根因结论。", "subs": ["拓扑约束传播路径", "代码和配置知识能把服务级定位深入到机制", "贝叶斯网络用于证据更新", "相关、传播和因果必须区分", "干预和反事实验证能增强根因结论"]}]}, {"title": "第五阶段：Agent 化诊断", "sections": [{"title": "Single-Agent", "content": "单 Agent 维护一个上下文并选择工具。\n\n优点：\n\n- 架构简单。\n- 轨迹容易审计。\n- 通信成本低。\n\n缺点：\n\n- 单一上下文容易过载。\n- 错误判断会持续传播。\n- 领域能力难以分工。", "subs": ["架构简单", "轨迹容易审计", "通信成本低", "单一上下文容易过载", "错误判断会持续传播", "领域能力难以分工"]}, {"title": "Multi-Agent", "content": "多 Agent 可以按角色分工：\n\n- 协调器。\n- 日志分析员。\n- 指标分析员。\n- Trace 与拓扑分析员。\n- 代码分析员。\n- 反证审查员。\n\n更多 Agent 不自动意味着更准确。", "subs": ["协调器", "日志分析员", "指标分析员", "Trace 与拓扑分析员", "代码分析员", "反证审查员"]}, {"title": "多 Agent 通信风险", "content": "- 重复查询。\n- 摘要丢失。\n- 错误观点相互强化。\n- 角色边界重叠。\n- token 与延迟上升。\n- 投票把共同偏差当成共识。", "subs": ["重复查询", "摘要丢失", "错误观点相互强化", "角色边界重叠", "token 与延迟上升", "投票把共同偏差当成共识"]}, {"title": "角色感知 AgentFM", "content": "AgentFM 面向分布式数据库故障管理，使用角色感知多 Agent。\n\n它提醒我们按数据源和专业能力分工，而不是创建多个同质聊天角色。\n\n每个角色应拥有最小工具集合。", "subs": []}, {"title": "MABC 与协作机制", "content": "MABC 探索受区块链思想启发的多 Agent 协作。\n\n阅读此类方法时应区分：\n\n- 消息共享协议。\n- 候选根因共识。\n- 证据是否独立。\n- 谁能否决。\n- 失败怎样归因。", "subs": ["消息共享协议", "候选根因共识", "证据是否独立", "谁能否决", "失败怎样归因"]}, {"title": "SOP 约束的 Flow-of-Action", "content": "Flow-of-Action 使用 SOP 增强多 Agent RCA。\n\nSOP 提供：\n\n- 合法调查顺序。\n- 必查项。\n- 分支条件。\n- 角色职责。\n- 终止条件。\n\n它缩小自由搜索空间。\n\n过期 SOP 也会系统性约束到错误路径。", "subs": ["合法调查顺序", "必查项", "分支条件", "角色职责", "终止条件"]}, {"title": "RCAFlow 的层级规划", "content": "RCAFlow 使用工作流信息和层级规划。\n\n层级规划先选择诊断阶段，再选择具体工具动作。\n\n```mermaid\ngraph TD\n    A[Incident goal] --> B[Service scope]\n    B --> C[Signal analysis]\n    C --> D[Candidate generation]\n    D --> E[Evidence verification]\n    E --> F[Root cause report]\n```\n\n高层计划稳定，低层动作可按观察调整。", "subs": []}, {"title": "Recursion-of-Thought", "content": "递归推理把复杂问题拆成子问题。\n\n例如：\n\n1. 哪个调用路径异常？\n2. 路径上哪个节点最早异常？\n3. 该节点有哪些配置和代码变化？\n4. 哪个变化能解释所有症状？\n\n递归深度需要预算和停止条件。", "subs": []}, {"title": "ThinkFL 的自精炼", "content": "ThinkFL 使用自精炼与强化微调进行故障定位。\n\n自精炼可让模型复查候选、补充证据或修正输出。\n\n若评审者与生成者共享同一偏差，自我反思仍可能确认错误答案。", "subs": []}, {"title": "Agentic Memory", "content": "Agentic Memory Enhanced Recursive Reasoning 使用记忆增强递归定位。\n\n记忆可保存：\n\n- 已查工具。\n- 关键证据。\n- 被否定候选。\n- 中间计划。\n- 相似历史策略。\n\n记忆不是事实源。\n\n它需要事件隔离、过期和来源引用。", "subs": ["已查工具", "关键证据", "被否定候选", "中间计划", "相似历史策略"]}, {"title": "Memory 污染", "content": "若错误根因被写入长期记忆，未来事件会重复引用。\n\n长期记忆只应接收：\n\n- 人工确认根因。\n- 已审核工作流。\n- 版本化工具经验。\n- 明确适用范围。", "subs": ["人工确认根因", "已审核工作流", "版本化工具经验", "明确适用范围"]}, {"title": "协调器的职责", "content": "协调器应：\n\n- 分配子任务。\n- 去重查询。\n- 合并证据而非只合并结论。\n- 发现冲突。\n- 管理预算。\n- 决定继续、停止或升级。", "subs": ["分配子任务", "去重查询", "合并证据而非只合并结论", "发现冲突", "管理预算", "决定继续、停止或升级"]}, {"title": "反证 Agent", "content": "一个实用角色是专门寻找：\n\n- 与当前候选矛盾的观测。\n- 未解释的症状。\n- 其他可能原因。\n- 数据缺失。\n- 工具失败。\n\n它可以减少过早收敛。", "subs": ["与当前候选矛盾的观测", "未解释的症状", "其他可能原因", "数据缺失", "工具失败"]}, {"title": "Agent 架构评测", "content": "| 维度 | 问题 |\n|---|---|\n| 有效性 | 是否找到正确粒度根因 |\n| 效率 | 调用了多少工具和模型 |\n| 协作 | 子任务是否重复或冲突 |\n| 鲁棒性 | 工具失败后能否恢复 |\n| 记忆 | 是否引用正确且适用的经验 |\n| 安全 | 是否越权或请求写操作 |", "subs": []}, {"title": "本阶段小结", "content": "- Single-Agent 简单但容易上下文过载。\n- Multi-Agent 的价值来自异质分工，不来自数量。\n- SOP 和工作流约束搜索空间。\n- 递归、自精炼和记忆分别改善分解、复查和状态保持。\n- 错误共享和记忆污染会放大失败。", "subs": ["Single", "Multi-Agent 的价值来自异质分工，不来自数量", "SOP 和工作流约束搜索空间", "递归、自精炼和记忆分别改善分解、复查和状态保持", "错误共享和记忆污染会放大失败"]}]}, {"title": "第六阶段：可信 RCA 与评测", "sections": [{"title": "常见推理失败", "content": "#### 停滞\n\nAgent 反复查询同类数据，没有更新候选。\n\n#### 偏置\n\n过度依赖最近案例、首个异常或熟悉根因。\n\n#### 混淆\n\n把症状、故障位置、根因和动作混为一谈。\n\n#### 过早收敛\n\n找到一个合理解释后停止寻找反证。\n\n#### 忽略反证\n\n只引用支持当前候选的结果。\n\n#### 工具误用\n\n把失败、空结果或过期数据当成证据。\n\n#### 表示失败\n\n关键信息在摘要或序列化中丢失。\n\nStalled, Biased, and Confused 系统研究 LLM 在云 RCA 中的推理失败。", "subs": ["停滞", "偏置", "混淆", "过早收敛", "忽略反证", "工具误用", "表示失败"]}, {"title": "置信度的含义", "content": "校准良好的置信度应满足：\n\n当系统对一组案例给出约 0.8 置信度时，这组案例应约有 80% 正确。\n\n置信度不是语言强度。\n\n“我非常确定”不是校准结果。", "subs": []}, {"title": "LM-PACE", "content": "LM-PACE 面向黑盒根因生成器估计置信度。\n\n它结合：\n\n1. 历史事件检索。\n2. COE：评估当前证据是否足够评价。\n3. RCE：评价候选根因质量。\n4. 优化映射得到最终置信度。\n\nCOE 重要，因为估计器可能根本没有足够信息公平判断。", "subs": []}, {"title": "期望校准误差", "content": "将预测按置信度分桶，常见 ECE 为：\n\n$$\nECE=\\sum_{b=1}^{B}\\frac{|S_b|}{n}\\left|acc(S_b)-conf(S_b)\\right|\n$$\n\n- $S_b$ 是第 $b$ 个置信度桶。\n- $acc(S_b)$ 是桶内实际正确率。\n- $conf(S_b)$ 是桶内平均置信度。\n- $n$ 是样本总数。\n\nECE 低表示整体更校准，但可能隐藏小样本高风险桶。", "subs": ["$S_b$ 是第 $b$ 个置信度桶", "$acc(S_b)$ 是桶内实际正确率", "$conf(S_b)$ 是桶内平均置信度", "$n$ 是样本总数"]}, {"title": "可靠性图", "content": "可靠性图比较每个置信区间的平均置信度和实际正确率。\n\n高置信度错误最值得关注，因为工程师更可能采纳。\n\n应单独审核 0.8 以上错误案例。", "subs": []}, {"title": "置信度使用方式", "content": "| 置信度与证据 | 建议行为 |\n|---|---|\n| 高置信且证据完整 | 优先人工确认 |\n| 高置信但证据缺失 | 不应采纳，检查校准 |\n| 中置信 | 收集区分性证据 |\n| 低置信 | 扩展候选或升级专家 |\n| 冲突证据 | 明确拒答 |\n\n置信度不应直接触发生产写操作。", "subs": []}, {"title": "Top-K 定位", "content": "若正确根因在前 $K$ 个候选中，则 Top-K 命中。\n\n$$\nRecall@K=\\frac{1}{N}\\sum_{i=1}^{N}\\mathbf{1}[r_i\\le K]\n$$\n\n$r_i$ 是第 $i$ 个案例中正确根因排名。", "subs": []}, {"title": "MRR", "content": "$$\nMRR=\\frac{1}{N}\\sum_{i=1}^{N}\\frac{1}{r_i}\n$$\n\nMRR 更奖励正确根因排在前面。\n\n若没有正确候选，该案例贡献为 0。", "subs": []}, {"title": "定位粒度不能混比", "content": "| 粒度 | 示例 |\n|---|---|\n| 服务级 | payment-db |\n| 实例级 | payment-db-2 |\n| 资源级 | connection-pool |\n| 文件级 | PoolManager.go |\n| 函数级 | resizePool |\n| 代码行级 | config assignment line |\n\n服务级 Top-1 不能直接与代码行 Top-1 比较。", "subs": []}, {"title": "最终答案之外的指标", "content": "- 工具调用成功率。\n- 关键证据召回率。\n- 反证覆盖率。\n- 平均调查轮数。\n- 诊断时延。\n- 人工修改率。\n- 拒答准确率。\n- 置信度校准。\n- 单事件成本。", "subs": ["工具调用成功率", "关键证据召回率", "反证覆盖率", "平均调查轮数", "诊断时延", "人工修改率"]}, {"title": "真实生产距离", "content": "评价一项 RCA 研究时检查：\n\n- 是否使用真实或合成事件。\n- 是否使用当前多源数据。\n- 是否有真实工具。\n- 是否覆盖未知故障。\n- 是否包含噪声和并发异常。\n- 是否评价工具轨迹。\n- 是否有工程师参与。\n- 是否长期部署。\n- 是否报告失败案例。", "subs": ["是否使用真实或合成事件", "是否使用当前多源数据", "是否有真实工具", "是否覆盖未知故障", "是否包含噪声和并发异常", "是否评价工具轨迹"]}, {"title": "不因 Agent 名称判断自治", "content": "“Autonomous RCA Agent”可能只表示模型自动选择模拟工具。\n\n生产自治还需要：\n\n- 身份和权限。\n- 工具可靠性。\n- 审计。\n- 预算。\n- 停止条件。\n- 置信度。\n- 人工升级。", "subs": ["身份和权限", "工具可靠性", "审计", "预算", "停止条件", "置信度"]}, {"title": "本阶段小结", "content": "- 推理失败应按停滞、偏置、混淆、工具和表示分类。\n- 校准置信度反映真实正确概率，不是语言强度。\n- LM-PACE 将证据充足度与根因评价分开。\n- Top-K 和 MRR 依赖明确定位粒度。\n- 生产 RCA 必须同时评价答案、轨迹、成本和人机协作。", "subs": ["推理失败应按停滞、偏置、混淆、工具和表示分类", "校准置信度反映真实正确概率", "LM-PACE 将证据充足度与根因评价分开", "Top-K 和 MRR 依赖明确定位粒度", "生产 RCA 必须同时评价答案、轨迹、成本和人机协作"]}]}, {"title": "贯穿案例：支付超时的证据驱动 RCA", "sections": [{"title": "案例初始状态", "content": "周二 10:02，结算成功率从 99.95% 降到 96.8%，`checkout-api` 的 P99 延迟升高。10:00 刚完成 `payment-api` v42 灰度，但同一时间数据库代理也发生连接抖动。\n\n调查系统收到的不是“找出唯一答案”，而是一份带边界的事件状态：\n\n| 字段 | 当前值 |\n|---|---|\n| 时间窗 | 09:55–10:10，另取前一小时作基线 |\n| 影响范围 | 新加坡区约 3.2% 结算请求 |\n| 已知变更 | `payment-api` v42 灰度到 20% 实例 |\n| 初始异常 | checkout P99、payment 连接等待、数据库代理重连 |\n| 未知项 | v42 是否改变连接复用；代理抖动是否为独立故障 |\n| 动作边界 | 本方向只读调查，不执行回滚或扩容 |\n\n这是编辑性工程案例，用来串联本章方法，不代表某篇论文的生产实验。", "subs": []}, {"title": "候选、支持证据与反证", "content": "初始候选不能只保留“最近发布”：\n\n| 候选 | 支持证据 | 反证 | 下一条区分性查询 |\n|---|---|---|---|\n| H1 v42 降低连接池复用 | 发布与故障接近 | 旧版本也有少量等待 | 按版本比较连接新建率与等待时长 |\n| H2 数据库代理独立抖动 | 代理在同窗重连 | 仅部分应用实例显著恶化 | 按后端与可用区比较重连和延迟 |\n| H3 下游数据库容量不足 | 连接等待升高 | CPU 与活跃会话未饱和 | 查询队列、锁等待和连接上限 |\n| H4 网络丢包 | Trace 出现下游耗时 | 暂无链路丢包证据 | 查询同路径流量与重传 |\n\n候选表必须允许 `unknown`。若后续证据不能由 H1–H4 解释，系统应扩展候选，而不是把概率强行归一到已有集合。", "subs": []}, {"title": "工具查询和证据 provenance", "content": "调查计划优先选择能区分候选的只读查询：\n\n1. 指标查询按版本和实例比较连接等待、连接新建率、请求量与错误率。\n2. Trace 查询比较 v41、v42 的数据库 Span，并保留缺失 Span 比例。\n3. 变更查询取得 v42 的配置差异、灰度对象和实际生效时间。\n4. 数据库查询读取代理重连、后端切换、连接上限与锁等待。\n5. 拓扑查询取得事件时窗内的动态依赖快照，而不是使用当前拓扑冒充历史拓扑。\n\n每条证据至少记录 `query_id`、工具、参数、时间窗、采集时间、数据版本、权限范围、结果状态和原始快照键。摘要只能引用快照，不能替代快照。\n\n```mermaid\ngraph TD\n    A[Checkout latency alert] --> B[Create candidate set]\n    B --> C[Compare versions]\n    B --> D[Inspect proxy reconnects]\n    C --> E[Support H1]\n    D --> F[Support H2]\n    E --> G[Search counterevidence]\n    F --> G\n    G --> H[Update propagation graph]\n    H --> I{Evidence sufficient}\n    I -->|No| J[Expand candidates or escalate]\n    I -->|Yes| K[Human confirmation]\n```\n\n上图是编辑性综合。", "subs": []}, {"title": "拓扑传播和时间顺序", "content": "调查发现 v42 实例的连接新建率是 v41 的数倍，代理重连影响两个版本，但 v42 的连接风暴放大了代理抖动。动态传播路径为：\n\n```text\nv42 配置变化\n  -> 连接复用下降\n  -> 数据库代理连接建立压力升高\n  -> 代理抖动被放大\n  -> payment-api 等待\n  -> checkout-api P99 与成功率恶化\n```\n\n这里不能简单写成一个根因。更准确的分解是：\n\n- 直接根因：v42 的连接复用配置错误。\n- 促成因素：数据库代理在同一时窗发生重连。\n- 放大因素：灰度实例集中访问同一代理分片。\n- 症状节点：`payment-api` 和 `checkout-api`。\n\n若代理抖动在没有 v42 时也足以造成同等影响，它可能是并发独立故障，而非促成因素。评测标签应允许集合或因果结构，不能只接受单一 Top-1 字符串。", "subs": ["直接根因：v42 的连接复用配置错误", "促成因素：数据库代理在同一时窗发生重连", "放大因素：灰度实例集中访问同一代理分片", "症状节点：payment-api 和 checkout-api"]}, {"title": "反事实、混杂与不可执行干预", "content": "“回滚 v42 后恢复”支持 H1，但仍可能被同时结束的代理抖动混杂。更强的反事实比较是：在相同代理分片、相同流量和相同时间窗下，v41 与 v42 是否呈现稳定差异。\n\n生产环境经常无法执行理想干预：\n\n- 回滚代价过高或会丢失其他修复。\n- 流量切换会改变负载这个混杂变量。\n- 故障注入不允许在高严重度事件中进行。\n- 当前拓扑已漂移，无法重建当时路径。\n- 观察数据不足以识别唯一因果方向。\n\n因此应把结论分成“观察证据支持”“干预证据支持”和“尚不可识别”。不可执行反事实不是让模型猜测的理由。", "subs": ["回滚代价过高或会丢失其他修复", "流量切换会改变负载这个混杂变量", "故障注入不允许在高严重度事件中进行", "当前拓扑已漂移", "观察数据不足以识别唯一因果方向"]}, {"title": "停止、拒答和人工升级", "content": "满足以下条件才可停止只读调查并请求人工确认：\n\n- 至少一个候选能解释主要症状和传播顺序。\n- 关键支持证据有可追溯快照。\n- 已主动搜索最强替代解释与反证。\n- 拓扑和配置版本与事件时窗一致。\n- 剩余不确定性不会被隐藏在高置信措辞中。\n\n以下情况必须拒答或升级：\n\n| 情况 | 系统输出 | 后续动作 |\n|---|---|---|\n| 正确根因不在候选集 | `candidate_set_incomplete` | 扩展对象、时间窗或专家域 |\n| 未知或 OOD 故障 | `unknown_failure_pattern` | 保留证据包并升级领域专家 |\n| 工具无权限 | `insufficient_access` | 申请只读短期权限或人工查询 |\n| 数据缺失或冲突 | `insufficient_evidence` | 指明缺口，不给唯一根因 |\n| 拓扑过期 | `stale_topology` | 重建事件时窗快照 |\n| 多个候选不可区分 | `ambiguous_hypotheses` | 输出候选集合和区分性查询 |\n\n拒答质量应独立评测：既要避免证据不足时强答，也要避免证据充分时无谓升级。", "subs": ["至少一个候选能解释主要症状和传播顺序", "关键支持证据有可追溯快照", "已主动搜索最强替代解释与反证", "拓扑和配置版本与事件时窗一致", "剩余不确定性不会被隐藏在高置信措辞中"]}, {"title": "人工确认与结果回流", "content": "Incident Commander 确认配置差异和传播链后，方向五才接管回滚审批。事件关闭后回流的不是一段未经审查的模型总结，而是：\n\n- 已确认的直接根因、促成因素和影响范围。\n- 查询与证据快照引用。\n- 被否定候选及否定原因。\n- 实际动作、恢复证据和时间线。\n- 需要更新的规则、Runbook、测试和所有者。\n\n回流记录必须经过 owner 审核并版本化。错误诊断、未确认猜测和含敏感信息的原始输出不能直接写入长期记忆。", "subs": ["已确认的直接根因、促成因素和影响范围", "查询与证据快照引用", "被否定候选及否定原因", "实际动作、恢复证据和时间线", "需要更新的规则、Runbook、测试和所有者"]}, {"title": "多故障评测不能只看 Top-1", "content": "并发和层级原因下，应组合使用：\n\n- 根因集合的 Precision、Recall 与 F1。\n- 直接根因、促成因素、放大因素的角色准确率。\n- 传播路径边或关键路径召回率。\n- 候选集覆盖率与未知故障拒答率。\n- 支持证据和反证覆盖率。\n- 到达可行动结论的调查成本与时延。\n- 拓扑漂移、权限缺失和缺失模态下的性能退化。\n\n一个把直接根因排在第二但完整识别共同原因与传播链的系统，可能比偶然命中 Top-1 却给出错误机制的系统更有用。", "subs": ["根因集合的 Precision、Recall 与 F1", "直接根因、促成因素、放大因素的角色准确率", "传播路径边或关键路径召回率", "候选集覆盖率与未知故障拒答率", "支持证据和反证覆盖率", "到达可行动结论的调查成本与时延"]}]}, {"title": "论文阅读路线", "sections": [{"title": "入门：任务与基线", "content": "1. [Automatic RCA](https://arxiv.org/pdf/2305.15778.pdf)：多源收集、摘要和历史案例分类。\n2. [Xpert](https://arxiv.org/pdf/2312.11988)：主动查询推荐。\n3. [OpenRCA](https://openreview.net/pdf?id=M4qNIzQYpd)：定位能力与 benchmark。", "subs": []}, {"title": "进阶：工具和结构", "content": "1. [RCAgent](https://arxiv.org/pdf/2310.16340.pdf)：工具增强循环与本地模型。\n2. [Cloud Atlas](https://arxiv.org/pdf/2407.08694)：因果洞见。\n3. [COCA](https://arxiv.org/abs/2503.23051v1)：代码知识。\n4. [贝叶斯网络 RCA](https://ieeexplore.ieee.org/abstract/document/10979844)：概率图。", "subs": []}, {"title": "深入：Agent 和可信性", "content": "1. [Flow-of-Action](https://www.arxiv.org/pdf/2502.08224)：SOP 约束。\n2. [RCAFlow](https://ojs.aaai.org/index.php/AAAI/article/view/36991)：层级规划。\n3. [Agentic Memory](https://arxiv.org/abs/2601.02732)：记忆与递归。\n4. [LM-PACE](https://arxiv.org/pdf/2309.05833.pdf)：黑盒置信度校准。\n5. [RCA 推理失败](https://arxiv.org/abs/2601.22208)：系统错误分析。\n6. [传播感知 Benchmark](https://arxiv.org/pdf/2510.04711)：评价边界。", "subs": []}, {"title": "代表性路线对比", "content": "| 路线 | 代表方法 | 主要增量 | 主要风险 |\n|---|---|---|---|\n| 历史分类 | RCACopilot | 多源摘要和案例 | 未知类别与案例偏差 |\n| 查询推荐 | Xpert | 主动调查入口 | 查询不一定有效 |\n| 工具 Agent | RCAgent | 当前环境交互 | 工具误用和长轨迹 |\n| 结构约束 | Cloud Atlas | 拓扑和因果 | 结构过期或错误 |\n| 代码增强 | COCA | 深入机制 | 代码版本不匹配 |\n| 工作流 Agent | RCAFlow | 层级计划 | 工作流限制未知故障 |\n| 置信度 | LM-PACE | 黑盒校准 | 历史参考与估计器偏差 |", "subs": []}]}, {"title": "本方向总结", "sections": [{"title": "最值得记住的结论", "content": "1. RCA 是候选生成、证据查询、反证和验证的循环。\n2. 历史案例、Prompt 和摘要只能增强推理，不能替代当前证据。\n3. 工具接口必须语义化、只读、可审计，并准确表达失败状态。\n4. 拓扑、代码和因果图分别约束传播、机制和概率关系。\n5. Multi-Agent 的价值来自专业分工，错误通信和记忆污染会抵消收益。\n6. 置信度必须校准，服务级、实例级和代码级定位不可直接混比。\n7. 论文使用 Agent 不表示系统已达到生产自治。", "subs": []}, {"title": "推荐学习顺序", "content": "1. 先掌握任务边界和候选根因表。\n2. 再学习历史案例与多源摘要。\n3. 然后实现只读工具循环。\n4. 加入拓扑、代码和传播约束。\n5. 最后研究 Agent 规划、记忆、失败分析和校准。", "subs": []}]}, {"title": "来源索引", "sections": [{"title": "主方向论文", "content": "本方向正文以仓库 [论文目录](https://github.com/Jun-jie-Huang/awesome-LLM-AIOps/blob/main/README.md) 中方向四的 30 篇资料为范围。下表为逐篇直达入口；“学习位置”是编辑性导航，不是论文成熟度评级。\n\n下表链接统一采用仓库 `README.md` 中的公开原文地址，分享 HTML 后无需依赖本地译文文件。\n\n| # | 译文 | 学习位置 |\n|---:|---|---|\n| 1 | [D-Bot](https://arxiv.org/pdf/2312.01454.pdf) | 数据库诊断与工具协作 |\n| 2 | [FLASH](https://www.microsoft.com/en-us/research/uploads/prod/2024/10/FLASH_Paper.pdf) | 复发事件工作流自动化 |\n| 3 | [NetAssistant](https://www.usenix.org/system/files/nsdi24-wang-haopei.pdf) | 对话式网络诊断 |\n| 4 | [AgentFM](https://arxiv.org/pdf/2504.06614) | 角色感知多 Agent 故障管理 |\n| 5 | [Agentic Memory](https://arxiv.org/abs/2601.02732) | 记忆增强递归定位 |\n| 6 | [LLM 与贝叶斯网络 RCA](https://ieeexplore.ieee.org/abstract/document/10979844) | 概率图与证据更新 |\n| 7 | [GPT-4 上下文学习 RCA](https://arxiv.org/pdf/2401.13810v1.pdf) | 上下文学习与历史案例 |\n| 8 | [Automatic RCA](https://arxiv.org/pdf/2305.15778.pdf) | 多源云事件根因分析 |\n| 9 | [Cloud Atlas](https://arxiv.org/pdf/2407.08694) | 因果洞见与故障定位 |\n| 10 | [COCA](https://arxiv.org/abs/2503.23051v1) | 代码知识增强 RCA |\n| 11 | [eARCO](https://arxiv.org/pdf/2504.11505) | Prompt 优化与效率 |\n| 12 | [探索 LLM RCA Agent](https://arxiv.org/pdf/2403.04123) | Agent RCA 能力边界 |\n| 13 | [Flow-of-Action](https://www.arxiv.org/pdf/2502.08224) | SOP 增强多 Agent |\n| 14 | [FVDebug](https://arxiv.org/abs/2510.15906) | 形式验证失败诊断 |\n| 15 | [多 Agent RCA 框架](https://doi.org/10.1007/s40747-025-02096-0) | 专家分工与协作 |\n| 16 | [PACE-LM](https://arxiv.org/pdf/2309.05833.pdf) | 根因置信度校准 |\n| 17 | [LogPilot](https://www.zhihan-jiang.com/files/ASE25/LogPilot.pdf) | 意图感知告警诊断 |\n| 18 | [MABC](https://arxiv.org/pdf/2404.12135) | 多 Agent 协作机制 |\n| 19 | [OpenRCA](https://openreview.net/pdf?id=M4qNIzQYpd) | 软件故障定位 Benchmark |\n| 20 | [RCAFlow](https://ojs.aaai.org/index.php/AAAI/article/view/36991) | 工作流知情层级规划 |\n| 21 | [RCAgent](https://arxiv.org/pdf/2310.16340.pdf) | 工具增强自主调查 |\n| 22 | [根因与缓解步骤推荐](https://arxiv.org/pdf/2301.03797.pdf) | 诊断到行动建议的边界 |\n| 23 | [表示感知 RCA](https://dl.acm.org/doi/10.1145/3777911.3801108) | 输入表示与立场分析 |\n| 24 | [故障传播感知 Benchmark](https://arxiv.org/pdf/2510.04711) | 传播结构与评测 |\n| 25 | [停滞 偏置与困惑](https://arxiv.org/abs/2601.22208) | 推理失败分类 |\n| 26 | [One-Shot RCA](https://dl.acm.org/doi/10.1145/3691620.3695475) | LLM 与小分类器协作 |\n| 27 | [ThinkFL](https://arxiv.org/abs/2504.18776) | 强化微调与自精炼定位 |\n| 28 | [Recursion-of-Thought](https://arxiv.org/abs/2605.14866) | 多 Agent 深层递归定位 |\n| 29 | [X-Lifecycle](https://arxiv.org/pdf/2404.03662) | 跨生命周期事件学习 |\n| 30 | [Xpert](https://arxiv.org/pdf/2312.11988) | 主动查询推荐 |", "subs": []}, {"title": "跨方向来源", "content": "- 方向三提供日志、指标、Trace 与异常证据。\n- 方向二提供 Incident Context、历史事件和 SOP。\n- 方向五承接动作审批、执行、验证和回滚。", "subs": ["方向三提供日志、指标、Trace 与异常证据", "方向二提供 Incident Context、历史事件和 SOP", "方向五承接动作审批、执行、验证和回滚"]}, {"title": "资料边界", "content": "论文方法和研究观察以本地中文译文为依据。\n\n证据分级、候选表、工具 Schema、停止条件、成熟度判断和部分流程图是教学性综合。\n\nMermaid 图不冒充论文原图。\n\n不同论文使用不同故障注入、定位粒度、工具和数据集，绝对结果不直接横向比较。", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

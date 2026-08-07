@@ -53,8 +53,8 @@ After regeneration, verify that:
 
 ### Issue tracker
 
-Issues for this repository live in GitHub Issues for `luozijian1990/ops-roadmap`. Use the `gh` CLI for issue operations and infer the repository from the configured `origin` remote. Pull requests are not an issue-triage request surface by default.
+Issues for this repository live in GitHub Issues for `luozijian1990/ops-roadmap`. Use the `gh` CLI for issue operations and infer the repository from the configured `origin` remote. Pull requests are not an issue-triage request surface by default. See `docs/agents/issue-tracker.md`.
 
 ### Domain docs
 
-This is a single-context repository. If `CONTEXT.md` or files under `docs/adr/` are added later, read the relevant documents before changing the affected area. If they do not exist, proceed without requiring them.
+This is a single-context repository. If `CONTEXT.md` or files under `docs/adr/` are added later, read the relevant documents before changing the affected area. If they do not exist, proceed without requiring them. See `docs/agents/domain.md`.

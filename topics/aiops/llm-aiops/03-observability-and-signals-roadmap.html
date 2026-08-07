@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方向三：可观测性智能与信号理解 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>方向三：可观测性智能与信号理解</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "方向三：可观测性智能与信号理解", "intro": "> 本方向从遥测如何产生开始，学习如何把日志、指标、时间序列、Trace、事件和告警转成结构化、可解释的异常证据，并明确它们与故障定位和 RCA 的边界。", "parts": [{"title": "📚 目录", "sections": [{"title": "阅读导航", "content": "- [方向定位](#方向定位)\n- [学习目标](#学习目标)\n- [落地之前的思考](#落地之前的思考)\n- [第一阶段：理解信号产生与数据质量](#第一阶段理解信号产生与数据质量)\n- [第二阶段：学习日志结构化](#第二阶段学习日志结构化)\n- [第三阶段：学习日志异常检测](#第三阶段学习日志异常检测)\n- [第四阶段：理解时间序列与告警](#第四阶段理解时间序列与告警)\n- [第五阶段：构建多信号上下文](#第五阶段构建多信号上下文)\n- [论文阅读路线](#论文阅读路线)\n- [来源索引](#来源索引)", "subs": ["方向定位", "学习目标", "落地之前的思考", "第一阶段：理解信号产生与数据质量", "第二阶段：学习日志结构化", "第三阶段：学习日志异常检测"]}]}, {"title": "方向定位", "sections": [{"title": "这个方向研究什么", "content": "可观测性系统把运行中的软件状态转成可查询信号。\n\nLLM 和传统机器学习可以帮助：\n\n- 生成与插入日志语句。\n- 把原始日志抽取为模板和参数。\n- 判断日志序列是否异常。\n- 解释时间序列异常。\n- 生成或修订监控规则。\n- 把多种信号组织为诊断上下文。\n\n本方向关注“信号表达了什么”和“异常证据怎样形成”。\n\n它不提前宣称真实根因。", "subs": ["生成与插入日志语句", "把原始日志抽取为模板和参数", "判断日志序列是否异常", "解释时间序列异常", "生成或修订监控规则", "把多种信号组织为诊断上下文"]}, {"title": "四个容易混淆的层次", "content": "| 层次 | 核心问题 | 典型输出 | 示例 |\n|---|---|---|---|\n| 解析 | 这条原始记录的结构是什么 | 模板与参数 | `login failed user <*>` |\n| 异常检测 | 观察是否偏离正常 | 异常分数或标签 | 失败率异常升高 |\n| 故障定位 | 异常集中在哪里 | 服务、组件或资源 | payment-db 异常 |\n| RCA | 为什么出现故障 | 经验证的根因与证据链 | 连接池配置错误 |\n\n解析提供统一表示。\n\n异常检测发现偏离。\n\n定位缩小对象范围。\n\nRCA 解释因果机制。\n\n一篇论文即使输出自然语言“原因”，若没有跨信号验证、因果证据或干预验证，也不应自动归为完整 RCA。", "subs": []}, {"title": "信号处理主链", "content": "```mermaid\ngraph LR\n    A[Software execution] --> B[Telemetry generation]\n    B --> C[Collection and normalization]\n    C --> D[Parsing and representation]\n    D --> E[Anomaly detection]\n    E --> F[Signal localization]\n    F --> G[Diagnosis context]\n    G --> H[RCA in direction four]\n```\n\n上图是本路线图的编辑性综合。", "subs": []}, {"title": "本方向的核心判断", "content": "模型上限受信号质量上限约束。\n\n缺失关键日志、错误时间戳、不可连接的服务标识和失真的采样，无法通过更大的语言模型自动恢复为可靠事实。\n\n因此应先问：\n\n1. 信号是否被正确产生？\n2. 信号是否能被稳定解析？\n3. 异常定义是否符合业务语境？\n4. 输出是否保留时间、对象和证据？\n5. 系统是否在生产成本和延迟预算内？", "subs": []}]}, {"title": "学习目标", "sections": [{"title": "学完后应该能回答的问题", "content": "- Metrics、Logs、Traces、Events 与 Alerts 的语义有什么不同？\n- 一条高质量日志语句应包含什么？\n- 日志模板、常量 token 和变量 token 是什么？\n- GA、PA、FGA 和 FTA 为什么可能得出不同结论？\n- LLM 日志解析相对传统解析器增加了什么能力和成本？\n- 示例选择、缓存、自纠正和开源模型分别解决什么问题？\n- 日志异常检测与日志解析有什么输入输出差异？\n- RAG、规则代码和 EVT 如何用于异常检测？\n- 为什么时间序列不能简单转成文本后直接问 LLM？\n- 如何把多信号组织成不包含未经证实根因的上下文？", "subs": ["Metrics、Logs、Traces、Events 与 Alerts 的语义有什么", "一条高质量日志语句应包含什么？", "日志模板、常量 token 和变量 token 是什么？", "GA、PA、FGA 和 FTA 为什么可能得出不同结论？", "LLM 日志解析相对传统解析器增加了什么能力和成本？", "示例选择、缓存、自纠正和开源模型分别解决什么问题？"]}, {"title": "学完后应该具备的实践能力", "content": "- 审查一个服务的遥测质量。\n- 用四类指标评价日志解析器。\n- 为在线解析设计缓存、回退和漂移处理。\n- 为异常检测设计窗口、阈值和反馈流程。\n- 区分异常证据、定位结论和 RCA 结论。\n- 为 Metrics、Logs 与 Traces 设计关联键。", "subs": ["审查一个服务的遥测质量", "用四类指标评价日志解析器", "为在线解析设计缓存、回退和漂移处理", "为异常检测设计窗口、阈值和反馈流程", "区分异常证据、定位结论和 RCA 结论", "为 Metrics、Logs 与 Traces 设计关联键"]}]}, {"title": "落地之前的思考", "sections": [{"title": "先问信号是否值得被解释", "content": "本章是工程性综合，讨论可观测性智能进入生产前的判断条件，不是论文实验结果的汇总。\n\n可观测性项目很容易把“再加一个模型”当成缺口，但模型无法凭空修复不存在、不可关联或语义错误的信号。\n\n开始前先挑一个具体观察问题：\n\n- 哪个服务或资源的状态目前不可见。\n- 哪类异常经常被发现得太晚。\n- 工程师需要手工拼接哪些信号。\n- 当前告警为什么噪声高或漏报多。\n- 结果最终会用于解释、分诊、RCA 还是动作触发。\n\n同一条日志或指标，在不同任务中的要求并不相同：\n\n| 目标 | 必须保留的语义 | 常见误区 |\n|---|---|---|\n| 结构化 | 模板、变量、来源和时间 | 只保留自然语言摘要 |\n| 异常检测 | 窗口、基线、单位和缺失状态 | 把缺失当成正常 |\n| 定位 | 服务、实例、区域和版本 | 只输出一个异常分数 |\n| 关联 | Trace、request、event 和变更键 | 只按相似文本拼接 |\n| RCA 输入 | 时间因果和反证信息 | 提前写入根因结论 |\n| 自动动作 | 目标对象和健康状态 | 让异常解释直接触发写操作 |\n\n如果信号只适合展示，不能支撑下一步决策，就不应过早包装成“智能运维能力”。", "subs": ["哪个服务或资源的状态目前不可见", "哪类异常经常被发现得太晚", "工程师需要手工拼接哪些信号", "当前告警为什么噪声高或漏报多", "结果最终会用于解释、分诊、RCA 还是动作触发"]}, {"title": "先做遥测质量和成本基线", "content": "任何模型指标都应建立在遥测基线上。\n\n至少盘点以下维度：\n\n- 采集覆盖率。\n- 时间戳准确性和时钟偏差。\n- 服务、实例、区域、版本和租户标识。\n- 日志模板稳定性。\n- Metrics 的单位、标签和基线窗口。\n- Trace 的采样率、传播完整性和异步关联。\n- 告警规则与业务 SLI 的对应关系。\n- 丢弃、限流、重采样和延迟到达比例。\n\n可以先画出信号从产生到使用的路径：\n\n```mermaid\ngraph LR\n    A[Application state] --> B[Instrumentation]\n    B --> C[Collector]\n    C --> D[Storage and index]\n    D --> E[Query and alert]\n    E --> F[Human or AI interpretation]\n    C --> G[Drop delay and cost]\n    D --> G\n```\n\n每条边都应有 owner、SLO 和故障可见性。\n\n推荐建立三类基线：\n\n| 基线 | 需要记录的内容 | 用途 |\n|---|---|---|\n| 数据质量 | 缺失、延迟、重复、乱序和错误标签 | 防止把采集故障当业务异常 |\n| 检测质量 | 误报、漏报、检测延迟和告警去重 | 比较规则与模型增量 |\n| 运行成本 | 存储、查询、网络、模型调用和延迟 | 判断智能化是否经济 |\n\n日志解析或异常检测的离线分数不能替代成本基线。\n\n一个准确率更高的解析器，如果使日志 token、索引体积或查询延迟大幅增加，可能降低整体可靠性。", "subs": ["采集覆盖率", "时间戳准确性和时钟偏差", "服务、实例、区域、版本和租户标识", "日志模板稳定性", "Metrics 的单位、标签和基线窗口", "Trace 的采样率、传播完整性和异步关联"]}, {"title": "判断哪里需要模型，哪里应该保留确定性逻辑", "content": "可观测性流水线应拆成确定性层和推理层。\n\n确定性逻辑更适合：\n\n- 时间戳校验。\n- 单位换算。\n- 标签规范化。\n- 字段 Schema 验证。\n- 采样和限流。\n- 已知模板匹配。\n- 告警抑制和去重。\n\n模型可能更适合：\n\n- 新模板的候选归纳。\n- 复杂日志的语义解释。\n- 多信号之间的自然语言关联线索。\n- 监控规则的草稿生成。\n- 面向工程师的异常摘要。\n\n模型输出仍应回到可验证结构：\n\n```mermaid\ngraph TD\n    A[Raw telemetry] --> B[Deterministic validation]\n    B --> C{Known pattern}\n    C -->|Yes| D[Stable parser or rule]\n    C -->|No| E[LLM candidate]\n    E --> F[Schema and confidence check]\n    F --> G[Human or offline validation]\n    D --> H[Structured signal]\n    G --> H\n```\n\n不要让模型直接覆盖生产解析器或直接修改告警阈值。\n\n新模板、规则或字段应先进入候选区，经过回放和人工确认后再发布。", "subs": ["时间戳校验", "单位换算", "标签规范化", "字段 Schema 验证", "采样和限流", "已知模板匹配"]}, {"title": "检查信号能否支撑目标决策", "content": "“有日志”不等于“能诊断”。\n\n落地前要把目标决策写成证据需求：\n\n| 决策 | 最小证据 | 缺失时的行为 |\n|---|---|---|\n| 判断是否异常 | 当前值、窗口、历史基线 | 标记未知，不输出正常 |\n| 判断影响范围 | 服务、实例、区域、租户 | 降低定位粒度 |\n| 判断是否变更相关 | 版本、发布、配置和时间 | 仅列为候选 |\n| 关联请求链路 | Trace 或请求关联键 | 不强行拼接链路 |\n| 判断业务恢复 | 业务 SLI 和用户结果 | 不因技术指标恢复而关闭 |\n\n每个异常输出至少保存：\n\n- 观测时间和事件时间。\n- 信号来源和查询范围。\n- 原始值或可复现查询。\n- 处理版本和特征版本。\n- 缺失、延迟和权限状态。\n- 异常分数以及阈值来源。\n\n如果输出只有一句“检测到异常”，下游 RCA 无法判断它是业务事件、采集故障、版本漂移还是模型误报。", "subs": ["观测时间和事件时间", "信号来源和查询范围", "原始值或可复现查询", "处理版本和特征版本", "缺失、延迟和权限状态", "异常分数以及阈值来源"]}, {"title": "选择最小可验证信号闭环", "content": "第一个试点不应同时覆盖 Logs、Metrics、Traces、Events 和所有告警。\n\n可以选择一个服务族和一种高频问题，按以下顺序推进：\n\n1. 先验证采集覆盖和时间语义。\n2. 再建立已知模板或异常的回放集。\n3. 对照规则、统计方法和模型候选。\n4. 让模型只生成结构化候选或解释草稿。\n5. 由工程师确认后才进入 Incident Context。\n6. 观察长期漂移、成本和查询延迟。\n\n影子模式的闭环可以这样记录：\n\n```text\n生产信号 → 并行解析或检测 → 不影响现有告警 → 人工抽样 → 反馈回放集\n```\n\n成功条件应包含：\n\n- 关键异常类型的检测延迟下降。\n- 漏报和误报没有超过风险阈值。\n- 输出保留对象、时间和 provenance。\n- 解析或检测退化能自动告警。\n- 模型调用成本在预算内。\n- 旧规则和人工流程仍可接管。\n\n退出条件应包含：\n\n- 信号质量问题无法在模型层之外解决。\n- 模型增益只出现在不代表生产的样本上。\n- 新方案增加告警噪声或查询成本。\n- 版本、标签或时间漂移无法被发现。\n- 工程师无法复现模型使用的输入。\n- 下游把异常候选误当成根因事实。\n\n还要把“监控系统自身健康”列为试点的一等对象：\n\n- Collector 是否丢数据或积压。\n- 规则、解析器和模型版本是否发生变化。\n- 查询是否超时或被限流。\n- 标签基数和存储成本是否异常增长。\n- 反馈样本是否覆盖新版本和新服务。\n\n可观测性智能不能在自己的观测链路失效时继续输出确定结论。\n\n可观测性智能的第一项交付不是一张漂亮的异常图，而是一组可复现、可回退、能说明缺失信息的结构化证据。", "subs": ["关键异常类型的检测延迟下降", "漏报和误报没有超过风险阈值", "输出保留对象、时间和 provenance", "解析或检测退化能自动告警", "模型调用成本在预算内", "旧规则和人工流程仍可接管"]}]}, {"title": "第一阶段：理解信号产生与数据质量", "sections": [{"title": "五类常见可观测性信号", "content": "#### Metrics\n\n指标是按时间采样或聚合的数值。\n\n它擅长表达趋势、比例、容量和服务级目标。\n\n典型例子：\n\n- 请求速率。\n- 错误率。\n- 延迟分位数。\n- CPU 和内存使用率。\n- 队列长度。\n\n指标压缩能力强，但通常丢失单次请求细节。\n\n#### Logs\n\n日志是离散事件记录。\n\n它可以保存错误码、资源标识、状态变化和局部上下文。\n\n日志表达力强，但格式多样、数量巨大，并可能包含敏感数据。\n\n#### Traces\n\nTrace 描述一次请求跨组件传播的 span 集合。\n\n它擅长显示调用路径、耗时分解和错误传播位置。\n\n采样会让部分请求不可见。\n\n缺失或错误的上下文传播会切断路径。\n\n#### Events\n\n事件是部署、扩缩容、配置修改、故障转移等离散状态变化。\n\n它们经常是诊断的重要时间锚点。\n\n时间接近仍不代表因果成立。\n\n#### Alerts\n\n告警是规则或检测器对信号作出的判断。\n\n告警不是原始指标本身。\n\n它包含阈值、窗口、抑制和路由策略造成的二次语义。", "subs": ["Metrics", "Logs", "Traces", "Events", "Alerts"]}, {"title": "信号之间如何互补", "content": "| 信号 | 最擅长回答 | 主要盲区 |\n|---|---|---|\n| Metrics | 是否整体偏离 | 单次请求细节 |\n| Logs | 局部发生了什么 | 全局趋势与完整路径 |\n| Traces | 请求经过哪里 | 未采样请求和后台任务 |\n| Events | 系统发生了什么变化 | 变化是否造成故障 |\n| Alerts | 哪个规则需要关注 | 原始异常细节与真实根因 |\n\n单信号通常不足以支撑 RCA。\n\n本方向的目标是把每类信号加工成可连接的证据。", "subs": []}, {"title": "好日志从代码阶段开始", "content": "日志智能不能只在采集后补救。\n\n日志语句设计至少包含四个决策：\n\n1. 在哪里记录。\n2. 使用什么级别。\n3. 记录哪些变量。\n4. 文本怎样表达事件语义。\n\n日志位置决定能否观察关键分支。\n\n日志级别决定噪声与告警价值。\n\n变量决定能否关联请求和资源。\n\n文本决定人和解析器能否理解事件。", "subs": []}, {"title": "自动日志生成研究解决什么", "content": "Automated Logging Generation 实证研究考察 LLM 生成日志语句的有效性。\n\nFastLog 关注端到端地生成并插入日志语句。\n\nGo Static 关注利用静态上下文生成更贴合代码语境的日志语句。\n\n它们共同覆盖：\n\n- 日志位置建议。\n- 日志级别选择。\n- 文本生成。\n- 变量选择。\n- 代码插入。\n\n不能只用代码能否编译评价生成结果。\n\n还要检查信息价值、敏感信息、性能开销和团队规范。", "subs": ["日志位置建议", "日志级别选择", "文本生成", "变量选择", "代码插入"]}, {"title": "一条日志语句的审查清单", "content": "```go\nlogger.Error(\"payment authorization failed\",\n    \"order_id\", orderID,\n    \"provider\", provider,\n    \"error_code\", code,\n)\n```\n\n审查问题：\n\n- 事件语义是否明确？\n- 是否有稳定、可关联的标识？\n- 是否记录了必要但非敏感变量？\n- 是否避免重复打印完整请求？\n- 级别是否符合团队约定？\n- 高频路径上的成本是否可接受？\n- 是否能与指标或 Trace 连接？", "subs": ["事件语义是否明确？", "是否有稳定、可关联的标识？", "是否记录了必要但非敏感变量？", "是否避免重复打印完整请求？", "级别是否符合团队约定？", "高频路径上的成本是否可接受？"]}, {"title": "日志的结构化优于拼接文本", "content": "结构化日志把字段与文本分开。\n\n```json\n{\n  \"timestamp\": \"2026-08-03T10:02:11.123+08:00\",\n  \"level\": \"ERROR\",\n  \"service\": \"payment-api\",\n  \"trace_id\": \"4f8a...\",\n  \"event\": \"payment_authorization_failed\",\n  \"order_id\": \"redacted\",\n  \"provider\": \"gateway-a\",\n  \"error_code\": \"P203\"\n}\n```\n\n稳定字段支持过滤与连接。\n\n敏感值应在源头脱敏，而不是寄希望于生成模型忽略。", "subs": []}, {"title": "数据质量问题", "content": "#### 缺失\n\n关键路径没有埋点，或采集器丢弃数据。\n\n结果是异常发生但没有可用证据。\n\n#### 重复\n\n重试、重放或采集配置导致同一事件被多次记录。\n\n结果是频次异常被夸大。\n\n#### 时间错误\n\n时钟漂移、时区不一致或事件时间与接收时间混用。\n\n结果是传播顺序和窗口聚合错误。\n\n#### 命名漂移\n\n服务、实例和区域名称随版本改变。\n\n结果是跨源连接失败。\n\n#### 模板漂移\n\n代码变更使日志常量和参数位置变化。\n\n结果是旧缓存和旧解析器失效。\n\n#### 采样偏差\n\nTrace 或日志采样只保留部分请求。\n\n结果是异常分布不代表全部流量。\n\n#### 敏感信息\n\n日志包含凭据、个人数据或业务秘密。\n\n结果是索引、Prompt 和模型调用扩大泄漏面。", "subs": ["缺失", "重复", "时间错误", "命名漂移", "模板漂移", "采样偏差", "敏感信息"]}, {"title": "遥测质量基线", "content": "每个服务可以维护：\n\n| 维度 | 示例指标 |\n|---|---|\n| 完整性 | 带 trace_id 的错误日志比例 |\n| 一致性 | 可映射到服务目录的日志比例 |\n| 时效性 | 采集延迟 P95 |\n| 稳定性 | 每版本新增或变化模板数 |\n| 可解析性 | 成功解析消息比例 |\n| 安全性 | 敏感字段扫描命中数 |\n| 成本 | 每请求遥测字节数 |\n\n质量基线发生变化时，应先调查采集或版本变化，再解释业务异常。", "subs": []}, {"title": "本阶段小结", "content": "- 不同信号回答不同问题。\n- 告警是检测规则的输出，不是原始事实。\n- 高质量日志需要在代码阶段设计。\n- 自动日志生成必须评价语义、安全和成本。\n- 数据质量直接限制后续解析、检测和诊断。", "subs": ["不同信号回答不同问题", "告警是检测规则的输出", "高质量日志需要在代码阶段设计", "自动日志生成必须评价语义、安全和成本", "数据质量直接限制后续解析、检测和诊断"]}]}, {"title": "第二阶段：学习日志结构化", "sections": [{"title": "什么是日志解析", "content": "日志解析把原始日志消息拆成常量模板和动态参数。\n\n原始消息：\n\n```text\nFailed password for alice from 10.0.0.8 port 55231\n```\n\n模板：\n\n```text\nFailed password for <*> from <*> port <*>\n```\n\n参数：\n\n```json\n[\"alice\", \"10.0.0.8\", \"55231\"]\n```\n\n常量 token 描述事件类型。\n\n变量 token 描述具体实体或数值。", "subs": []}, {"title": "解析结果的下游用途", "content": "- 统计模板频率。\n- 构造事件序列。\n- 压缩日志存储。\n- 发现新模板。\n- 为异常检测提供离散输入。\n- 按参数值调查资源或用户。\n\n错误解析会向下游传播。\n\n把错误码误当参数会合并不同事件。\n\n把请求 ID 误当常量会制造大量模板。", "subs": ["统计模板频率", "构造事件序列", "压缩日志存储", "发现新模板", "为异常检测提供离散输入", "按参数值调查资源或用户"]}, {"title": "传统解析器与 LLM 解析器", "content": "传统解析器常使用：\n\n- 频率。\n- 相似度。\n- 启发式规则。\n- 前缀树或聚类。\n\n它们速度快、成本低、可在本地运行。\n\nLLM 解析器增加语义判断能力。\n\n它能理解某些 token 在上下文中是实体还是常量，也能遵循自然语言规则。\n\n代价包括：\n\n- 调用成本。\n- 生成延迟。\n- 输出不稳定。\n- 数据外发风险。\n- Prompt 与模型版本漂移。\n\n生产系统常采用分层管线，而不是所有日志逐条调用大模型。", "subs": ["频率", "相似度", "启发式规则", "前缀树或聚类", "调用成本", "生成延迟"]}, {"title": "四个核心评价指标", "content": "大规模评估论文指出，小规模 Loghub-2k 和单一消息级指标可能掩盖长尾模板错误。\n\nLoghub-2.0 平均每个数据集约 360 万条标注消息和 249 个模板，显示了更明显的不平衡与复杂参数结构。\n\n#### Group Accuracy\n\nGA 衡量消息是否被正确分组。\n\n只有解析器输出的模板消息集合与真值集合完全一致，该消息才算正确分组。\n\nGA 关注“哪些消息在一起”。\n\n#### Parsing Accuracy\n\nPA 衡量每条消息的常量与参数 token 是否全部正确。\n\nPA 关注“模板内容是否正确”。\n\n对依赖参数的异常检测而言，PA 尤其重要。\n\n#### FGA\n\nFGA 是模板级分组指标。\n\n令 $N_p$ 为解析器输出模板数，$N_c$ 为正确分组模板数，$N_g$ 为真值模板数：\n\n$$\nPGA=\\frac{N_c}{N_p},\\qquad RGA=\\frac{N_c}{N_g}\n$$\n\n$$\nFGA=\\frac{2\\times PGA\\times RGA}{PGA+RGA}\n$$\n\n它平等对待高频和低频模板。\n\n#### FTA\n\nFTA 是模板内容准确性的模板级指标。\n\n令 $\\hat{N}_c$ 为 token 与真值完全相同的正确模板数：\n\n$$\nPTA=\\frac{\\hat{N}_c}{N_p},\\qquad RTA=\\frac{\\hat{N}_c}{N_g}\n$$\n\n$$\nFTA=\\frac{2\\times PTA\\times RTA}{PTA+RTA}\n$$\n\nFTA 比较严格地检查常量和参数是否正确。", "subs": ["Group Accuracy", "Parsing Accuracy", "FGA", "FTA"]}, {"title": "为什么消息级高分可能误导", "content": "假设 95% 的消息来自 1% 的高频模板。\n\n解析器只处理好这 1% 模板，GA 或 PA 仍可能接近 0.95。\n\n其余低频模板可能包含真正重要的错误和故障事件。\n\n因此至少同时报告：\n\n- GA。\n- PA。\n- FGA。\n- FTA。\n- 吞吐或总时间。\n- 长尾模板分层结果。\n- 参数密集模板结果。", "subs": ["GA", "PA", "FGA", "FTA", "吞吐或总时间", "长尾模板分层结果"]}, {"title": "LLMParser 建立了探索性基线", "content": "LLMParser 研究不同开源 LLM、提示与训练规模在日志解析上的能力。\n\n它代表“让语言模型直接学习模板抽取”的基础路线。\n\n阅读这类工作时应检查：\n\n1. 模型是否微调。\n2. 训练数据是否与测试系统重叠。\n3. Prompt 是否包含演示。\n4. 输出格式如何约束。\n5. 是否按消息调用模型。\n6. 是否与传统解析器在同一数据和预处理下比较。", "subs": []}, {"title": "In-Context Learning 的基本思想", "content": "不更新模型参数，而是在 Prompt 中提供日志与模板示例。\n\n新日志根据示例学习常量和变量的划分。\n\n示例质量比数量更重要。\n\n不相似或标注错误的示例可能让模型错误复制模板边界。", "subs": []}, {"title": "DivLog：多样化示例选择", "content": "DivLog 使用提示增强的 ICL 做日志解析。\n\n其核心直觉是从候选示例中选择与当前日志相关且彼此多样的演示。\n\n过度相似的示例浪费上下文预算。\n\n过度不同的示例又不能提供有效模板线索。\n\n因此示例选择是精度、覆盖和 token 成本之间的优化问题。", "subs": []}, {"title": "LEMUR：熵采样与思维链合并", "content": "LEMUR 关注不确定或信息量高的日志采样，并合并推理结果。\n\n熵采样的教学含义是：优先把昂贵标注或 LLM 预算花在模型最不确定的区域。\n\n思维链可能帮助模型显式比较 token。\n\n但生产输出不应依赖不可验证的自然语言推理。\n\n最终模板必须通过格式和匹配检查。", "subs": []}, {"title": "AdaParser：自生成示例与自纠正", "content": "AdaParser 减少对人工演示的依赖。\n\n它让系统生成 ICL 示例，并通过自纠正改进解析结果。\n\n这种路线解决冷启动成本，但引入新风险：\n\n- 初始错误成为后续示例。\n- 自我评价不等于真值验证。\n- 错误模板可能在缓存中扩散。\n\n因此自生成结果需要一致性检查、正则匹配或人工抽样。", "subs": ["初始错误成为后续示例", "自我评价不等于真值验证", "错误模板可能在缓存中扩散"]}, {"title": "MicLog：渐进式元上下文学习", "content": "MicLog 结合加权 DBSCAN 采样、渐进式元上下文训练和多级缓存。\n\n它体现了一条重要演进：\n\n不是让更大模型逐条解析，而是学习怎样选择代表数据、构建可迁移上下文，并用缓存减少重复调用。", "subs": []}, {"title": "HELP：分层嵌入与再平衡", "content": "HELP 通过分层嵌入组织日志，再让上下文感知模块解析，并用迭代再平衡调整分组。\n\n分层思路可先按粗粒度特征缩小候选范围，再用语义模型处理难例。\n\n这同时改善上下文相关性和并行能力。", "subs": []}, {"title": "LILAC：自适应解析缓存", "content": "日志高度重复。\n\n若一条新消息能与已知模板可靠匹配，就没有必要再次调用 LLM。\n\nLILAC 的自适应缓存路线强调：\n\n- 优先匹配已知模板。\n- 对缓存未命中或不确定项调用 LLM。\n- 新模板验证后进入缓存。\n- 模板漂移时更新或淘汰。\n\n缓存降低成本和延迟，但必须避免过宽匹配。", "subs": ["优先匹配已知模板", "对缓存未命中或不确定项调用 LLM", "新模板验证后进入缓存", "模板漂移时更新或淘汰"]}, {"title": "LUNAR 与 LibreLog：无监督和开源部署", "content": "LUNAR 通过层次化日志分片、日志对比单元选择和无标注 LLM 解析减少人工标签依赖。\n\nLibreLog 关注使用开源大模型实现准确、高效的无监督解析。\n\n开源本地部署的价值包括：\n\n- 日志不离开受控环境。\n- 模型版本可固定。\n- 成本更可预测。\n- 可针对领域做优化。\n\n它仍需要评测、资源容量和升级治理。\n\n“开源”不自动表示“低成本”或“安全”。", "subs": ["日志不离开受控环境", "模型版本可固定", "成本更可预测", "可针对领域做优化"]}, {"title": "免示例路线", "content": "Stronger, Cheaper and Demonstration-Free 关注不依赖演示的解析。\n\n免示例可以减少：\n\n- 人工标注。\n- Prompt token。\n- 示例泄漏。\n- 跨系统迁移负担。\n\n但系统仍要提供任务定义、输出约束和参数判定规则。", "subs": ["人工标注", "Prompt token", "示例泄漏", "跨系统迁移负担"]}, {"title": "在线可解释解析", "content": "在线日志流持续产生新消息。\n\n系统不能等待全量离线聚类后才输出模板。\n\n在线解析需要：\n\n- 有界处理延迟。\n- 增量模板更新。\n- 新模板检测。\n- 漂移处理。\n- 可解释的常量与参数划分。\n- 失败回退。\n\nInterpretable Online Log Analysis 使用 LLM 与提示策略探索在线、可解释日志分析。\n\n在线解释应说明模板依据，而不是生成长篇自然语言猜测。", "subs": ["有界处理延迟", "增量模板更新", "新模板检测", "漂移处理", "可解释的常量与参数划分", "失败回退"]}, {"title": "一个生产解析管线", "content": "```mermaid\ngraph TD\n    A[Incoming log] --> B[Normalize fields]\n    B --> C{Exact template cache}\n    C -->|Hit| D[Emit template and params]\n    C -->|Miss| E[Candidate retrieval]\n    E --> F{Reliable match}\n    F -->|Yes| D\n    F -->|No| G[LLM parse]\n    G --> H[Syntax and consistency checks]\n    H --> I{Accepted}\n    I -->|Yes| J[Versioned cache update]\n    I -->|No| K[Fallback and review queue]\n```", "subs": []}, {"title": "缓存的正确性检查", "content": "缓存模板匹配新消息时应检查：\n\n- 常量 token 是否全部匹配。\n- 参数位置是否允许该类型值。\n- 模板是否属于当前服务和版本。\n- 模板是否已废弃。\n- 匹配是否存在歧义。\n- 是否出现参数吞噬过多文本。", "subs": ["常量 token 是否全部匹配", "参数位置是否允许该类型值", "模板是否属于当前服务和版本", "模板是否已废弃", "匹配是否存在歧义", "是否出现参数吞噬过多文本"]}, {"title": "模板漂移处理", "content": "版本升级可能改变：\n\n- 固定文本。\n- 参数顺序。\n- 新增字段。\n- 日志级别。\n- 事件名称。\n\n建议保存 `service + version + template_id`。\n\n新版本先进入影子解析，对比旧模板命中、未知模板率和 FTA 抽样结果。\n\n不要无条件把新模板合并进全局缓存。", "subs": ["固定文本", "参数顺序", "新增字段", "日志级别", "事件名称"]}, {"title": "解析器的生产评价", "content": "| 维度 | 指标 |\n|---|---|\n| 正确性 | GA、PA、FGA、FTA |\n| 长尾 | 低频模板 FGA、FTA |\n| 复杂度 | 参数密集模板 PA、FTA |\n| 效率 | 行每秒、P95 延迟、LLM 调用率 |\n| 成本 | 每百万行 token 和算力成本 |\n| 稳定性 | 新模板率、缓存误命中率 |\n| 安全 | 外发日志比例、脱敏失败数 |", "subs": []}, {"title": "本阶段小结", "content": "- 日志解析把消息拆为模板和参数。\n- GA 与 PA 是消息级，FGA 与 FTA 是模板级。\n- 长尾模板要求同时报告模板级指标。\n- LLM 方法从直接解析演进到示例选择、自纠正、嵌入、缓存和开源部署。\n- 生产系统应把 LLM 放在难例路径，而不是默认逐行调用。", "subs": ["日志解析把消息拆为模板和参数", "GA 与 PA 是消息级", "长尾模板要求同时报告模板级指标", "LLM 方法从直接解析演进到示例选择、自纠正、嵌入、缓存和开源部署", "生产系统应把 LLM 放在难例路径"]}]}, {"title": "第三阶段：学习日志异常检测", "sections": [{"title": "异常检测的输入和输出", "content": "日志异常检测判断单条日志或一段日志序列是否偏离正常模式。\n\n输入可以是：\n\n- 原始日志文本。\n- 模板 ID。\n- 模板参数。\n- 固定时间窗口内的模板计数。\n- 会话或请求级日志序列。\n- 语义嵌入。\n\n输出可以是：\n\n- 二元标签。\n- 异常分数。\n- 异常类型。\n- 触发规则。\n- 自然语言解释。\n\n输出不是根因。", "subs": ["原始日志文本", "模板 ID", "模板参数", "固定时间窗口内的模板计数", "会话或请求级日志序列", "语义嵌入"]}, {"title": "三种异常", "content": "#### 点异常\n\n单条记录本身异常。\n\n例如从未见过的致命错误。\n\n#### 上下文异常\n\n记录只在特定时间、服务或状态下异常。\n\n例如维护窗口内重启正常，业务高峰重启异常。\n\n#### 序列异常\n\n单条记录都常见，但顺序或频率异常。\n\n例如认证失败后没有预期的回退事件。", "subs": ["点异常", "上下文异常", "序列异常"]}, {"title": "从模板序列到语义判断", "content": "传统方法常把模板 ID 序列送入分类器或序列模型。\n\n优点是输入紧凑、训练高效。\n\n缺点是新模板、模板漂移和语义变化会破坏表示。\n\nLLM 可以直接理解日志文本和领域描述，并生成解释。\n\n但它可能忽略频率、周期和长序列统计。", "subs": []}, {"title": "LogGPT 的提示式路线", "content": "LogGPT 探索用 ChatGPT 做日志异常检测。\n\n其流程包括日志预处理、提示构造、响应解析和异常解释。\n\n研究还考察提示、窗口大小和人工知识注入。\n\n这说明 LLM 异常检测不是单次零样本问答。\n\n窗口和知识会改变模型看到的上下文与判定边界。", "subs": []}, {"title": "窗口设计", "content": "窗口可按：\n\n- 固定时间。\n- 固定消息数。\n- 会话 ID。\n- 请求或 Trace ID。\n- 业务事务。\n\n窗口太小会切断完整序列。\n\n窗口太大会混入并发请求和无关噪声。\n\n窗口设计应与异常定义一致。", "subs": ["固定时间", "固定消息数", "会话 ID", "请求或 Trace ID", "业务事务"]}, {"title": "RAGLog：用历史案例提供语境", "content": "RAGLog 检索与当前日志相关的历史正常或异常案例，再让模型判定。\n\n它适合处理领域私有模式和少样本场景。\n\n风险包括：\n\n- 召回的案例来自其他版本。\n- 相似文本对应不同运行状态。\n- 标签错误进入示例。\n- 过度依赖单个邻居。\n- 测试样本或近重复样本泄漏。\n\n检索结果必须带服务、版本、时间和标签来源。", "subs": ["召回的案例来自其他版本", "相似文本对应不同运行状态", "标签错误进入示例", "过度依赖单个邻居", "测试样本或近重复样本泄漏"]}, {"title": "CodeAD：把语义知识编译为规则代码", "content": "CodeAD 使用 LLM 合成日志异常检测规则代码。\n\n相比每个窗口都调用模型，规则代码可以：\n\n- 本地执行。\n- 低延迟处理。\n- 明确审查条件。\n- 版本化和回归测试。\n- 统计具体规则命中。\n\n它把 LLM 从在线分类器变成规则生成器。\n\n生成代码仍需沙箱、测试和限制资源。", "subs": ["本地执行", "低延迟处理", "明确审查条件", "版本化和回归测试", "统计具体规则命中"]}, {"title": "一条规则的教学示例", "content": "```python\ndef detect(events):\n    auth_failures = [e for e in events if e.template_id == \"AUTH_FAIL\"]\n    success = any(e.template_id == \"AUTH_SUCCESS\" for e in events)\n    return len(auth_failures) >= 5 and not success\n```\n\n上线前应测试：\n\n- 空窗口。\n- 边界数量。\n- 乱序事件。\n- 重复事件。\n- 模板缺失。\n- 新版本字段。\n- 大窗口性能。", "subs": ["空窗口", "边界数量", "乱序事件", "重复事件", "模板缺失", "新版本字段"]}, {"title": "不稳定日志", "content": "日志会随软件演进发生变化。\n\nLLM Meets ML 研究在不稳定日志上的数据高效异常检测，并结合缓存增强推理、上下文增强提示和集成学习。\n\n该路线说明 LLM 与小模型不是二选一。\n\n可以让 LLM 处理新语义和少样本，让轻量模型或缓存处理稳定重复模式。", "subs": []}, {"title": "集成学习的价值", "content": "多个基模型可以提供不同偏差：\n\n- 规则擅长已知边界。\n- 统计模型擅长频次变化。\n- 序列模型擅长顺序。\n- LLM 擅长文本语义和解释。\n\n集成不应只用多数投票。\n\n还应根据服务、日志稳定性、模型置信度和验证历史动态选择。", "subs": ["规则擅长已知边界", "统计模型擅长频次变化", "序列模型擅长顺序", "LLM 擅长文本语义和解释"]}, {"title": "EVT 的阈值视角", "content": "极值理论关注分布尾部。\n\n异常检测可以先得到连续异常分数，再对高分尾部拟合极值分布，推导阈值。\n\n常见学习流程：\n\n1. 计算正常样本异常分数。\n2. 选取初始高阈值 $u$。\n3. 对超过 $u$ 的超额值建模。\n4. 按目标风险水平估计最终阈值。\n5. 用人工反馈修正误报和漏报。", "subs": []}, {"title": "广义 Pareto 分布", "content": "超额值 $y=x-u$ 常用广义 Pareto 分布近似：\n\n$$\nG_{\\xi,\\beta}(y)=1-\\left(1+\\frac{\\xi y}{\\beta}\\right)^{-1/\\xi}\n$$\n\n其中：\n\n- $u$ 是初始高阈值。\n- $y$ 是超过阈值的超额值。\n- $\\xi$ 是形状参数。\n- $\\beta$ 是尺度参数。\n\n该公式用于理解 EVT 尾部阈值思想。\n\n具体论文实现、符号和反馈更新应以译文原公式为准。", "subs": ["$u$ 是初始高阈值", "$y$ 是超过阈值的超额值", "$\\xi$ 是形状参数", "$\\beta$ 是尺度参数"]}, {"title": "反馈怎样调整检测器", "content": "反馈可以表示：\n\n- 某次告警是误报。\n- 某段未告警日志实际异常。\n- 某服务进入特殊维护状态。\n- 某个新版本改变正常基线。\n\n反馈不应直接无界修改阈值。\n\n应记录反馈者、事件、版本和生效范围，并在回放集上验证。", "subs": ["某次告警是误报", "某段未告警日志实际异常", "某服务进入特殊维护状态", "某个新版本改变正常基线"]}, {"title": "异常检测指标", "content": "$$\nPrecision=\\frac{TP}{TP+FP}\n$$\n\n$$\nRecall=\\frac{TP}{TP+FN}\n$$\n\n$$\nF1=\\frac{2\\times Precision\\times Recall}{Precision+Recall}\n$$\n\nPrecision 高表示告警中真异常比例高。\n\nRecall 高表示真实异常被发现得多。\n\n运维系统还需关注：\n\n- 每小时误报数。\n- 检测延迟。\n- 事件级 Recall。\n- 连续告警是否合并。\n- 不同服务和故障类型的分层结果。", "subs": ["每小时误报数", "检测延迟", "事件级 Recall", "连续告警是否合并", "不同服务和故障类型的分层结果"]}, {"title": "点级与事件级评价", "content": "一次持续十分钟的异常可能产生六百个异常点。\n\n把每个点都算 TP 会夸大检测价值。\n\n生产评价应定义：\n\n- 一个事件的时间容忍窗口。\n- 多个连续点如何合并。\n- 提前或延迟检测如何计分。\n- 一次事件多次告警是否算重复。", "subs": ["一个事件的时间容忍窗口", "多个连续点如何合并", "提前或延迟检测如何计分", "一次事件多次告警是否算重复"]}, {"title": "解释的证据要求", "content": "一个可用解释应说明：\n\n- 哪些日志或模板异常。\n- 与正常模式差异在哪里。\n- 发生在哪个窗口和对象。\n- 使用了什么规则或历史案例。\n- 结论置信度和限制。\n\n不应把“异常模板包含 connection failed”扩写为“数据库连接池配置错误”。\n\n后者属于需要验证的根因假设。", "subs": ["哪些日志或模板异常", "与正常模式差异在哪里", "发生在哪个窗口和对象", "使用了什么规则或历史案例", "结论置信度和限制"]}, {"title": "异常检测生产管线", "content": "```mermaid\ngraph TD\n    A[Parsed logs] --> B[Windowing]\n    B --> C[Rules and statistical models]\n    B --> D[Semantic retrieval]\n    D --> E[LLM or generated rule]\n    C --> F[Score fusion]\n    E --> F\n    F --> G[Threshold and feedback]\n    G --> H[Anomaly evidence]\n    H --> I[Incident correlation]\n```", "subs": []}, {"title": "本阶段小结", "content": "- 异常检测处理点、上下文和序列偏离。\n- LogGPT 展示 Prompt、窗口和知识注入路线。\n- RAGLog 用历史案例增强语境，但受召回和标签质量限制。\n- CodeAD 把 LLM 能力转成可审查、低延迟的规则代码。\n- EVT 对异常分数尾部建模，反馈需要版本化验证。\n- 检测解释不能越界声称根因。", "subs": ["异常检测处理点、上下文和序列偏离", "LogGPT 展示 Prompt、窗口和知识注入路线", "RAGLog 用历史案例增强语境", "CodeAD 把 LLM 能力转成可审查、低延迟的规则代码", "EVT 对异常分数尾部建模", "检测解释不能越界声称根因"]}]}, {"title": "第四阶段：理解时间序列与告警", "sections": [{"title": "时间序列包含什么结构", "content": "时间序列不仅是一串数值。\n\n它可能包含：\n\n- 趋势。\n- 周期性。\n- 季节性。\n- 突变。\n- 方差变化。\n- 缺失和不规则采样。\n- 多变量相关。\n- 业务日历效应。\n\n把数值直接拼成文本会丢失采样间隔、尺度和统计结构。", "subs": ["趋势", "周期性", "季节性", "突变", "方差变化", "缺失和不规则采样"]}, {"title": "四类不同任务", "content": "| 任务 | 输入 | 输出 |\n|---|---|---|\n| 预测 | 历史窗口 | 未来数值或区间 |\n| 检测 | 历史与当前窗口 | 异常分数或标签 |\n| 规则生成 | 指标语义和历史 | 查询或阈值规则 |\n| 解释 | 异常片段和上下文 | 模式描述与证据 |\n\n论文报告“时间序列能力”时，要先确认属于哪一类。", "subs": []}, {"title": "LLM 时间序列异常检测", "content": "Large Language Models Can Deliver Accurate and Interpretable Time Series Anomaly Detection 研究 LLM 在时间序列检测和解释上的能力。\n\n它的重要启发是把统计信号、任务提示与自然语言解释结合。\n\n但解释应与检测证据绑定。\n\n模型看到一个尖峰，不应凭公共常识编造业务原因。", "subs": []}, {"title": "时间序列转写", "content": "常见表示方式包括：\n\n- 原始数值序列。\n- 归一化或量化 token。\n- 趋势与分段统计摘要。\n- 图像表示。\n- 由工具计算的变化点和周期特征。\n\n没有一种表示对所有指标都最好。\n\n计数器、比率、延迟直方图和容量水位有不同语义。", "subs": ["原始数值序列", "归一化或量化 token", "趋势与分段统计摘要", "图像表示", "由工具计算的变化点和周期特征"]}, {"title": "先用工具提取统计特征", "content": "LLM 更适合消费经过工具计算的明确特征：\n\n```yaml\nmetric: http_error_ratio\nwindow: 10m\nsampling_interval: 15s\nbaseline:\n  median: 0.002\n  mad: 0.0007\nobservation:\n  max: 0.081\n  change_point: 2026-08-03T10:01:45+08:00\nseasonality_adjusted_zscore: 11.3\nmissing_points: 0\n```\n\n这比让模型自行从长数字串估算趋势更可验证。", "subs": []}, {"title": "MonitorAssistant：从自然语言到监控配置", "content": "MonitorAssistant 研究用 LLM 简化云服务监控。\n\n这类系统可帮助工程师表达监控意图、生成查询或规则，并解释配置。\n\n关键风险是自然语言需求存在歧义。\n\n“延迟过高”必须落实为：\n\n- 哪个指标。\n- 哪个分位数。\n- 什么过滤范围。\n- 多长窗口。\n- 什么阈值。\n- 持续多久。\n- 如何处理无数据。", "subs": ["哪个指标", "哪个分位数", "什么过滤范围", "多长窗口", "什么阈值", "持续多久"]}, {"title": "从意图到规则的示例", "content": "自然语言：\n\n```text\n生产 checkout 服务 P95 延迟连续十分钟超过 800ms 时告警。\n```\n\n候选 PromQL：\n\n```promql\nhistogram_quantile(\n  0.95,\n  sum by (le) (\n    rate(http_request_duration_seconds_bucket{\n      env=\"prod\",\n      service=\"checkout\"\n    }[5m])\n  )\n) > 0.8\n```\n\n规则还需设置 `for: 10m`。\n\n上线前必须用历史数据回放，并由工程师确认标签、单位和缺失数据语义。", "subs": []}, {"title": "Argos：自主生成规则的 Agent 路线", "content": "Argos 关注通过 LLM 自主生成时间序列异常检测规则。\n\nAgent 可以迭代：\n\n1. 理解指标语义。\n2. 分析历史数据。\n3. 提出候选规则。\n4. 执行回放。\n5. 读取误报与漏报。\n6. 修订规则。\n7. 输出解释。\n\n“自主”描述的是规则生成工作流。\n\n生产发布仍需要权限、验证和审批。", "subs": []}, {"title": "规则生成闭环", "content": "```mermaid\nsequenceDiagram\n    participant E as Engineer\n    participant A as Rule agent\n    participant T as Time series tool\n    participant V as Validator\n    E->>A: Monitoring intent and constraints\n    A->>T: Query history and metadata\n    T->>A: Series and statistics\n    A->>V: Candidate rule\n    V->>T: Historical replay\n    T->>V: Precision recall delay\n    V->>A: Failures and constraints\n    A->>E: Reviewed candidate and evidence\n```", "subs": []}, {"title": "告警不是异常本身", "content": "从指标到 Incident 至少经过：\n\n```text\nMetric sample\n  -> detector or rule state\n  -> alert instance\n  -> routed notification\n  -> grouped incident candidate\n```\n\n每层都可能改变语义。\n\n例如抑制规则会隐藏某些告警，路由聚合会合并重复通知，Incident 平台又可能按服务归组。\n\n分析时应保留原始查询和规则版本。", "subs": []}, {"title": "告警降噪与分组", "content": "告警降噪包括：\n\n- 去重。\n- 抑制。\n- 静默。\n- 依赖感知屏蔽。\n- 时间聚合。\n- 事件关联。\n\n告警聚合与异常检测有交叉，但目标不同。\n\n异常检测判断信号是否偏离。\n\n告警聚合判断多个告警是否属于同一事件。\n\nKnowledge-aware Alert Aggregation 在方向二详细讨论。", "subs": ["去重", "抑制", "静默", "依赖感知屏蔽", "时间聚合", "事件关联"]}, {"title": "多变量时间序列", "content": "多个指标可能共同表达状态。\n\n例如：\n\n- 请求率下降。\n- 错误率上升。\n- 数据库连接数达到上限。\n- CPU 仍然正常。\n\n多变量检测需要处理不同尺度、采样频率和延迟。\n\n相关性可以帮助发现共同变化，但不证明因果方向。", "subs": ["请求率下降", "错误率上升", "数据库连接数达到上限", "CPU 仍然正常"]}, {"title": "基线漂移", "content": "正常行为会因以下因素变化：\n\n- 流量增长。\n- 业务活动。\n- 节假日。\n- 新版本。\n- 扩缩容。\n- 区域迁移。\n\n固定阈值可能逐渐产生误报。\n\n自适应基线又可能把缓慢恶化吸收为正常。\n\n因此需要回放、变更标注和人工反馈。", "subs": ["流量增长", "业务活动", "节假日", "新版本", "扩缩容", "区域迁移"]}, {"title": "时间序列评价", "content": "除 Precision、Recall、F1 外，还应记录：\n\n- 检测延迟。\n- 每日误报数。\n- 事件覆盖率。\n- 告警持续时间。\n- 首次触发稳定性。\n- 规则变更后的回归结果。\n- 不同季节与流量区间的分层效果。", "subs": ["检测延迟", "每日误报数", "事件覆盖率", "告警持续时间", "首次触发稳定性", "规则变更后的回归结果"]}, {"title": "本阶段小结", "content": "- 时间序列具有趋势、周期和多变量结构。\n- 预测、检测、规则生成与解释是不同任务。\n- LLM 应消费可验证统计特征，而不是凭文本化数字猜测。\n- MonitorAssistant 和 Argos 展示自然语言监控与规则生成路线。\n- 告警是规则输出，不能与原始异常或 Incident 混为一谈。", "subs": ["时间序列具有趋势、周期和多变量结构", "预测、检测、规则生成与解释是不同任务", "LLM 应消费可验证统计特征", "MonitorAssistant 和 Argos 展示自然语言监控与规则生成路线", "告警是规则输出"]}]}, {"title": "第五阶段：构建多信号上下文", "sections": [{"title": "多信号关联的目标", "content": "目标不是把所有数据拼成一个巨大 Prompt。\n\n目标是让每条异常证据能回答：\n\n- 何时发生。\n- 发生在哪个对象。\n- 来自哪种信号。\n- 与哪些请求、服务和变化相关。\n- 是原始观测、规则输出还是模型解释。", "subs": ["何时发生", "发生在哪个对象", "来自哪种信号", "与哪些请求、服务和变化相关", "是原始观测、规则输出还是模型解释"]}, {"title": "常见关联键", "content": "| 关联键 | 连接对象 | 局限 |\n|---|---|---|\n| 时间窗口 | 所有信号 | 同时不等于相关 |\n| service_id | 服务级指标、日志、Trace | 命名需稳定 |\n| resource_id | Pod、主机、数据库 | 资源生命周期短 |\n| trace_id | 请求日志与 spans | 采样和传播可能缺失 |\n| deployment_id | 变更与遥测 | 需要发布平台接入 |\n| topology edge | 上下游信号 | 拓扑可能过期 |\n\n至少使用时间加一个对象键。\n\n只凭时间接近会把并发事件错误合并。", "subs": []}, {"title": "统一时间语义", "content": "每条数据建议保留：\n\n- 原始事件时间。\n- 接收时间。\n- 标准化时区时间。\n- 数据源时钟信息。\n- 采样或聚合窗口。\n\n指标点代表一个采样或聚合区间。\n\n日志通常代表某个离散时刻。\n\nTrace span 代表开始到结束区间。\n\n三者不能只按字符串时间直接等价连接。", "subs": ["原始事件时间", "接收时间", "标准化时区时间", "数据源时钟信息", "采样或聚合窗口"]}, {"title": "统一对象语义", "content": "同一服务可能在不同系统中叫：\n\n- `checkout`。\n- `checkout-api`。\n- `svc-017`。\n- Kubernetes label 中的 `app=checkout-v2`。\n\n应通过服务目录映射到稳定 `service_id`。\n\n映射本身要版本化，因为团队与架构会变化。", "subs": ["checkout", "svc-017", "Kubernetes label 中的 app=checkout"]}, {"title": "从异常到上下文的示例", "content": "```yaml\nsignal_context:\n  window:\n    start: 2026-08-03T10:00:00+08:00\n    end: 2026-08-03T10:10:00+08:00\n  subject:\n    service_id: svc-checkout\n    environment: production\n    region: ap-southeast-1\n  metrics:\n    - name: http_error_ratio\n      anomaly_score: 0.98\n      evidence: query://metrics/abc\n  logs:\n    - template_id: DB_POOL_EXHAUSTED\n      count: 92\n      evidence: query://logs/def\n  traces:\n    - span_service: payment-db\n      error_rate: 0.71\n      evidence: query://traces/ghi\n  changes:\n    - deployment_id: deploy-2191\n      time_relation: 2m_before_anomaly\n  interpretation:\n    status: symptom_candidate\n    root_cause_confirmed: false\n```", "subs": []}, {"title": "从信号解释到定位", "content": "若异常只出现在一个服务，可输出“异常集中于该服务”。\n\n这是一种信号定位。\n\n若 Trace 显示多个上游请求都在同一数据库 span 失败，可输出“失败共同点为数据库调用”。\n\n这仍是候选故障位置。\n\n要确认根因，还需检查数据库状态、配置、变化和干预结果。", "subs": []}, {"title": "不越界的输出语言", "content": "推荐：\n\n```text\n10:02 至 10:10，checkout-api 的错误率异常升高。\n同一窗口内 DB_POOL_EXHAUSTED 模板出现 92 次。\n失败 Trace 的共同 span 为 payment-db。\n10:00 有一次应用发布。\n这些证据支持优先检查应用到数据库的连接路径；尚不能确认发布是根因。\n```\n\n不推荐：\n\n```text\n10:00 的发布导致数据库连接池耗尽，是本次故障根因。\n```\n\n除非已有配置差异、复现、回滚或其他因果验证。", "subs": []}, {"title": "分层处理成本", "content": "生产信号量巨大。\n\n可采用：\n\n1. 规则和统计模型处理全量流。\n2. 缓存处理已知日志模板。\n3. 小模型处理稳定分类任务。\n4. LLM 处理新模板、难例和解释。\n5. 人工处理高影响和低置信度情况。\n\n该层次将昂贵能力集中在信息增益高的样本。", "subs": []}, {"title": "离线与在线的选择", "content": "| 模式 | 适合任务 | 主要要求 |\n|---|---|---|\n| 离线批处理 | 模板盘点、规则回放、模型训练 | 完整性和可重复 |\n| 准实时 | 告警聚合、异常解释 | 分钟级延迟 |\n| 在线流式 | 日志解析、快速检测 | 有界延迟和回退 |\n| 交互式 | 工程师查询与调查 | 权限、引用和可取消 |\n\n不是所有信号理解都需要毫秒级 LLM 响应。", "subs": []}, {"title": "模型和数据版本", "content": "每个输出应能追踪：\n\n- 原始数据时间范围。\n- 预处理版本。\n- 模板缓存版本。\n- 检测器版本。\n- 阈值或规则版本。\n- LLM 与 Prompt 版本。\n- 知识库快照。\n\n否则异常结果变化时无法判断是系统变化还是分析管线变化。", "subs": ["原始数据时间范围", "预处理版本", "模板缓存版本", "检测器版本", "阈值或规则版本", "LLM 与 Prompt 版本"]}, {"title": "隐私与最小化", "content": "在送入模型前：\n\n- 删除凭据。\n- 脱敏个人标识。\n- 截断无关 payload。\n- 按租户隔离。\n- 应用访问控制。\n- 记录数据外发边界。\n\n只发送完成任务所需的最小证据。", "subs": ["删除凭据", "脱敏个人标识", "截断无关 payload", "按租户隔离", "应用访问控制", "记录数据外发边界"]}, {"title": "生产上线检查表", "content": "- [ ] 日志模板和检测规则有版本。\n- [ ] 指标单位与标签语义明确。\n- [ ] Trace 采样率已知。\n- [ ] 时间和服务标识可统一。\n- [ ] 长尾模板有单独评测。\n- [ ] 模板漂移有监控和回退。\n- [ ] 异常检测按事件级评价。\n- [ ] 解释引用具体信号证据。\n- [ ] 输出明确“不等于根因”。\n- [ ] LLM 调用有成本与延迟预算。\n- [ ] 敏感数据在源头脱敏。\n- [ ] 高影响异常有人工升级路径。", "subs": ["[ ] 日志模板和检测规则有版本", "[ ] 指标单位与标签语义明确", "[ ] Trace 采样率已知", "[ ] 时间和服务标识可统一", "[ ] 长尾模板有单独评测", "[ ] 模板漂移有监控和回退"]}, {"title": "本阶段小结", "content": "- 多信号关联至少需要时间和稳定对象键。\n- 指标、日志和 Trace 有不同时间语义。\n- 异常共同点可以支持定位，但不能自动确认根因。\n- 分层管线能平衡吞吐、成本和语义能力。\n- 版本、隐私和回退是生产可观测性智能的一部分。", "subs": ["多信号关联至少需要时间和稳定对象键", "指标、日志和 Trace 有不同时间语义", "异常共同点可以支持定位", "分层管线能平衡吞吐、成本和语义能力", "版本、隐私和回退是生产可观测性智能的一部分"]}]}, {"title": "工程补充：Metrics、Traces 与信号健康", "sections": [{"title": "资料边界先行", "content": "本方向 24 篇主方向译文主要覆盖日志解析、日志异常检测、日志生成，以及少量时间序列异常与监控规则生成。下面关于 Metrics、Traces、采样、SLI/SLO 和监控控制面的内容是为了补齐生产可观测性链路的工程性综合，不是这些论文共同报告的实验结论。", "subs": []}, {"title": "Counter、Gauge 与 Histogram 不能混用", "content": "| 类型 | 语义 | 正确问题 | 常见错误 |\n|---|---|---|---|\n| Counter | 只增或重置的累计量 | 一段时间发生多少次 | 直接比较两个实例的累计值 |\n| Gauge | 可升可降的当前值 | 当前队列或温度是多少 | 对瞬时值盲目求 rate |\n| Histogram | 按桶累计的分布 | 延迟分布与分位数怎样 | 先算实例分位数再平均 |\n\nCounter 通常先对每条时间序列求 `rate`，再按所需维度聚合：\n\n```promql\nsum by (service) (\n  rate(http_requests_total{status=~\"5..\"}[5m])\n)\n/\nsum by (service) (\n  rate(http_requests_total[5m])\n)\n```\n\n应先求每条 Counter 的 `rate` 再 `sum`，以正确处理各实例独立重置。若先聚合原始 Counter，实例重启可能被其他实例增长掩盖。", "subs": []}, {"title": "Histogram、分位数与聚合顺序", "content": "经典 Histogram 保存累计桶、总和与计数。跨实例计算 P99 时，应先按 `le` 和目标维度聚合桶的速率，再求分位数：\n\n```promql\nhistogram_quantile(\n  0.99,\n  sum by (le, service) (\n    rate(http_request_duration_seconds_bucket[5m])\n  )\n)\n```\n\n实例 P99 的平均值不等于全局 P99。分位数也不能告诉你尾部中每个请求的具体值；桶边界过粗会限制精度。", "subs": []}, {"title": "标签基数和缺失数据是语义问题", "content": "把 `user_id`、`request_id` 或完整 URL 放入指标标签，会制造高基数并推高采集、存储和查询成本。高基数字段更适合进入日志或 Trace，通过 exemplar 或稳定关联键连接。\n\n“没有样本”至少有四种含义：没有流量、目标未发现、采集失败、查询标签不匹配。检测器不能把它们统一补成 0。建议同时携带：\n\n- `sample_present` 或目标存活信号。\n- scrape 成功率和最后成功时间。\n- 数据新鲜度与预期采样间隔。\n- 缺失原因与补值策略。", "subs": ["sample_present 或目标存活信号", "scrape 成功率和最后成功时间", "数据新鲜度与预期采样间隔", "缺失原因与补值策略"]}, {"title": "Recording Rule 与 SLI/SLO", "content": "Recording Rule 用预计算降低重复查询成本并固定团队语义，但规则错误会把同一偏差传播给告警、Dashboard 和 Agent。每条规则应有 owner、版本、单元测试和回放样本。\n\n以请求成功率为 SLI，窗口内错误预算消耗可抽象为：\n\n$$\n\\text{BurnRate}=\\frac{\\text{observed error ratio}}{1-\\text{SLO target}}\n$$\n\nAgent 解释告警时应引用 SLI 的定义、窗口和 SLO 目标，不能只看到指标名就推断业务影响。多窗口燃尽率比单一瞬时阈值更能区分短促尖峰与持续风险。", "subs": []}, {"title": "Span、Span Link 与异步边界", "content": "Trace 由多个 Span 组成。父子关系通常表示同步调用或嵌套工作；异步消息、批处理和 fan-in 可能无法用单一父节点表达，应使用 Span Link 关联因果相关但不属于同一树枝的工作。\n\n```mermaid\ngraph LR\n    A[HTTP server span] --> B[Publish span]\n    B -. Span Link .-> C[Consumer span]\n    C --> D[Database span]\n    C --> E[Downstream API span]\n```\n\n上图是工程性综合。\n\n上下文传播若在代理、消息头、线程池或跨语言 SDK 处断裂，会产生孤立 Span。模型看到孤立慢 Span 时，不能默认它是根因或属于当前事件。", "subs": []}, {"title": "时钟偏差、断链和采样", "content": "| 问题 | 表现 | 诊断要求 |\n|---|---|---|\n| 时钟偏差 | 子 Span 看似早于父 Span | 记录时钟同步状态并容忍小范围偏差 |\n| 上下文断链 | 同一请求被拆成多个 Trace | 使用稳定业务键和 Span Link 补充 |\n| Head Sampling | 请求开始时决定是否采样 | 成本可控但可能丢失事后异常 |\n| Tail Sampling | 收齐部分或全部 Trace 后决定 | 可保留错误慢请求但增加缓冲与延迟 |\n\n采样率变化会改变错误 Trace 的可见性。比较两个时间窗前必须确认采样策略、Collector 版本和丢弃统计一致。", "subs": []}, {"title": "多信号融合先对齐再推理", "content": "融合记录建议至少包含：\n\n| 字段 | 含义 |\n|---|---|\n| `event_time` | 信号实际发生时间 |\n| `ingest_time` | 平台收到时间 |\n| `window` | 聚合窗口或 Trace 生命周期 |\n| `entity` | 服务、实例、资源或请求 |\n| `sampling` | 采样策略与比例 |\n| `freshness` | 当前时间减最新事件时间 |\n| `provenance` | Collector、规则、查询和版本 |\n| `quality_state` | 完整、缺失、截断、延迟或冲突 |\n\n不同采样粒度不能靠字符串拼接融合。分钟级指标、单请求 Trace 和异步日志要先映射到共同时间区间与对象层级，同时保留原始粒度。", "subs": []}, {"title": "缺失、冲突与重复证据", "content": "- 缺失模态：没有 Trace 时继续使用指标和日志，但降低可回答范围，而不是生成虚构链路。\n- 冲突证据：指标显示恢复而用户探针仍失败，应保留两个来源并调查覆盖范围。\n- 重复证据：同一 OpenTelemetry 事件经日志和 Trace 导出，不应当成两份独立支持。\n- 新鲜度：旧拓扑或延迟日志只能支持历史状态，不能证明当前状态。\n- provenance：每个摘要句应能回到查询、规则、窗口和原始快照。\n\n```mermaid\ngraph TD\n    M[Metrics evidence] --> N[Normalize time and entity]\n    L[Log evidence] --> N\n    T[Trace evidence] --> N\n    C[Change evidence] --> N\n    N --> D[Deduplicate by provenance]\n    D --> Q[Quality and freshness checks]\n    Q --> F[Fused incident context]\n    F --> R[RCA candidate generation]\n```\n\n上图是工程性综合。", "subs": ["缺失模态：没有 Trace 时继续使用指标和日志，但降低可回答范围，而不是生成虚构链", "冲突证据：指标显示恢复而用户探针仍失败，应保留两个来源并调查覆盖范围", "重复证据：同一 OpenTelemetry 事件经日志和 Trace 导出，不应当成", "新鲜度：旧拓扑或延迟日志只能支持历史状态，不能证明当前状态", "provenance"]}, {"title": "监控系统也必须被监控", "content": "当遥测管线失效时，业务“看起来正常”可能只是失明。至少监控：\n\n- 目标发现和采集成功率、采集延迟、样本乱序与丢样。\n- Collector 或 Agent 队列积压、丢弃、重试和导出失败。\n- Recording Rule 评估失败、耗时和最后成功时间。\n- 告警规则状态、通知队列、通知失败和静默配置变化。\n- 查询错误率、延迟、超时、并发和缓存命中。\n- 日志解析失败率、Trace 断链率和 Tail Sampling 缓冲压力。\n\n这些健康信号应进入 Incident Context。若监控控制面不健康，异常检测结果必须标记 `observability_degraded`。", "subs": ["目标发现和采集成功率、采集延迟、样本乱序与丢样", "Collector 或 Agent 队列积压、丢弃、重试和导出失败", "Recording Rule 评估失败、耗时和最后成功时间", "告警规则状态、通知队列、通知失败和静默配置变化", "查询错误率、延迟、超时、并发和缓存命中", "日志解析失败率、Trace 断链率和 Tail Sampling 缓冲压力"]}, {"title": "漂移和反馈污染的治理闭环", "content": "异常检测漂移可能来自业务季节性、发布、日志模板变化、采样策略变化、标签重命名或检测器更新。人工反馈也可能被误标、延迟确认或被模型建议锚定。\n\n推荐闭环：\n\n1. 冻结旧版本并对历史事件离线回放。\n2. 新旧检测器同时影子运行，比较事件级召回、误报、检测时延和切片结果。\n3. 反馈进入隔离区，由 owner 区分真异常、重复告警、数据缺失和规则问题。\n4. 只用已确认样本更新阈值或模型，并记录数据版本。\n5. 小流量灰度，监控告警量、零结果、缺失模态和人工覆盖。\n6. 超过误报、漏报或时延阈值时回滚检测器、规则和关联配置的兼容版本。\n\n阈值回滚必须恢复与之匹配的特征、窗口和基线；只把数值改回去而保留新特征定义，不能保证恢复旧行为。", "subs": []}]}, {"title": "论文阅读路线", "sections": [{"title": "第一步：建立日志解析共同语言", "content": "1. [日志解析技术的大规模评估](https://arxiv.org/pdf/2308.10828)：先掌握数据集、GA、PA、FGA 和 FTA。\n2. [LLMParser](https://arxiv.org/pdf/2404.18001)：理解直接使用和适配 LLM 的基础路线。\n3. [日志解析：ChatGPT 能走多远](https://arxiv.org/pdf/2306.01590.pdf)：补充闭源模型探索视角。", "subs": []}, {"title": "第二步：比较 ICL 与自适应方法", "content": "1. [DivLog](https://arxiv.org/pdf/2307.09950.pdf)：示例选择与 ICL。\n2. [LEMUR](https://arxiv.org/pdf/2402.18205.pdf)：熵采样与推理合并。\n3. [AdaParser](https://arxiv.org/pdf/2406.03376)：自生成示例与自纠正。\n4. [MicLog](https://ojs.aaai.org/index.php/AAAI/article/view/37123)：渐进式元上下文与多级缓存。", "subs": []}, {"title": "第三步：研究效率与部署", "content": "1. [HELP](https://arxiv.org/pdf/2402.18205.pdf)：分层嵌入、上下文解析和再平衡。\n2. [LILAC](https://arxiv.org/pdf/2310.01796.pdf)：自适应解析缓存。\n3. [LUNAR](https://arxiv.org/pdf/2406.07174)：无监督分片与对比单元。\n4. [LibreLog](https://www.arxiv.org/pdf/2408.01585)：开源模型与无监督解析。\n5. [更强、更省且免示例](https://arxiv.org/pdf/2406.06156)：免演示路线。\n6. [可解释在线日志分析](https://arxiv.org/pdf/2308.07610.pdf)：在线与解释约束。", "subs": []}, {"title": "第四步：进入日志异常检测", "content": "1. [LogGPT](https://arxiv.org/pdf/2309.01189.pdf)：Prompt、窗口与解释。\n2. [RAGLog](https://arxiv.org/pdf/2311.05261.pdf)：历史案例检索。\n3. [CodeAD](https://arxiv.org/pdf/2510.22986)：规则代码合成。\n4. [LLM Meets ML](https://arxiv.org/pdf/2406.07467)：不稳定日志与集成。\n5. [基于 EVT 与反馈的日志异常检测](https://arxiv.org/pdf/2306.05032.pdf)：尾部阈值与反馈。", "subs": []}, {"title": "第五步：补齐信号生成与时间序列", "content": "1. [自动日志生成实证研究](https://arxiv.org/pdf/2307.05950.pdf)。\n2. [FastLog](https://arxiv.org/pdf/2311.02862)。\n3. [Go Static](https://arxiv.org/pdf/2402.12958.pdf)。\n4. [LLM 时间序列异常检测](https://arxiv.org/pdf/2405.15370v1)。\n5. [MonitorAssistant](https://netman.aiops.org/wp-content/uploads/2024/07/MonitorAssistant_CameraReady-v1.5_submitted.pdf)。\n6. [Argos](https://arxiv.org/pdf/2501.14170)。", "subs": []}, {"title": "代表性方法对比", "content": "| 方法 | 任务 | 主要机制 | 生产关注点 |\n|---|---|---|---|\n| LLMParser | 日志解析 | LLM 适配与提示 | 训练与推理成本 |\n| DivLog | 日志解析 | 多样化 ICL 示例 | 示例质量和 token |\n| AdaParser | 日志解析 | 自生成与自纠正 | 错误自增强 |\n| LILAC | 日志解析 | 自适应缓存 | 缓存误命中和漂移 |\n| LibreLog | 日志解析 | 开源无监督 LLM | 本地资源与版本治理 |\n| LogGPT | 异常检测 | Prompt 与窗口 | 窗口、稳定性和解释 |\n| RAGLog | 异常检测 | 历史案例检索 | 版本过滤和标签质量 |\n| CodeAD | 异常检测 | 合成规则代码 | 沙箱、测试和发布 |\n| EVT with Feedback | 异常检测 | 尾部建模与反馈 | 阈值漂移和审核 |\n| Argos | 时间序列检测 | Agent 生成规则 | 回放、权限和审批 |", "subs": []}]}, {"title": "本方向总结", "sections": [{"title": "最值得记住的结论", "content": "1. 可观测性智能从信号质量开始，而不是从 Prompt 开始。\n2. 日志解析、异常检测、故障定位和 RCA 是四种不同任务。\n3. 日志解析必须同时看消息级和模板级指标，避免高频模板掩盖长尾失败。\n4. LLM 解析的生产路线依赖示例选择、缓存、分层处理、开源部署和漂移治理。\n5. 异常检测可以结合语义、RAG、规则代码、统计模型和反馈。\n6. 时间序列规则需要明确指标语义、窗口、阈值、持续时间和缺失数据处理。\n7. 多信号上下文的输出是结构化异常证据和候选位置，不是未经验证的根因。", "subs": []}, {"title": "推荐学习顺序", "content": "1. 先审查一个服务的遥测质量。\n2. 再用 Loghub-2.0 论文掌握解析指标。\n3. 比较直接 LLM、ICL、自纠正、缓存与开源解析路线。\n4. 进入日志异常检测，掌握窗口和事件级评价。\n5. 学习时间序列规则生成和回放。\n6. 最后构建多信号上下文，为方向四 RCA 做准备。", "subs": []}]}, {"title": "来源索引", "sections": [{"title": "时间序列与监控", "content": "- [MonitorAssistant](https://netman.aiops.org/wp-content/uploads/2024/07/MonitorAssistant_CameraReady-v1.5_submitted.pdf)\n- [LLM 时间序列异常检测](https://arxiv.org/pdf/2405.15370v1)\n- [Argos](https://arxiv.org/pdf/2501.14170)", "subs": ["MonitorAssistant", "LLM 时间序列异常检测", "Argos"]}, {"title": "日志解析", "content": "- [LLMParser](https://arxiv.org/pdf/2404.18001)\n- [DivLog](https://arxiv.org/pdf/2307.09950.pdf)\n- [大规模日志解析评估](https://arxiv.org/pdf/2308.10828)\n- [LEMUR](https://arxiv.org/pdf/2402.18205.pdf)\n- [可解释在线日志分析](https://arxiv.org/pdf/2308.07610.pdf)\n- [LILAC](https://arxiv.org/pdf/2310.01796.pdf)\n- [LUNAR](https://arxiv.org/pdf/2406.07174)\n- [MicLog](https://ojs.aaai.org/index.php/AAAI/article/view/37123)\n- [AdaParser](https://arxiv.org/pdf/2406.03376)\n- [HELP](https://arxiv.org/pdf/2402.18205.pdf)\n- [更强、更省且免示例](https://arxiv.org/pdf/2406.06156)\n- [日志解析：ChatGPT 能走多远](https://arxiv.org/pdf/2306.01590.pdf)\n- [LibreLog](https://www.arxiv.org/pdf/2408.01585)", "subs": ["LLMParser", "DivLog", "大规模日志解析评估", "LEMUR", "可解释在线日志分析", "LILAC"]}, {"title": "日志异常检测", "content": "- [CodeAD](https://arxiv.org/pdf/2510.22986)\n- [LLM Meets ML](https://arxiv.org/pdf/2406.07467)\n- [基于 EVT 与反馈的日志异常检测](https://arxiv.org/pdf/2306.05032.pdf)\n- [LogGPT](https://arxiv.org/pdf/2309.01189.pdf)\n- [RAGLog](https://arxiv.org/pdf/2311.05261.pdf)", "subs": ["CodeAD", "LLM Meets ML", "基于 EVT 与反馈的日志异常检测", "LogGPT", "RAGLog"]}, {"title": "日志生成", "content": "- [自动日志生成实证研究](https://arxiv.org/pdf/2307.05950.pdf)\n- [FastLog](https://arxiv.org/pdf/2311.02862)\n- [Go Static](https://arxiv.org/pdf/2402.12958.pdf)", "subs": ["自动日志生成实证研究", "FastLog", "Go Static"]}, {"title": "资料与结论边界", "content": "论文方法、指标定义和研究观察以链接译文为依据。\n\n信号处理主链、生产管线、上下文示例、检查表和部分公式说明是本路线图为教学目的做的编辑性综合。\n\nMermaid 图不冒充论文原图。\n\n不同论文的数据规模、预处理、模型、Prompt、指标和硬件条件不同。\n\n本笔记不直接横向比较不同实验中的绝对结果。\n\n方向二的告警聚合只用于解释信号到事件的过渡。\n\n真实故障定位、因果验证和 RCA 方法留在方向四。", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
