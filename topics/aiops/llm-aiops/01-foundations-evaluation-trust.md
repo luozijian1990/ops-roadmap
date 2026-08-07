@@ -534,7 +534,7 @@ $$
 实践中通常把概率区间分桶，并用 Expected Calibration Error（ECE）量化预测置信度与实际正确率的差异：
 
 $$
-\mathrm{ECE}=\sum_{m=1}^{M}\frac{|B_m|}{n}\left|\operatorname{acc}(B_m)-\operatorname{conf}(B_m)\right|.
+\mathrm{ECE}=\sum_{m=1}^{M}\frac{|B_m|}{n}\left|\mathrm{acc}(B_m)-\mathrm{conf}(B_m)\right|.
 \tag{6}
 $$
 
@@ -1207,7 +1207,7 @@ $$
 
 $$
 k=\max(k')\quad\text{s.t.}\quad
-\operatorname{len}([h^{[1]},\ldots,h^{[k']}])\le L.
+\mathrm{len}([h^{[1]},\ldots,h^{[k']}])\le L.
 \tag{9}
 $$
 
