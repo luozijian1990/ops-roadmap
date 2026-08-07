@@ -402,12 +402,12 @@ $$
 证据分支通过相关文档检索和 ROUGE Recall 衡量回答与参考文档的重合：
 
 $$
-\mathrm{Evidence}=\mathrm{ROUGE}_{\mathrm{Recall}}(R,D)
-=\frac{\\#\mathrm{Overlapping\ Words}}{\\#\mathrm{Words\ in}\ D}
+\mathrm{Evidence}
+=\frac{\mathrm{overlap}(R,D)}{\mathrm{words}(D)}
 \tag{4}
 $$
 
-$R$ 是模型生成的回答，$D$ 是检索到的相关文档。这个分数只能说明回答覆盖了参考文档中的多少内容，不能证明检索文档本身正确，也不能证明回答没有遗漏关键风险。
+$R$ 是模型生成的回答，$D$ 是检索到的相关文档；$\mathrm{overlap}(R,D)$ 是二者的重合词数，$\mathrm{words}(D)$ 是文档总词数。这个比值对应 ROUGE Recall。它只能说明回答覆盖了参考文档中的多少内容，不能证明检索文档本身正确，也不能证明回答没有遗漏关键风险。
 
 #### 如何解读 FAE-Score
 
@@ -522,14 +522,14 @@ sequenceDiagram
 
 ### 置信度校准
 
-LM-PACE 将置信度理解为“预测正确的概率”，而不是模型表达得有多自信。对输入 $X_i$ 和预测 $\hat{y}_i$，校准要求：
+LM-PACE 将置信度理解为“预测正确的概率”，而不是模型表达得有多自信。把预测置信度为 $p$ 的样本集合记为 $B(p)$，理想校准要求：
 
 $$
-\Pr(l_i\mid \tilde{P}_i=p)=p,\quad \forall p\in[0,1].
+\mathrm{acc}(B(p))=p,\quad p\in[0,1].
 \tag{5}
 $$
 
-$l_i$ 表示第 $i$ 个预测正确这一事件，$\tilde{P}_i$ 是模型给出的置信度。直观上，所有置信度约为 $0.7$ 的样本，长期来看约有 70% 应该正确。
+$\mathrm{acc}(B(p))$ 是这组样本的实际正确率。直观上，所有置信度约为 $0.7$ 的样本，长期来看约有 70% 应该正确。
 
 实践中通常把概率区间分桶，并用 Expected Calibration Error（ECE）量化预测置信度与实际正确率的差异：
 
