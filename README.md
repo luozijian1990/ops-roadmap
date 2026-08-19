@@ -51,7 +51,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 54 份标准路线图和 Kubernetes 完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 55 份标准路线图和 Kubernetes 完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
