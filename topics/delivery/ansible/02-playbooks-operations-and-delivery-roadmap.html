@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Ansible 学习笔记 · 第二册：Playbook、运维控制与持续交付 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ansible 学习笔记 · 第二册：Playbook、运维控制与持续交付</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Ansible 学习笔记 · 第二册：Playbook、运维控制与持续交付", "intro": "> **适用对象**：已经掌握 Inventory、Patterns、Ad-Hoc 命令与模块基础的运维工程师、SRE 和平台工程师<br>\n> **学习目标**：把一次性命令沉淀为可复用、可审查、可预演并能够安全滚动执行的自动化工程<br>\n> **版本说明**：原始课程来自 Ansible 1.x 文档。本册按 2026-08-19 的 Ansible 官方文档更新语法和实践，保留旧机制仅用于解释历史演进。", "parts": [{"title": "第四章 · 编写具备控制逻辑的 Playbook", "sections": [{"title": "从 Play 和 Task 理解 Playbook 的执行模型", "content": "<!-- src: f308346b55708758/Playbooks-介绍.md -->\n\nPlaybook 是 YAML 编写的自动化执行说明。一个 Playbook 包含一个或多个 Play；每个 Play 把一组主机映射到一组有序 Task；Task 调用模块描述目标状态；Handler 只在收到变更通知时执行。\n\n```mermaid\ngraph TD\n    B[Playbook] --> P1[Play webservers]\n    B --> P2[Play dbservers]\n    P1 --> T1[Task install package]\n    P1 --> T2[Task render config]\n    T2 --> H[Handler restart service]\n    P2 --> T3[Task migrate database]\n```\n\n#### 一个现代化的最小 Playbook\n\n```yaml\n---\n- name: 配置 Web 服务\n  hosts: webservers\n  become: true\n  gather_facts: true\n\n  vars:\n    web_package: nginx\n    web_service: nginx\n\n  tasks:\n    - name: 确保软件包已安装\n      ansible.builtin.package:\n        name: \"{{ web_package }}\"\n        state: present\n\n    - name: 写入站点配置\n      ansible.builtin.template:\n        src: templates/site.conf.j2\n        dest: /etc/nginx/conf.d/site.conf\n        owner: root\n        group: root\n        mode: '0644'\n        validate: 'nginx -t -c %s'\n      notify: 重载 Web 服务\n\n    - name: 确保服务已启动\n      ansible.builtin.service:\n        name: \"{{ web_service }}\"\n        state: started\n        enabled: true\n\n  handlers:\n    - name: 重载 Web 服务\n      ansible.builtin.service:\n        name: \"{{ web_service }}\"\n        state: reloaded\n```\n\n现代写法使用 `become` 替代旧课程中的 `sudo`，使用 FQCN 明确模块来源，并用 YAML 映射传参，避免难读的 `key=value` 长行。\n\n#### Task 如何跨主机推进\n\n在线性策略下，Ansible 通常先让当前批次的所有活跃主机完成同一个 Task，再进入下一个 Task。某台主机失败后，它通常退出该 Play 后续 Task，而其他主机继续运行。\n\n```mermaid\nsequenceDiagram\n    participant C as Controller\n    participant W1 as web01\n    participant W2 as web02\n    C->>W1: Task 1\n    C->>W2: Task 1\n    W1-->>C: ok\n    W2-->>C: changed\n    C->>W1: Task 2\n    C->>W2: Task 2\n```\n\n执行前先做静态和目标检查：\n\n```bash\nansible-playbook -i inventories/staging site.yml --syntax-check\nansible-playbook -i inventories/staging site.yml --list-hosts\nansible-playbook -i inventories/staging site.yml --list-tasks\n```\n\n执行时从小范围开始：\n\n```bash\nansible-playbook -i inventories/staging site.yml --limit web01 --diff\n```\n\n#### Handler 把“发生变化”转换成后续动作\n\n只有通知它的 Task 返回 `changed: true` 时，Handler 才会进入待执行队列。同一 Handler 被多次通知通常也只执行一次，并在 Play 的既定刷新点运行。\n\n```yaml\n- name: 更新应用配置\n  ansible.builtin.template:\n    src: app.conf.j2\n    dest: /etc/example/app.conf\n    mode: '0644'\n  notify: 重启应用\n\n- name: 立即执行已通知的 Handler\n  ansible.builtin.meta: flush_handlers\n```\n\n`flush_handlers` 会改变正常时序，只应在后续 Task 确实依赖重启结果时使用。Handler 名称在 Play 范围内应保持唯一且表达动作。\n\n#### 幂等性需要设计和验证\n\n声明式模块通常能判断目标是否已经满足，但 `command`、`shell` 和外部 API 不会自动幂等。可以用模块自身参数或结果判断补足：\n\n```yaml\n- name: 只在数据库尚未初始化时执行命令\n  ansible.builtin.command:\n    cmd: /opt/app/bin/init-db\n    creates: /var/lib/app/.initialized\n```\n\n第二次执行 Playbook 时，大部分 Task 应返回 `ok` 而不是 `changed`。持续出现无意义变更会触发 Handler、制造噪声并掩盖真实漂移。\n\n#### 理解 `ansible-pull` 的反向执行模式\n\n常规 Ansible 从控制节点向受管主机推送任务；`ansible-pull` 则在受管主机上定时拉取 Git 仓库并本地执行 Playbook：\n\n```bash\nansible-pull -U https://git.example/infra/node-config.git \\\n  -C v1.4.2 \\\n  -i localhost, \\\n  -c local \\\n  local.yml\n```\n\n这种模式适合难以被中心控制节点主动连接、数量很大的终端或边缘节点，但会把调度、凭据、日志和失败重试责任分散到每台主机。生产使用时要固定经过审核的提交或标签，验证仓库身份，避免多个定时任务并发运行，并把执行结果集中上报。它不是规避 Inventory、审批和审计的捷径。\n\n官方入口见 [Playbook 指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/index.html)。", "subs": ["一个现代化的最小 Playbook", "Task 如何跨主机推进", "Handler 把“发生变化”转换成后续动作", "幂等性需要设计和验证", "理解 ansible"]}, {"title": "用变量适配不同主机与运行环境", "content": "<!-- src: f308346b55708758/Variables.md -->\n\n变量让同一套自动化适配环境、区域、角色和主机差异。变量应描述数据，不应变成隐藏控制流；同一个变量尽量只在一个清晰位置定义。\n\n#### 使用可读的数据结构\n\n```yaml\napp:\n  name: example-api\n  listen_port: 8080\n  features:\n    metrics: true\n    tracing: false\n  upstreams:\n    - api-a.internal\n    - api-b.internal\n```\n\n```jinja2\nserver {\n    listen {{ app.listen_port }};\n{% for upstream in app.upstreams %}\n    # upstream {{ loop.index }}: {{ upstream }}\n{% endfor %}\n}\n```\n\n引用以 Jinja 表达式开头的 YAML 值时必须加引号：\n\n```yaml\ninstall_path: \"{{ base_path }}/releases/{{ release_id }}\"\n```\n\n#### 按“谁应该覆盖它”选择定义位置\n\n| 数据类型 | 建议位置 | 原因 |\n| --- | --- | --- |\n| Role 的安全默认值 | `roles/<role>/defaults/main.yml` | 易被 Inventory 或调用方覆盖 |\n| 环境或地域差异 | `group_vars/` | 与主机分组一致 |\n| 单机例外 | `host_vars/` | 范围明确但应尽量少 |\n| Play 临时参数 | Play 的 `vars` 或 `vars_files` | 生命周期局限于 Play |\n| Task 运行结果 | `register` | 只在本次运行内有效 |\n| 强制运行参数 | `--extra-vars` | 优先级最高，应谨慎使用 |\n| 秘密 | Vault 或外部秘密系统 | 避免明文进入仓库和日志 |\n\n变量优先级规则很长。工程上更重要的原则是减少同名多处定义，而不是依靠背诵优先级解决覆盖冲突。需要查询时以 [官方变量优先级](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_variables.html) 为准。\n\n#### Facts、注册变量和魔法变量\n\n```yaml\n- name: 根据系统家族选择软件包\n  ansible.builtin.debug:\n    msg: \"OS={{ ansible_facts['os_family'] }} host={{ inventory_hostname }}\"\n\n- name: 查询当前应用版本\n  ansible.builtin.command: /opt/app/bin/version\n  register: app_version_result\n  changed_when: false\n\n- name: 展示版本\n  ansible.builtin.debug:\n    var: app_version_result.stdout\n```\n\n- Facts 来自受管主机，可关闭 `gather_facts` 以减少不需要的开销；\n- 注册变量是当前主机、本次运行的内存数据，不会自动跨运行持久化；\n- `inventory_hostname`、`groups`、`hostvars`、`group_names` 等魔法变量由 Ansible 提供；\n- 长时间 Playbook 中的 `ansible_date_time` 可能已经过时，不能当实时钟使用；\n- 读取其他主机的 `hostvars` 前，要确保相应 Facts 或变量已经存在。\n\n#### 本地 Facts 与缓存\n\nLinux 主机可在 `facts.d` 中提供自定义本地 Facts；事实缓存则能让后续 Play 或运行复用已收集信息。两者都需要有效期和数据所有权设计，不能替代 CMDB。\n\n静态本地 Fact 文件必须以 `.fact` 结尾。INI、JSON 或能输出 JSON 的可执行脚本都可以作为来源。下面把应用归属信息放进受管节点：\n\n```ini\n# /etc/ansible/facts.d/application.fact\n[general]\nowner=payments\ndeployment_ring=stable\n```\n\n```bash\nansible webservers -m ansible.builtin.setup -a 'filter=ansible_local'\n```\n\n```yaml\n- name: 展示本地应用归属\n  ansible.builtin.debug:\n    msg: >-\n      owner={{ ansible_local['application']['general']['owner'] }}\n      ring={{ ansible_local['application']['general']['deployment_ring'] }}\n```\n\nINI 键会被转成小写。若 Playbook 刚创建 `.fact` 文件，需要再次运行 `setup` 才能在同一个 Play 里读取；可执行 Fact 必须由连接用户执行，并且其标准输出必须是合法 JSON，因此还要评估执行成本和安全性。\n\n默认 `memory` 缓存只在当前 Playbook 运行期间有效。需要跨运行复用时可显式选择 cache plugin 和 TTL：\n\n```ini\n[defaults]\ngathering = smart\nfact_caching = jsonfile\nfact_caching_connection = ./.cache/ansible-facts\nfact_caching_timeout = 3600\n```\n\n本地 `jsonfile` 适合单控制节点实验；多控制节点应选择支持并发的共享后端，并设置访问控制。缓存能够减少大规模环境的 Facts 收集开销，也能让未包含在当前 Play 的主机 Facts 供 `hostvars` 读取，但 TTL 内的数据可能已经过时。网络地址、容量和发布状态等高风险决策不能盲信陈旧缓存。\n\n```yaml\n- name: 只收集网络相关 Facts\n  ansible.builtin.setup:\n    gather_subset:\n      - '!all'\n      - network\n```\n\n#### 使用 `hostvars`、`groups` 与 `group_names` 组织跨主机数据\n\n`groups` 将组名映射为 Inventory 主机名列表；`hostvars` 按主机名访问其 Inventory 变量、已收集 Facts 和注册变量；`group_names` 表示当前主机所属组。一个常见用途是为负载均衡器生成后端列表：\n\n```jinja2\n{% for host in groups.get('app_servers', []) %}\nserver {{ host }} {{ hostvars[host].ansible_host | default(host) }}:{{ app_port }};\n{% endfor %}\n```\n\n```yaml\n- name: 标识当前主机是否属于灰度组\n  ansible.builtin.set_fact:\n    is_canary: \"{{ 'canary' in group_names }}\"\n```\n\n如果模板需要其他主机的 `ansible_facts`，必须先在那些主机上收集 Facts，或启用仍在有效期内的事实缓存。对可选层级使用 `default`、`get` 或先做 `is defined` 判断，避免某台主机缺少字段导致整个批次失败。\n\n#### 从文件和命令行载入运行参数\n\nPlay 级 `vars_files` 适合载入经版本控制的环境数据：\n\n```yaml\n- name: 发布应用\n  hosts: app_servers\n  vars_files:\n    - vars/common.yml\n    - \"vars/{{ deployment_environment }}.yml\"\n  tasks:\n    - name: 验证发布输入\n      ansible.builtin.assert:\n        that:\n          - release_version is defined\n          - deployment_environment in ['staging', 'production']\n```\n\n大量运行参数可以从 YAML 或 JSON 文件传给额外变量：\n\n```bash\nansible-playbook release.yml -e @release-input.yml\n```\n\n额外变量优先级很高，适合 CI 注入不可变发布版本和工单号，不适合绕过 Inventory 或 Role 默认值随意修补配置。提交前检查输入文件是否含秘密。\n\n常用 Jinja filter 用于把数据整理成模块需要的形状：\n\n```yaml\n- name: 规范化输入\n  ansible.builtin.set_fact:\n    normalized_ports: \"{{ app.ports | default([]) | map('int') | unique | sort | list }}\"\n    feature_items: \"{{ app.features | default({}) | dict2items }}\"\n\n- name: 读取可选的嵌套字段\n  ansible.builtin.debug:\n    msg: \"{{ app.logging.level | default('info', true) }}\"\n```\n\nFilter 改变数据，不应隐藏复杂业务决策。表达式需要连续套用很多 filter 时，先用命名变量或 Task 分步转换，便于调试类型和空值。\n\n#### 变量调试避免泄密\n\n```yaml\n- name: 验证必须变量存在\n  ansible.builtin.assert:\n    that:\n      - app.listen_port is defined\n      - app.listen_port | int > 0\n    fail_msg: app.listen_port 必须是正整数\n```\n\n不要对整个 `hostvars` 做无差别 debug。输出结构化变量前先确认其中没有密码、Token、证书私钥或个人信息。", "subs": ["使用可读的数据结构", "按“谁应该覆盖它”选择定义位置", "Facts、注册变量和魔法变量", "本地 Facts 与缓存", "使用 hostvars、groups 与 group_names 组织跨主机数据", "从文件和命令行载入运行参数", "变量调试避免泄密"]}, {"title": "用条件判断控制任务是否执行", "content": "<!-- src: f308346b55708758/条件选择.md -->\n\n`when` 在每台主机上独立求值，不需要 Jinja 双花括号。条件应使用明确的布尔值、类型转换和 `is defined` 检查。\n\n```yaml\n- name: 只在 Debian 系安装 Nginx\n  ansible.builtin.apt:\n    name: nginx\n    state: present\n    update_cache: true\n  when:\n    - ansible_facts['os_family'] == 'Debian'\n    - install_web | bool\n```\n\n#### 基于注册结果判断\n\n```yaml\n- name: 查询应用健康状态\n  ansible.builtin.uri:\n    url: http://127.0.0.1:8080/healthz\n    return_content: true\n    status_code:\n      - 200\n      - 503\n  register: health\n  changed_when: false\n\n- name: 健康检查失败时终止\n  ansible.builtin.fail:\n    msg: \"应用未就绪 status={{ health.status }}\"\n  when: health.status != 200\n```\n\n常用判断包括 `result is failed`、`result is changed`、`result is skipped` 和 `variable is defined`。先验证变量存在，再访问深层字段。\n\n#### 静态 import 与动态 include 的条件不同\n\n```mermaid\ngraph TD\n    S[Reuse tasks] --> I[import_tasks static]\n    S --> D[include_tasks dynamic]\n    I --> A[Condition inherited by imported tasks]\n    D --> B[Condition evaluated on include action]\n```\n\n```yaml\n- name: 静态导入 Debian 任务\n  ansible.builtin.import_tasks: debian.yml\n  when: ansible_facts['os_family'] == 'Debian'\n\n- name: 根据运行期变量动态包含任务\n  ansible.builtin.include_tasks: \"{{ deployment_mode }}.yml\"\n  when: deployment_mode is defined\n```\n\n静态 import 在解析阶段展开，条件会应用到导入的各个 Task；动态 include 在运行时决定是否包含。不要把旧版通用 `include:` 继续用于新代码。\n\n#### 根据平台加载变量\n\n```yaml\n- name: 加载平台变量\n  ansible.builtin.include_vars:\n    file: \"vars/{{ ansible_facts['os_family'] }}.yml\"\n\n- name: 确保平台软件包存在\n  ansible.builtin.package:\n    name: \"{{ web_package }}\"\n    state: present\n```\n\n平台差异优先放在数据中，避免复制两份几乎相同的 Task。条件语法见 [官方 Conditionals 指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_conditionals.html)。", "subs": ["基于注册结果判断", "静态 import 与动态 include 的条件不同", "根据平台加载变量"]}, {"title": "用循环消除重复任务并等待目标状态", "content": "<!-- src: f308346b55708758/循环.md -->\n\n现代 Playbook 优先使用统一的 `loop`。旧材料中的大量 `with_items`、`with_dict`、`with_nested` 仍有兼容场景，但新代码通常可由 `loop` 配合 filter 或 lookup 表达。\n\n```yaml\n- name: 创建应用用户\n  ansible.builtin.user:\n    name: \"{{ item.name }}\"\n    groups: \"{{ item.groups }}\"\n    state: present\n  loop:\n    - name: api\n      groups: app\n    - name: worker\n      groups: app,queue\n  loop_control:\n    label: \"{{ item.name }}\"\n```\n\n#### 处理字典、笛卡尔积与子元素\n\n```yaml\n- name: 展示字典配置\n  ansible.builtin.debug:\n    msg: \"{{ item.key }}={{ item.value }}\"\n  loop: \"{{ app_config | dict2items }}\"\n```\n\n```yaml\n- name: 为用户授予数据库权限\n  ansible.builtin.debug:\n    msg: \"user={{ item.0 }} db={{ item.1 }}\"\n  loop: \"{{ users | product(databases) | list }}\"\n```\n\n复杂循环如果需要多层 `item.0.1` 才能理解，应先重塑数据或拆成更明确的 Task。\n\n子元素关系可用 `subelements` filter 表达：\n\n```yaml\nvars:\n  application_users:\n    - name: alice\n      authorized_keys:\n        - ssh-ed25519 AAAA-example-alice\n    - name: bob\n      authorized_keys:\n        - ssh-ed25519 AAAA-example-bob\n        - ssh-ed25519 AAAA-example-bob-backup\ntasks:\n  - name: 安装每个用户的公钥\n    ansible.posix.authorized_key:\n      user: \"{{ item.0.name }}\"\n      key: \"{{ item.1 }}\"\n    loop: \"{{ application_users | subelements('authorized_keys') }}\"\n    loop_control:\n      label: \"{{ item.0.name }}\"\n```\n\n#### 用 `query` 获取控制节点上的外部列表\n\n旧式 `with_fileglob`、`with_first_found` 和 `with_ini` 本质上依赖 lookup plugin。现代写法优先用 `query`，因为它天然返回列表，适合直接交给 `loop`：\n\n```yaml\n- name: 复制控制节点上的全部策略文件\n  ansible.builtin.copy:\n    src: \"{{ policy_file }}\"\n    dest: \"/etc/example/policies/{{ policy_file | basename }}\"\n    mode: '0644'\n  loop: \"{{ query('ansible.builtin.fileglob', 'files/policies/*.conf') }}\"\n  loop_control:\n    loop_var: policy_file\n    label: \"{{ policy_file | basename }}\"\n```\n\n```yaml\n- name: 选择第一个存在的平台变量文件\n  ansible.builtin.include_vars:\n    file: \"{{ lookup('ansible.builtin.first_found', candidate_files) }}\"\n  vars:\n    candidate_files:\n      files:\n        - \"{{ ansible_facts['distribution'] }}-{{ ansible_facts['distribution_major_version'] }}.yml\"\n        - \"{{ ansible_facts['os_family'] }}.yml\"\n        - default.yml\n      paths:\n        - vars\n```\n\nlookup 在控制节点上执行，不是在当前受管主机上。它可能读取本地文件、环境、秘密系统或外部 API，因此其输入必须可信，并要评估网络失败、返回类型和重复查询成本。可用 `ansible-doc -t lookup -l` 查看本机实际安装的插件。\n\n#### 用 filter 替代旧式嵌套与扁平循环\n\n旧材料中的循环可以按数据结构转换：\n\n| 旧写法 | 现代等价思路 | 注意事项 |\n| --- | --- | --- |\n| `with_items` | `loop: \"{{ values | flatten(levels=1) }}\"` | `loop` 不会隐式做完全相同的扁平化 |\n| `with_dict` | `dict2items` | 可以用 `key_name`、`value_name` 改字段名 |\n| `with_nested` | `product` | 先确认笛卡尔积不会爆炸 |\n| `with_subelements` | `subelements` | 为缺少子列表的数据设计默认值 |\n| `with_indexed_items` | `loop_control.index_var` | 索引从零开始 |\n| `with_sequence` | Jinja `range` 或 sequence query | 数字和字符串格式化需求不同 |\n\n```yaml\n- name: 生成三个分片编号\n  ansible.builtin.debug:\n    msg: \"shard-{{ '%02d' | format(shard_index) }}\"\n  loop: \"{{ range(0, 3) | list }}\"\n  loop_control:\n    loop_var: shard_index\n\n- name: 扁平化一层软件包列表\n  ansible.builtin.package:\n    name: \"{{ package_name }}\"\n    state: present\n  loop: \"{{ package_groups | flatten(levels=1) }}\"\n  loop_control:\n    loop_var: package_name\n```\n\n旧式 `with_lines` 常把控制节点 shell 输出直接变成循环输入。更可审计的做法是用模块取得结构化结果，再遍历 `stdout_lines`；确需 `lookup('pipe', ...)` 时，命令在控制节点执行，不能拼入不可信变量。随机选择会破坏可重复性，配置管理中通常应由 Inventory 或发布输入显式指定；只有真正允许随机的任务才使用 `random`，并记录结果。\n\n#### 用 `loop_control` 提高可读性\n\n```yaml\n- name: 配置多个服务\n  ansible.builtin.include_tasks: configure-service.yml\n  loop: \"{{ services }}\"\n  loop_control:\n    loop_var: service_item\n    label: \"{{ service_item.name }}\"\n    index_var: service_index\n```\n\n在 Role 或嵌套 include 中使用自定义 `loop_var`，可避免内外层都叫 `item` 导致变量覆盖。\n\n#### `until` 是重试机制而不是普通列表循环\n\n```yaml\n- name: 等待应用健康\n  ansible.builtin.uri:\n    url: http://127.0.0.1:8080/healthz\n    status_code: 200\n  register: healthcheck\n  until: healthcheck.status == 200\n  retries: 12\n  delay: 5\n  changed_when: false\n```\n\n`retries` 表示达到 `until` 条件前的最大重试控制，`delay` 是重试间隔。为轮询设置总时限，并确保被轮询操作安全可重复。\n\n#### 循环注册结果\n\n```yaml\n- name: 查询服务状态\n  ansible.builtin.command: \"systemctl is-active {{ item }}\"\n  loop:\n    - nginx\n    - redis\n  register: service_checks\n  changed_when: false\n  failed_when: false\n\n- name: 输出异常服务\n  ansible.builtin.debug:\n    msg: \"{{ item.item }} rc={{ item.rc }}\"\n  loop: \"{{ service_checks.results }}\"\n  when: item.rc != 0\n```\n\n带循环的 `register` 结果包含 `results` 列表，每个元素才是一次模块调用的返回值。循环详情见 [官方 Loops 指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_loops.html)。", "subs": ["处理字典、笛卡尔积与子元素", "用 query 获取控制节点上的外部列表", "用 filter 替代旧式嵌套与扁平循环", "用 loop_control 提高可读性", "until 是重试机制而不是普通列表循环", "循环注册结果"]}]}, {"title": "第五章 · 组织可复用且易维护的自动化代码", "sections": [{"title": "使用 Roles 和 Include 拆分复杂 Playbook", "content": "<!-- src: f308346b55708758/Playbook-角色(Roles)-和-Include-语句.md -->\n\nRole 用约定目录封装 tasks、handlers、defaults、vars、templates、files 和 metadata。它适合表达“配置 Web 服务”这样的能力，而顶层 Playbook 负责选择环境、主机和角色组合。\n\n```text\nroles/web_service/\n├── defaults/main.yml\n├── handlers/main.yml\n├── meta/main.yml\n├── tasks/main.yml\n├── templates/site.conf.j2\n├── files/\n└── README.md\n```\n\n```yaml\n- name: 配置 Web 集群\n  hosts: webservers\n  become: true\n  roles:\n    - role: web_service\n      vars:\n        web_service_port: 8080\n```\n\n`defaults/main.yml` 放可覆盖的公共默认值；`vars/main.yml` 优先级较高，只放角色内部不希望调用方改变的数据。为公开 Role 提供参数说明、示例和 `meta/argument_specs.yml` 参数校验。\n\n#### 声明 Role 参数契约\n\n参数校验让错误在角色执行前暴露，而不是等到某个深层 Task 才因类型不符失败：\n\n```yaml\n# roles/web_service/meta/argument_specs.yml\nargument_specs:\n  main:\n    short_description: 配置并运行 Web 服务\n    options:\n      web_service_port:\n        type: int\n        required: true\n      web_service_tls_enabled:\n        type: bool\n        default: true\n      web_service_allowed_networks:\n        type: list\n        elements: str\n        default: []\n```\n\n参数规范描述输入类型和约束；Role 的 README 还应说明副作用、支持平台、依赖、标签、Handler 和可运行示例。校验不能替代业务级 `assert`，例如端口范围、互斥开关和外部系统前置条件仍需显式检查。\n\n```mermaid\ngraph LR\n    P[Playbook orchestration] --> R[Role capability]\n    R --> T[Tasks]\n    R --> H[Handlers]\n    R --> D[Defaults]\n    R --> F[Files and templates]\n```\n\n复用方式分为两类：\n\n| 方式 | 解析时机 | 典型用途 |\n| --- | --- | --- |\n| `import_tasks` / `import_role` | 静态解析 | 结构固定、需要完整标签继承 |\n| `include_tasks` / `include_role` | 运行时 | 文件名或角色由运行期数据决定 |\n| `import_playbook` | 静态解析 | 组合多个完整 Play |\n\n旧式通用 `include:` 已被明确的 `import_*` 和 `include_*` 取代。依赖跨项目分发时优先使用 Collection；不要靠隐式全局 `roles_path` 让项目在某台控制机上“碰巧能运行”。详见 [官方 Roles 指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_reuse_roles.html)。\n\n#### 用元数据表达 Role 前置能力\n\n`meta/main.yml` 的 `dependencies` 会在当前 Role 之前执行依赖角色：\n\n```yaml\n# roles/web_service/meta/main.yml\ndependencies:\n  - role: base_hardening\n  - role: monitoring_agent\n    monitoring_service_name: example-web\n```\n\n```mermaid\ngraph LR\n    P[Play] --> B[base_hardening]\n    B --> M[monitoring_agent]\n    M --> W[web_service]\n```\n\nRole 依赖是执行前置项，不是面向对象式父子关系。Ansible 会在一个 Play 内对参数、标签和条件相同的 Role 调用去重；只有确实需要重复运行时，才在被重复的 Role 的 `meta/main.yml` 中设置 `allow_duplicates: true`。若依赖关系只对某个具体 Play 成立，而不是 Role 的固有前提，应在顶层 Playbook 明确编排，避免隐藏执行顺序。\n\nRole 还能携带 `library/` 自定义模块、`module_utils/` 公共代码、filter/test/lookup 等插件。可跨多个 Role 复用的插件更适合放入 Collection，并配套文档、单元测试和版本约束；不要让同名本地插件悄悄覆盖已安装 Collection 的行为。\n\n#### 安装并固定 Galaxy 依赖\n\n```yaml\n# requirements.yml\nroles:\n  - name: nginx_role\n    src: example.nginx\n    version: 3.2.1\ncollections:\n  - name: community.general\n    version: '>=10.0.0,<11.0.0'\n```\n\n```bash\nansible-galaxy role install -r requirements.yml -p roles\nansible-galaxy collection install -r requirements.yml -p collections\nansible-galaxy role list\nansible-galaxy collection list\n```\n\n生产项目应固定已经测试的版本或提交，不用浮动默认分支。第三方内容需要审查维护状态、许可证、输入输出、提权和下载行为；内部共享的新能力优先封装成带版本的 Collection，而不是复制 Role 目录到多个仓库。", "subs": ["声明 Role 参数契约", "用元数据表达 Role 前置能力", "安装并固定 Galaxy 依赖"]}, {"title": "按最佳实践设计目录 变量与部署拓扑", "content": "<!-- src: f308346b55708758/最佳实践.md -->\n\n```text\nansible-project/\n├── ansible.cfg\n├── requirements.yml\n├── inventories/\n│   ├── staging/\n│   └── production/\n├── playbooks/\n│   ├── site.yml\n│   └── rolling-update.yml\n├── roles/\n├── templates/\n└── README.md\n```\n\n设计原则：\n\n- 环境由 Inventory 隔离，角色按能力组织；\n- Task 名称描述可观察结果，模块使用 FQCN；\n- 模板部署前使用模块的 `validate` 参数；\n- 服务重启放 Handler，避免每次运行都打断流量；\n- 主机差异尽量建模为组和变量，不复制 Playbook；\n- Collection 和核心版本都显式约束；\n- 生产入口保持少而清晰，先测试再扩大范围；\n- 密码不进普通变量，日志不输出秘密。\n\n#### 把平台差异转换为数据和动态组\n\n当任务流程相同、只有包名或服务名不同，应在变量文件中表达差异；当整组任务确实随平台变化，可以先根据 Facts 创建临时组：\n\n```yaml\n- name: 根据系统家族建立本次运行的动态组\n  hosts: all\n  tasks:\n    - name: 按系统家族分组\n      ansible.builtin.group_by:\n        key: \"os_{{ ansible_facts['os_family'] | lower }}\"\n\n- name: 配置 Debian 系主机\n  hosts: os_debian\n  roles:\n    - debian_baseline\n```\n\n`group_by` 只改变当前运行的内存 Inventory，不会写回源清单。能用一套 Role 加变量解决时，不要为每个发行版复制完整 Playbook；平台行为真的不同，再拆成明确的 task 文件或 Role。\n\n#### 分离基础配置与应用发布\n\n配置管理回答“主机长期应是什么状态”，应用发布回答“哪一个不可变版本何时进入哪批主机”。两者可以共享 Role，却不应混成无法独立执行的巨大入口：\n\n```text\nplaybooks/\n├── baseline.yml\n├── configure-platform.yml\n├── deploy-application.yml\n└── rollback-application.yml\n```\n\n基础配置通常节奏慢、覆盖面广；发布操作频率高、批次小且要求健康门禁和回滚。数据库迁移还应有独立的兼容性策略。每个 Task 使用有意义的名称，YAML 保持一致缩进和空行，复杂决策写注释说明“为什么”，所有修改进入版本控制并经 review。\n\n模块或插件进入 `ansible.builtin` 不代表它适合所有平台，Collection 中的内容也不代表质量较低。依赖选择应看模块文档、维护状态、check mode、幂等性、平台支持和团队测试证据。\n\n持续验证链：\n\n```bash\nyamllint .\nansible-lint\nansible-playbook -i inventories/staging playbooks/site.yml --syntax-check\nansible-playbook -i inventories/staging playbooks/site.yml --check --diff\n```\n\n静态检查、check mode 和真实测试各有边界，不能相互替代。涉及服务重启、外部 API 或数据库迁移时，应在隔离环境做真实集成测试。", "subs": ["把平台差异转换为数据和动态组", "分离基础配置与应用发布"]}, {"title": "使用标签选择性执行 Play 和 Task", "content": "<!-- src: 3b674c8d93eb5e29/标签.md -->\n\n```yaml\n- name: 写入监控配置\n  ansible.builtin.template:\n    src: monitoring.yml.j2\n    dest: /etc/example/monitoring.yml\n    mode: '0644'\n  tags:\n    - config\n    - monitoring\n```\n\n```bash\nansible-playbook site.yml --list-tags\nansible-playbook site.yml --tags config\nansible-playbook site.yml --skip-tags disruptive\n```\n\n标签是执行选择器，不是依赖管理器。只运行中间标签可能跳过前置条件，所以标签设计要按可独立执行的能力分组。`always` 通常用于安全检查，`never` 适合必须显式启用的诊断或破坏性任务。动态 include 的标签继承与静态 import 不同，发布前应用 `--list-tasks --tags ...` 检查实际任务集。", "subs": []}, {"title": "从指定任务启动并逐步调试 Playbook", "content": "<!-- src: 3b674c8d93eb5e29/从指定任务开始运行palybook以及分步运行playbook.md -->\n\n```bash\nansible-playbook site.yml --list-tasks\nansible-playbook site.yml --start-at-task '写入应用配置'\nansible-playbook site.yml --step\n```\n\n`--start-at-task` 依赖精确 Task 名称，并会跳过此前的前置条件；动态 include 中尚未展开的 Task 也可能无法作为可靠起点。它适合故障恢复和调试，不应成为正常部署方式。`--step` 会逐个询问是否执行，适合实验环境人工观察，不适合无人值守流水线。", "subs": []}, {"title": "使用 Check Mode 预演配置变更", "content": "<!-- src: 3b674c8d93eb5e29/Check-Mode-(“Dry-Run”).md -->\n\n```bash\nansible-playbook -i inventories/staging site.yml --check --diff\n```\n\nCheck mode 让支持它的模块预测变化而不真正修改目标；diff mode 展示文件等资源的前后差异。必须先查模块文档的 `check_mode` 和 `diff_mode` 支持等级。\n\n```yaml\n- name: 即使在 check mode 也执行只读探测\n  ansible.builtin.command: /opt/app/bin/version\n  check_mode: false\n  changed_when: false\n\n- name: 在 check mode 跳过外部变更\n  ansible.builtin.command: /opt/app/bin/migrate\n  when: not ansible_check_mode\n```\n\nCheck mode 不是事务、回滚或完整测试：依赖前一 Task 新建文件的后续 Task 可能得到错误预测，command/shell 和外部系统也未必支持。生产执行仍需小批次、监控和恢复方案。", "subs": []}]}, {"title": "第六章 · 控制复杂任务的执行 安全与故障行为", "sections": [{"title": "用异步执行和轮询处理长时间任务", "content": "<!-- src: 3b674c8d93eb5e29/异步操作和轮询.md -->\n\n```yaml\n- name: 启动长时间升级并定期轮询\n  ansible.builtin.command: /opt/app/bin/upgrade\n  async: 1800\n  poll: 30\n```\n\n`async` 是允许任务运行的上限秒数，`poll` 是轮询间隔；`poll: 0` 表示启动后立即继续，需要保存 job id 并用 `async_status` 收尾。\n\n```yaml\n- name: 后台启动任务\n  ansible.builtin.command: /opt/app/bin/reindex\n  async: 3600\n  poll: 0\n  register: reindex_job\n\n- name: 等待后台任务完成\n  ansible.builtin.async_status:\n    jid: \"{{ reindex_job.ansible_job_id }}\"\n  register: reindex_result\n  until: reindex_result is finished\n  retries: 120\n  delay: 30\n```\n\n不要异步执行有全局锁竞争的包管理任务，也不要启动后永远不收集结果。详情见 [官方异步执行指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_async.html)。", "subs": []}, {"title": "定义任务失败 变更与恢复行为", "content": "<!-- src: 3b674c8d93eb5e29/Playbooks-中的错误处理.md -->\n\n```yaml\n- name: 执行健康检查\n  ansible.builtin.command: /opt/app/bin/healthcheck\n  register: health\n  changed_when: false\n  failed_when:\n    - health.rc != 0\n    - \"'warming up' not in health.stderr\"\n```\n\n`ignore_errors` 只应处理已理解且可继续的失败，不应隐藏未知问题。用 block 表达事务边界：\n\n```yaml\n- name: 部署并恢复\n  block:\n    - name: 发布新版本\n      ansible.builtin.include_role:\n        name: deploy_app\n  rescue:\n    - name: 恢复上一版本\n      ansible.builtin.include_role:\n        name: rollback_app\n  always:\n    - name: 恢复监控\n      ansible.builtin.include_role:\n        name: enable_monitoring\n```\n\n需要跨主机快速停止时，可使用 `any_errors_fatal` 或 `max_fail_percentage`。Handler 默认可能因后续 Task 失败而不运行；确有需要时使用 `force_handlers`，同时理解它无法修复不可达主机。参考 [官方错误处理指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_error_handling.html)。\n\n#### 区分失败、不可达与恢复后的主机状态\n\n模块已运行并返回失败时，`ignore_errors` 才可能继续；连接、认证或网络失败产生的是 `UNREACHABLE`，需要单独考虑 `ignore_unreachable`。忽略不可达只适合后续任务可能恢复连接、且继续执行不会扩大风险的场景：\n\n```yaml\n- name: 首次连接探测允许暂时不可达\n  ansible.builtin.ping:\n  ignore_unreachable: true\n\n- name: 重置已失败主机的连接状态\n  ansible.builtin.meta: clear_host_errors\n```\n\n`meta: clear_host_errors` 让先前不可达的主机重新进入后续任务候选，不会修复网络本身。执行前要有带外修复或等待动作，并确认重复执行前序步骤不会造成不一致。\n\n`block` 的 `rescue` 只在 block 内任务返回失败后运行，不会捕获 YAML 解析错误或所有不可达情况；`always` 无论 block 成功或被 rescue 都会运行，适合恢复临时监控静默、释放锁和写审计信息。不要在 `always` 中无条件把健康检查失败的节点重新加回负载均衡器。", "subs": ["区分失败、不可达与恢复后的主机状态"]}, {"title": "用委托 本地动作和批次控制实现滚动操作", "content": "<!-- src: 3b674c8d93eb5e29/委托,滚动更新,本地动作.md -->\n\n```yaml\n- name: 滚动更新 Web 集群\n  hosts: webservers\n  serial: 2\n  max_fail_percentage: 0\n  tasks:\n    - name: 从负载均衡移除当前主机\n      ansible.builtin.uri:\n        url: \"https://lb.example/api/nodes/{{ inventory_hostname }}\"\n        method: DELETE\n        status_code: [200, 204]\n      delegate_to: localhost\n\n    - name: 更新应用\n      ansible.builtin.include_role:\n        name: deploy_app\n\n    - name: 重新加入负载均衡\n      ansible.builtin.uri:\n        url: \"https://lb.example/api/nodes/{{ inventory_hostname }}\"\n        method: PUT\n        status_code: [200, 201, 204]\n      delegate_to: localhost\n```\n\n`serial` 控制每批主机数，`throttle` 可限制单个 Task 并发，`run_once` 表示当前批次只执行一次。委托不会自动串行化；多个 fork 同时写同一个委托资源时要显式控制并发。详见 [官方 Delegation 指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_delegation.html)。\n\n#### 委托 Facts 给真正的数据来源主机\n\n委托任务默认把取得的 Facts 归到当前 `inventory_hostname`。需要从未包含在当前 Play 的数据库主机收集信息时，使用 `delegate_facts: true` 把数据存到被委托主机：\n\n```yaml\n- name: 为应用部署收集数据库主机 Facts\n  ansible.builtin.setup:\n  delegate_to: \"{{ db_host }}\"\n  delegate_facts: true\n  loop: \"{{ groups['dbservers'] }}\"\n  loop_control:\n    loop_var: db_host\n  run_once: true\n```\n\n之后可以通过 `hostvars[db_host].ansible_facts` 读取。被委托任务的连接变量通常切换到委托主机语境，但 `inventory_hostname` 仍代表当前原始主机；模板和调试信息要明确两者，避免凭据或路径取错对象。\n\n#### 理解 `run_once` 在批次中的语义\n\n配合 `serial` 时，`run_once` 通常是“每个批次一次”，不是整个 Play 永远一次。数据库迁移之类的全局操作最好放到独立 Play，以单一明确主机执行：\n\n```yaml\n- name: 只执行一次向后兼容的数据库迁移\n  hosts: db_migration_runner\n  gather_facts: false\n  tasks:\n    - name: 执行扩展式迁移\n      ansible.builtin.command: /opt/app/bin/migrate --mode expand\n      changed_when: true\n\n- name: 分批更新应用节点\n  hosts: webservers\n  serial: 2\n  roles:\n    - deploy_app\n```\n\n如果必须在批次 Play 中只运行一次，可用条件将其绑定到 `ansible_play_hosts_all` 中明确的一台主机，但动态顺序仍要先验证。`max_fail_percentage` 按当前批次计算，并在失败比例“超过”阈值时停止；想让两台一批中任何一台失败都停止，可以使用 `max_fail_percentage: 0` 或更直接的 `any_errors_fatal`。\n\n#### 运行完整的本地 Play\n\n只有控制节点 API、制品校验或本地模板处理的流程，可以明确声明本地连接：\n\n```yaml\n- name: 在控制节点验证发布制品\n  hosts: localhost\n  connection: local\n  gather_facts: false\n  tasks:\n    - name: 计算制品摘要\n      ansible.builtin.stat:\n        path: \"artifacts/example-{{ release_version }}.tar.gz\"\n        checksum_algorithm: sha256\n      register: artifact_stat\n```\n\n本地执行使用控制节点的 Python、文件系统和权限。不要把不可信变量传给本地 shell，也不要假设 CI 容器与开发机安装了相同工具。", "subs": ["委托 Facts 给真正的数据来源主机", "理解 run_once 在批次中的语义", "运行完整的本地 Play"]}, {"title": "为任务和代理环境传递环境变量", "content": "<!-- src: 3b674c8d93eb5e29/配置环境-(在代理环境中).md -->\n\n```yaml\n- name: 通过代理安装软件包\n  ansible.builtin.package:\n    name: example-agent\n    state: present\n  environment:\n    http_proxy: http://proxy.example:8080\n    https_proxy: http://proxy.example:8080\n    no_proxy: 127.0.0.1,localhost,.internal\n```\n\n`environment` 设置的是模块在远端执行时的环境，不是控制节点全局环境，也不会自动成为 Fact。代理凭据属于秘密；环境变量还可能被进程列表、调试输出或子进程继承，应尽量使用短期凭据并配合 `no_log`。", "subs": []}, {"title": "使用 Vault 保护 Playbook 中的敏感数据", "content": "<!-- src: 3b674c8d93eb5e29/Vault.md -->\n\n```bash\nansible-vault create group_vars/production/vault.yml\nansible-vault edit group_vars/production/vault.yml\nansible-vault view group_vars/production/vault.yml\nansible-vault rekey group_vars/production/vault.yml\n```\n\n加密或解密已有文件：\n\n```bash\nansible-vault encrypt group_vars/production/secrets.yml\nansible-vault decrypt group_vars/development/local-secrets.yml\n```\n\n`decrypt` 会把文件恢复成明文，通常只应在受控迁移中临时使用，完成后立即重新加密或从工作区安全移除，并确认没有被 Git 暂存。\n\n单变量加密：\n\n```bash\nansible-vault encrypt_string --vault-id production@prompt \\\n  --name database_password\n```\n\n运行：\n\n```bash\nansible-playbook site.yml --vault-id production@prompt\n```\n\n不同环境使用不同 Vault ID，避免一把密码解开所有数据：\n\n```bash\nansible-vault encrypt --vault-id development@prompt vars/dev-secrets.yml\nansible-vault encrypt --vault-id production@prompt vars/prod-secrets.yml\n\nansible-playbook site.yml \\\n  --vault-id development@./scripts/dev-vault-client \\\n  --vault-id production@./scripts/prod-vault-client\n```\n\n密码客户端脚本应只把密码写到标准输出，错误与诊断写到标准错误，并以非零状态报告失败。脚本本身不应硬编码密码；它应通过工作负载身份向秘密管理器领取短期凭据，并限制日志、缓存和进程环境中的暴露。\n\nVault 只保护静态存储中的密文。解密后秘密仍可能进入日志、模板、远端文件或进程参数；因此还要限制文件权限、设置 `no_log`、控制 CI 凭据和轮换 Vault 密钥。多环境使用 Vault ID，密码来源优先接入秘密管理器脚本或自动化控制器 Credential。参考 [官方 Vault 指南](https://docs.ansible.com/projects/ansible/latest/vault_guide/vault.html)。", "subs": []}, {"title": "理解 Accelerated Mode 的历史作用与淘汰背景", "content": "<!-- src: 3b674c8d93eb5e29/Accelerated-Mode.md -->\n\nAccelerated Mode 是 Ansible 1.x 为减少旧 SSH 连接开销设计的远端临时守护机制，涉及 `accelerate: true`、5099 端口和 `accelerate_*` 配置。它已从现代 Ansible 移除，新项目不得照搬。\n\n当前性能优化顺序通常是：复用 OpenSSH ControlPersist、评估 pipelining、合理设置 forks、减少不必要 Facts、合并模块调用、优化慢查询，并用执行数据定位瓶颈。不要为了速度关闭主机密钥检查或扩大无边界并发。", "subs": []}]}, {"title": "第七章 · 将 Ansible 应用于开发和持续交付", "sections": [{"title": "使用 Vagrant 搭建可重复的 Ansible 实验环境", "content": "<!-- src: 07a2c664dbb799d4/使用Vagrant和Ansible.md -->\n\nVagrant 可创建可丢弃虚拟机并调用 Ansible provisioner，适合验证 Linux 系统配置、Role 幂等性和多节点流程。\n\n```ruby\nVagrant.configure(\"2\") do |config|\n  config.vm.box = \"generic/ubuntu2204\"\n  config.vm.define \"web01\" do |node|\n    node.vm.hostname = \"web01\"\n    node.vm.network \"private_network\", ip: \"192.168.56.21\"\n  end\n  config.vm.provision \"ansible\" do |ansible|\n    ansible.playbook = \"playbooks/site.yml\"\n    ansible.inventory_path = \"inventories/vagrant/hosts.yml\"\n  end\nend\n```\n\n```bash\nvagrant up\nvagrant provision\nvagrant ssh web01\nvagrant destroy\n```\n\n#### 使用 Vagrant 生成的 Inventory 手动运行 Ansible\n\nVagrant provisioner 适合一键初始化；调试时也可以让 Vagrant 只负责虚拟机和 SSH 参数，然后手动运行 Playbook。先查看连接信息：\n\n```bash\nvagrant ssh-config web01\n```\n\n如果 Vagrantfile 配置了 `ansible.inventory_path`，可直接使用该清单。也可以为实验环境维护一个明确的 Inventory：\n\n```yaml\n# inventories/vagrant/hosts.yml\nall:\n  children:\n    webservers:\n      hosts:\n        web01:\n          ansible_host: 192.168.56.21\n          ansible_user: vagrant\n          ansible_ssh_private_key_file: .vagrant/machines/web01/virtualbox/private_key\n```\n\n```bash\nansible-inventory -i inventories/vagrant/hosts.yml --graph\nansible webservers -i inventories/vagrant/hosts.yml -m ansible.builtin.ping\nansible-playbook -i inventories/vagrant/hosts.yml playbooks/site.yml --check --diff\nansible-playbook -i inventories/vagrant/hosts.yml playbooks/site.yml\nansible-playbook -i inventories/vagrant/hosts.yml playbooks/site.yml\n```\n\n最后一次重复执行用来观察幂等性。`.vagrant/` 中的私钥和机器状态不应提交；不同 provider 生成的连接参数也可能不同，以 `vagrant ssh-config` 的实际输出为准。\n\n旧教程的 Ubuntu Precise box、`ansible.sudo` 和 `ansible_ssh_*` 已过时。实验环境仍应固定 box 版本、限制私有网络、避免真实生产凭据，并验证第二次 provision 是否保持幂等。", "subs": ["使用 Vagrant 生成的 Inventory 手动运行 Ansible"]}, {"title": "编排多层应用的持续交付与滚动升级", "content": "<!-- src: 07a2c664dbb799d4/持续交付与滚动升级.md -->\n\n滚动发布不是单个 `serial` 参数，而是一条可观测状态机：验证前置条件、摘除流量、部署、健康检查、恢复流量、观察，再进入下一批。\n\n```mermaid\nstateDiagram-v2\n    [*] --> Validate\n    Validate --> Drain\n    Drain --> Deploy\n    Deploy --> HealthCheck\n    HealthCheck --> Restore: healthy\n    HealthCheck --> Rollback: unhealthy\n    Restore --> Observe\n    Observe --> NextBatch\n    Rollback --> Stop\n    NextBatch --> [*]\n```\n\n#### 把发布输入变成不可变且可审计的契约\n\n流水线不应让目标主机自己拉取“最新版本”。CI 应构建一次不可变制品，记录版本、提交、摘要和来源，再把同一个版本传给所有环境：\n\n```yaml\n# release-input.yml 由 CI 生成并作为流水线制品保存\nrelease_version: 1.4.2\nrelease_commit: 8d3f3a1\nrelease_sha256: 9f2a8c1f-example\nchange_ticket: CHG-2026-0819\nprevious_release_version: 1.4.1\n```\n\n```bash\nansible-playbook -i inventories/production playbooks/release.yml \\\n  -e @release-input.yml \\\n  --limit 'webservers:&production'\n```\n\nPlaybook 应校验版本和摘要，不应在运行时把 `latest`、可变分支或时间戳重新解析成另一个制品。流水线保存 `--list-hosts` 结果、Ansible 与 Collection 版本、操作者、审批、开始结束时间和 recap，才能回答“谁在何时把什么版本发到哪些主机”。\n\n#### 先定义数据库迁移和回滚边界\n\n应用回滚不自动等于数据库回滚。滚动期间新旧应用版本会同时访问数据库，因此迁移通常采用 expand-contract：\n\n1. 先做向后兼容的 expand，例如新增可空列或新表；\n2. 发布同时兼容新旧结构的应用；\n3. 完成数据回填并观察；\n4. 确认旧版本不再使用旧结构后，另一个发布窗口执行 contract；\n5. contract 之后若要回滚应用，必须确认旧版本仍兼容当前结构。\n\n破坏性 DDL、长时间锁表和不可逆数据转换不应藏在每台 Web 主机的 Role 中。它们需要独立 Play、备份或恢复点、锁与超时、专门审批，以及明确的 forward-fix 或数据恢复方案。\n\n#### 编排安全的单节点滚动发布\n\n下面的教学案例将前置校验、监控静默、负载均衡摘流、部署、健康检查、恢复和审计放进同一条可读流程。API 地址和参数是示意值，实际项目应封装为经过测试的 Role 或 Collection 模块。\n\n```yaml\n- name: 生产滚动发布\n  hosts: webservers\n  serial:\n    - 1\n    - 25%\n    - 100%\n  any_errors_fatal: true\n  order: inventory\n  vars:\n    application_port: 8080\n    healthcheck_url: \"http://127.0.0.1:{{ application_port }}/healthz\"\n  pre_tasks:\n    - name: 验证发布契约\n      ansible.builtin.assert:\n        that:\n          - release_version is match('^[0-9]+\\.[0-9]+\\.[0-9]+$')\n          - previous_release_version is match('^[0-9]+\\.[0-9]+\\.[0-9]+$')\n          - release_sha256 | length >= 16\n          - change_ticket | length > 0\n\n    - name: 初始化节点健康门禁\n      ansible.builtin.set_fact:\n        node_safe_for_traffic: false\n        release_outcome: started\n\n  tasks:\n    - name: 更新当前节点并在失败时回退\n      block:\n        - name: 为当前节点创建监控静默\n          ansible.builtin.uri:\n            url: https://monitoring.example/api/silences\n            method: POST\n            body_format: json\n            body:\n              host: \"{{ inventory_hostname }}\"\n              ticket: \"{{ change_ticket }}\"\n            status_code: [200, 201]\n          delegate_to: localhost\n          register: monitoring_silence\n\n        - name: 从负载均衡器摘除当前节点\n          ansible.builtin.uri:\n            url: \"https://lb.example/api/nodes/{{ inventory_hostname }}/drain\"\n            method: POST\n            status_code: [200, 202, 204]\n          delegate_to: localhost\n\n        - name: 等待现有连接排空\n          ansible.builtin.uri:\n            url: \"https://lb.example/api/nodes/{{ inventory_hostname }}\"\n            return_content: true\n            status_code: 200\n          register: drain_state\n          until: drain_state.json.active_connections | int == 0\n          retries: 30\n          delay: 2\n          changed_when: false\n          delegate_to: localhost\n\n        - name: 部署指定不可变版本\n          ansible.builtin.include_role:\n            name: deploy_app\n          vars:\n            deploy_app_version: \"{{ release_version }}\"\n            deploy_app_sha256: \"{{ release_sha256 }}\"\n\n        - name: 等待新版本通过本机健康检查\n          ansible.builtin.uri:\n            url: \"{{ healthcheck_url }}\"\n            status_code: 200\n            return_content: true\n          register: health\n          until:\n            - health.status == 200\n            - health.json.version == release_version\n          retries: 12\n          delay: 5\n          changed_when: false\n\n        - name: 标记节点可以恢复流量\n          ansible.builtin.set_fact:\n            node_safe_for_traffic: true\n            release_outcome: deployed\n\n      rescue:\n        - name: 回退到上一不可变版本\n          ansible.builtin.include_role:\n            name: deploy_app\n          vars:\n            deploy_app_version: \"{{ previous_release_version }}\"\n\n        - name: 验证回退版本健康\n          ansible.builtin.uri:\n            url: \"{{ healthcheck_url }}\"\n            status_code: 200\n            return_content: true\n          register: rollback_health\n          until:\n            - rollback_health.status == 200\n            - rollback_health.json.version == previous_release_version\n          retries: 12\n          delay: 5\n          changed_when: false\n\n        - name: 回退成功后允许恢复流量\n          ansible.builtin.set_fact:\n            node_safe_for_traffic: true\n            release_outcome: rolled_back\n\n        - name: 终止后续批次并保留失败信号\n          ansible.builtin.fail:\n            msg: >-\n              {{ inventory_hostname }} 发布失败并已回退到\n              {{ previous_release_version }}，停止后续批次\n\n      always:\n        - name: 仅将健康节点重新加入负载均衡器\n          ansible.builtin.uri:\n            url: \"https://lb.example/api/nodes/{{ inventory_hostname }}/enable\"\n            method: POST\n            status_code: [200, 202, 204]\n          delegate_to: localhost\n          when: node_safe_for_traffic | bool\n\n        - name: 解除当前节点的监控静默\n          ansible.builtin.uri:\n            url: \"https://monitoring.example/api/silences/{{ monitoring_silence.json.id }}\"\n            method: DELETE\n            status_code: [200, 204, 404]\n          delegate_to: localhost\n          when:\n            - monitoring_silence is defined\n            - monitoring_silence.json is defined\n            - monitoring_silence.json.id is defined\n\n        - name: 无论成功或回退都写入发布审计事件\n          ansible.builtin.uri:\n            url: https://audit.example/api/deployments\n            method: POST\n            body_format: json\n            body:\n              host: \"{{ inventory_hostname }}\"\n              release: \"{{ release_version }}\"\n              ticket: \"{{ change_ticket }}\"\n              outcome: \"{{ release_outcome }}\"\n              safe_for_traffic: \"{{ node_safe_for_traffic }}\"\n            status_code: [200, 201, 204]\n          delegate_to: localhost\n\n  post_tasks:\n    - name: 从负载均衡器确认节点已经恢复服务\n      ansible.builtin.uri:\n        url: \"https://lb.example/api/nodes/{{ inventory_hostname }}\"\n        return_content: true\n        status_code: 200\n      register: final_lb_state\n      failed_when: not final_lb_state.json.enabled | bool\n      changed_when: false\n      delegate_to: localhost\n```\n\n这个案例刻意把 `node_safe_for_traffic` 作为恢复流量的门禁：新版本或已验证的回退版本健康时才设为 `true`。如果回退本身失败，`always` 仍会解除监控静默，但不会把不健康节点加回负载均衡器，值班人员会看到真实告警并接管。实际系统还要处理 LB API 幂等键、并发限制、监控静默超时、审计 API 故障以及不同健康检查层级。\n\n`pre_tasks` 适合在每批角色执行前完成契约校验，Role 或 `tasks` 承载部署能力，`post_tasks` 做批后验证。审计放在 `always` 中，才能同时记录成功、回退和未恢复流量的结果。若审计失败不应使已经健康的发布被判为业务失败，可以把审计写入可靠队列，或单独定义经过评审的失败策略，而不是随意 `ignore_errors`。\n\n生产流水线至少应具备：代码和依赖审核、staging 验证、目标预览、变更审批、不可变版本、分批发布、健康门禁、失败停止、可执行回滚、审计记录和发布后观察。Ansible 负责编排动作，但“零停机”最终取决于应用兼容性、容量冗余、负载均衡、数据库迁移策略和监控质量。\n\n#### 第二册学习闭环\n\n1. 用 Play、Task、Handler 表达可重复目标状态；\n2. 用变量、Facts、条件和循环适配差异；\n3. 用 Role 和 Collection 建立可维护边界；\n4. 用标签、check mode 和分步执行控制变更范围；\n5. 用异步、block、委托和批次处理复杂故障行为；\n6. 用 Vault 和外部秘密系统保护敏感数据；\n7. 在隔离环境验证后，以可观察、可停止、可回滚的方式滚动交付。", "subs": ["把发布输入变成不可变且可审计的契约", "先定义数据库迁移和回滚边界", "编排安全的单节点滚动发布", "第二册学习闭环"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
