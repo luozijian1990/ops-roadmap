@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Helm 学习笔记 · 第三册：仓库、安全与扩展 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Helm 学习笔记 · 第三册：仓库、安全与扩展</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Helm 学习笔记 · 第三册：仓库、安全与扩展", "intro": "> **适用对象**：平台工程师、Chart 仓库维护者、安全工程师和需要嵌入 Helm 能力的开发者<br>\n> **学习目标**：建立 Chart 分发和完整性校验流程，治理兼容性与权限，并理解插件、PostRenderer 和 Go SDK 的扩展边界。", "parts": [{"title": "第八章 · 发布和分发 Chart", "sections": [{"title": "理解传统 Chart Repository 的结构与索引", "content": "<!-- src: 340051e0e422d4f0/The-Chart-Repository-Guide.md -->\n\n传统 Chart Repository 本质上是能通过 HTTP 提供 `index.yaml` 和 `.tgz` 文件的静态站点。`index.yaml` 汇总 Chart 元数据、版本、下载 URL 和摘要；包不必与索引同域，但同域部署最简单。\n\n```text\nrepository/\n├── index.yaml\n├── web-1.2.0.tgz\n├── web-1.2.0.tgz.prov\n└── web-1.3.0.tgz\n```\n\n```mermaid\ngraph LR\n    P[Chart tgz] --> I[index.yaml]\n    S[签名 prov] --> I\n    I --> H[HTTP Server]\n    P --> H\n    C[Helm Client] -->|repo update| H\n    C -->|pull| P\n```\n\n客户端添加仓库时会下载索引到本地缓存，`helm search repo` 查询的是本地索引，因此仓库更新后需要执行 `helm repo update`。\n\n#### `index.yaml` 包含哪些信息\n\n```yaml\napiVersion: v1\nentries:\n  web:\n    - name: web\n      version: 1.3.0\n      appVersion: \"2.8.1\"\n      created: 2026-08-20T00:00:00Z\n      digest: sha256:...\n      urls:\n        - https://charts.example.com/web-1.3.0.tgz\ngenerated: 2026-08-20T00:00:00Z\n```\n\n同名 Chart 的多个版本放在同一 entries 列表。客户端根据版本约束选择条目，再从 `urls` 下载包。Digest 用于检测内容变化，但没有签名身份时不能单独回答“谁发布了它”。\n\n#### 客户端缓存与一致性\n\n`helm repo add` 保存仓库名称和 URL，并下载索引；`helm repo update` 刷新缓存。包已经上传但索引未更新时，客户端搜索不到；索引已经更新但包尚未上传时，搜索可见却下载失败。\n\n```bash\nhelm env\nhelm repo list\nhelm repo update vendor --debug\nhelm search repo vendor/web --versions\n```\n\n排障时从 `helm env` 找到 repository config 与 cache 的实际路径，不要假设所有平台都在相同目录。\n\n#### 传统 Repository 与 OCI 的差异\n\n| 维度 | 传统 Repository | OCI Registry |\n| --- | --- | --- |\n| 发现 | 集中 `index.yaml` | Registry Repository 与 tag |\n| 上传 | Helm 本身不定义通用上传协议 | 内置 `helm push` |\n| 引用 | `repo-name/chart` | `oci://host/path/chart` |\n| 认证 | HTTP Basic、TLS 等 | Registry 认证 |\n| 元数据 | 索引集中保存 | OCI Manifest 与 config |\n| 复制 | 同步静态文件与索引 | 使用 Registry 复制能力 |\n\n已有消费者依赖 `helm search repo` 时，迁移到 OCI 需要额外提供发现入口或文档。", "subs": ["index.yaml 包含哪些信息", "客户端缓存与一致性", "传统 Repository 与 OCI 的差异"]}, {"title": "创建、托管、同步和更新 Chart Repository", "content": "<!-- src: 340051e0e422d4f0/The-Chart-Repository-Guide.md; 0b443dd78fd28297/Syncing-Your-Chart-Repository.md -->\n\n```bash\nhelm package ./charts/web\nhelm repo index ./public --url https://charts.example.com\n```\n\n向已有仓库增加版本时，先下载现有 `index.yaml`，再使用 `--merge` 合并；直接重建只会包含本地目录当前存在的包，容易丢失历史索引。\n\n```bash\nhelm repo index ./public \\\n  --url https://charts.example.com \\\n  --merge ./public/index.yaml\n```\n\n上传 `.tgz`、`.prov` 和新索引时应考虑原子性：先上传不可变版本包，最后替换索引，避免客户端看到尚不存在的 URL。对象存储或普通 Web Server 必须正确提供 HTTPS、YAML 内容类型、缓存策略和访问控制。\n\n#### 支持哪些托管方式\n\n只要能稳定响应 HTTPS GET，就可以使用对象存储静态站点、GitHub Pages、普通 Web Server、ChartMuseum、Artifactory、Cloudsmith 或 GitLab Package Registry。选择时比较认证、不可变策略、审计、复制、备份和生命周期管理，而不只是“能否提供文件”。\n\n#### 新建仓库的步骤\n\n```bash\nhelm package ./charts/web --destination ./public\nhelm package ./charts/worker --destination ./public\nhelm repo index ./public --url https://charts.example.com\n```\n\n上传后从一台没有本地缓存的环境验证：\n\n```bash\nhelm repo add verify https://charts.example.com\nhelm search repo verify/ --versions\nhelm pull verify/web --version 1.3.0 --verify\n```\n\n#### 增量更新的安全顺序\n\n1. 下载当前远端 `index.yaml`。\n2. 在隔离目录放入新 Chart 包和 provenance 文件。\n3. 用 `helm repo index --merge` 生成新索引。\n4. 校验旧版本条目仍在、新 URL 可访问、digest 正确。\n5. 上传不可变 Chart 和 provenance。\n6. 最后原子替换索引。\n7. 从干净客户端刷新并拉取验证。\n\n直接在不完整本地目录运行 `repo index` 会重建索引并移除未在本地出现的历史版本。\n\n#### GCS 类对象存储同步\n\n材料以对象存储目录为例。同步命令需要避免先删除远端旧包，生产仓库还应配置版本控制或回收站，以便索引发布错误时恢复。公开仓库可以匿名读取，但写权限只给发布流水线。", "subs": ["支持哪些托管方式", "新建仓库的步骤", "增量更新的安全顺序", "GCS 类对象存储同步"]}, {"title": "用 GitHub Actions 自动发布 Chart", "content": "<!-- src: 0b443dd78fd28297/Chart-Releaser-Action-to-Automate-GitHub-Page-Charts.md -->\n\nChart Releaser Action 可以把 Git 仓库中的 Chart 打包为 GitHub Release，并维护 GitHub Pages 上的索引。典型触发点是默认分支的 Chart 目录发生变更。\n\n```yaml\nname: release-charts\non:\n  push:\n    branches: [main]\npermissions:\n  contents: write\njobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - uses: azure/setup-helm@v4\n      - uses: helm/chart-releaser-action@v1\n        env:\n          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n```\n\n流水线应在发布前执行 lint、渲染、Schema 校验和安装测试，并确保同一 Chart 版本不可覆盖发布。\n\n#### Chart Releaser 工作流的输入输出\n\n典型仓库在默认分支保存 `charts/NAME` 源码，在 GitHub Release 保存 `.tgz`，在 `gh-pages` 分支保存 `index.yaml`。Chart Releaser 根据 Chart 版本判断需要创建哪些 Release。\n\n发布前检查 Git 历史深度、目标分支、Pages 设置和 token 权限。`contents: write` 是高权限，应限制触发分支并防止不受信任的 Pull Request 直接获得发布凭据。\n\n#### 建议增加的质量阶段\n\n```yaml\n- name: Lint\n  run: helm lint charts/web --strict\n- name: Render production values\n  run: helm template web charts/web -f charts/web/ci/production-values.yaml\n- name: Package\n  run: helm package charts/web --destination .cr-release-packages\n```\n\n真正安装测试通常需要 KIND 或专用测试集群。测试通过后再允许 Releaser 创建不可变版本，失败时不能生成半成品索引。", "subs": ["Chart Releaser 工作流的输入输出", "建议增加的质量阶段"]}, {"title": "用 OCI Registry 存储、签名和迁移 Chart", "content": "<!-- src: 340051e0e422d4f0/Use-OCI-based-registries.md -->\n\nOCI Registry 可以在现有容器镜像基础设施中存放 Chart，统一认证、权限、复制和保留策略。上传引用不包含 Chart 名和标签，它们分别从 `Chart.yaml` 的 `name` 与 `version` 推导。\n\n```bash\nhelm registry login registry.example.com\nhelm package ./web\nhelm push web-1.2.0.tgz oci://registry.example.com/helm\n\nhelm pull oci://registry.example.com/helm/web --version 1.2.0\nhelm install web oci://registry.example.com/helm/web --version 1.2.0\n```\n\nOCI 依赖在 `Chart.yaml` 中也使用不含依赖名的仓库路径。传统仓库迁移到 OCI 时，要同步迁移版本保留、签名、访问授权和消费者引用方式，不能只复制包。\n\n#### OCI 引用规则\n\n上传：\n\n```text\nhelm push web-1.2.0.tgz oci://registry.example.com/platform\n                              └── 不含 web 和 1.2.0\n```\n\n下载：\n\n```text\noci://registry.example.com/platform/web --version 1.2.0\n                                    └── 包含 Chart 名\n```\n\nChart 名成为 OCI Repository basename，SemVer 成为 tag。构建元数据中的 `+` 在某些 OCI tag 表达中需要规范化，消费时仍按 Chart SemVer 理解。\n\n#### OCI Manifest 的组成\n\nHelm Chart 作为 OCI Artifact 存储，Manifest 引用 Chart content layer、config layer，以及存在时的 provenance layer。Registry 返回的 digest 对整个 Manifest 提供内容寻址依据。\n\n#### OCI 依赖\n\n```yaml\ndependencies:\n  - name: database\n    version: 3.2.1\n    repository: oci://registry.example.com/platform\n```\n\n`repository` 不含 `database`。执行 `helm dependency update` 后，依赖包进入 `charts/` 并记录锁定信息。\n\n#### Registry 运营注意事项\n\n- 某些 Registry 要求先创建 Project 或 Repository 命名空间。\n- Robot Account 只授予指定路径的 pull 或 push 权限。\n- 启用 tag 不可变，阻止相同版本被覆盖。\n- 设置跨区域复制、保留和垃圾回收策略。\n- Chart 与镜像可以共用 Registry，但权限与保留周期可能不同。\n- 非 TLS 本地 Registry 只用于测试，生产不要依赖 `plain-http`。", "subs": ["OCI 引用规则", "OCI Manifest 的组成", "OCI 依赖", "Registry 运营注意事项"]}, {"title": "用 Provenance 验证 Chart 的来源与完整性", "content": "<!-- src: 340051e0e422d4f0/Helm-Provenance-and-Integrity.md -->\n\nProvenance 文件把 Chart 摘要与发布者签名绑定。验证成功表示包与签名时内容一致，并且签名能追溯到给定密钥；它不自动证明 Chart 安全、维护者可信或镜像无漏洞。\n\n```bash\nhelm package --sign --key \"release@example.com\" --keyring secring.gpg ./web\nhelm verify web-1.2.0.tgz --keyring pubring.gpg\nhelm install web ./web-1.2.0.tgz --verify --keyring pubring.gpg\n```\n\n供应链还应管理密钥身份验证、轮换和吊销。OCI 场景可结合 Sigstore 工具链；无论采用哪种方案，都应在准入前按 digest 固定并验证制品。\n\n#### Provenance 文件的工作流\n\n1. Chart 作者完成源代码和版本审查。\n2. `helm package --sign` 生成 `.tgz` 与相邻 `.prov`。\n3. 仓库同时发布包与 provenance。\n4. 消费者取得发布者公钥并验证其身份。\n5. `helm verify` 校验签名和包摘要。\n6. 验证成功后才进入渲染与安装阶段。\n\nProvenance 文件包含 Chart 元数据和包摘要的签名表达。包被修改、`.prov` 与包不匹配、密钥不在 keyring 或签名无效都会导致验证失败。\n\n#### 信任密钥而不只是导入密钥\n\n从同一不可信下载页同时取得 Chart、`.prov` 和公钥，无法建立独立信任。公钥指纹应通过组织目录、线下渠道或已验证身份发布，并记录轮换和吊销。\n\n#### 签名不能覆盖的风险\n\n- 模板本身包含高权限或恶意资源。\n- Chart 引用的镜像被覆盖或含漏洞。\n- 默认 Values 暴露不安全服务。\n- 安装身份权限过大。\n- 签名密钥已经泄露但尚未吊销。\n\n完整供应链还需要源码审查、依赖锁定、镜像签名、漏洞扫描、准入策略与审计日志。", "subs": ["Provenance 文件的工作流", "信任密钥而不只是导入密钥", "签名不能覆盖的风险"]}]}, {"title": "第九章 · 处理兼容性、安全与存储治理", "sections": [{"title": "管理 Helm 与 Kubernetes 的版本偏差和发布节奏", "content": "<!-- src: 340051e0e422d4f0/Helm-Version-Support-Policy.md; 340051e0e422d4f0/Release-schedule-policy.md -->\n\nHelm 与 Kubernetes 的支持范围会随版本变化，不能把材料中的某个版本号永久写成事实。升级前应核对当前 Helm 支持策略、目标 Kubernetes 版本以及 Chart 的 `kubeVersion`。\n\n```bash\nhelm version\nkubectl version\nhelm show chart oci://registry.example.com/helm/web --version 1.2.0\n```\n\n团队应为 Patch、Minor、Major 版本建立不同验证强度：Patch 做回归和安全验证，Minor 关注新增功能与废弃项，Major 必须阅读迁移指南并在影子环境演练。\n\n#### 版本偏差不是单向兼容承诺\n\nHelm 的支持策略定义客户端版本可配合哪些 Kubernetes 版本，不意味着任意旧 Chart 都能在这些集群上运行。Chart 自己使用的 API、Webhook 和 CRD 还要单独验证。\n\n升级决策至少有三张矩阵：Helm Client 与 Kubernetes、Chart 与 Kubernetes、应用与 Chart。任意一张不兼容都可能导致发布失败。\n\n#### Patch、Minor 与 Major 发布\n\n| 类型 | 预期内容 | 团队动作 |\n| --- | --- | --- |\n| Patch | Bug 和安全修复 | 快速回归并部署 |\n| Minor | 向后兼容功能与废弃提醒 | 插件、脚本和 Chart 回归 |\n| Major | 允许破坏性变化 | 完整迁移项目 |\n\n版本发布日期与维护窗口会变化，应以执行时官方策略为准。生产环境不应自动跟随“latest”。\n\n#### 升级演练清单\n\n- 渲染现有生产 Values。\n- 验证传统仓库与 OCI 拉取。\n- 验证签名和 keyring。\n- 回归所有必需插件。\n- 对关键 Release 执行 install、upgrade、rollback、uninstall。\n- 测试 Hook、CRD、PostRenderer 和存储驱动。\n- 比较 Manifest 并观察弃用警告。", "subs": ["版本偏差不是单向兼容承诺", "Patch、Minor 与 Major 发布", "升级演练清单"]}, {"title": "在不同 Kubernetes 发行版中使用 Helm", "content": "<!-- src: 340051e0e422d4f0/Kubernetes-Distribution-Guide.md -->\n\nHelm 面向符合 Kubernetes API 的集群，可用于托管云、KIND、Minikube、OpenShift 等环境。真正差异通常来自认证插件、默认 StorageClass、Ingress 实现、安全策略、LoadBalancer 能力和可用 API。\n\n部署前用能力而不是发行版名称做检查：\n\n```bash\nkubectl api-resources\nkubectl auth can-i --list -n target\nkubectl get storageclass\nhelm template web ./chart --kube-version 1.32.0\n```\n\n#### 托管 Kubernetes 的常见差异\n\nAKS、EKS、GKE 等托管集群通常通过云 CLI 或 exec credential plugin 完成认证。Helm 复用 kubeconfig，因此认证插件过期、缺失或使用错误账号会表现为 Helm 连接失败。\n\n不同云的 LoadBalancer annotation、IAM 集成、StorageClass 和 Ingress Controller 不同。把这些差异放在 Values，而不是复制整套 Chart。\n\n#### 本地与测试发行版\n\nKIND、Minikube、MicroK8s 等适合 Chart 安装测试，但默认可能没有 LoadBalancer、动态存储或完整准入策略。测试成功只能证明该环境覆盖的能力。CI 可按 Chart 依赖安装必要 addon，并明确哪些生产能力未模拟。\n\n#### OpenShift 等受限环境\n\n更严格的安全上下文、随机 UID 和路由能力可能暴露 Chart 对 root、固定 UID 或特权容器的假设。Chart 应允许平台注入 securityContext，并避免写死宿主机路径。\n\n#### 用能力探测代替发行版分支\n\n优先根据 `.Capabilities.APIVersions.Has` 和公开 Values 决定是否生成可选资源。直接判断集群供应商会把模板绑定到品牌名称，也容易漏掉同能力的其他发行版。", "subs": ["托管 Kubernetes 的常见差异", "本地与测试发行版", "OpenShift 等受限环境", "用能力探测代替发行版分支"]}, {"title": "识别并迁移已经废弃的 Kubernetes API", "content": "<!-- src: 340051e0e422d4f0/Deprecated-Kubernetes-APIs.md -->\n\nKubernetes 删除旧 API 后，包含旧 `apiVersion` 的 Chart 可能无法安装，旧 Release 的历史 Manifest 也可能阻碍升级。Chart 维护者应更新模板和 `kubeVersion`，使用者应在集群升级前扫描已部署 Release。\n\n迁移顺序：盘点目标版本删除项、渲染所有 Values 组合、升级 Chart、验证对象转换和行为、再升级集群。不能只搜索源码，因为条件模板和历史修订可能隐藏旧 API。\n\n#### Chart 维护者的迁移责任\n\n维护者应在目标 Kubernetes 版本上渲染并安装 Chart，更新 `apiVersion` 与字段结构，提升 `kubeVersion` 下限，并在变更日志说明用户动作。仅替换 API 字符串可能不够，因为不同版本的 Schema 可能改变 selector、backend 或版本列表结构。\n\n#### Helm 使用者的迁移责任\n\n使用者要盘点所有 Release 的实际 Manifest，而不仅是当前 Chart 源码。旧修订中的废弃 API 可能影响回滚或升级解析。升级集群前先升级 Release 到兼容 Chart，并验证回滚策略不再依赖已删除 API。\n\n```bash\nhelm list -A\nhelm get manifest RELEASE -n NAMESPACE\nkubectl api-resources\n```\n\n#### CRD 转换需要额外小心\n\nCRD 的 served/storage 版本、转换 Webhook 和现有对象存储版本不由普通 Helm 升级自动解决。先完成 CRD 与对象迁移，再升级依赖新版本的应用 Chart。", "subs": ["Chart 维护者的迁移责任", "Helm 使用者的迁移责任", "CRD 转换需要额外小心"]}, {"title": "用 Kubernetes RBAC 限制 Helm 操作者权限", "content": "<!-- src: 340051e0e422d4f0/Role-based-Access-Control.md -->\n\nHelm 使用 kubeconfig 中的身份，没有独立授权层。给日常发布账号分配命名空间级 Role/RoleBinding；只有确实需要 CRD、ClusterRole 等资源时才授予集群级权限。\n\n```bash\nkubectl auth can-i create deployments.apps -n app --as system:serviceaccount:ci:helm-deployer\nkubectl auth can-i create customresourcedefinitions.apiextensions.k8s.io --as system:serviceaccount:ci:helm-deployer\n```\n\nChart 的权限需求应进入 README 和安全审查，避免用 `cluster-admin` 掩盖缺失权限。\n\n#### Namespace 级发布角色示意\n\n```yaml\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: helm-deployer\n  namespace: app\nrules:\n  - apiGroups: [\"\", \"apps\", \"batch\", \"networking.k8s.io\"]\n    resources: [\"configmaps\", \"secrets\", \"services\", \"deployments\", \"jobs\", \"ingresses\"]\n    verbs: [\"get\", \"list\", \"watch\", \"create\", \"update\", \"patch\", \"delete\"]\n```\n\n这只是示意，实际资源和 verbs 必须从 Chart 渲染结果得出。Helm 为了比较和等待资源通常需要 get/list/watch，不能只授予 create。\n\n#### 读写角色分离\n\n审计人员可以只读取 Release Secret 和相关对象；发布账号拥有目标命名空间变更权限；CRD 与集群 RBAC 由平台管理员的独立流程执行。分离后，普通应用发布不再需要 cluster-admin。\n\n#### 模拟身份预检\n\n```bash\nkubectl auth can-i --list \\\n  --as system:serviceaccount:ci:helm-deployer \\\n  -n app\n```\n\n预检结果还要结合准入策略。RBAC 允许不代表 Pod Security、OPA 或其他 Webhook 会接受对象。", "subs": ["Namespace 级发布角色示意", "读写角色分离", "模拟身份预检"]}, {"title": "为 SQL Release 存储后端分配最小权限", "content": "<!-- src: 340051e0e422d4f0/Permissions-management-for-SQL-storage-backend.md -->\n\nSQL 后端适用于有特定集中存储需求的环境，但会引入数据库可用性、凭据和权限治理。初始化账号可建表和授权，运行账号只获得所需表操作权限；不要让 Helm 运行身份长期持有数据库管理员权限。\n\n选择存储驱动时先回答：是否真的不能使用集群内 Secret、备份和恢复如何做、网络故障时发布如何失败、多个集群如何隔离数据。\n\n#### 初始化与运行权限分开\n\nSQL 管理账号负责创建数据库、表或初始权限；Helm 运行账号只获得 Release 表所需的 SELECT、INSERT、UPDATE、DELETE 等权限。完成初始化后撤销建库、建表和授权能力。\n\n```sql\nGRANT SELECT, INSERT, UPDATE, DELETE\nON ALL TABLES IN SCHEMA public\nTO helm_runtime;\n```\n\n具体表和序列权限取决于驱动初始化结果，应在目标数据库核对，不要直接复制示例到生产。\n\n#### 多租户与备份\n\n不同集群或租户需要独立数据库、Schema 或受驱动支持的隔离键，并验证运行账号不能读取其他租户 Release。备份要与集群资源和外部数据形成一致恢复点；只有 SQL Release 历史不能恢复应用。", "subs": ["初始化与运行权限分开", "多租户与备份"]}]}, {"title": "第十章 · 使用和开发 Helm 插件", "sections": [{"title": "理解插件类型、API 版本、运行时和目录结构", "content": "<!-- src: dea9de507a10787d/Overview.md; 340051e0e422d4f0/The-Helm-Plugins-Guide.md -->\n\n插件扩展 Helm CLI，但不要求修改 Helm 核心。Helm 4 材料把插件区分为 CLI、Getter 和 PostRenderer 等类型，并支持 subprocess 与 Wasm 等运行时。插件根目录包含 `plugin.yaml`、可执行代码和可选平台配置。\n\n```yaml\napiVersion: v1\ntype: cli/v1\nname: system-info\nversion: 0.1.0\nruntime: subprocess\nconfig:\n  usage: system-info\n```\n\n插件 API 和 manifest 字段会随主版本演进，不能把旧版 `plugin.yaml` 示例直接用于 Helm 4 而不验证。\n\n#### 三类插件解决的问题不同\n\n| 类型 | 接入点 | 输入 | 输出 | 典型用途 |\n| --- | --- | --- | --- | --- |\n| CLI | Helm 子命令分发 | 命令行参数与 Helm 环境 | 文本、文件或外部副作用 | 审计、迁移、批量管理 |\n| Getter | Chart 下载阶段 | 自定义 URL 与认证配置 | Chart 字节流 | 内网协议、专有制品库 |\n| PostRenderer | Manifest 提交前 | 标准输入中的多文档 YAML | 标准输出中的多文档 YAML | 注入标签、策略与 sidecar |\n\n类型决定 Helm 在什么时候调用插件，也决定插件必须遵守的协议。CLI 插件通常最自由；Getter 和 PostRenderer 位于关键数据链路，输出格式错误会直接阻断安装或升级。\n\n#### 插件目录与可移植构建\n\n一个可分发插件至少要让使用者能够回答四个问题：插件是谁、支持哪个 Helm 插件 API、执行什么程序、怎样卸载或更新。建议目录保持简单：\n\n```text\nsystem-info/\n├── plugin.yaml\n├── README.md\n├── LICENSE\n└── bin/\n    ├── system-info\n    └── system-info.exe\n```\n\n不要让 `plugin.yaml` 指向开发机上的绝对路径。跨平台插件应明确支持的操作系统和架构，并让打包产物包含对应二进制。若运行时是 Wasm，则要固定模块及其运行权限，不应默认允许任意目录和网络访问。\n\n#### Manifest 是调用契约\n\n不同插件 API 版本的字段结构并不完全相同，开发时应以目标 Helm 版本的文档和校验器为准。无论具体字段名称如何变化，都应把以下内容视为发布契约：\n\n- `apiVersion`：插件清单所遵循的 schema 版本；\n- `type`：CLI、Getter 或 PostRenderer 的接口类型；\n- `name` 与 `version`：命令发现、升级和审计所需身份；\n- `runtime`：subprocess 或 Wasm 等执行方式；\n- `config`：入口、参数、协议前缀、用法说明等类型专属配置；\n- 平台约束：支持的 OS、架构以及相应入口。\n\n发布前应在干净环境运行 manifest 校验，不要以“开发机上能执行”代替协议兼容验证。\n\n#### 环境变量与参数边界\n\nHelm 调用插件时会暴露一组 Helm 相关环境变量，例如插件目录、缓存目录、配置目录、数据目录、命名空间和 kubeconfig。插件应只读取完成任务所需的变量，并允许显式参数覆盖合理默认值。\n\n环境变量可能包含路径或集群访问信息，因此日志中不应无差别打印整个环境。CLI 参数必须正确处理空格、Unicode 和以连字符开头的值；subprocess 入口不要把参数重新拼接成一段 shell 字符串，以免出现转义和注入问题。\n\n#### 自动补全与帮助信息\n\nCLI 插件应提供稳定的 `--help`，并让错误消息同时包含“发生了什么”和“下一步怎么做”。若插件 API 支持补全协议，可按当前位置返回候选项，但补全过程不能执行有副作用的操作，也不应因为网络不可达拖慢 shell。", "subs": ["三类插件解决的问题不同", "插件目录与可移植构建", "Manifest 是调用契约", "环境变量与参数边界", "自动补全与帮助信息"]}, {"title": "安全地查找、安装、查看和卸载插件", "content": "<!-- src: dea9de507a10787d/Using-Plugins.md -->\n\n插件以当前用户权限执行，可能读取 kubeconfig、环境变量和文件系统，应像安装本地程序一样审查来源、版本和安装 Hook。\n\n```bash\nhelm plugin install https://example.com/plugin --version 1.2.0\nhelm plugin list\nhelm plugin update plugin-name\nhelm plugin uninstall plugin-name\n```\n\n生产环境应固定插件版本和校验值，并在隔离环境评估升级。不要把不可信仓库地址直接交给自动化安装。\n\n#### 安装前审查清单\n\n安装动作通常会拉取代码并可能运行安装 Hook。至少完成以下审查：\n\n1. 确认仓库所有者、发布标签和提交是否可信；\n2. 阅读 `plugin.yaml`，确认入口没有越界路径；\n3. 阅读 install、update、delete Hook，查找下载和提权行为；\n4. 核对二进制校验和或签名，而不是只依赖 HTTPS；\n5. 在不含生产 kubeconfig 和云凭据的环境试运行；\n6. 固定精确版本，记录审批人、来源和安装时间。\n\n#### 生命周期操作的真实含义\n\n`helm plugin list` 只说明 Helm 当前能发现哪些插件，并不证明入口安全或功能正常。`plugin update` 可能替换可执行文件，应像依赖升级一样审阅差异并回归测试。`plugin uninstall` 通常移除插件目录，但插件此前创建的外部资源、缓存和凭据不会自动消失。\n\n团队环境可以维护一份允许清单：包含插件名、来源、版本、digest、支持的 Helm 主版本和责任人。CI 镜像中预装插件时，还要把插件纳入镜像 SBOM 和漏洞扫描。\n\n#### 发现插件执行失败时\n\n按以下顺序缩小范围：\n\n```text\nHelm 能否发现插件\n  -> manifest 能否被目标版本解析\n  -> 当前平台是否有匹配入口\n  -> 文件是否可执行\n  -> 直接运行入口是否成功\n  -> Helm 传入的环境和参数是否符合预期\n```\n\n退出码非零时保留标准错误，但要先脱敏。插件在终端成功、在 CI 失败，常见原因是工作目录、HOME、PATH、代理、证书或 kubeconfig 不同。", "subs": ["安装前审查清单", "生命周期操作的真实含义", "发现插件执行失败时"]}, {"title": "开发 CLI、Getter 与 PostRenderer 插件", "content": "<!-- src: dea9de507a10787d/Developing-Plugins.md; fa02247a9e4fa3f3/Build-a-CLI-Plugin.md; fa02247a9e4fa3f3/Build-a-Getter-Plugin.md; fa02247a9e4fa3f3/Build-a-Postrenderer-Plugin.md -->\n\n- CLI 插件增加新的 `helm NAME` 命令。\n- Getter 插件支持新的 Chart 获取协议。\n- PostRenderer 插件接收渲染后的 Manifest 并输出修改结果。\n\n开发流程包括创建目录与 manifest、实现 subprocess 或 Wasm 入口、开发模式安装、测试输入输出和失败码。PostRenderer 必须保持 YAML 多文档边界；Getter 要处理认证和 TLS；CLI 插件不要静默修改集群。\n\n#### CLI subprocess 插件\n\nCLI 插件的入口应把命令行解析与业务逻辑分开，并遵循普通命令行程序约定：成功返回 0，用户输入错误和运行错误返回非零；普通结果写 stdout，诊断写 stderr。\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n\ncase \"${1:-}\" in\n  version)\n    printf '%s\\n' 'system-info 0.1.0'\n    ;;\n  *)\n    printf '%s\\n' 'usage: helm system-info version' >&2\n    exit 2\n    ;;\nesac\n```\n\n真实插件还应处理 `SIGINT`、超时和临时文件清理。不要假定调用工作目录就是插件目录，应从 Helm 提供的插件根目录变量解析内置资源。\n\n#### CLI Wasm 插件\n\nWasm 适合提供跨平台、受约束的执行单元，但宿主能力不是自动存在的。文件系统、环境变量、网络和时钟是否可用取决于 Helm 的 Wasm 运行时与授权配置。开发流程包括：\n\n1. 为目标 WASI ABI 编译模块；\n2. 只声明实际需要的宿主权限；\n3. 用固定输入验证 stdout、stderr 和退出码；\n4. 在不同目标平台的 Helm 中做兼容测试；\n5. 将模块 digest 与插件版本绑定。\n\n如果任务强依赖本地系统命令或动态库，subprocess 可能更合适；不要为了形式上的“沙箱化”把大量未经说明的权限重新开放给 Wasm。\n\n#### Getter 插件的数据契约\n\nGetter 为 Helm 增加新的 URL scheme，例如 `corp://team/chart`。它的核心责任是把引用解析为可验证的 Chart 内容，同时正确处理：\n\n- URL 规范化和路径穿越防护；\n- 身份认证、令牌刷新与凭据脱敏；\n- 企业 CA、TLS 主机名和代理；\n- 重定向策略与目标域名限制；\n- 大文件、超时、重试和取消；\n- 内容长度、digest 和签名验证；\n- 明确区分“未找到”“未授权”“临时不可用”。\n\n不要在 Getter 中把认证失败自动降级为匿名访问，也不要在错误消息中回显带凭据的 URL。\n\n#### Getter 的最小测试矩阵\n\n| 场景 | 期望 |\n| --- | --- |\n| 合法 URL | 返回完整 Chart 字节且 digest 匹配 |\n| 不支持的 scheme | 明确拒绝，不尝试本地文件 |\n| 401/403 | 返回认证或授权错误，不泄露 token |\n| TLS 证书错误 | 默认失败，不静默跳过校验 |\n| 下载中断 | 清理临时文件，返回非零 |\n| context 取消 | 尽快终止网络和解压操作 |\n| 恶意路径 | 不访问允许根目录之外的文件 |\n\n#### PostRenderer 插件的流协议\n\nsubprocess PostRenderer 从 stdin 读取 Helm 渲染出的完整多文档 YAML，把变换后的结果写到 stdout。任何日志、进度条或调试文本都必须写 stderr，否则会污染 Manifest。\n\n```bash\nhelm template web ./chart | ./bin/add-policy > rendered.yaml\nkubectl apply --dry-run=server -f rendered.yaml\n```\n\n插件要保留 `---` 文档边界、注释的必要语义、资源顺序以及无法识别的字段。更稳妥的方式是使用 Kubernetes 结构化 YAML 库解析对象，再显式修改目标字段，而不是对文本做正则替换。\n\n#### 开发模式与发布模式\n\n开发阶段可以把本地目录链接或安装到插件目录，缩短反馈周期；发布阶段则必须从干净构建产出包，验证包内没有测试凭据、缓存和本地路径。至少运行三层测试：\n\n- 单元测试：参数解析、URL 解析、对象变换；\n- 契约测试：stdin/stdout、退出码、manifest schema；\n- 集成测试：由目标 Helm 版本实际安装并执行。\n\n若同时支持 Helm 多个主版本，应分别跑集成矩阵，而不是只声明兼容。", "subs": ["CLI subprocess 插件", "CLI Wasm 插件", "Getter 插件的数据契约", "Getter 的最小测试矩阵", "PostRenderer 插件的流协议", "开发模式与发布模式"]}]}, {"title": "第十一章 · 通过高级接口扩展 Helm", "sections": [{"title": "用 PostRenderer 改写最终清单", "content": "<!-- src: 340051e0e422d4f0/Advanced-Helm-Techniques.md -->\n\nPostRenderer 位于模板渲染与提交 API Server 之间，可统一注入标签、安全上下文或策略变换。\n\n```mermaid\ngraph LR\n    C[Chart 与 Values] --> R[Helm Render]\n    R --> P[PostRenderer]\n    P --> V[最终 Manifest]\n    V --> K[Kubernetes API]\n```\n\n所有参与同一 Release 的操作者必须使用相同 PostRenderer，否则后续升级可能产生漂移。PostRenderer 是可执行代码，应版本化、签名并保存其配置。\n\n#### 变换必须可重复\n\n同一输入重复经过 PostRenderer 应得到相同输出。若每次都追加标签、容器或随机值，升级时会制造无意义差异甚至资源膨胀。可重复变换通常遵循“存在则更新，不存在才创建”的规则。\n\n```text\n输入 Manifest\n  -> 解析全部 YAML 文档\n  -> 按 apiVersion/kind/name/namespace 选择对象\n  -> 检查目标字段是否已经存在\n  -> 合并或替换\n  -> 稳定序列化\n  -> 输出 Manifest\n```\n\n#### 版本一致性是 Release 输入的一部分\n\nChart、Values 和 PostRenderer 三者共同决定最终 Manifest。因此发布记录应保存 PostRenderer 名称、版本、digest 和配置。GitOps 或 CI 流程中应从固定制品调用它，不能依赖操作者机器上的“最新版”。\n\nPostRenderer 失败时 Helm 应停止提交；脚本不能吞掉解析错误后原样放行。涉及策略强制时，还应在 API Server 侧配置准入策略，避免绕过 Helm 的其他客户端直接提交不合规资源。\n\n#### 适合与不适合的用途\n\n适合统一注入组织级标签、Pod 安全字段、镜像拉取 Secret 或服务网格注解；不适合修补 Chart 的核心业务逻辑、隐藏不兼容 API，或产生需要独立生命周期管理的大量资源。能够在上游 Chart 解决的问题，优先回到模板和 Values。", "subs": ["变换必须可重复", "版本一致性是 Release 输入的一部分", "适合与不适合的用途"]}, {"title": "选择 ConfigMap、Secret、Memory 或 SQL 存储后端", "content": "<!-- src: 340051e0e422d4f0/Advanced-Helm-Techniques.md -->\n\nRelease 存储决定历史保留位置。Secret 是常见默认选择；ConfigMap 可读性更强但不适合敏感内容；Memory 只适合测试；SQL 引入独立数据库。选择时比较机密性、容量、RBAC、备份、灾难恢复和运维成本。\n\n| 驱动 | 持久性 | 访问控制 | 适用场景 | 主要风险 |\n| --- | --- | --- | --- | --- |\n| Secret | 集群内持久 | Kubernetes RBAC，可配合静态加密 | 大多数集群 | etcd 容量、集群权限过宽 |\n| ConfigMap | 集群内持久 | Kubernetes RBAC | 无敏感配置的兼容场景 | 内容更容易被读取，不宜存机密 |\n| Memory | 进程内 | 进程边界 | 单元测试、短生命周期工具 | 进程退出即丢失，不能多副本共享 |\n| SQL | 集群外持久 | 数据库权限与网络策略 | 集中式平台、特殊容量需求 | 新增数据库可用性、备份和租户隔离责任 |\n\n切换驱动并不会自动迁移旧历史。变更 `HELM_DRIVER` 前先盘点 Release、设计迁移和回退方案，并验证新驱动能读取预期历史。只迁移最新修订会影响回滚与审计。\n\n#### 存储不是应用备份\n\nRelease 记录保存 Helm 所需状态，不包含数据库数据、PVC 内容和所有外部系统副作用。灾难恢复演练必须同时覆盖 Kubernetes 资源、Helm 历史、持久数据和外部依赖；恢复后再验证 `helm list`、`helm history` 与集群实际对象一致。", "subs": ["存储不是应用备份"]}, {"title": "通过 Go SDK 调用 Helm 核心能力", "content": "<!-- src: 97fd329e1effbc74/Introduction.md; 340051e0e422d4f0/Advanced-Helm-Techniques.md -->\n\nGo SDK 让控制器或平台服务复用 Helm 的 action、chart、cli 和 release 包。最小流程是创建环境设置、初始化 `action.Configuration`、构造具体 Action 并运行。\n\n```go\nsettings := cli.New()\ncfg := new(action.Configuration)\nif err := cfg.Init(settings.RESTClientGetter(), settings.Namespace(), os.Getenv(\"HELM_DRIVER\")); err != nil {\n    return err\n}\nclient := action.NewList(cfg)\nreleases, err := client.Run()\n```\n\nSDK 与 CLI 共享 kubeconfig、命名空间、Registry 和存储等概念。嵌入式程序必须处理 context、超时、日志、并发、凭据和版本兼容，不能只复制示例主函数。\n\n#### 常用包的职责\n\n| 包 | 主要职责 |\n| --- | --- |\n| `action` | Install、Upgrade、List、Pull 等高层操作 |\n| `cli` | 环境设置、kubeconfig、namespace 和路径默认值 |\n| `chart` / `chart/loader` | Chart 数据模型以及目录或归档加载 |\n| `release` | Release、状态和 Hook 等领域对象 |\n| `registry` | OCI 登录、拉取、推送与凭据交互 |\n| `getter` | 按协议获取 Chart |\n| `storage` / `driver` | Release 持久化抽象与具体驱动 |\n\n应用代码应依赖高层 Action，而不是直接操作存储记录来模拟发布。直接修改 Secret 或 SQL 行会绕开状态机、校验和 Hook 语义。\n\n#### 初始化 Configuration\n\n`action.Configuration` 聚合 Kubernetes 客户端、Release 存储、日志函数和能力发现。它应按目标集群与命名空间初始化，初始化失败必须立即返回。\n\n```go\nsettings := cli.New()\nsettings.SetNamespace(\"production\")\n\ncfg := new(action.Configuration)\nerr := cfg.Init(\n    settings.RESTClientGetter(),\n    settings.Namespace(),\n    os.Getenv(\"HELM_DRIVER\"),\n    func(format string, args ...interface{}) {\n        logger.Printf(format, args...)\n    },\n)\nif err != nil {\n    return fmt.Errorf(\"initialize helm action: %w\", err)\n}\n```\n\n示例中的日志函数可能收到 Chart 或 Kubernetes 的诊断信息，生产实现需要分级和脱敏。不要把一个包含可变 namespace 的 Configuration 无锁共享给所有租户请求。\n\n#### Chart 定位与加载\n\nChart 参数可能是本地目录、`.tgz`、传统仓库引用或 OCI 引用。SDK 调用者需要先建立与 CLI 等价的定位选项，再加载 Chart：\n\n```go\ninstall := action.NewInstall(cfg)\ninstall.ReleaseName = \"web\"\ninstall.Namespace = \"production\"\ninstall.Version = \"1.4.0\"\n\nchartPath, err := install.ChartPathOptions.LocateChart(ref, settings)\nif err != nil {\n    return fmt.Errorf(\"locate chart %q: %w\", ref, err)\n}\nch, err := loader.Load(chartPath)\nif err != nil {\n    return fmt.Errorf(\"load chart: %w\", err)\n}\n```\n\n远程引用应固定版本或 digest，并配置 Registry Client、TLS 与凭据。加载成功只代表包可解析，仍需检查依赖和安装约束。\n\n#### Values 的构造\n\nSDK 不会替你定义团队的 Values 优先级。可以复用 Helm 的 values options，也可以在平台层解析多个 YAML 并合并，但必须保持与 CLI 一致的右侧优先、类型和 `null` 删除语义。\n\n禁止将用户提供的任意字符串直接拼成 YAML。结构化 API 应接收 JSON/YAML 对象，做 schema 校验后再传给 Action；敏感值不要进入普通日志或错误上下文。\n\n#### context、超时与取消\n\n平台请求被取消时，Kubernetes 和 Registry 操作也应尽快停止。优先使用支持 context 的 Action 接口，并为下载、等待资源和 Hook 分别设置合理超时。HTTP 请求的 30 秒超时不等于 Helm 等待工作负载就绪的 10 分钟超时，二者要分别设计。", "subs": ["常用包的职责", "初始化 Configuration", "Chart 定位与加载", "Values 的构造", "context、超时与取消"]}, {"title": "用 Action 和 Driver 构建自定义 Helm 工具", "content": "<!-- src: 97fd329e1effbc74/Examples.md -->\n\n材料覆盖 Pull、Install、Upgrade、Uninstall、List 等 Action 以及负责串联它们的 Driver。工程实现应把配置初始化、Registry Client、Chart 定位、依赖下载和错误包装抽成稳定边界。\n\n```mermaid\ngraph TD\n    S[EnvSettings] --> A[Action Configuration]\n    R[Registry Client] --> A\n    A --> P[Pull]\n    A --> I[Install]\n    A --> U[Upgrade]\n    A --> L[List]\n    A --> D[Uninstall]\n```\n\n自定义平台还应实现审计、幂等请求、并发锁和失败恢复。SDK 提供 Helm 语义，不自动提供多租户隔离或发布编排。\n\n#### Pull：只下载不发布\n\n```go\npull := action.NewPull()\npull.Settings = settings\npull.Version = \"1.4.0\"\npull.DestDir = \"./dist\"\npull.Verify = true\npull.Keyring = \"./keys/pubring.gpg\"\n\nresult, err := pull.Run(\"vendor/web\")\nif err != nil {\n    return fmt.Errorf(\"pull chart: %w\", err)\n}\nlogger.Printf(\"downloaded %s\", result)\n```\n\nOCI Chart 还需给 Pull 或 ChartPathOptions 注入 Registry Client。下载目录应是受控临时目录，成功后再原子移动到制品区，防止半包被后续步骤使用。\n\n#### Install：明确全部发布输入\n\n```go\ninstall := action.NewInstall(cfg)\ninstall.ReleaseName = \"web\"\ninstall.Namespace = \"production\"\ninstall.CreateNamespace = true\ninstall.Version = \"1.4.0\"\ninstall.Wait = true\ninstall.Atomic = true\ninstall.Timeout = 10 * time.Minute\n\nrel, err := install.RunWithContext(ctx, ch, vals)\nif err != nil {\n    return fmt.Errorf(\"install web: %w\", err)\n}\nlogger.Printf(\"release=%s revision=%d status=%s\",\n    rel.Name, rel.Version, rel.Info.Status)\n```\n\nRelease 名、namespace、Chart 版本、Values、等待策略和超时都应进入审计记录。`Atomic` 改善失败清理，但不能撤销 Hook 调用的外部 API。\n\n#### Upgrade：先读取再决策\n\n升级前先读取当前 Release 和历史，判断请求是升级、首次安装还是重复提交。平台若提供 `upgrade --install` 等价能力，要定义“Release 不存在”的判定，不能把所有读取错误都当作不存在。\n\n```go\nupgrade := action.NewUpgrade(cfg)\nupgrade.Namespace = \"production\"\nupgrade.Version = \"1.5.0\"\nupgrade.Wait = true\nupgrade.Atomic = true\nupgrade.Timeout = 10 * time.Minute\n\nrel, err := upgrade.RunWithContext(ctx, \"web\", ch, vals)\n```\n\n应显式选择 reset 或 reuse Values 语义。平台 API 最好让调用方提交完整期望配置，从而避免旧值在多年升级中悄然累积。\n\n#### List、Status 与 History：构建只读视图\n\n```go\nlist := action.NewList(cfg)\nlist.All = true\nlist.AllNamespaces = true\nlist.SetStateMask()\nrels, err := list.Run()\n```\n\nList 的默认过滤与排序不一定满足平台分页需求。跨 namespace 查询还要求集群级读取权限，不能因为 UI 有“全部”选项就扩大后端 ServiceAccount。Status 和 History 输出可能包含 Notes、Values 或描述，也要按租户授权过滤。\n\n#### Uninstall：区分请求成功与清理完成\n\n```go\nuninstall := action.NewUninstall(cfg)\nuninstall.Wait = true\nuninstall.Timeout = 10 * time.Minute\nuninstall.KeepHistory = false\n\nresp, err := uninstall.Run(\"web\")\n```\n\n卸载成功不代表 PVC、带 keep 策略的资源、CRD 或 Hook 外部副作用全部清理。平台应把这些残留作为显式结果展示，而不是只返回一个布尔值。\n\n#### Driver 与编排层的边界\n\n可以在 Action 之上封装 Driver，统一完成客户端初始化、Chart 解析、Values 校验、审计和指标，但 Driver 不应吞掉 Helm 状态。建议返回结构化结果：Release 身份、修订、状态、资源摘要、警告和原始错误链。\n\n```mermaid\nsequenceDiagram\n    participant API as 平台 API\n    participant Lock as 发布锁\n    participant Driver as Helm Driver\n    participant Store as Release Store\n    participant K8s as Kubernetes API\n    API->>Lock: 获取 cluster/ns/release 锁\n    Lock->>Driver: 执行 Action\n    Driver->>Store: 读取历史与当前状态\n    Driver->>K8s: 校验并提交资源\n    Driver->>Store: 保存新修订\n    Driver-->>API: 返回结构化结果\n    API->>Lock: 释放锁\n```\n\n#### 并发、幂等与恢复\n\n同一 Release 的两个升级不能并行执行。至少以集群、namespace、Release 三元组加锁，并为请求分配幂等键。超时后不要立即重试写操作，应先查询 Helm 状态和集群资源，判断前一次操作是否仍在运行。\n\n对 pending 状态的自动修复必须保守：记录原始错误、确认没有存活操作、备份 Release 元数据，再由人工批准回滚或清理。直接删除 pending Secret 虽然可能“解锁”，但会破坏历史状态机。\n\n#### 错误分类与可观测性\n\n至少区分输入错误、认证失败、授权失败、Chart 获取失败、模板失败、API 校验失败、等待超时、Hook 失败和存储失败。对外返回稳定错误码，对内保留 Go 错误链。\n\n建议指标包含 Action 类型、结果、耗时、目标集群、namespace、Chart 名和版本；不要把 Release Values、token 或完整错误正文放进高基数标签。日志用 request ID 串联下载、渲染、提交和等待阶段。\n\n#### SDK 升级策略\n\nHelm Go 包的 API 与行为可能随主版本变化。应用应固定模块版本，阅读 release notes，运行真实集群契约测试，并重点回归：Values 合并、能力发现、Hook、CRD、存储格式、Registry 认证和错误分类。不要让库版本随着间接依赖自动漂移。", "subs": ["Pull：只下载不发布", "Install", "Upgrade", "List、Status 与 History", "Uninstall", "Driver 与编排层的边界", "并发、幂等与恢复", "错误分类与可观测性", "SDK 升级策略"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

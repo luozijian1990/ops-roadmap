@@ -51,12 +51,12 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 57 份标准路线图和 Kubernetes 完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 61 份标准路线图和 Kubernetes 完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
 | 系统基础 | [容器核心技术](./topics/systems/container-fundamentals/) · [Linux 底层原理](./topics/systems/linux/) · [Linux 性能优化](./topics/systems/linux-performance/) |
-| 云原生 | [Docker](./topics/cloud-native/docker/) · [Kubernetes](./topics/cloud-native/kubernetes/) · [Kubernetes 容器网络](./topics/cloud-native/kubernetes-networking/) · [Consul](./topics/cloud-native/consul/) · [etcd](./topics/cloud-native/etcd/) |
+| 云原生 | [Docker](./topics/cloud-native/docker/) · [Helm](./topics/cloud-native/helm/) · [Kubernetes](./topics/cloud-native/kubernetes/) · [Kubernetes 容器网络](./topics/cloud-native/kubernetes-networking/) · [Consul](./topics/cloud-native/consul/) · [etcd](./topics/cloud-native/etcd/) |
 | 可观测性 | [Prometheus](./topics/observability/prometheus/) · [Kube-Prometheus](./topics/observability/kube-prometheus/) · [VictoriaMetrics](./topics/observability/victoria-metrics/) · [VictoriaMetrics Flags](./topics/observability/victoria-metrics-flags/) · [VictoriaMetrics PromQL](./topics/observability/victoria-metrics-promql/) |
 | 数据系统 | [MySQL](./topics/data-systems/mysql/) · [Kafka](./topics/data-systems/kafka/) · [RabbitMQ](./topics/data-systems/rabbitmq/) |
 | 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) |
