@@ -1,0 +1,935 @@
+# 计算机网络基础学习笔记 · 第二册：传输、路由与网络服务
+
+## 第二册 · 传输、路由与网络服务
+
+### TCP 如何用端口和连接提供可靠字节流
+<!-- src: temp/network/1.txt (Ch. 14.1-14.4 TCP Goals, Stack Location, Ports and Overview) -->
+
+IP 只负责尽力把数据包送向目标主机，TCP 则在两个进程之间建立面向连接的可靠字节流。它用端口区分主机上的不同进程，用序列号描述字节位置，并通过确认、重传和窗口控制处理丢包、乱序及接收能力差异。
+
+> **材料说明**：知识覆盖参考 Brian “Beej Jorgensen” Hall 的 *Beej's Guide to Network Concepts* v1.0.40。本文按运维与 SRE 学习路径进行原创重组，不是原书的逐章翻译；原作及其许可信息以 [官方页面](https://beej.us/guide/bgnet0/) 为准。
+
+一条 TCP 连接通常由四元组唯一标识：
+
+```text
+源 IP  源端口  目的 IP  目的端口
+```
+
+因此，同一个服务端端口可以同时服务大量客户端，只要客户端地址或临时端口不同。监听 Socket 代表“接受新连接的入口”，已建立连接则由独立 Socket 表示。
+
+```mermaid
+flowchart LR
+    APP1[客户端进程] --> P1[临时端口]
+    P1 --> TCP[TCP 可靠字节流]
+    TCP --> P2[服务端口]
+    P2 --> APP2[服务端进程]
+```
+
+TCP 的可靠指数据在连接语义内按序交给应用，不能理解成网络永远不断开。超时、进程崩溃、链路长期中断仍会使连接失败，应用必须自行定义超时、重试和幂等策略。
+
+#### 连接的两个层次
+
+监听端点常用“本地地址和服务端口”描述，已建立连接则由四元组区分。服务器监听 `0.0.0.0:443` 时，操作系统仍会为每个客户端创建独立连接状态。
+
+```bash
+ss -lntp
+ss -nt state established
+```
+
+| 本地端点 | 远端端点 | 状态 | 解释 |
+| --- | --- | --- | --- |
+| `0.0.0.0:443` | `*:*` | LISTEN | 接受任意本地 IPv4 地址的新连接 |
+| `10.0.0.5:443` | `10.0.0.8:51000` | ESTABLISHED | 一条具体连接 |
+
+端口是 16 位整数。服务端通常使用约定端口，客户端由系统从临时端口范围分配。端口耗尽、NAT 映射耗尽和文件描述符耗尽都会限制连接数。
+
+#### TCP 不提供的能力
+
+- 不保留应用写入边界。
+- 不定义消息格式。
+- 不保证业务操作只执行一次。
+- 不自动恢复已断开的应用会话。
+- 不判断返回内容是否业务正确。
+
+这些能力必须由应用协议和状态管理补充。
+
+### 序列号、确认与重传如何恢复顺序和完整性
+<!-- src: temp/network/1.txt (Ch. 14.4-14.5 Transmission, Packet Ordering and Error Detection) -->
+
+TCP 把字节编号。接收方通过 ACK 告诉发送方下一个期望字节，发送方在超时或收到重复 ACK 等信号后重传缺失数据。校验和用于发现传输错误，序列号用于恢复顺序和排除重复段。
+
+#### 用字节编号而不是用包编号
+
+假设发送方从序列号 1000 开始发送 500 字节，下一段序列号是 1500。接收方回复 ACK 1500，表示 1500 之前的字节已连续收到，而不是“收到了编号 1500 的包”。
+
+```mermaid
+sequenceDiagram
+    participant S as 发送方
+    participant R as 接收方
+    S->>R: seq 1000 len 500
+    R-->>S: ack 1500
+    S->>R: seq 1500 len 500 丢失
+    S->>R: seq 2000 len 500
+    R-->>S: ack 1500
+    S->>R: 重传 seq 1500
+    R-->>S: ack 2500
+```
+
+累计确认允许一个 ACK 覆盖之前连续到达的全部字节。若中间出现缺口，接收方可以暂存后续数据，但 ACK 仍指向缺失位置。
+
+#### 什么时候重传
+
+发送方可以在重传计时器超时后重发，也可以根据多个重复 ACK 推断丢包并快速重传。超时值应随 RTT 估计调整，固定得过短会产生虚假重传，过长则故障恢复迟缓。
+
+抓包分析时关注 `tcp.analysis.retransmission` 只是起点。还要判断抓包点是否漏包、重传前是否有重复 ACK、RTT 是否突然上升，以及丢包发生在哪个方向。
+
+### 流量控制和拥塞控制解决了什么不同问题
+<!-- src: temp/network/1.txt (Ch. 14.6-14.7 Flow Control, Slow Start and Congestion Avoidance) -->
+
+流量控制与拥塞控制解决不同问题：
+
+| 机制 | 保护对象 | 主要信号 |
+| --- | --- | --- |
+| 流量控制 | 接收端缓冲区 | 接收窗口 rwnd |
+| 拥塞控制 | 网络路径 | 拥塞窗口 cwnd、丢包、时延 |
+
+发送方实际可发送的未确认数据受两者较小值约束。慢启动从较小窗口开始探测容量，拥塞避免则更谨慎地增长；发生拥塞信号后会收缩窗口。
+
+```mermaid
+stateDiagram-v2
+    [*] --> SlowStart
+    SlowStart --> CongestionAvoidance: 达到阈值
+    SlowStart --> Recovery: 发现丢包
+    CongestionAvoidance --> Recovery: 发现丢包
+    Recovery --> CongestionAvoidance: 恢复完成
+```
+
+应用看到吞吐下降时，不应只看带宽上限，还要结合 RTT、丢包、窗口缩放、重传和接收端处理速度判断瓶颈。
+
+#### 接收窗口
+
+接收方在 ACK 中通告可用缓冲空间。窗口降到零时，发送方暂停普通数据并周期性探测，等待窗口重新打开。持续零窗口通常提示应用读取过慢，而不只是网络拥塞。
+
+#### 拥塞窗口演进
+
+慢启动阶段窗口按每个 RTT 近似指数增长，以快速探测容量；达到阈值后进入拥塞避免，增长更平缓。检测到拥塞后根据算法降低窗口。
+
+```text
+RTT 1  cwnd 1 MSS
+RTT 2  cwnd 2 MSS
+RTT 3  cwnd 4 MSS
+RTT 4  cwnd 8 MSS
+达到阈值后改为较缓慢增长
+```
+
+发送窗口约为 `min(rwnd, cwnd)`。如果 rwnd 小，瓶颈在接收端；如果 cwnd 因丢包反复收缩，瓶颈更可能在路径。
+
+```bash
+ss -tin dst 203.0.113.20
+```
+
+Linux 的详细 Socket 信息可显示 RTT、拥塞窗口和重传等指标，但字段随内核版本和算法变化。
+
+### 三次握手、数据传输与四次关闭
+<!-- src: temp/network/1.txt (Ch. 14.4.1-14.4.3 Connection, Transmission and Closing) -->
+
+三次握手让双方确认彼此可达并同步初始序列号。简化过程如下：
+
+```mermaid
+sequenceDiagram
+    participant C as 客户端
+    participant S as 服务端
+    C->>S: SYN seq x
+    S-->>C: SYN ACK seq y ack x加一
+    C->>S: ACK ack y加一
+    C->>S: 应用数据
+    S-->>C: ACK
+```
+
+关闭连接时，每个方向的字节流独立关闭，因此通常会看到 FIN、ACK 的双向交换。主动关闭的一方可能进入 `TIME_WAIT`，用来吸收旧的延迟报文并保证最后 ACK 有机会重传。
+
+常见状态及含义：
+
+| 状态 | 含义 |
+| --- | --- |
+| `LISTEN` | 服务端等待新连接 |
+| `SYN-SENT` | 客户端已发 SYN |
+| `ESTABLISHED` | 双向连接已建立 |
+| `CLOSE-WAIT` | 对端已关闭，本地应用尚未关闭 |
+| `TIME-WAIT` | 主动关闭后等待旧报文失效 |
+
+大量 `CLOSE-WAIT` 往往提示应用没有及时关闭 Socket；大量 `TIME-WAIT` 不一定是故障，应结合连接建立速率、端口范围和复用策略分析。
+
+#### 握手失败的包级表现
+
+| 抓包现象 | 常见解释 |
+| --- | --- |
+| SYN 重传，无响应 | 路径丢弃、防火墙或回程异常 |
+| SYN 后立即 RST | 目标可达但端口未监听或策略拒绝 |
+| SYN、SYN ACK、无最终 ACK | 客户端回程、主机策略或抓包点问题 |
+| 握手完成后立即 RST | 应用主动拒绝、协议不符或进程退出 |
+
+#### 半关闭
+
+`shutdown(SHUT_WR)` 表示本端不再发送，但仍可以接收对端数据。某些请求响应协议用半关闭表示请求体结束。`close` 则释放应用持有的描述符，具体 FIN 时机还受缓冲区和引用计数影响。
+
+TIME_WAIT 通常由主动关闭方承担，持续约两个最大报文生存期。它防止旧报文污染后续同四元组连接，也保证最后 ACK 丢失时能再次响应 FIN。
+
+### UDP 为什么选择简单而不保证可靠
+<!-- src: temp/network/1.txt (Ch. 15 User Datagram Protocol) -->
+
+UDP 是无连接的数据报协议。每个数据报保留消息边界，头部只包含源端口、目的端口、长度和校验和。它不负责握手、排序、重传、流量控制或拥塞控制。
+
+```mermaid
+flowchart LR
+    A[应用消息] --> U[UDP 数据报]
+    U --> IP[IP 数据包]
+    IP --> NET[网络]
+    NET -. 可能丢失乱序重复 .-> B[接收端]
+```
+
+简单不等于天然更快。若应用需要可靠性，就必须自行实现确认、超时、重传、排序和拥塞控制。UDP 的优势是控制权更高、无连接建立开销、支持一对多通信，并适合能容忍少量丢失的实时场景。
+
+常见用途包括 DNS 查询、语音视频、在线游戏、遥测，以及把可靠传输实现在用户态的 QUIC。
+
+### TCP 与 UDP、MTU 和分片应该如何权衡
+<!-- src: temp/network/1.txt (Ch. 15.6-15.8 Maximum Payload, Uses and Datagram Sockets; Ch. 14 TCP) -->
+
+| 需求 | 更常见选择 | 原因 |
+| --- | --- | --- |
+| 文件、网页、数据库连接 | TCP | 需要可靠有序字节流 |
+| 简单问答查询 | UDP | 消息小、交互短 |
+| 实时音视频 | UDP | 更关注时效而非补齐旧数据 |
+| 应用自定义可靠传输 | UDP | 在用户态控制确认与拥塞 |
+| 超过单个数据报的大消息 | TCP 或应用分片 | 避免 IP 分片风险 |
+
+UDP 载荷大小必须考虑路径 MTU。IPv4 网络上常用保守值避免分片；IPv6 路由器不会替发送方分片。生产协议应通过路径 MTU 探测或控制单个数据报大小。
+
+选择协议时优先从应用语义出发，而不是从“TCP 慢、UDP 快”的口号出发。可靠性、消息边界、连接迁移、拥塞公平性和中间设备兼容性都要纳入判断。
+
+#### 计算 UDP 载荷上限
+
+在 Ethernet MTU 1500、IPv4 无选项时，单个不分片 UDP 载荷常见上限是：
+
+```text
+1500 - 20 字节 IPv4 头 - 8 字节 UDP 头 = 1472 字节
+```
+
+IPv6 基础头为 40 字节，对应 1452 字节。真实路径可能包含 PPPoE、VPN、VXLAN 等封装，有效 MTU 更小，因此应用不应把 1472 当成普遍安全值。
+
+```bash
+tracepath 203.0.113.20
+ping -M do -s 1472 -c 1 203.0.113.20
+```
+
+第二条命令适用于部分 Linux IPv4 环境；ICMP 被过滤时，路径 MTU 发现可能形成黑洞。
+
+#### 应用层分片
+
+若业务消息超过单个数据报，可在应用层增加消息 ID、分片编号、总分片数和超时。必须限制同时重组的消息数量与总内存，否则攻击者可以用不完整分片耗尽资源。
+
+### Internet 校验和如何发现传输错误
+<!-- src: temp/network/1.txt (Ch. 16.3 Checksum in General) -->
+
+Internet 校验和把数据按 16 位字分组，使用反码加法累加，再对结果逐位取反。接收方重复计算并比较，用于发现传输中的常见位错误。
+
+TCP 校验不仅覆盖 TCP 头和数据，还包含由 IP 地址、协议号和 TCP 长度构成的伪首部。伪首部不会在线路上作为 TCP 数据发送，它把关键 IP 信息纳入校验，降低误投递未被发现的概率。
+
+```python
+def internet_checksum(data: bytes) -> int:
+    if len(data) % 2:
+        data += b"\x00"
+    total = 0
+    for offset in range(0, len(data), 2):
+        total += int.from_bytes(data[offset:offset + 2], "big")
+        total = (total & 0xffff) + (total >> 16)
+    return (~total) & 0xffff
+```
+
+校验和只能发现错误，不能纠正错误，也不提供抗篡改能力。需要验证发送者身份和抵御恶意修改时，应使用 TLS、MAC 或数字签名等密码学机制。
+
+#### 回卷进位
+
+反码加法的进位要加回低 16 位。例如 `0xffff + 0x0002 = 0x10001`，回卷后得到 `0x0002`。最终再逐位取反。
+
+```python
+def add16(total: int, word: int) -> int:
+    total += word
+    return (total & 0xffff) + (total >> 16)
+```
+
+奇数字节载荷在计算时补一个零字节，但补位不属于实际数据。验证报文时，包含已填写校验和的全部字应得到全 1 结果。
+
+### 用伪首部逐步验证 TCP 校验和
+<!-- src: temp/network/1.txt (Ch. 16.1-16.11 Validating a TCP Packet) -->
+
+TCP 伪首部把源 IPv4、目的 IPv4、零字节、协议号和 TCP 长度纳入校验。它不在线路上作为 TCP 头发送，只为校验计算临时拼接。
+
+```text
+源 IPv4       4 字节
+目的 IPv4     4 字节
+保留零        1 字节
+协议号 6      1 字节
+TCP 长度      2 字节
+TCP 头和数据  可变
+```
+
+#### 验证步骤
+
+1. 读取源和目的 IPv4 文本并转换为四字节表示。
+2. 读取原始 TCP 数据。
+3. 保存报文中原校验和值。
+4. 构造伪首部并拼接 TCP 数据。
+5. 若总长度为奇数，在计算缓冲区尾部补零。
+6. 按网络字节序迭代 16 位字并做回卷进位。
+7. 取反得到计算值，与原值比较。
+
+```python
+import ipaddress
+import struct
+
+def pseudo_header(src: str, dst: str, tcp_length: int) -> bytes:
+    return (
+        ipaddress.ip_address(src).packed
+        + ipaddress.ip_address(dst).packed
+        + struct.pack("!BBH", 0, 6, tcp_length)
+    )
+```
+
+抓包中看到“checksum incorrect”不一定真是线上坏包。发送校验和卸载时，抓包点可能位于网卡填写校验和之前；接收卸载也可能改变观察方式。应结合抓包方向和网卡 offload 配置判断。
+
+### 路由器如何根据路由表逐跳转发数据包
+<!-- src: temp/network/1.txt (Ch. 18.2-18.4 Routing Tables, Algorithm, Example) -->
+
+主机和路由器都通过路由表决定下一步。转发时通常执行以下流程：读取目的 IP、查找最佳匹配路由、确定出接口和下一跳、递减 TTL、重新构造链路层帧并发送。
+
+```mermaid
+flowchart TD
+    PKT[收到 IP 数据包] --> CHECK[检查目的地址]
+    CHECK --> LOOKUP[查路由表]
+    LOOKUP --> FOUND{存在匹配路由}
+    FOUND -->|是| TTL[递减 TTL]
+    TTL --> NEIGH[解析下一跳邻居]
+    NEIGH --> OUT[从出接口发送]
+    FOUND -->|否| DROP[丢弃并可返回不可达]
+```
+
+Linux 可以用下面的命令查看内核对特定目的地址的实际决策：
+
+```bash
+ip route show
+ip route get 203.0.113.10
+```
+
+`ip route get` 比只阅读路由表更直接，因为它会显示选中的源地址、下一跳和接口。
+
+#### 转发前后的头部变化
+
+路由器收到帧后先验证链路层，再取出 IP 包。若目的地址不是本机且允许转发，就递减 TTL、更新 IPv4 头校验和，并为下一条链路创建新的帧头。
+
+| 字段 | 经过普通路由器后 |
+| --- | --- |
+| 源 IP | 不变 |
+| 目的 IP | 不变 |
+| TTL | 减 1 |
+| IPv4 头校验和 | 重新计算 |
+| 源 MAC | 改成出接口 MAC |
+| 目的 MAC | 改成下一跳 MAC |
+
+如果下一跳邻居解析失败，数据包会在队列中等待，最终丢弃。路由表正确并不代表链路层下一跳一定可达。
+
+```bash
+sysctl net.ipv4.ip_forward
+ip route get 203.0.113.10 from 192.0.2.10
+ip neigh show
+```
+
+普通主机默认可能关闭三层转发；路由器或容器宿主机需要明确启用并配合防火墙策略。
+
+### 默认路由、最长前缀匹配与下一跳
+<!-- src: temp/network/1.txt (Ch. 18 IP Routing; Ch. 28.5-28.7 Default Gateways and Routing Tables) -->
+
+当多条路由都能匹配目的地址时，路由器选择前缀最长、也就是范围最具体的那一条。默认路由 `0.0.0.0/0` 能匹配所有 IPv4 地址，但只在没有更具体路由时使用。
+
+```text
+10.0.0.0/8       via 192.168.1.1
+10.20.0.0/16     via 192.168.1.2
+10.20.30.0/24    dev eth1
+default          via 192.168.1.254
+```
+
+访问 `10.20.30.8` 会选 `/24`，访问 `10.20.99.8` 会选 `/16`，访问 `8.8.8.8` 才走默认路由。
+
+下一跳必须能通过某个直连网络到达，否则路由本身无法使用。排查静态路由时应同时检查下一跳邻居解析、出接口状态和回程路由。
+
+#### 同前缀长度时如何继续选择
+
+不同路由实现还会比较管理距离、协议优先级、Metric 或策略规则。最长前缀匹配解决“哪个前缀最具体”，不负责解释所有厂商的最终选路细节。
+
+```bash
+ip rule show
+ip route show table all
+```
+
+Linux 策略路由可以依据源地址、标记等条件选择不同路由表。只查看主表可能遗漏实际规则。
+
+#### 递归下一跳
+
+一条路由可能只给出下一跳 IP，系统还需再次查表确定如何到达该下一跳。若递归结果指向错误接口或形成循环，目标前缀即使存在也不可用。
+
+### IGP 与 BGP 如何在网络之间传播路径
+<!-- src: temp/network/1.txt (Ch. 18.1 Interior and Exterior Gateway Protocols) -->
+
+静态路由适合规模小、拓扑稳定的环境。网络扩大后，动态路由协议让路由器交换可达前缀，并在链路变化时重新计算路径。
+
+| 范围 | 类型 | 常见协议 | 关注点 |
+| --- | --- | --- | --- |
+| 单一自治系统内部 | IGP | OSPF、IS-IS | 快速收敛、内部成本 |
+| 自治系统之间 | EGP | BGP | 策略、可扩展性、路径属性 |
+
+OSPF 等链路状态协议传播拓扑信息并计算最短路径；BGP 传播前缀及路径属性，主要按策略选路，不能简单理解为“总是选择物理最短路径”。
+
+运维人员需要区分控制面和数据面：路由协议负责学习和选择路径，转发表负责真正转发每个包。控制面已学到路由，不代表数据面、ACL 或邻居解析一定正常。
+
+#### 收敛与策略
+
+拓扑变化后，设备发现变化、传播信息、重新计算并更新转发表需要时间，这段过程叫收敛。收敛期间可能出现短暂黑洞、环路或非对称路径。
+
+BGP 选择依据包含本地策略、AS Path、下一跳等属性。企业可以偏好成本更高但合规的出口，因此“BGP 最短”通常指策略排序后的路径，而不是物理距离。
+
+| 检查对象 | 要回答的问题 |
+| --- | --- |
+| 邻居状态 | 会话是否建立 |
+| 接收路由 | 对端是否通告 |
+| 最佳路由 | 为什么选择这一条 |
+| 安装结果 | 是否进入转发表 |
+| 数据面 | 流量是否真正按其转发 |
+
+### TTL、广播地址与路由环路如何影响转发
+<!-- src: temp/network/1.txt (Ch. 18.5-18.6 Routing Loops, Time To Live and Broadcast Address) -->
+
+IPv4 的 TTL 和 IPv6 的 Hop Limit 都会在每经过一个路由器时减一。归零后路由器丢弃数据包，并通常发送 ICMP Time Exceeded。这样即使路由配置形成环路，包也不会永久循环。
+
+`traceroute` 正是利用逐步增加 TTL 来发现路径上的路由节点：
+
+```bash
+traceroute example.com
+tracepath example.com
+```
+
+路径中的 `*` 不一定表示该跳转发失败，也可能是设备不回应或返回 ICMP 的路径不同。应结合最终目标是否可达、多个探测结果和抓包判断。
+
+#### 环路示例
+
+如果 R1 认为 `10.9.0.0/16` 应交给 R2，而 R2 又认为应交给 R1，数据包会往返直到 TTL 为零。每跳通常返回 ICMP Time Exceeded，可能形成高频控制流量。
+
+#### 广播边界
+
+`192.168.10.0/24` 的定向广播地址是 `192.168.10.255`。路由器默认通常不转发定向广播，以避免放大攻击。`255.255.255.255` 是本地受限广播，也不会跨越路由器。
+
+广播只属于 IPv4 子网语义；IPv6 使用不同作用域的组播。把广播、组播和泛洪混为一谈会导致错误的容量与安全判断。
+
+### 用 Dijkstra 算法理解最短路径路由
+<!-- src: temp/network/1.txt (Ch. 22 Routing with Dijkstra) -->
+
+Dijkstra 算法在边权非负的图中，从一个起点计算到其他节点的最短路径。链路状态路由协议可以把路由器看作节点、链路成本看作边权，然后构建最短路径树。
+
+```mermaid
+graph LR
+    A[A] -->|1| B[B]
+    A -->|4| C[C]
+    B -->|2| C
+    B -->|5| D[D]
+    C -->|1| D
+```
+
+从 A 到 D 的最低成本路径是 A 到 B 到 C 到 D，总成本为 4。算法核心是反复选择尚未确定且当前距离最小的节点，再尝试松弛它的邻边。
+
+路由中的“成本”不一定等于跳数，可以依据带宽、管理员配置或其他度量。最短路径算法解释的是计算机制，实际协议还要处理邻居建立、数据库同步、收敛和等价多路径。
+
+### 用 Python 实现最短路径计算实验
+<!-- src: temp/network/1.txt (Ch. 22.4-22.7 Dijkstra Implementation, Graph Representation and Examples) -->
+
+邻接表适合表示稀疏网络。每个节点映射到邻居和成本，优先队列用于快速取得当前距离最小的候选节点。
+
+```python
+from heapq import heappop, heappush
+
+def dijkstra(graph, start):
+    distance = {node: float("inf") for node in graph}
+    previous = {node: None for node in graph}
+    distance[start] = 0
+    queue = [(0, start)]
+
+    while queue:
+        current_distance, node = heappop(queue)
+        if current_distance != distance[node]:
+            continue
+        for neighbor, cost in graph[node].items():
+            candidate = current_distance + cost
+            if candidate < distance[neighbor]:
+                distance[neighbor] = candidate
+                previous[neighbor] = node
+                heappush(queue, (candidate, neighbor))
+    return distance, previous
+```
+
+```python
+graph = {
+    "A": {"B": 1, "C": 4},
+    "B": {"A": 1, "C": 2, "D": 5},
+    "C": {"A": 4, "B": 2, "D": 1},
+    "D": {"B": 5, "C": 1},
+}
+distance, previous = dijkstra(graph, "A")
+assert distance["D"] == 4
+```
+
+测试应包含断开的节点、相同成本路径、起点到自身、零成本边和非法负权。Dijkstra 不支持负权边，但网络路由成本通常非负。
+
+要恢复路径，从目标沿 `previous` 反向回溯到起点，再将结果翻转。实际链路状态协议还要处理拓扑数据库版本、老化和并发变化。
+
+### DNS 如何把域名递归解析为地址
+<!-- src: temp/network/1.txt (Ch. 31.1-31.5 DNS Usage, Domains, Name Servers, Resolution Example) -->
+
+DNS 是分层、分布式命名系统。应用通常把查询交给递归解析器，解析器负责查询缓存，或沿根、顶级域和权威服务器逐级寻找答案。
+
+```mermaid
+sequenceDiagram
+    participant C as 客户端
+    participant R as 递归解析器
+    participant Root as 根服务器
+    participant TLD as 顶级域服务器
+    participant Auth as 权威服务器
+    C->>R: 查询 www.example.com
+    R->>Root: 查询 www.example.com
+    Root-->>R: 返回 com 服务器
+    R->>TLD: 查询 www.example.com
+    TLD-->>R: 返回 example.com 权威服务器
+    R->>Auth: 查询 www.example.com
+    Auth-->>R: 返回地址记录
+    R-->>C: 返回结果并缓存
+```
+
+客户端配置的 DNS 服务器通常是递归解析器，而不是所有域名的权威来源。把“DNS 服务器”笼统当作一个角色，会混淆递归、转发和权威托管问题。
+
+### DNS 层级、Zone、Resolver、缓存与 TTL 如何协作
+<!-- src: temp/network/1.txt (Ch. 31.3-31.8 Name Servers, Root Servers, Zones, Caching) -->
+
+域名从右向左体现层级，例如 `api.prod.example.com` 的父域依次是 `prod.example.com`、`example.com` 和 `com`。区域是由某组权威服务器管理的一部分命名空间，不必等同于整个域。
+
+TTL 指示解析结果可以缓存多久。较长 TTL 降低查询压力并提高缓存命中，但变更传播更慢；较短 TTL 便于切换，却增加权威服务器和递归解析器负载。
+
+DNS 还存在负缓存：不存在的名字或记录也可能按 SOA 相关设置缓存。修复记录后仍然解析失败时，应检查是否命中了旧的负缓存，而不是反复修改权威数据。
+
+#### 递归和迭代的区别
+
+客户端通常要求递归解析器给出最终结果；递归解析器向根、TLD 和权威服务器发出的查询则按委派逐级迭代。权威服务器只对自己负责的 Zone 给权威答案。
+
+| 角色 | 保存或执行的内容 |
+| --- | --- |
+| Stub Resolver | 应用或系统的简单查询接口 |
+| Recursive Resolver | 代表客户端追踪答案并缓存 |
+| Root Server | 指向顶级域服务器 |
+| TLD Server | 指向注册域的权威服务器 |
+| Authoritative Server | 保存 Zone 的正式记录 |
+
+#### Zone 与委派
+
+域名层级不必由同一组服务器管理。父 Zone 通过 NS 记录把子域委派出去；必要时还提供 Glue 记录，避免解析权威服务器名称时形成循环依赖。
+
+```bash
+dig example.com SOA
+dig example.com NS
+dig +norecurse @203.0.113.53 example.com A
+```
+
+SOA 中的序列号帮助辅助服务器判断区域是否更新。修改记录却忘记推进序列号，会让区域传送和缓存行为难以预测。
+
+### DNS 记录、动态更新与反向解析分别解决什么问题
+<!-- src: temp/network/1.txt (Ch. 31.9-31.11 Record Types, Dynamic DNS, Reverse DNS) -->
+
+| 类型 | 用途 | 示例含义 |
+| --- | --- | --- |
+| `A` | 名称到 IPv4 | `api` 指向 IPv4 地址 |
+| `AAAA` | 名称到 IPv6 | `api` 指向 IPv6 地址 |
+| `CNAME` | 名称别名 | 一个名称引用另一个名称 |
+| `MX` | 邮件交换器 | 指定邮件接收主机和优先级 |
+| `NS` | 权威服务器 | 指定区域的名称服务器 |
+| `TXT` | 文本数据 | 域验证、SPF 等 |
+| `SRV` | 服务定位 | 服务、协议、端口和权重 |
+| `PTR` | 反向解析 | 地址映射回名称 |
+
+反向 DNS 使用 `in-addr.arpa` 或 `ip6.arpa` 命名空间，通常由地址拥有者管理。正向记录和 PTR 不会自动保持一致，需要分别配置。
+
+#### CNAME 与其他记录的边界
+
+CNAME 表示一个名称是另一个规范名称的别名。传统 DNS 规则下，同一名称有 CNAME 时不应再并列其他业务记录；Zone 顶点通常还需要 SOA、NS，因此不能直接放普通 CNAME。
+
+MX 和 SRV 的目标应是主机名称，再由 A 或 AAAA 解析到地址。把它们直接指向 IP 不符合记录语义。
+
+#### 动态 DNS
+
+动态更新允许授权客户端通过协议修改记录，常用于 DHCP 与 DNS 协作。它必须配合认证、更新范围限制和审计，否则相当于把命名控制权暴露出去。
+
+```bash
+dig -x 192.0.2.10 PTR
+dig _service._tcp.example.com SRV
+```
+
+### 用 dig 从递归查询追踪到权威服务器
+<!-- src: temp/network/1.txt (Ch. 34 Digging DNS Info) -->
+
+```bash
+dig example.com A
+dig example.com AAAA
+dig example.com NS
+dig -x 192.0.2.10
+dig +trace example.com
+```
+
+阅读 `dig` 输出时关注：响应状态、Answer、Authority、Additional、TTL、查询耗时以及实际响应服务器。`NOERROR` 但 Answer 为空与 `NXDOMAIN` 含义不同，前者可能表示名称存在但没有所查类型。
+
+对指定服务器查询有助于区分权威数据和缓存问题：
+
+```bash
+dig @192.0.2.53 example.com A
+dig @192.0.2.53 example.com A +norecurse
+```
+
+`+trace` 从根开始模拟迭代查询，适合定位委派和权威链路问题，但不等同于客户端平时通过递归解析器的实际路径。
+
+#### 一次手工迭代查询实验
+
+先获得根服务器列表：
+
+```bash
+dig . NS
+```
+
+选择一个根服务器查询目标名称。根不会直接返回最终 A 记录，而会在 Authority 中给出顶级域 NS，并可能在 Additional 中提供 Glue 地址。
+
+```bash
+dig @198.41.0.4 www.example.com A +norecurse
+```
+
+再选择一个顶级域服务器查询：
+
+```bash
+dig @192.0.2.53 www.example.com A +norecurse
+```
+
+这里的地址只作示例，真实实验应从上一步响应中取得。最后向 `example.com` 的权威服务器询问，才会得到权威答案或 CNAME 链。
+
+#### 如何阅读 Header 标志
+
+| 标志 | 含义 |
+| --- | --- |
+| `qr` | 这是响应 |
+| `aa` | 回答来自权威数据 |
+| `rd` | 客户端请求递归 |
+| `ra` | 服务器支持递归 |
+| `tc` | UDP 响应被截断 |
+| `ad` | 解析器认为 DNSSEC 验证通过 |
+
+`aa` 只对响应中由该服务器权威管理的数据有意义。递归解析器从缓存返回结果时通常没有 `aa`，但答案仍可能正确。
+
+#### 状态码并不等于是否有 Answer
+
+| 状态 | Answer | 解释 |
+| --- | --- | --- |
+| `NOERROR` | 有 | 查询成功并有该类型记录 |
+| `NOERROR` | 空 | 名称存在但没有该类型 |
+| `NXDOMAIN` | 空 | 名称不存在 |
+| `SERVFAIL` | 不确定 | 上游失败、DNSSEC 或服务器错误 |
+| `REFUSED` | 空 | 服务器策略拒绝查询 |
+
+排查“偶尔解析失败”时，保存完整响应而不仅是最终 IP。Authority 中的 SOA、响应服务器、耗时和 TTL 都能帮助区分权威故障、缓存差异和网络超时。
+
+#### 对比不同解析路径
+
+```bash
+dig @10.0.0.53 www.example.com A
+dig @1.1.1.1 www.example.com A
+dig @8.8.8.8 www.example.com A
+```
+
+公共解析器只用于对比，企业内部名称、地域调度和访问策略可能要求使用指定解析器。不要因为公共解析结果“正常”就认定本地 DNS 一定配置错误。
+
+#### TTL 观察实验
+
+连续执行两次查询并比较 TTL。如果第二次由缓存返回，TTL 通常减少；换一个递归解析器可能看到不同剩余值。权威服务器返回的是记录配置 TTL，递归服务器返回的是缓存剩余寿命。
+
+```bash
+dig +noall +answer www.example.com A
+sleep 2
+dig +noall +answer www.example.com A
+```
+
+修改记录前先降低 TTL 只能影响尚未缓存或刷新后的记录；已经进入缓存的旧 TTL 不会被远程立即缩短。
+
+### DHCP DORA 如何自动分配网络配置
+<!-- src: temp/network/1.txt (Ch. 6.6 Static versus Dynamic Addresses; Ch. 33.1 DHCP Operation) -->
+
+DHCP 可以下发 IP 地址、掩码、默认网关、DNS 服务器和租约时间等配置。典型 IPv4 交互称为 DORA：Discover、Offer、Request、Acknowledge。
+
+```mermaid
+sequenceDiagram
+    participant C as 客户端
+    participant S as DHCP 服务器
+    C->>S: Discover
+    S-->>C: Offer
+    C->>S: Request
+    S-->>C: Acknowledge
+```
+
+客户端最初没有可用地址，因此前几步通常依赖广播。跨网段部署时，由 DHCP Relay 把客户端请求转给服务器，并携带来源网段信息，帮助服务器选择正确地址池。
+
+排查 DHCP 应检查地址池是否耗尽、VLAN 是否正确、Relay 是否配置、UDP 67 和 68 是否被阻断，以及是否存在未授权 DHCP 服务器。
+
+#### DORA 中每一步携带什么意图
+
+| 消息 | 客户端或服务端的意图 |
+| --- | --- |
+| Discover | 客户端寻找可用服务器 |
+| Offer | 服务器提出地址和配置 |
+| Request | 客户端声明选择的 Offer |
+| Ack | 服务器确认租约正式生效 |
+
+一个广播域中可能有多个服务器提供 Offer。客户端选择其中一个并广播 Request，让其他服务器知道自己的 Offer 未被采用。
+
+```bash
+sudo tcpdump -ni eth0 -vv 'udp port 67 or udp port 68'
+```
+
+抓包时记录事务 ID、客户端 MAC、Requested IP、Server Identifier、租期、网关和 DNS 选项，才能确认响应是否属于同一次申请。
+
+### DHCP 租约、续租与跨网段 Relay 如何工作
+<!-- src: temp/network/1.txt (Ch. 33 DHCP Operation and Reflection) -->
+
+租约不是永久配置。客户端通常在 T1 时尝试向原服务器单播续租，在 T2 时扩大为广播重绑定；租期结束仍未成功就必须停止使用地址。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Bound: 获得 Ack
+    Bound --> Renewing: 到达 T1
+    Renewing --> Bound: 续租成功
+    Renewing --> Rebinding: 到达 T2
+    Rebinding --> Bound: 任一服务器确认
+    Rebinding --> Init: 租约到期
+```
+
+DHCP 广播默认不能跨路由器。Relay 在客户端网段接收广播，转成单播发给服务器，并填写来源网段信息。服务器据此从正确地址池分配地址。
+
+排查 Relay 应确认：
+
+1. 客户端广播确实到达网关接口。
+2. Relay 指向正确服务器。
+3. 服务器有匹配来源网段的 Scope。
+4. 回应能返回 Relay。
+5. Relay 能在原 VLAN 广播给客户端。
+
+地址池利用率、租约冲突、错误 Option 和 Rogue DHCP 都应纳入监控。
+
+### NAT 状态表如何转换地址与端口
+<!-- src: temp/network/1.txt (Ch. 32.1-32.5 NAT Motivation, Private Networks, Operation and IPv6) -->
+
+NAT 在网络边界修改 IP 地址，常见的源 NAT 会让多个私有地址共享一个公网地址。配合端口转换时，设备通过公网端口与内部四元组之间的状态映射区分连接。
+
+```mermaid
+flowchart LR
+    A[10.0.0.10 51000] --> NAT[NAT 网关]
+    NAT --> PUB[198.51.100.8 40001]
+    PUB --> WEB[203.0.113.20 443]
+```
+
+NAT 缓解了 IPv4 地址不足，也隐藏了内部地址结构，但它不是完整安全边界。真正的访问控制来自防火墙策略和连接跟踪规则。
+
+NAT 会破坏端到端地址透明性，使入站连接、对等通信和某些携带地址信息的协议更复杂。IPv6 主要依靠充足地址和防火墙，而不是把 NAT 当作必需设计。
+
+#### 映射表如何区分连接
+
+| 内部源 | 转换后源 | 外部目标 | 协议 |
+| --- | --- | --- | --- |
+| `10.0.0.10:51000` | `198.51.100.8:40001` | `203.0.113.20:443` | TCP |
+| `10.0.0.11:51000` | `198.51.100.8:40002` | `203.0.113.20:443` | TCP |
+
+返回包到达公网地址时，网关按状态表找到内部目标并做逆转换。映射具有超时；TCP 可以依据状态管理，UDP 则通常依靠空闲时间。
+
+```bash
+conntrack -L -p tcp 2>/dev/null
+nft list ruleset
+```
+
+#### NAT 不是防火墙
+
+没有端口映射时，外部通常无法主动命中内部连接，但这只是状态和地址转换的结果。安全策略仍应明确谁能访问什么端口，并记录拒绝原因。
+
+某些协议把 IP 或端口写进应用载荷，需要 ALG 或协议自身的 NAT 穿越机制。复杂 ALG 容易造成兼容和安全问题，现代协议更倾向显式代理或端到端加密。
+
+### 端口转发和回程路径为什么必须成对检查
+<!-- src: temp/network/1.txt (Ch. 32.6 Port Forwarding) -->
+
+端口转发通常是目的 NAT：网关收到发往某个公网地址和端口的流量后，把目的地址改成内部服务地址。返回流量再依据连接状态做反向转换。
+
+```text
+公网入口 198.51.100.8:8443
+内部服务 10.0.0.20:443
+```
+
+Linux 环境中可以先观察而不要盲改规则：
+
+```bash
+nft list ruleset
+conntrack -L
+ss -lntp
+```
+
+端口转发失败需要分层判断：公网路由是否到网关、入站防火墙是否放行、DNAT 是否命中、内部服务是否监听、内部主机是否把回程流量送回同一网关。非对称回程会绕开 NAT 状态并导致连接失败。
+
+#### 一条 DNAT 流量的检查点
+
+```mermaid
+flowchart LR
+    C[公网客户端] --> WAN[网关公网接口]
+    WAN --> FILTER[入站策略]
+    FILTER --> DNAT[修改目的地址]
+    DNAT --> S[内部服务]
+    S --> RETURN[返回同一网关]
+    RETURN --> REV[逆向状态转换]
+    REV --> C
+```
+
+内部服务日志看到的源地址取决于是否同时做 SNAT。保留真实源地址便于审计，但要求内部回程经过同一网关；SNAT 简化回程，却需要代理协议或应用 Header 传递真实来源。
+
+#### Hairpin NAT
+
+内网客户端用公网名称访问同一内网服务时，流量可能需要在网关上完成 Hairpin NAT。若公网访问正常、内网用公网名称失败，应检查 Split DNS 或 Hairpin 配置，而不是只改服务监听。
+
+#### 验证顺序
+
+1. 在 WAN 抓到原始目的地址。
+2. 确认防火墙计数器增长。
+3. 在 LAN 抓到转换后的目的地址。
+4. 确认服务返回包。
+5. 在 WAN 确认逆转换后的响应。
+
+### 从浏览器输入域名到收到响应发生了什么
+<!-- src: temp/network/1.txt (Ch. 3 Client Connection Process; Ch. 14 TCP; Ch. 31 DNS; Ch. 32 NAT) -->
+
+一次网页访问把本册的知识串在一起：
+
+1. 浏览器和操作系统检查 DNS 缓存，并向递归解析器查询地址。
+2. 主机按路由表选择出接口和下一跳。
+3. 若下一跳在本地链路，通过 ARP 或 NDP 获取其链路层地址。
+4. 流量可能经过防火墙和 NAT。
+5. 客户端与服务端建立 TCP 连接，HTTPS 还要完成 TLS 握手。
+6. 浏览器发送 HTTP 请求，服务端返回响应。
+7. TCP 处理确认、重传、流量控制和拥塞控制。
+
+```mermaid
+flowchart LR
+    URL[输入 URL] --> DNS[DNS 解析]
+    DNS --> ROUTE[路由与邻居解析]
+    ROUTE --> TCP[TCP 建连]
+    TCP --> TLS[TLS 握手]
+    TLS --> HTTP[HTTP 请求响应]
+    HTTP --> PAGE[渲染页面]
+```
+
+任何一步都可能失败，因此“网站打不开”不是一个足够精确的故障描述。第三册将把这些层次转化为 Socket 程序、抓包方法和可重复的排障清单。
+
+#### 端到端演算：首次访问一个 HTTPS 站点
+
+假设客户端 `10.0.0.10/24` 使用网关 `10.0.0.1`、递归解析器 `10.0.0.53`，访问 `https://www.example.com/`。本地缓存为空，网络出口使用源 NAT。
+
+##### 阶段一：获得目标地址
+
+客户端先查询本地 hosts、系统缓存，再向递归解析器发送 DNS 查询。若 DNS 使用 UDP 且响应被截断，解析器或客户端可能改用 TCP；若启用 DoT 或 DoH，DNS 又会建立加密连接。
+
+```text
+Question  www.example.com A
+Answer    www.example.com 300 IN A 203.0.113.20
+```
+
+TTL 300 表示缓存最多使用该结果约五分钟，但实际缓存还受本地策略影响。若同时有 AAAA，地址选择算法可能优先尝试 IPv6。
+
+##### 阶段二：选择路由和邻居
+
+客户端执行等价于下面的查找：
+
+```bash
+ip route get 203.0.113.20
+```
+
+目的地址不属于 `10.0.0.0/24`，于是选默认网关。若邻居缓存没有 `10.0.0.1`，先广播 ARP，得到网关 MAC 后才发送 IP 包。
+
+##### 阶段三：建立 TCP
+
+客户端选择临时端口，例如 51000，向 `203.0.113.20:443` 发 SYN。路径上的 NAT 可能改写为 `198.51.100.8:40001`。
+
+| 观察位置 | 源端点 | 目的端点 |
+| --- | --- | --- |
+| 客户端 | `10.0.0.10:51000` | `203.0.113.20:443` |
+| NAT 外侧 | `198.51.100.8:40001` | `203.0.113.20:443` |
+
+服务端回复 SYN ACK，NAT 按状态表恢复内部目标。最终 ACK 完成握手。
+
+##### 阶段四：TLS 与应用协议
+
+TCP 只建立可靠字节流。客户端随后发送 TLS ClientHello，携带 SNI 和支持的协议；双方协商密钥并验证证书。ALPN 可能选择 HTTP/2 或 HTTP/1.1。
+
+TLS 成功后，浏览器才发送加密的 HTTP 请求：
+
+```http
+GET / HTTP/1.1
+Host: www.example.com
+Connection: keep-alive
+```
+
+服务端返回 HTML 后，浏览器还会解析页面并并行请求 CSS、JavaScript、图片和 API，因此一次“打开页面”通常对应多次 DNS 复用或查询、多个连接和大量请求。
+
+##### 阶段五：TCP 持续调节发送
+
+传输期间接收窗口反映接收方缓冲，拥塞窗口根据路径反馈调整。丢失一个段时，序列号和 ACK 帮助定位缺口；重传恢复字节后，应用仍看到有序流。
+
+高 RTT、小窗口、持续重传或零窗口都会降低页面加载速度，但根因分别位于路径容量、接收应用或链路质量。
+
+#### 分阶段故障矩阵
+
+| 停止阶段 | 可见现象 | 优先检查 |
+| --- | --- | --- |
+| DNS | 名称解析失败或地址错误 | `dig`、权威记录、缓存 |
+| ARP/NDP | 到网关前就超时 | 地址、VLAN、邻居表 |
+| 路由 | ICMP 不可达或中途丢失 | `ip route get`、traceroute |
+| NAT | 出口有请求但回包不恢复 | conntrack、端口资源、回程 |
+| TCP | SYN 重传或 RST | 监听、防火墙、正反向路径 |
+| TLS | 证书或协商错误 | 时间、SNI、证书链、协议 |
+| HTTP | 4xx 或 5xx | Host、路径、代理和应用日志 |
+| 页面资源 | 主页面成功但页面不完整 | 浏览器 Network、CORS、子资源 |
+
+#### 把抓包和应用日志关联起来
+
+网络抓包提供时间、四元组、序列和重传，应用日志提供请求 ID、路由、处理结果和依赖。两者可通过时间、客户端地址、服务端端口和请求 ID 关联。
+
+```bash
+sudo tcpdump -ni any -w visit.pcap 'host 203.0.113.20 and tcp port 443'
+curl -v --trace-time https://www.example.com/
+```
+
+HTTPS 抓包通常看不到 HTTP 正文，但仍能观察 DNS、握手、TLS Alert、包长、时序和连接关闭。若要查看明文，应在合法测试环境使用客户端会话密钥或在 TLS 终止点记录请求，不能绕过生产隐私边界。
+
+#### 第二册自测
+
+1. TCP ACK 号为什么表示下一个期望字节？
+2. rwnd 与 cwnd 分别由谁控制？
+3. 一个 UDP 载荷为什么不能只按本机 MTU 计算？
+4. TCP 伪首部为什么包含 IP 地址却不作为 TCP 头发送？
+5. 最长前缀匹配与路由协议 Metric 的顺序是什么？
+6. TTL 能终止环路，为什么不能防止短暂丢包？
+7. Dijkstra 的 `distance` 和 `previous` 分别解决什么问题？
+8. 递归解析器、权威服务器和 Stub Resolver 各做什么？
+9. DHCP Relay 为什么必须告诉服务器客户端来自哪个网段？
+10. NAT 为什么要求返回流量命中同一状态边界？
+
+能用一张时序图把 DNS、路由、ARP、NAT、TCP、TLS 与 HTTP 连起来，才算真正掌握了这些看似分散的协议。
