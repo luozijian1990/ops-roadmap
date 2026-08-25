@@ -1,0 +1,111 @@
+<!-- roadmap animation: throughput-drop-funnel -->
+<!-- marker data-roadmap-animation-id="throughput-drop-funnel" -->
+<script id="throughput-drop-funnel-script">
+(function(){
+  "use strict";
+  var ID = "throughput-drop-funnel";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,12.5,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function row(key,x,y,w,h,left,right){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"8",fill:PAPER,stroke:INK,"stroke-width":"1.8"},g); txt(g,x+14,y+h/2+5,left,12,800,INK,"start"); txt(g,x+w*0.5,y+h/2+5,"→",13,800,MUTED); txt(g,x+w-14,y+h/2+5,right,11,700,"#1d4ed8","end"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("a",330,16,240,44,"监控显示 RPS 骤降","");
+      node("b",150,78,600,44,"同时记录：成功/总吞吐 · 状态码 · 错误 · 延迟分位 · 两端资源","");
+      node("c",330,140,240,44,"成功吞吐真降了吗?","");
+      node("d",55,210,330,60,"否：失败请求被当吞吐","wrk 总 RPS 高但全是异常响应");
+      node("e",515,210,330,60,"是：进入逐层瓶颈排查","修一层、暴露下一层");
+      edge(450,60,450,78); edge(450,122,450,140);
+      edge(360,162,200,210,"否");
+      edge(540,162,700,210,"是");
+      note(450,300,"");
+      setPanel("stage","先确认真降"); setPanel("sign","RPS 下降"); setPanel("check","成功 vs 总吞吐"); setPanel("key","别把失败当吞吐");
+    } else if(idx===1){
+      node("g1",80,18,740,64,"① 连接跟踪表满 conntrack","count=max + table full 日志 → 新连接被丢 · nf_conntrack_count / max");
+      node("g2",130,96,640,64,"② 工作进程不足 worker","Nginx 499 + PHP-FPM max_children · 受内存/CPU 上限约束");
+      node("g3",180,174,540,64,"③ 监听队列溢出 backlog","ListenOverflows/Drops · ss -lntp · somaxconn · 扩队列只吸短时突发");
+      node("g4",230,252,440,64,"④ 临时端口耗尽 port","Nginx→FPM 短连接 · ip_local_port_range · TIME_WAIT · 用长连接/池");
+      edge(450,82,450,96); edge(450,160,450,174); edge(450,238,450,252);
+      txt(svg,860,170,"吞",11,800,"#b45309","end"); txt(svg,860,186,"吐",11,800,"#b45309","end"); txt(svg,860,202,"递",11,800,"#b45309","end"); txt(svg,860,218,"减",11,800,"#b45309","end");
+      note(450,336,"");
+      setPanel("stage","四个瓶颈"); setPanel("sign","逐道窄口"); setPanel("check","conntrack/worker/队列/端口"); setPanel("key","修一层暴露下一层");
+    } else {
+      var rows=[
+        ["区分成功 / 失败吞吐","wrk 成功 RPS","r1"],
+        ["状态码 + 连接错误","499 / 超时 / 重置","r2"],
+        ["conntrack + 丢包","count / max · dmesg","r3"],
+        ["工作进程 + 依赖","max_children","r4"],
+        ["监听队列","ListenOverflows","r5"],
+        ["临时端口 + 短连接","ss -s · TIME_WAIT","r6"],
+        ["perf / 火焰图找热点","inet_hash_connect 变宽","r7"],
+        ["逐项改 + 重复压测","重测错误率 / P99","r8"]
+      ];
+      for(var j=0;j<rows.length;j++){ row(rows[j][2],110,14+j*44,680,38,rows[j][0],rows[j][1]); }
+      note(450,388,"");
+      setPanel("stage","迭代闭环"); setPanel("sign","多瓶颈串联"); setPanel("check","每轮重测"); setPanel("key","错误多≠成功");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"吞吐骤降第一步<b>不是抓瓶颈，而是确认吞吐真的降了</b>。只看 <code>Requests/sec</code> 会把<b>失败请求也算成业务能力</b>。",
+      steps:[
+        {text:"监控显示 <b>RPS 骤降</b>——先别急着下结论。", run:function(c){ apply({fills:{a:"active"}, panels:{stage:"现象",sign:"RPS 降"}, note:"① 观察到吞吐降"}); return c.wait(750);}},
+        {text:"压测<b>同时记录</b>：成功吞吐 / 总吞吐、状态码、连接与超时错误、延迟分位、<b>客户端和服务端两端资源</b>。", run:function(c){ apply({fills:{a:"done",b:"active"}, panels:{stage:"取全指标",check:"成功/总 + 错误 + 两端资源"}, note:"② 一次记全，别只看 RPS"}); return c.wait(850);}},
+        {text:"关键判断：<b>成功吞吐真的降了吗？</b>", run:function(c){ apply({fills:{b:"done",c:"warn"}, panels:{stage:"判断",check:"成功吞吐"}, note:"③ 区分成功 vs 总"}); return c.wait(750);}},
+        {text:"<b>否</b>：课程案例里 <code>wrk</code> 总 RPS 不低，但<b>全是异常响应</b>——失败请求被当成了吞吐。", run:function(c){ apply({fills:{c:"done",d:"fail"}, panels:{stage:"假象",key:"失败≠吞吐"}, note:"④ 别把失败当吞吐"}); return c.wait(800);}},
+        {text:"<b>是</b>：成功吞吐确实降了，再进入<b>逐层瓶颈排查</b>——记住「修一层、暴露下一层」。", run:function(c){ apply({fills:{e:"done"}, panels:{stage:"进入排查",key:"逐层剥洋葱"}, note:"⑤ 真降 → 逐层排查"}); return c.wait(800);}}
+      ]},
+    { intro:"吞吐被<b>四道窄口</b>逐层卡住，像漏斗一样越收越窄。修掉上面一道，负载上去后下一道才暴露。",
+      steps:[
+        {text:"<b>① 连接跟踪表满 conntrack</b>：<code>count == max</code> 且日志出现 <code>table full</code> → 新连接被丢弃。按峰值并发与连接寿命规划容量，别照抄大数值。", run:function(c){ apply({fills:{g1:"fail"}, panels:{stage:"瓶颈①",sign:"table full",check:"nf_conntrack_count/max"}, note:"① conntrack 满 → 丢连接"}); return c.wait(900);}},
+        {text:"<b>② 工作进程不足 worker</b>：Nginx 返回 <code>499</code>（客户端先关）+ PHP-FPM 达 <code>max_children</code> → 下游 worker 不够。进程数受<b>内存上限和 CPU 上限</b>双重约束。", run:function(c){ apply({fills:{g1:"done",g2:"fail"}, panels:{stage:"瓶颈②",sign:"499 + max_children",check:"按内存/CPU 定 worker"}, note:"② worker 不足"}); return c.wait(900);}},
+        {text:"<b>③ 监听队列溢出 backlog</b>：<code>ListenOverflows/Drops</code> 增长，受应用 backlog 与 <code>somaxconn</code> 限制。<b>扩队列只能吸短时突发</b>，长期处理不过来只会增延迟。", run:function(c){ apply({fills:{g2:"done",g3:"fail"}, panels:{stage:"瓶颈③",sign:"ListenOverflows",check:"ss -lntp · somaxconn"}, note:"③ 监听队列溢出"}); return c.wait(900);}},
+        {text:"<b>④ 临时端口耗尽 port</b>：Nginx 给 PHP-FPM 后端连接要分配临时端口，短连接太多 → 端口/<code>TIME_WAIT</code> 耗尽。优先<b>后端长连接 + 连接池</b>，别随意破坏 TIME_WAIT 语义。", run:function(c){ apply({fills:{g3:"done",g4:"fail"}, panels:{stage:"瓶颈④",sign:"TIME_WAIT 多",check:"ip_local_port_range · ss -s"}, note:"④ 临时端口耗尽"}); return c.wait(900);}}
+      ]},
+    { intro:"完整分析链是一个<b>迭代闭环</b>：从确认真降一路查到端口，再用<b>火焰图</b>找新热点，改完<b>重复压测</b>——每轮都要重看错误率和 P99。",
+      steps:[
+        {text:"先<b>区分成功/失败吞吐</b>，再查<b>状态码与连接错误</b>（499/超时/重置）。", run:function(c){ apply({fills:{r1:"active",r2:"active"}, panels:{stage:"业务层",check:"成功 RPS + 错误"}, note:"① 业务：成功吞吐 + 错误"}); return c.wait(800);}},
+        {text:"系统层逐项过：<b>conntrack + 丢包 → 工作进程 + 依赖 → 监听队列</b>。", run:function(c){ apply({fills:{r1:"done",r2:"done",r3:"active",r4:"active",r5:"active"}, panels:{stage:"系统层",check:"conntrack/worker/队列"}, note:"② 系统：三道窄口"}); return c.wait(850);}},
+        {text:"再查<b>临时端口与短连接</b>（<code>ss -s</code>、TIME_WAIT），定位主动连接侧的端口周转。", run:function(c){ apply({fills:{r3:"done",r4:"done",r5:"done",r6:"active"}, panels:{stage:"连接层",check:"端口 / TIME_WAIT"}, note:"③ 端口与短连接"}); return c.wait(800);}},
+        {text:"前面限制都解除后 <b>CPU 成为新瓶颈</b>：火焰图里 <code>inet_hash_connect</code> 和端口检查<b>变宽</b>，说明短连接让端口分配成了热点。", run:function(c){ apply({fills:{r6:"done",r7:"warn"}, panels:{stage:"火焰图",sign:"inet_hash_connect 宽",check:"perf / 火焰图"}, note:"④ 火焰图找新热点"}); return c.wait(900);}},
+        {text:"<b>逐项修改 → 重复压测</b>，循环往复。牢记：<b>吞吐升高但错误更多，不是优化成功</b>，每轮都重看错误率和 P99。", run:function(c){ apply({fills:{r7:"done",r8:"done"}, panels:{stage:"迭代",key:"错误多≠成功"}, note:"⑤ 改一项 → 重测 → 再剥下一层"}); return c.wait(900);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>吞吐骤降：四瓶颈漏斗</strong><small>先确认真降 · 逐层剥洋葱 · 迭代复测</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">先确认真降</button><button data-ch="1">四个瓶颈</button><button data-ch="2">迭代闭环</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 400" role="img" aria-label="服务吞吐骤降排查动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>阶段</b><span data-panel="stage">—</span></div><div class="ka-panel"><b>现象</b><span data-panel="sign">—</span></div><div class="ka-panel"><b>检查</b><span data-panel="check">—</span></div><div class="ka-panel"><b>要点</b><span data-panel="key">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需关注</span><span><i style="background:#fecaca"></i>瓶颈/假象</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

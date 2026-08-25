@@ -1,0 +1,109 @@
+<!-- roadmap animation: cpu-quick-locate -->
+<!-- marker data-roadmap-animation-id="cpu-quick-locate" -->
+<script id="cpu-quick-locate-script">
+(function(){
+  "use strict";
+  var ID = "cpu-quick-locate";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,13.5,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,11,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function row(key,x,y,w,h,left,right){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"8",fill:PAPER,stroke:INK,"stroke-width":"1.8"},g); txt(g,x+14,y+h/2+5,left,12.5,800,INK,"start"); txt(g,x+w*0.46,y+h/2+5,"→",13,800,MUTED); txt(g,x+w-14,y+h/2+5,right,12,700,"#1d4ed8","end"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("top",60,90,220,80,"top","全局画像");
+      node("vmstat",340,90,220,80,"vmstat 1","队列/切换/中断");
+      node("pidstat",620,90,220,80,"pidstat -u -w 1","责任进程");
+      edge(280,130,340,130,"再核对");
+      edge(560,130,620,130,"再落地");
+      note(450,250,"");
+      setPanel("entry","top"); setPanel("look","全局负载"); setPanel("next","vmstat"); setPanel("stage","入口①");
+    } else if(idx===1){
+      row("us",90,30,720,42,"us 高","perf 找应用热点函数");
+      row("sy",90,80,720,42,"sy 高","strace / perf 看内核路径");
+      row("b",90,130,720,42,"负载高 + b 高","iostat / pidstat -d 定位 I/O");
+      row("cs",90,180,720,42,"cs 高","pidstat -wt 分自愿/非自愿");
+      row("si",90,230,720,42,"si 高","/proc/softirqs + tcpdump");
+      row("miss",90,280,720,42,"系统 CPU 高但找不到进程","execsnoop 捕短时进程");
+      note(450,340,"");
+      setPanel("entry","按起始现象"); setPanel("look","哪个指标异常"); setPanel("next","选对应工具"); setPanel("stage","分叉");
+    } else {
+      node("alert",40,30,160,52,"业务变慢/告警","");
+      node("pic",250,30,150,52,"top 画像","");
+      node("chk",450,30,160,52,"vmstat 核对","");
+      node("own",660,30,170,52,"pidstat 关联","");
+      node("branch",330,120,240,52,"按主要异常分叉","");
+      node("root",330,200,240,52,"形成根因假设","");
+      node("cross",330,280,240,52,"第二类证据交叉验证","");
+      node("fix",330,360,240,52,"最小修复 + 复测","");
+      edge(200,56,250,56,""); edge(400,56,450,56,""); edge(610,56,660,56,"");
+      edge(450,82,450,120,""); edge(450,172,450,200,""); edge(450,252,450,280,""); edge(450,332,450,360,"");
+      note(120,250,"");
+      setPanel("entry","闭环"); setPanel("look","全链路"); setPanel("next","复测验证"); setPanel("stage","闭环");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"快速定位不靠灵感，靠<b>固定起手式</b>：先 <code>top</code> 看全局，再 <code>vmstat</code> 核对队列与切换，最后 <code>pidstat</code> 落到具体进程。",
+      steps:[
+        {text:"<b>top</b>：整体负载如何、CPU 时间花在哪、哪些进程和状态可疑——先拿到全局画像。", run:function(c){ apply({fills:{top:"active"}, panels:{entry:"top",look:"全局画像",next:"vmstat"}, note:"① 全局画像"}); return c.wait(750);}},
+        {text:"<b>vmstat 1</b>：运行队列 r、阻塞队列 b、上下文切换 cs、中断 in 是否异常。", run:function(c){ apply({fills:{top:"done",vmstat:"active"}, panels:{entry:"vmstat",look:"r/b/cs/in",next:"pidstat",stage:"入口②"}, note:"② 核对队列/切换/中断"}); return c.wait(800);}},
+        {text:"<b>pidstat -u -w 1</b>：哪个进程吃用户/内核 CPU、谁在等 CPU、谁频繁切换——落到责任进程。", run:function(c){ apply({fills:{vmstat:"done",pidstat:"active"}, panels:{entry:"pidstat",look:"责任进程",stage:"入口③"}, note:"③ 关联责任进程"}); return c.wait(800);}},
+        {text:"三者各回答一层：<b>先全局 → 再核对 → 再落地</b>。任何 CPU 问题都从这三步开始。", run:function(c){ apply({fills:{pidstat:"done"}, panels:{stage:"起手式完成"}, note:"固定起手式"}); return c.wait(700);}}
+      ]},
+    { intro:"拿到异常指标后，<b>不同现象走不同分支</b>。这张表就是「看到什么 → 下一步用什么」的对照。",
+      steps:[
+        {text:"<b>us 高</b>（用户态 CPU 高）→ <code>pidstat -u</code> 找进程，再用 <code>perf</code> 定位热点函数。", run:function(c){ apply({fills:{us:"active"}, panels:{look:"us 高",next:"perf"}, note:"用户态热点"}); return c.wait(700);}},
+        {text:"<b>sy 高</b>（系统态 CPU 高）→ <code>strace</code> / <code>perf</code> 分析系统调用、调度或内核热点。", run:function(c){ apply({fills:{us:"done",sy:"active"}, panels:{look:"sy 高",next:"strace/perf"}, note:"内核路径"}); return c.wait(700);}},
+        {text:"<b>负载高 + b 高</b>（阻塞队列）→ <code>dstat</code>/<code>iostat</code>/<code>pidstat -d</code> 定位 I/O 等待。", run:function(c){ apply({fills:{sy:"done",b:"active"}, panels:{look:"b 高 / iowait",next:"iostat"}, note:"I/O 等待"}); return c.wait(700);}},
+        {text:"<b>cs 高</b>（上下文切换）→ <code>pidstat -w</code>/<code>-wt</code> 区分自愿与非自愿切换。", run:function(c){ apply({fills:{b:"done",cs:"active"}, panels:{look:"cs 高",next:"pidstat -wt"}, note:"自愿/非自愿"}); return c.wait(700);}},
+        {text:"<b>si 高</b>（软中断）→ <code>/proc/softirqs</code>、<code>sar -n DEV</code>、<code>tcpdump</code> 定位类型与流量。", run:function(c){ apply({fills:{cs:"done",si:"active"}, panels:{look:"si 高",next:"softirqs/tcpdump"}, note:"软中断类型"}); return c.wait(700);}},
+        {text:"<b>系统 CPU 高却找不到进程</b> → <code>execsnoop</code> / <code>perf record -a</code> 捕捉短时进程。", run:function(c){ apply({fills:{si:"done",miss:"warn"}, panels:{look:"进程数据缺失",next:"execsnoop"}, note:"短时进程作祟"}); return c.wait(750);}}
+      ]},
+    { intro:"把起手式和分叉串成<b>完整闭环</b>：告警 → 画像 → 核对 → 关联 → 分叉 → 根因 → <b>交叉验证</b> → 最小修复复测。",
+      steps:[
+        {text:"业务变慢或告警，排查开始。", run:function(c){ apply({fills:{alert:"active"}, panels:{stage:"触发"}, note:"告警触发"}); return c.wait(600);}},
+        {text:"<b>top</b> 拿全局画像 → <b>vmstat</b> 核对队列/切换/中断 → <b>pidstat</b> 关联责任进程。", run:function(c){ apply({fills:{alert:"done",pic:"active",chk:"active",own:"active"}, panels:{stage:"三入口"}, note:"三入口画像"}); return c.wait(800);}},
+        {text:"按<b>主要异常</b>选下一步工具（us/sy/iowait/软中断/切换/短时进程各走各的分支）。", run:function(c){ apply({fills:{pic:"done",chk:"done",own:"done",branch:"active"}, panels:{stage:"分叉"}, note:"按异常分叉"}); return c.wait(750);}},
+        {text:"汇总证据，<b>形成根因假设</b>。", run:function(c){ apply({fills:{branch:"done",root:"active"}, panels:{stage:"根因假设"}, note:"根因假设"}); return c.wait(700);}},
+        {text:"关键一步：用<b>第二类证据交叉验证</b>，避免被单一指标误导。", run:function(c){ apply({fills:{root:"done",cross:"warn"}, panels:{stage:"交叉验证"}, note:"⚠ 交叉验证再下结论"}); return c.wait(800);}},
+        {text:"实施<b>最小修复并复测</b>，闭环。改一处、测一处，不要一次堆一堆改动。", run:function(c){ apply({fills:{cross:"done",fix:"done"}, panels:{stage:"复测闭环"}, note:"最小修复 + 复测"}); return c.wait(750);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>CPU 快速定位流程</strong><small>top → vmstat → pidstat → 按指标分叉</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">三个入口</button><button data-ch="1">按指标分叉</button><button data-ch="2">完整闭环</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 360" role="img" aria-label="CPU 快速定位流程动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>入口/工具</b><span data-panel="entry">—</span></div><div class="ka-panel"><b>看什么</b><span data-panel="look">—</span></div><div class="ka-panel"><b>下一步</b><span data-panel="next">—</span></div><div class="ka-panel"><b>阶段</b><span data-panel="stage">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>关键步</span><span><i style="background:#fecaca"></i>特例</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

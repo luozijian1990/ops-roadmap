@@ -1,0 +1,120 @@
+<!-- roadmap animation: vfs-storage-path -->
+<!-- marker data-roadmap-animation-id="vfs-storage-path" -->
+<script id="vfs-storage-path-script">
+(function(){
+  "use strict";
+  var ID = "vfs-storage-path";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,13,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("app",300,14,300,40,"应用程序","read() / write()");
+      node("sys",300,68,300,40,"系统调用","sys_read / sys_write");
+      node("vfs",300,122,300,40,"VFS 虚拟文件系统","统一 inode / dentry 接口");
+      node("cache",300,176,300,40,"页缓存 + 元数据缓存","命中即返回，不打盘");
+      node("fs",300,230,300,40,"具体文件系统","Ext4 / XFS / NFS / OverlayFS");
+      node("blk",300,284,300,40,"通用块层 blk-mq","排队 / 合并 / 调度");
+      node("dev",300,338,300,40,"设备驱动 → 存储","本地磁盘 / 网络存储");
+      edge(450,54,450,68); edge(450,108,450,122); edge(450,162,450,176);
+      edge(450,216,450,230); edge(450,270,450,284); edge(450,324,450,338);
+      txt(svg,150,200,"下行",12,800,MUTED); txt(svg,150,218,"越接近磁盘",10.5,600,MUTED);
+      txt(svg,750,200,"上行",12,800,MUTED); txt(svg,750,218,"数据回到应用",10.5,600,MUTED);
+      note(750,260,"");
+      setPanel("layer","入口"); setPanel("act","发起读写"); setPanel("where","用户态"); setPanel("key","VFS 统一接口");
+    } else if(idx===1){
+      node("app",340,16,220,44,"应用 read()/write()","");
+      node("cache",340,92,220,44,"页缓存 Page Cache","先查缓存");
+      node("hit",80,182,250,52,"命中 → 直接返回","内存拷贝，快");
+      node("fs",560,182,260,46,"未命中 → 文件系统","Ext4 / XFS 取数据块");
+      node("blk",560,250,260,42,"通用块层 → 磁盘","真打到盘，慢");
+      node("refill",560,316,260,42,"数据回填页缓存","下次即命中");
+      edge(450,60,450,92);
+      edge(400,136,260,182,"命中");
+      edge(510,136,650,182,"未命中");
+      edge(690,228,690,250); edge(690,292,690,316);
+      edge(540,38,560,182,"O_DIRECT 绕过",true);
+      note(150,300,"");
+      setPanel("layer","页缓存判定"); setPanel("act","先查缓存"); setPanel("where","内存"); setPanel("key","命中决定快慢");
+    } else {
+      node("vfs",350,16,200,44,"VFS 统一接口","一套系统调用");
+      node("local",35,140,180,58,"本地磁盘 FS","Ext4 / XFS");
+      node("pseudo",255,140,180,58,"伪文件系统","procfs/sysfs/tmpfs");
+      node("net",475,140,180,58,"网络文件系统","NFS / SMB");
+      node("overlay",695,140,180,58,"叠加文件系统","OverlayFS");
+      node("t_local",35,262,180,52,"通用块层 → 本地磁盘","");
+      node("t_pseudo",255,262,180,52,"内存，无设备 I/O","");
+      node("t_net",475,262,180,52,"网络栈 → 远端存储","");
+      node("t_overlay",695,262,180,52,"镜像层 + 上层目录","");
+      edge(450,60,125,140); edge(450,60,345,140); edge(450,60,565,140); edge(450,60,785,140);
+      edge(125,198,125,262); edge(345,198,345,262); edge(565,198,565,262); edge(785,198,785,262);
+      note(450,348,"");
+      setPanel("layer","VFS 分流"); setPanel("act","按 FS 类型路由"); setPanel("where","各异"); setPanel("key","接口统一、下游不同");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"一次文件 I/O 要穿过一整条<b>下行栈</b>：应用 → 系统调用 → <b>VFS</b> → 页缓存 → 具体文件系统 → 通用块层 → 设备。VFS 把不同文件系统统一成同一套接口。",
+      steps:[
+        {text:"应用调用 <code>read()</code>/<code>write()</code>，经<b>系统调用</b>陷入内核——这是用户态到内核态的入口。", run:function(c){ apply({fills:{app:"active",sys:"active"}, panels:{layer:"系统调用",act:"陷入内核",where:"用户态→内核态"}, note:"① 进入内核"}); return c.wait(800);}},
+        {text:"<b>VFS</b> 用统一的 inode/dentry 抽象，把请求转交给具体文件系统——普通文件、目录、设备、管道都走同一套接口。", run:function(c){ apply({fills:{app:"done",sys:"done",vfs:"active"}, panels:{layer:"VFS",act:"统一抽象",where:"内核",key:"屏蔽 FS 差异"}, note:"② VFS 统一接口"}); return c.wait(850);}},
+        {text:"先查<b>页缓存 + 元数据缓存</b>：命中就直接返回，<b>不必打盘</b>。这也是为什么二次读取往往快得多。", run:function(c){ apply({fills:{vfs:"done",cache:"warn"}, panels:{layer:"页缓存",act:"查缓存",where:"内存",key:"命中即返回"}, note:"③ 缓存命中可短路"}); return c.wait(850);}},
+        {text:"未命中才落到<b>具体文件系统</b>（Ext4/XFS/NFS/OverlayFS），把读写翻译成对数据块的操作。", run:function(c){ apply({fills:{cache:"done",fs:"active"}, panels:{layer:"文件系统",act:"翻译为块请求",where:"内核",key:"按 FS 实现"}, note:"④ 具体文件系统"}); return c.wait(800);}},
+        {text:"<b>通用块层 blk-mq</b> 负责排队、合并与调度，把块请求交给设备驱动。", run:function(c){ apply({fills:{fs:"done",blk:"active"}, panels:{layer:"通用块层",act:"排队/合并/调度",where:"内核"}, note:"⑤ blk-mq 调度"}); return c.wait(800);}},
+        {text:"最后<b>设备驱动</b>访问本地磁盘或网络存储，数据再沿原路<b>上行</b>返回应用。注意 <code>write()</code> 返回不等于已落盘。", run:function(c){ apply({fills:{blk:"done",dev:"done"}, panels:{layer:"设备",act:"读写存储",where:"磁盘/网络",key:"返回≠持久化"}, note:"⑥ 抵达存储，再上行"}); return c.wait(850);}}
+      ]},
+    { intro:"页缓存是这条路径上的<b>分岔口</b>：命中走内存（快），未命中才一路打到磁盘，并把结果<b>回填</b>缓存。<code>O_DIRECT</code> 则主动绕过缓存。",
+      steps:[
+        {text:"应用发起读写，VFS 先去<b>查页缓存</b>。", run:function(c){ apply({fills:{app:"active",cache:"active"}, panels:{act:"先查缓存",where:"内存"}, note:"① 先查页缓存"}); return c.wait(750);}},
+        {text:"<b>命中</b>：数据已在内存，直接拷贝返回，<b>不产生设备 I/O</b>——最快的路径。", run:function(c){ apply({fills:{cache:"done",hit:"done"}, panels:{act:"命中返回",where:"内存",key:"无设备 I/O"}, note:"② 命中：直接返回"}); return c.wait(800);}},
+        {text:"<b>未命中</b>：交给文件系统取数据块，再经<b>通用块层 → 磁盘</b>真正读写，这一支才慢。", run:function(c){ apply({fills:{fs:"active",blk:"active"}, panels:{act:"打到磁盘",where:"磁盘",key:"慢路径"}, note:"③ 未命中：打到盘"}); return c.wait(850);}},
+        {text:"取回的数据<b>回填页缓存</b>，所以「冷读慢、热读快」，下次同样的读就命中了。", run:function(c){ apply({fills:{blk:"done",refill:"done"}, panels:{act:"回填缓存",where:"内存",key:"冷读慢/热读快"}, note:"④ 回填：下次即命中"}); return c.wait(800);}},
+        {text:"<code>O_DIRECT</code> 会<b>绕过页缓存</b>直达文件系统/设备（数据库自管缓存常用），但顺序读场景反而可能丢掉缓存收益。", run:function(c){ apply({fills:{hit:"done",refill:"done",fs:"warn"}, panels:{act:"绕过缓存",where:"磁盘",key:"O_DIRECT 双刃"}, note:"⚠ O_DIRECT 绕过缓存"}); return c.wait(850);}}
+      ]},
+    { intro:"VFS 的价值在于<b>接口统一、下游各异</b>：同一套 <code>open/read/write</code> 之下，按文件系统类型路由到完全不同的存储后端。",
+      steps:[
+        {text:"应用看到的永远是同一套系统调用，由 <b>VFS</b> 按文件系统类型分流。", run:function(c){ apply({fills:{vfs:"active"}, panels:{act:"按类型分流",where:"内核"}, note:"① VFS 分流入口"}); return c.wait(800);}},
+        {text:"<b>本地磁盘 FS</b>（Ext4/XFS）→ 通用块层 → 本地磁盘，是最典型的持久化路径。", run:function(c){ apply({fills:{vfs:"done",local:"active",t_local:"active"}, panels:{act:"本地持久化",where:"磁盘",key:"走块层"}, note:"② 本地磁盘文件系统"}); return c.wait(800);}},
+        {text:"<b>伪文件系统</b>（procfs/sysfs/tmpfs）→ 数据在<b>内存</b>，几乎不产生设备 I/O。", run:function(c){ apply({fills:{local:"done",t_local:"done",pseudo:"active",t_pseudo:"active"}, panels:{act:"内存读写",where:"内存",key:"无设备 I/O"}, note:"③ 伪文件系统"}); return c.wait(800);}},
+        {text:"<b>网络文件系统</b>（NFS/SMB）→ 走<b>网络栈</b>到远端存储，延迟受网络影响。", run:function(c){ apply({fills:{pseudo:"done",t_pseudo:"done",net:"active",t_net:"active"}, panels:{act:"远程访问",where:"网络",key:"受网络影响"}, note:"④ 网络文件系统"}); return c.wait(800);}},
+        {text:"<b>叠加文件系统</b>（OverlayFS）→ 容器常用，由<b>镜像只读层 + 可写上层</b>合并出视图。", run:function(c){ apply({fills:{net:"done",t_net:"done",overlay:"done",t_overlay:"done"}, panels:{act:"分层合并",where:"镜像层+上层",key:"容器常用"}, note:"⑤ 叠加文件系统"}); return c.wait(800);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>VFS 与存储路径</strong><small>应用 → VFS → 页缓存 → 文件系统 → 块层 → 设备</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">存储路径</button><button data-ch="1">页缓存命中</button><button data-ch="2">文件系统分流</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 392" role="img" aria-label="VFS 与存储路径动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>层级</b><span data-panel="layer">—</span></div><div class="ka-panel"><b>动作</b><span data-panel="act">—</span></div><div class="ka-panel"><b>数据位置</b><span data-panel="where">—</span></div><div class="ka-panel"><b>要点</b><span data-panel="key">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需注意</span><span><i style="background:#fecaca"></i>特例</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

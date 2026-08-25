@@ -1,0 +1,123 @@
+<!-- roadmap animation: memory-reclaim-watermark -->
+<!-- marker data-roadmap-animation-id="memory-reclaim-watermark" -->
+<script id="memory-reclaim-watermark-script">
+(function(){
+  "use strict";
+  var ID = "memory-reclaim-watermark";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null,fill:null,freeLine:null,freeLabel:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); ui.nodes={}; ui.note=null; ui.fill=null; ui.freeLine=null; ui.freeLabel=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"12",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,13.5,800); if(sub) txt(g,x+w/2,y+h/2+16,sub,11,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+
+  var GX=110, GY=50, GW=150, GBOT=370;
+  function wmLine(y,labelText,color){
+    el("line",{x1:GX,y1:y,x2:GX+GW,y2:y,stroke:color,"stroke-width":"2.5","stroke-dasharray":"7 5"},svg);
+    txt(svg,GX+GW+8,y+4,labelText,12,800,color,"start");
+  }
+  function gauge(){
+    el("rect",{x:GX,y:GY,width:GW,height:GBOT-GY,rx:"8",fill:"#f1f5f9",stroke:INK,"stroke-width":"2"},svg);
+    txt(svg,GX+GW/2,GY-12,"内存 Zone · 空闲页",12.5,800,MUTED);
+    ui.fill=el("rect",{x:GX+3,y:200,width:GW-6,height:GBOT-200-2,fill:ACTIVE,opacity:"0.85"},svg);
+    wmLine(120,"high",DONE_DARK());
+    wmLine(220,"low","#b45309");
+    wmLine(310,"min","#b91c1c");
+    ui.freeLine=el("line",{x1:GX-6,y1:200,x2:GX+GW+6,y2:200,stroke:INK,"stroke-width":"3"},svg);
+    ui.freeLabel=txt(svg,GX-10,204,"free",12,800,INK,"end");
+  }
+  function DONE_DARK(){ return "#15803d"; }
+  function setFree(y,colorName){
+    if(!ui.fill) return;
+    ui.fill.setAttribute("y",y); ui.fill.setAttribute("height",(GBOT-y-2));
+    ui.fill.setAttribute("fill", colorFor(colorName||"active"));
+    ui.freeLine.setAttribute("y1",y); ui.freeLine.setAttribute("y2",y);
+    ui.freeLabel.setAttribute("y",y+4);
+  }
+  function apply(p){
+    if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k];
+    if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]);
+    if(p.free) setFree(p.free.y, p.free.color);
+    if("note" in p && ui.note) ui.note.textContent=p.note;
+    paint();
+  }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    gauge();
+    if(idx===0){
+      node("app",430,80,210,72,"应用持续申请内存","free 不断下降");
+      node("goal",430,250,210,72,"回收目标","拉回 high 附近");
+      note(560,390,"");
+      setFree(90,"active");
+      setPanel("free","充足"); setPanel("who","无需回收"); setPanel("obj","—"); setPanel("impact","无感");
+    } else if(idx===1){
+      node("kswapd",420,70,230,68,"kswapd（后台线程）","异步，不阻塞应用");
+      node("filepg",420,180,230,62,"干净文件页","直接丢弃，最便宜");
+      node("anonpg",420,270,230,62,"匿名页","需换出到 Swap");
+      note(560,390,"");
+      setFree(220,"warn");
+      setPanel("free","跌破 low"); setPanel("who","kswapd"); setPanel("obj","文件页优先"); setPanel("impact","几乎无感");
+    } else {
+      node("alloc",420,70,230,68,"进程申请内存","速度过快");
+      node("direct",420,175,230,66,"直接回收","同步阻塞分配");
+      node("swappiness",420,275,230,66,"vm.swappiness","回收倾向旋钮");
+      note(560,390,"");
+      setFree(310,"fail");
+      setPanel("free","跌破 min"); setPanel("who","申请进程自己"); setPanel("obj","看 swappiness"); setPanel("impact","卡顿 / 毛刺");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"内存回收不是「用满才开始」，而是按<b>三条水位线</b>提前触发。内核为每个 Zone 维护 <code>min / low / high</code>（<code>cat /proc/zoneinfo</code>）。",
+      steps:[
+        {text:"系统刚起来，空闲页充足，<b>free 在 high 之上</b>，岁月静好，无需回收。", run:function(c){ apply({fills:{app:"active"}, free:{y:90,color:"active"}, panels:{free:"充足"}, note:"free ≫ high"}); return c.wait(750);}},
+        {text:"应用不断申请内存，<b>free 一路下降</b>……向 low 逼近。", run:function(c){ apply({fills:{app:"warn"}, free:{y:170,color:"active"}, panels:{free:"下降中"}, note:"free 逼近 low"}); return c.wait(800);}},
+        {text:"一旦 <b>free 跌破 low</b>，回收机制启动，目标是把空闲页<b>拉回 high 附近</b>再停。", run:function(c){ apply({fills:{app:"warn",goal:"active"}, free:{y:220,color:"warn"}, panels:{free:"跌破 low",who:"触发回收"}, note:"跌破 low → 开始回收"}); return c.wait(800);}},
+        {text:"记住这条<b>区间逻辑</b>：low 唤醒回收、high 是停止目标、min 是最后防线（由 <code>vm.min_free_kbytes</code> 决定，别乱调）。", run:function(c){ apply({fills:{goal:"done"}, free:{y:120,color:"done"}, panels:{free:"回到 high"}, note:"回到 high，停止回收"}); return c.wait(800);}}
+      ]},
+    { intro:"跌破 low 时，先上场的是<b>后台线程 kswapd</b>。它异步回收，应用几乎无感——这是健康的回收方式。",
+      steps:[
+        {text:"free 跌破 <b>low</b>，内核唤醒后台线程 <b>kswapd</b> 开始异步回收。", run:function(c){ apply({fills:{kswapd:"active"}, free:{y:220,color:"warn"}, panels:{who:"kswapd"}, note:"唤醒 kswapd"}); return c.wait(750);}},
+        {text:"优先回收<b>干净文件页</b>：直接丢弃即可，需要时再从文件重读，成本最低。", run:function(c){ apply({fills:{kswapd:"active",filepg:"done"}, free:{y:170,color:"warn"}, panels:{obj:"文件页"}, note:"丢弃干净文件页"}); return c.wait(800);}},
+        {text:"文件页不够，才回收<b>匿名页</b>（堆、栈）——它没有文件后备，必须<b>换出到 Swap</b>。", run:function(c){ apply({fills:{anonpg:"warn"}, free:{y:140,color:"warn"}, panels:{obj:"匿名页 → Swap"}, note:"匿名页换出到 Swap"}); return c.wait(800);}},
+        {text:"free 回到 <b>high</b> 附近，kswapd 停止。<b>全程不阻塞应用</b>，这就是后台回收。", run:function(c){ apply({fills:{kswapd:"done",filepg:"done",anonpg:"done"}, free:{y:115,color:"done"}, panels:{free:"回到 high",impact:"几乎无感"}, note:"回到 high，应用无感"}); return c.wait(800);}}
+      ]},
+    { intro:"如果分配太快、kswapd 来不及，free 会跌破 <b>min</b>，触发<b>直接回收</b>——同步阻塞，延迟毛刺就来了。",
+      steps:[
+        {text:"分配速度太快，kswapd 没追上，<b>free 直接跌破 min</b>。", run:function(c){ apply({fills:{alloc:"warn"}, free:{y:310,color:"fail"}, panels:{free:"跌破 min"}, note:"free < min"}); return c.wait(750);}},
+        {text:"申请内存的进程被迫在分配路径上<b>同步「直接回收」</b>：分配被阻塞，出现卡顿。", run:function(c){ apply({fills:{alloc:"fail",direct:"fail"}, panels:{who:"进程自己",impact:"分配阻塞"}, note:"⚠ 直接回收 = 同步阻塞"}); return c.wait(850);}},
+        {text:"<b>swappiness</b> 决定回收倾向：高→更积极换匿名页（更多 Swap），低→更偏向回收文件页。它<b>不是</b>「内存用到百分之多少才 Swap」。", run:function(c){ apply({fills:{swappiness:"active"}, panels:{obj:"swappiness 调倾向"}, note:"swappiness = 回收倾向，非阈值"}); return c.wait(850);}},
+        {text:"直接回收 + 大量换页 = <b>延迟毛刺</b>。注意：swappiness=0 也不等于禁 Swap；真关掉 Swap 反而可能<b>更早 OOM</b>。", run:function(c){ apply({fills:{swappiness:"warn"}, free:{y:200,color:"warn"}, panels:{impact:"延迟毛刺 / OOM 风险"}, note:"关 Swap 改变失败模式"}); return c.wait(800);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>内存水位与回收</strong><small>min / low / high 怎么驱动 kswapd 与直接回收</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">三条水位线</button><button data-ch="1">kswapd 异步回收</button><button data-ch="2">直接回收阻塞</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 410" role="img" aria-label="内存水位回收动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>free 水位</b><span data-panel="free">—</span></div><div class="ka-panel"><b>谁在回收</b><span data-panel="who">—</span></div><div class="ka-panel"><b>回收对象</b><span data-panel="obj">—</span></div><div class="ka-panel"><b>对应用影响</b><span data-panel="impact">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>健康</span><span><i style="background:#bbf7d0"></i>已回收</span><span><i style="background:#fde68a"></i>跌破 low</span><span><i style="background:#fecaca"></i>跌破 min</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null,fill:null,freeLine:null,freeLabel:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

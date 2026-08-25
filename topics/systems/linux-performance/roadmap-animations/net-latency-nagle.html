@@ -1,0 +1,122 @@
+<!-- roadmap animation: net-latency-nagle -->
+<!-- marker data-roadmap-animation-id="net-latency-nagle" -->
+<script id="net-latency-nagle-script">
+(function(){
+  "use strict";
+  var ID = "net-latency-nagle";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,12.5,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function lifeline(x,y1,y2){ el("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#9ca3af","stroke-width":"1.6","stroke-dasharray":"4 5"},svg); }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      txt(svg,450,30,"总请求时间 = 以下各段之和（curl -w 可逐段测）",12.5,800,INK);
+      node("dns",40,56,160,64,"DNS 解析","time_namelookup");
+      node("conn",204,56,160,64,"TCP 建连","time_connect");
+      node("tls",368,56,160,64,"TLS 握手","time_appconnect");
+      node("wait",532,56,160,64,"服务端排队+处理","starttransfer");
+      node("xfer",696,56,164,64,"数据传输","time_total");
+      edge(200,88,204,88); edge(364,88,368,88); edge(528,88,532,88); edge(692,88,696,88);
+      node("conc",120,180,660,64,"单次正常、并发才变慢","→ 排队 / 锁 / 连接池 / 套接字缓冲 / TCP 小包交互");
+      note(450,272,"");
+      setPanel("stage","延迟分解"); setPanel("where","逐段拆开"); setPanel("act","curl -w 逐段测"); setPanel("key","先定位慢在哪段");
+    } else if(idx===1){
+      node("chead",120,18,160,42,"客户端","延迟确认 ON");
+      node("shead",620,18,160,42,"服务端","Nagle ON");
+      lifeline(200,60,352); lifeline(700,60,352);
+      edge(200,98,700,98,"① HTTP 请求");
+      edge(700,140,200,140,"② 响应分段一(小包)");
+      node("cwait",40,164,200,42,"③ 客户端延迟确认","等一会儿再 ACK");
+      node("swait",560,210,210,42,"④ 服务端 Nagle 等 ACK","未确认就不发后续小包");
+      node("dead",320,258,260,44,"⑤ 双方互等 ≈ 40ms","死锁");
+      edge(200,320,700,320,"⑥ ACK（延迟后）");
+      edge(700,348,200,348,"⑦ 响应分段二");
+      node("fix",250,362,400,30,"修复：tcp_nodelay on → 不等 ACK 立即发","");
+      note(450,228,"");
+      setPanel("stage","Nagle×延迟ACK"); setPanel("where","单连接时序"); setPanel("act","抓包看固定间隔"); setPanel("key","互等→40ms");
+    } else {
+      node("a",350,12,200,40,"请求延迟升高","");
+      node("b",320,64,260,40,"拆分 DNS/建连/TLS/首字节","");
+      node("c",350,116,200,40,"基础 RTT 升高?","");
+      node("d",40,116,210,40,"查 路由/丢包/拥塞","");
+      node("e",330,168,240,40,"并发时才变慢?","");
+      node("f",40,168,210,40,"查 队列/连接池/CPU","");
+      node("g",330,224,240,40,"抓取单连接时序","");
+      node("h",320,276,260,40,"定位 重传/窗口/ACK 小包","");
+      node("i",330,328,240,40,"改单一变量 → 复测","");
+      edge(450,52,450,64); edge(450,104,450,116);
+      edge(350,136,250,136,"是");
+      edge(450,156,450,168,"否");
+      edge(330,188,250,188,"是");
+      edge(450,208,450,224,"否");
+      edge(145,188,330,238,"",true);
+      edge(450,264,450,276); edge(450,316,450,328);
+      note(700,348,"");
+      setPanel("stage","延迟排查流程"); setPanel("where","RTT vs 并发"); setPanel("act","逐层缩小"); setPanel("key","阶梯延迟=定时器");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"网络请求延迟是<b>多段之和</b>：DNS + TCP 建连 + TLS 握手 + 服务端排队处理 + 数据传输。先拆开看慢在哪一段，别笼统说「网络慢」。",
+      steps:[
+        {text:"用 <code>curl -w</code> 把请求<b>逐段计时</b>：<code>time_namelookup</code>(DNS)、<code>time_connect</code>(建连)、<code>time_appconnect</code>(TLS)。", run:function(c){ apply({fills:{dns:"active",conn:"active",tls:"active"}, panels:{stage:"前三段",act:"curl -w"}, note:"① DNS / 建连 / TLS"}); return c.wait(850);}},
+        {text:"<code>time_starttransfer</code> 到首字节，覆盖<b>服务端排队与处理</b>；<code>time_total</code> 到<b>数据传输</b>结束。", run:function(c){ apply({fills:{dns:"done",conn:"done",tls:"done",wait:"active",xfer:"active"}, panels:{stage:"后两段",where:"首字节/总时"}, note:"② 排队处理 / 传输"}); return c.wait(850);}},
+        {text:"若<b>单次握手和请求都正常，并发压测才变慢</b>——问题多半不在链路本身。", run:function(c){ apply({fills:{wait:"done",xfer:"done",conc:"warn"}, panels:{stage:"并发才慢",key:"不在链路"}, note:"③ 并发才慢 → 换方向"}); return c.wait(800);}},
+        {text:"这时重点查<b>排队、锁、连接池、套接字缓冲区和 TCP 小包交互</b>——下一幕的 Nagle×延迟 ACK 就是经典小包问题。", run:function(c){ apply({fills:{conc:"done"}, panels:{stage:"重点方向",act:"查队列/连接池/小包",key:"小包交互"}, note:"④ 查队列/连接池/小包"}); return c.wait(850);}}
+      ]},
+    { intro:"经典的<b>固定 40ms 延迟</b>：服务端 <b>Nagle</b> 攒小包等 ACK，客户端<b>延迟确认</b>又攒着不发 ACK，双方互等。",
+      steps:[
+        {text:"客户端发出 <b>HTTP 请求</b>，服务端开始回应。", run:function(c){ apply({fills:{chead:"active",shead:"active"}, panels:{stage:"请求",where:"单连接"}, note:"① 请求发出"}); return c.wait(750);}},
+        {text:"服务端先发<b>响应分段一</b>（一个小分段），但后面还有数据要发。", run:function(c){ apply({fills:{shead:"active"}, panels:{stage:"分段一",act:"先发一个小包"}, note:"② 服务端发分段一"}); return c.wait(800);}},
+        {text:"客户端启用<b>延迟确认</b>：收到小包后<b>不马上 ACK</b>，攒一会儿希望和后续数据合并确认。", run:function(c){ apply({fills:{cwait:"warn"}, panels:{stage:"延迟确认",act:"攒着不发 ACK"}, note:"③ 客户端：延迟确认"}); return c.wait(850);}},
+        {text:"服务端启用 <b>Nagle</b>：<b>存在未确认数据时不发后续小包</b>，于是等客户端的 ACK。", run:function(c){ apply({fills:{swait:"warn"}, panels:{stage:"Nagle",act:"等 ACK 才发"}, note:"④ 服务端：Nagle 等 ACK"}); return c.wait(850);}},
+        {text:"<b>双方互等</b>：客户端等更多数据再 ACK，服务端等 ACK 再发数据 → 卡出固定 <b>≈40ms</b>。抓包能看到分段一与 ACK 之间的<b>固定间隔</b>。", run:function(c){ apply({fills:{cwait:"warn",swait:"warn",dead:"fail"}, panels:{stage:"互等",key:"固定≈40ms",act:"抓包看间隔"}, note:"⑤ 互等 → 40ms 死锁"}); return c.wait(900);}},
+        {text:"延迟确认超时后客户端补发 <b>ACK</b>，服务端才发<b>分段二</b>。修复：<code>tcp_nodelay on</code> 让服务端不等 ACK 立即发（交互式小响应适用）。", run:function(c){ apply({fills:{dead:"done",cwait:"done",swait:"done",fix:"done"}, panels:{stage:"修复",act:"tcp_nodelay on",key:"按业务取舍"}, note:"⑥ tcp_nodelay on 解锁"}); return c.wait(900);}}
+      ]},
+    { intro:"延迟排查的<b>固定套路</b>：先逐段拆，再判断是基础 RTT 问题还是并发问题，最后抓单连接时序定位小包/重传。",
+      steps:[
+        {text:"延迟升高 → 先 <b>拆分 DNS / 建连 / TLS / 首字节</b>，定位慢在哪一段。", run:function(c){ apply({fills:{a:"active",b:"active"}, panels:{stage:"拆分",act:"curl -w"}, note:"① 先拆分"}); return c.wait(800);}},
+        {text:"判断<b>基础 RTT 是否升高</b>：是 → 查<b>路由、丢包、拥塞</b>（ping/traceroute/mtr）。", run:function(c){ apply({fills:{b:"done",c:"active",d:"warn"}, panels:{stage:"RTT 分支",where:"链路",act:"ping/mtr"}, note:"② RTT 高 → 查链路"}); return c.wait(850);}},
+        {text:"RTT 正常但<b>并发时才变慢</b> → 查<b>队列、连接池、CPU</b>。", run:function(c){ apply({fills:{c:"done",e:"active",f:"warn"}, panels:{stage:"并发分支",where:"应用侧",act:"查队列/池"}, note:"③ 并发慢 → 查队列/池"}); return c.wait(850);}},
+        {text:"否则<b>抓取单连接时序</b>，定位<b>重传、窗口、ACK、小包</b>等待——Nagle×延迟 ACK 就在这里现形。", run:function(c){ apply({fills:{e:"done",f:"done",g:"active",h:"active"}, panels:{stage:"抓时序",act:"看重传/小包"}, note:"④ 抓单连接时序"}); return c.wait(850);}},
+        {text:"<b>改单一变量 → 相同负载复测</b>。记住：固定 <b>40ms / 200ms / 1s</b> 阶梯延迟，往往是<b>定时器/重试/超时</b>，优先找协议与应用里的等待机制。", run:function(c){ apply({fills:{h:"done",i:"done"}, panels:{stage:"复测",key:"阶梯=定时器"}, note:"⑤ 单变量复测 · 阶梯延迟=定时器"}); return c.wait(900);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>网络请求延迟与 Nagle 死锁</strong><small>延迟分解 · 40ms 互等 · 排查流程</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">延迟分解</button><button data-ch="1">Nagle 死锁</button><button data-ch="2">排查流程</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 396" role="img" aria-label="网络请求延迟与 Nagle 死锁动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>阶段</b><span data-panel="stage">—</span></div><div class="ka-panel"><b>在哪一段</b><span data-panel="where">—</span></div><div class="ka-panel"><b>动作</b><span data-panel="act">—</span></div><div class="ka-panel"><b>要点</b><span data-panel="key">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>等待中</span><span><i style="background:#fecaca"></i>死锁/重点</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

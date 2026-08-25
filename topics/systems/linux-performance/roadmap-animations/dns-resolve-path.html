@@ -1,0 +1,109 @@
+<!-- roadmap animation: dns-resolve-path -->
+<!-- marker data-roadmap-animation-id="dns-resolve-path" -->
+<script id="dns-resolve-path-script">
+(function(){
+  "use strict";
+  var ID = "dns-resolve-path";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,12.5,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("app",25,120,150,56,"应用查询域名","getaddrinfo");
+      node("local",205,120,165,56,"本地 hosts / 缓存","NSS / stub");
+      node("rec",405,120,150,56,"递归解析器","resolv.conf");
+      node("root",615,18,210,46,"根域名服务器","");
+      node("tld",615,86,210,46,"顶级域 TLD 服务器","");
+      node("auth",615,154,210,46,"权威域名服务器","最终答案");
+      edge(175,148,205,148);
+      edge(370,148,405,148,"未命中");
+      edge(555,138,615,42,"迭代查询");
+      edge(720,64,720,86); edge(720,132,720,154);
+      edge(615,182,560,168,"逐级应答",true);
+      edge(440,182,150,206,"回填结果并返回",true);
+      note(450,250,"");
+      setPanel("stage","解析路径"); setPanel("where","本地→递归→权威"); setPanel("tool","getent / dig"); setPanel("key","UDP53，可回退 TCP");
+    } else if(idx===1){
+      node("q1a",30,38,130,52,"首次查询","cold");
+      node("q1c",185,38,165,52,"本地 / 递归缓存","未命中");
+      node("q1f",375,38,255,52,"完整迭代 根→TLD→权威","慢");
+      node("q1r",655,38,210,52,"Query time 大 · TTL 满","");
+      edge(160,64,185,64); edge(350,64,375,64); edge(630,64,655,64);
+      node("q2a",30,182,130,52,"后续查询","warm");
+      node("q2h",185,182,210,52,"递归缓存命中","无需迭代");
+      node("q2r",420,182,250,52,"Query time 小 · TTL 递减","快");
+      edge(160,208,185,208); edge(395,208,420,208);
+      note(450,290,"");
+      setPanel("stage","命中差异"); setPanel("where","首次 vs 后续"); setPanel("tool","连续 dig +stats"); setPanel("key","首慢后快=命中缓存");
+    } else {
+      node("f1",40,20,820,86,"① 解析器配置错误","现象：首次全超时 / 特定环境失败 → resolv.conf · resolvectl · getent · 抓包看是否真有请求");
+      node("f2",40,120,820,86,"② 链路丢包 / 高延迟","现象：偶发慢、响应迟到或重试 → 分别 dig @解析器 +stats · ping · mtr 看路径");
+      node("f3",40,220,820,86,"③ 缓存未命中 / 上游递归慢","现象：首次慢后续快、TTL 递减 → 连续 dig 看 SERVER · TTL · Query time");
+      note(450,348,"");
+      setPanel("stage","三类故障"); setPanel("where","现象→证据链"); setPanel("tool","dig / mtr / getent"); setPanel("key","串起包与复测");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"DNS 延迟会直接叠加到首次连接里。解析走一条固定路径：<b>本地 hosts/缓存 → 递归解析器 → 根 → TLD → 权威</b>，再原路返回。",
+      steps:[
+        {text:"应用解析域名，先查<b>本地 hosts 与缓存</b>（走 NSS / stub resolver）。", run:function(c){ apply({fills:{app:"active",local:"active"}, panels:{stage:"本地",where:"hosts/缓存",key:"先查本地"}, note:"① 本地 hosts/缓存"}); return c.wait(800);}},
+        {text:"本地未命中 → 交给 <code>resolv.conf</code> 指定的<b>递归解析器</b>，由它代为查询。", run:function(c){ apply({fills:{app:"done",local:"done",rec:"active"}, panels:{stage:"递归解析器",where:"resolv.conf"}, note:"② 交给递归解析器"}); return c.wait(800);}},
+        {text:"递归解析器<b>迭代查询</b>：根服务器 → 顶级域 TLD → <b>权威服务器</b>，逐级拿到委派直到最终答案。", run:function(c){ apply({fills:{rec:"active",root:"active",tld:"active",auth:"done"}, panels:{stage:"迭代查询",where:"root→TLD→权威",key:"逐级委派"}, note:"③ 迭代到权威"}); return c.wait(850);}},
+        {text:"权威应答<b>逐级返回</b>递归解析器，再由它<b>回填缓存并返回</b>应用。", run:function(c){ apply({fills:{root:"done",tld:"done",rec:"done",app:"done"}, panels:{stage:"返回",key:"回填缓存"}, note:"④ 回填并返回"}); return c.wait(800);}},
+        {text:"注意：多数查询走 <b>UDP 53</b>，但响应过大/截断会<b>回退 TCP</b>——排查抓包时不能只过滤 UDP。", run:function(c){ apply({fills:{}, panels:{stage:"协议",tool:"tcpdump 53",key:"UDP+TCP 都抓"}, note:"⑤ 别只抓 UDP"}); return c.wait(800);}}
+      ]},
+    { intro:"「时快时慢」常常就是<b>缓存命中差异</b>：首次冷查询要完整迭代（慢），后续命中递归缓存（快），可用连续 <code>dig +stats</code> 验证。",
+      steps:[
+        {text:"<b>首次查询</b>：本地与递归缓存都<b>未命中</b>，只能从头查。", run:function(c){ apply({fills:{q1a:"active",q1c:"warn"}, panels:{stage:"首次",where:"缓存未命中"}, note:"① 冷查询，缓存空"}); return c.wait(800);}},
+        {text:"递归解析器做<b>完整迭代</b>（根→TLD→权威），所以首次 <b>Query time 大</b>、TTL 是满值。", run:function(c){ apply({fills:{q1c:"done",q1f:"warn",q1r:"warn"}, panels:{stage:"首次·慢",tool:"dig +stats",key:"Query time 大"}, note:"② 首次：完整迭代→慢"}); return c.wait(850);}},
+        {text:"<b>后续查询</b>同一域名：<b>递归缓存命中</b>，无需再迭代。", run:function(c){ apply({fills:{q2a:"active",q2h:"done"}, panels:{stage:"后续",where:"递归缓存命中"}, note:"③ 后续：命中缓存"}); return c.wait(800);}},
+        {text:"于是 <b>Query time 变小、TTL 递减</b>——这就是「首慢后快」的真相。", run:function(c){ apply({fills:{q2r:"done"}, panels:{stage:"后续·快",key:"TTL 递减=命中"}, note:"④ 后续：快、TTL 递减"}); return c.wait(800);}},
+        {text:"若<b>每次都慢</b>，多半是缓存未生效、TTL 极短、查询类型不同或被分配到不同解析节点——要换思路查。", run:function(c){ apply({fills:{q1r:"fail"}, panels:{stage:"反例",key:"每次慢另查"}, note:"⚠ 每次都慢 → 别只怪缓存"}); return c.wait(850);}}
+      ]},
+    { intro:"DNS 慢<b>不能凭一次 dig 下结论</b>。把现象、假设、抓包和复测串成证据链，对号入座三类故障。",
+      steps:[
+        {text:"<b>① 解析器配置错误</b>：所有域名首次超时或只在特定环境失败。查 <code>resolv.conf</code>/<code>resolvectl</code>，<code>getent</code> 复测；<b>抓包里没有 DNS 请求</b>说明问题在 NSS / 应用缓存 / namespace。", run:function(c){ apply({fills:{f1:"warn"}, panels:{stage:"配置错误",tool:"resolvectl/getent",key:"无请求=本地"}, note:"① 配置错误"}); return c.wait(900);}},
+        {text:"<b>② 链路丢包 / 高延迟</b>：偶发慢、响应迟到或重试。<b>分别 <code>dig @解析器 +stats</code></b> 对比，配合 <code>ping</code>/<code>mtr</code> 看路径丢包。", run:function(c){ apply({fills:{f1:"done",f2:"warn"}, panels:{stage:"链路问题",tool:"dig@/ping/mtr",key:"逐解析器对比"}, note:"② 链路丢包/高延迟"}); return c.wait(900);}},
+        {text:"<b>③ 缓存未命中 / 上游递归慢</b>：首次慢后续快、TTL 递减。<b>连续 <code>dig</code></b> 记录 SERVER / TTL / Query time 判断。", run:function(c){ apply({fills:{f2:"done",f3:"warn"}, panels:{stage:"缓存/上游",tool:"连续 dig",key:"看 TTL 轨迹"}, note:"③ 缓存/上游递归慢"}); return c.wait(900);}},
+        {text:"收尾两个坑：<code>dig +trace</code> 自行迭代，<b>不等于应用解析路径</b>；修复后要用 <code>getent</code> 和<b>应用自身请求</b>复测（dig 不一定走相同 NSS）。", run:function(c){ apply({fills:{f3:"done"}, panels:{stage:"复测",key:"按应用路径复测"}, note:"④ 用应用路径复测"}); return c.wait(900);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>DNS 解析路径与排查</strong><small>本地 → 递归 → 根/TLD/权威</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">解析路径</button><button data-ch="1">首次慢/后续快</button><button data-ch="2">三类故障</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 320" role="img" aria-label="DNS 解析路径动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>阶段</b><span data-panel="stage">—</span></div><div class="ka-panel"><b>在哪一段</b><span data-panel="where">—</span></div><div class="ka-panel"><b>工具</b><span data-panel="tool">—</span></div><div class="ka-panel"><b>要点</b><span data-panel="key">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需注意</span><span><i style="background:#fecaca"></i>反例/故障</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

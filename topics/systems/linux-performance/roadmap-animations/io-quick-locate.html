@@ -1,0 +1,95 @@
+<!-- roadmap animation: io-quick-locate -->
+<!-- marker data-roadmap-animation-id="io-quick-locate" -->
+<script id="io-quick-locate-script">
+(function(){
+  "use strict";
+  var ID = "io-quick-locate";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,13,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function row(key,x,y,w,h,left,right){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"8",fill:PAPER,stroke:INK,"stroke-width":"1.8"},g); txt(g,x+14,y+h/2+5,left,12,800,INK,"start"); txt(g,x+w*0.52,y+h/2+5,"→",13,800,MUTED); txt(g,x+w-14,y+h/2+5,right,11.5,700,"#1d4ed8","end"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function listItem(key,x,y,w,h,idx,text){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"7",fill:PAPER,stroke:INK,"stroke-width":"1.6"},g); el("circle",{cx:x+16,cy:y+h/2,r:"10",fill:"#e5e7eb",stroke:INK,"stroke-width":"1.4"},g); txt(g,x+16,y+h/2+4,idx,11,800,INK); txt(g,x+34,y+h/2+4,text,11.5,700,INK,"start"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("iostat",60,150,180,84,"① iostat -xz 1","设备瓶颈 %util/await");
+      node("pidstat",290,150,180,84,"② pidstat -d / iotop","哪个进程在 I/O");
+      node("trace",520,150,180,84,"③ strace/lsof","filetop/biosnoop");
+      node("root",750,150,120,84,"④ 根因","修复+复测");
+      edge(240,192,290,192,""); edge(470,192,520,192,""); edge(700,192,750,192,"");
+      note(450,300,"");
+      setPanel("step","第① 步"); setPanel("look","设备是否瓶颈"); setPanel("ask","读/写? 随机/顺序?"); setPanel("tool","iostat -xz");
+    } else if(idx===1){
+      var q=[["读还是写？","q1"],["随机还是顺序？","q2"],["平均请求多大？","q3"],["是否同步持久化？","q4"],["是否命中页缓存？","q5"],["哪个设备或远端存储？","q6"],["哪个进程/线程/文件？","q7"],["I/O 是否业务必需？","q8"],["是否有其他进程干扰？","q9"],["相对设备基线如何？","q10"]];
+      for(var i=0;i<q.length;i++){ listItem(q[i][1],110,14+i*35,680,30,String(i+1),q[i][0]); }
+      note(450,372,"");
+      setPanel("step","诊断必问"); setPanel("look","定性 I/O"); setPanel("ask","逐项回答"); setPanel("tool","问题清单");
+    } else {
+      var rows=[["文件系统空间","df -h / du","r1"],["inode 用尽","df -i","r2"],["Slab 异常","slabtop","r3"],["进程打开文件","lsof / proc fd","r4"],["系统调用","strace","r5"],["短时打开文件","opensnoop","r6"],["读写热点","filetop","r7"],["块 I/O 延迟","biosnoop / biotop","r8"]];
+      for(var j=0;j<rows.length;j++){ row(rows[j][2],110,16+j*43,680,36,rows[j][0],rows[j][1]); }
+      note(450,372,"");
+      setPanel("step","专项工具"); setPanel("look","按问题选"); setPanel("ask","对症下药"); setPanel("tool","工具箱");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"I/O 排查走<b>四步定位法</b>：先确认设备真有瓶颈，再落到进程，再看它的 I/O 行为，最后结合原理形成根因。",
+      steps:[
+        {text:"<b>① iostat -xz 1</b>：确认设备是否瓶颈——看 <code>%util</code>、<code>await</code>、读写 IOPS/吞吐。设备不忙就别急着抓进程。", run:function(c){ apply({fills:{iostat:"active"}, panels:{step:"第① 步",look:"%util/await"}, note:"① 确认设备瓶颈"}); return c.wait(800);}},
+        {text:"<b>② pidstat -d 1 / iotop -oPa</b>：定位是<b>哪个进程</b>在产生 I/O。", run:function(c){ apply({fills:{iostat:"done",pidstat:"active"}, panels:{step:"第② 步",look:"责任进程"}, note:"② 定位进程"}); return c.wait(750);}},
+        {text:"<b>③ 分析 I/O 行为</b>：<code>strace</code>/<code>lsof</code>/<code>filetop</code>/<code>biosnoop</code> 看读写哪些文件、请求大小、块层延迟。", run:function(c){ apply({fills:{pidstat:"done",trace:"active"}, panels:{step:"第③ 步",look:"读写行为",tool:"strace/biosnoop"}, note:"③ 分析 I/O 行为"}); return c.wait(800);}},
+        {text:"<b>④ 结合应用与存储原理</b>形成根因，<b>修复并复测</b>。起手式：<code>iostat -xz 1 · vmstat 1 · pidstat -d 1 · iotop -oPa</code>。", run:function(c){ apply({fills:{trace:"done",root:"done"}, panels:{step:"第④ 步",look:"形成根因",tool:"修复+复测"}, note:"④ 根因 → 复测"}); return c.wait(800);}}
+      ]},
+    { intro:"定位前先把 I/O <b>定性</b>。这十个问题回答清楚，根因往往就浮出来了——同样是 write，答案不同诊断完全不同。",
+      steps:[
+        {text:"<b>是读还是写？是随机还是顺序？</b>——这两点决定了设备能给的 IOPS/吞吐上限。", run:function(c){ apply({fills:{q1:"active",q2:"active"}, panels:{ask:"读写 + 随机/顺序"}, note:"① ② 读写模式"}); return c.wait(800);}},
+        {text:"<b>平均请求多大？是否同步持久化？</b>——大小和 fsync 直接影响延迟。", run:function(c){ apply({fills:{q1:"done",q2:"done",q3:"active",q4:"active"}, panels:{ask:"请求大小 + 持久化"}, note:"③ ④ 大小与持久化"}); return c.wait(800);}},
+        {text:"<b>是否命中页缓存？哪个设备/远端存储？</b>——决定走缓存还是真打到盘/网络。", run:function(c){ apply({fills:{q3:"done",q4:"done",q5:"active",q6:"active"}, panels:{ask:"缓存命中 + 设备"}, note:"⑤ ⑥ 缓存与设备"}); return c.wait(800);}},
+        {text:"<b>哪个进程/线程/文件？这 I/O 业务必需吗？</b>——很多 I/O 其实可以消除或合并。", run:function(c){ apply({fills:{q5:"done",q6:"done",q7:"active",q8:"active"}, panels:{ask:"归属 + 是否必需"}, note:"⑦ ⑧ 归属与必要性"}); return c.wait(800);}},
+        {text:"<b>是否有其他进程干扰？相对设备基线如何？</b>——脱离基线谈「慢」没有意义。", run:function(c){ apply({fills:{q7:"done",q8:"done",q9:"warn",q10:"warn"}, panels:{ask:"干扰 + 基线"}, note:"⑨ ⑩ 干扰与基线"}); return c.wait(800);}}
+      ]},
+    { intro:"定性之后，按<b>具体问题</b>选专项工具。这张「问题 → 工具」对照，遇到对应症状直接取用。",
+      steps:[
+        {text:"<b>容量类</b>：文件系统空间 → <code>df -h</code>/<code>du</code>；inode 用尽 → <code>df -i</code>（容量问题要<b>同时看块和 inode</b>）。", run:function(c){ apply({fills:{r1:"active",r2:"active"}, panels:{tool:"df -h / df -i"}, note:"块满 vs inode 满"}); return c.wait(800);}},
+        {text:"<b>内核对象 / 打开文件</b>：Slab 异常 → <code>slabtop</code>；进程打开文件 → <code>lsof</code> / <code>/proc/&lt;PID&gt;/fd</code>。", run:function(c){ apply({fills:{r1:"done",r2:"done",r3:"active",r4:"active"}, panels:{tool:"slabtop / lsof"}, note:"Slab 与 fd"}); return c.wait(800);}},
+        {text:"<b>调用与短时事件</b>：系统调用 → <code>strace</code>；短时打开文件 → <code>opensnoop</code>。", run:function(c){ apply({fills:{r3:"done",r4:"done",r5:"active",r6:"active"}, panels:{tool:"strace / opensnoop"}, note:"系统调用 / 短时打开"}); return c.wait(800);}},
+        {text:"<b>热点与块层延迟</b>：读写热点 → <code>filetop</code>；块 I/O 延迟 → <code>biosnoop</code>/<code>biotop</code>（更细可用 <code>blktrace</code>）。", run:function(c){ apply({fills:{r5:"done",r6:"done",r7:"active",r8:"active"}, panels:{tool:"filetop / biosnoop"}, note:"热点 + 块层延迟"}); return c.wait(800);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>I/O 快速定位：四步定位法</strong><small>iostat → pidstat → 行为分析 → 根因</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">四步定位</button><button data-ch="1">诊断必问</button><button data-ch="2">专项工具</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 380" role="img" aria-label="I/O 快速定位动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>步骤</b><span data-panel="step">—</span></div><div class="ka-panel"><b>看什么</b><span data-panel="look">—</span></div><div class="ka-panel"><b>要问</b><span data-panel="ask">—</span></div><div class="ka-panel"><b>工具</b><span data-panel="tool">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需关注</span><span><i style="background:#fecaca"></i>特例</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

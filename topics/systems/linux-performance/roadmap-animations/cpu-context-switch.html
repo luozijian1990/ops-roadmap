@@ -1,0 +1,105 @@
+<!-- roadmap animation: cpu-context-switch -->
+<!-- marker data-roadmap-animation-id="cpu-context-switch" -->
+<script id="cpu-context-switch-script">
+(function(){
+  "use strict";
+  var ID = "cpu-context-switch";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"12",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,14.5,800); if(sub) txt(g,x+w/2,y+h/2+16,sub,11.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("A",70,150,180,80,"进程 A","用户态 + 内核态现场");
+      node("CPU",380,55,180,72,"CPU 核","一次只跑一个任务");
+      node("B",650,150,180,80,"进程 B","另一套地址空间");
+      node("ctx",360,300,200,80,"保存的现场","寄存器 / PC / 页表 / TLB");
+      edge(250,180,380,110,"运行中");
+      edge(470,127,470,300,"① 保存 A");
+      edge(560,340,650,200,"② 恢复 B");
+      edge(560,110,650,165,"切到 B",true);
+      note(450,408,"");
+      setPanel("obj","进程↔进程"); setPanel("addr","要换"); setPanel("cost","最高"); setPanel("watch","vmstat cs");
+    } else if(idx===1){
+      node("proc",300,40,300,70,"同一个进程（共享地址空间：页表 / 代码 / 全局数据）","");
+      node("t1",120,200,180,76,"线程 1","私有：栈 + 寄存器");
+      node("t2",600,200,180,76,"线程 2","私有：栈 + 寄存器");
+      node("ctx",360,320,200,70,"只切换","线程私有数据");
+      edge(300,110,210,200,"",true);
+      edge(600,110,690,200,"",true);
+      edge(300,238,600,238,"切换线程");
+      note(450,420,"");
+      setPanel("obj","线程↔线程"); setPanel("addr","不换"); setPanel("cost","较低"); setPanel("watch","pidstat -wt");
+    } else {
+      node("task",90,170,200,80,"当前进程","正在 CPU 上执行");
+      node("irq",620,60,210,80,"中断处理程序","内核态，优先级高");
+      node("ctx",380,300,200,76,"保存","内核栈 + 中断状态");
+      edge(290,200,620,110,"② 打断并跳转");
+      edge(480,110,480,300,"① 保存现场");
+      edge(620,140,290,225,"③ 处理完恢复",true);
+      note(380,410,"");
+      setPanel("obj","任务↔中断"); setPanel("addr","内核态内"); setPanel("cost","快但频繁"); setPanel("watch","/proc/interrupts");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"进程上下文切换是<b>最贵</b>的一种。贵在哪？跟着 A→B 的交接看：不只是换寄存器，连<b>虚拟内存（页表 / TLB / 缓存）</b>都要换。",
+      steps:[
+        {text:"进程 <b>A</b> 在 CPU 上运行，寄存器、程序计数器 PC 里装的全是 A 的现场。", run:function(c){ apply({fills:{A:"active",CPU:"active"}, panels:{obj:"进程↔进程"}, note:"A 正在运行"}); return c.wait(700);}},
+        {text:"触发切换（时间片耗尽 / 等 I/O / 被高优先级抢占 / 退出）→ 内核<b>保存 A 的现场</b>：用户态+内核态寄存器、PC、内核栈，以及虚拟内存（页表、TLB、缓存状态）。", run:function(c){ apply({fills:{A:"warn",ctx:"active"}, panels:{cost:"保存现场"}, note:"① 保存 A：含页表 / TLB"}); return c.wait(850);}},
+        {text:"调度器从运行队列里挑出下一个进程 <b>B</b>。", run:function(c){ apply({fills:{A:"done",B:"warn"}, panels:{obj:"调度器选 B"}, note:"调度器选中 B"}); return c.wait(650);}},
+        {text:"恢复 B 的现场——<b>连页表都要换成 B 的</b>，CPU 开始执行 B。", run:function(c){ apply({fills:{ctx:"done",B:"active",CPU:"active"}, panels:{addr:"换地址空间"}, note:"② 恢复 B：换页表"}); return c.wait(750);}},
+        {text:"代价：换页表会<b>刷新 TLB 和 CPU 缓存</b>，之后访存得重新建立缓存——这就是进程切换贵的根源。（注：系统调用只在同进程内切用户/内核态，不算进程切换）", run:function(c){ apply({fills:{ctx:"fail"}, panels:{cost:"TLB/cache 失效",watch:"vmstat cs ↑"}, note:"⚠ TLB / 缓存全失效"}); return c.wait(800);}}
+      ]},
+    { intro:"<b>线程切换</b>为什么轻？因为同进程的线程<b>共享地址空间</b>，页表不用换，省掉了最贵的那部分。",
+      steps:[
+        {text:"线程 1 在跑。它和线程 2 同属一个进程，<b>共享页表、代码段、全局数据</b>。", run:function(c){ apply({fills:{proc:"active",t1:"active"}, panels:{obj:"线程↔线程"}, note:"共享地址空间"}); return c.wait(700);}},
+        {text:"切到线程 2：地址空间不变，只需保存/恢复线程<b>私有的栈和寄存器</b>。", run:function(c){ apply({fills:{t1:"done",t2:"active",ctx:"active"}, panels:{addr:"不换页表"}, note:"只切私有栈 + 寄存器"}); return c.wait(750);}},
+        {text:"因为<b>不刷 TLB、不丢缓存</b>，同进程线程切换通常明显比跨进程切换轻。", run:function(c){ apply({fills:{ctx:"done"}, panels:{cost:"较低"}, note:"页表/TLB 都保留"}); return c.wait(700);}},
+        {text:"但要注意：如果两个线程<b>属于不同进程</b>，切换就退化成进程切换，成本一样高。", run:function(c){ apply({fills:{proc:"warn"}, panels:{cost:"跨进程则变高",watch:"pidstat -wt"}, note:"⚠ 跨进程 = 进程切换成本"}); return c.wait(800);}}
+      ]},
+    { intro:"<b>中断切换</b>不在两个进程之间，而是<b>当前任务 ↔ 中断处理程序</b>。它快，但中断频繁同样会把 cs/in 计数拉高。",
+      steps:[
+        {text:"当前进程正在 CPU 上正常执行。", run:function(c){ apply({fills:{task:"active"}, panels:{obj:"任务↔中断"}, note:"进程运行中"}); return c.wait(650);}},
+        {text:"硬件中断到达，CPU <b>立即打断</b>当前进程，保存它的内核态现场（寄存器、内核栈、中断状态）。", run:function(c){ apply({fills:{task:"warn",ctx:"active"}, panels:{addr:"保存内核态"}, note:"① 打断并保存现场"}); return c.wait(800);}},
+        {text:"跳到<b>中断处理程序</b>执行——它只在内核态运行，优先级高于普通进程，要求尽快完成。", run:function(c){ apply({fills:{irq:"active",ctx:"done"}, panels:{cost:"优先级高"}, note:"② 执行中断处理"}); return c.wait(750);}},
+        {text:"处理完，恢复被打断进程的现场，继续执行。中断切换不等同于进程切换，但<b>中断过多会抬高 in/cs</b>。", run:function(c){ apply({fills:{irq:"done",task:"done"}, panels:{watch:"/proc/interrupts, vmstat in"}, note:"③ 恢复现场，继续"}); return c.wait(750);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>CPU 上下文切换</strong><small>进程 / 线程 / 中断三类切换的成本差异</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">进程切换</button><button data-ch="1">线程切换</button><button data-ch="2">中断切换</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 430" role="img" aria-label="CPU 上下文切换动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>切换对象</b><span data-panel="obj">—</span></div><div class="ka-panel"><b>换地址空间</b><span data-panel="addr">—</span></div><div class="ka-panel"><b>主要成本</b><span data-panel="cost">—</span></div><div class="ka-panel"><b>怎么观测</b><span data-panel="watch">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>保存/警惕</span><span><i style="background:#fecaca"></i>高成本</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

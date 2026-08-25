@@ -1,0 +1,112 @@
+<!-- roadmap animation: io-model-evolution -->
+<!-- marker data-roadmap-animation-id="io-model-evolution" -->
+<script id="io-model-evolution-script">
+(function(){
+  "use strict";
+  var ID = "io-model-evolution";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,13,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function row(key,x,y,w,h,left,right){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"8",fill:PAPER,stroke:INK,"stroke-width":"1.8"},g); txt(g,x+14,y+h/2+5,left,12,800,INK,"start"); txt(g,x+w*0.52,y+h/2+5,"→",13,800,MUTED); txt(g,x+w-14,y+h/2+5,right,11,700,"#1d4ed8","end"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      txt(svg,450,28,"C10K 的本质不是连接多，而是「一连接一线程」的切换与扫描成本",12.5,800,INK);
+      el("line",{x1:35,y1:60,x2:840,y2:60,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg);
+      txt(svg,838,52,"并发能力 →",11,700,MUTED,"end");
+      node("block",35,90,170,96,"阻塞 I/O","一线程一连接");
+      node("select",255,90,170,96,"select","线性扫描全集合");
+      node("poll",475,90,170,96,"poll","数组管理仍遍历");
+      node("epoll",695,90,170,96,"epoll","只返就绪事件");
+      edge(205,138,255,138); edge(425,138,475,138); edge(645,138,695,138);
+      note(450,260,"");
+      setPanel("stage","阻塞 I/O"); setPanel("feat","一连接一执行单元"); setPanel("limit","线程/栈/切换成本高"); setPanel("tip","C10K 的起点");
+    } else if(idx===1){
+      node("lt",70,40,330,70,"水平触发 LT","仍可读写就持续通知");
+      node("et",500,40,330,70,"边缘触发 ET","状态变化才通知");
+      node("lt2",70,140,330,56,"编程简单","少读一点下次还会通知");
+      node("et2",500,140,330,56,"配合非阻塞","须循环读到 EAGAIN");
+      node("warn",170,250,560,70,"ET 不天然更快","事件循环/缓冲/错误处理不对 → 连接卡死、饥饿");
+      edge(235,110,235,140); edge(665,110,665,140);
+      edge(235,196,400,250); edge(665,196,500,250);
+      note(450,360,"");
+      setPanel("stage","触发模式"); setPanel("feat","LT vs ET"); setPanel("limit","ET 易踩坑"); setPanel("tip","先 LT 再谈 ET");
+    } else {
+      var rows=[
+        ["文件描述符上限","ulimit -n · fs.file-max","r1"],
+        ["套接字缓冲 + 对象内存","单连接 ~20KiB × N","r2"],
+        ["TCP 状态 + 定时器","ss -s · TIME_WAIT","r3"],
+        ["conntrack 表容量","nf_conntrack_max","r4"],
+        ["监听 / 接受队列","somaxconn · backlog","r5"],
+        ["临时端口范围","ip_local_port_range","r6"],
+        ["网卡多队列 + 软中断","RSS / RPS / irq 亲和","r7"],
+        ["事件循环里的阻塞","reactor 不能被阻塞","r8"]
+      ];
+      for(var j=0;j<rows.length;j++){ row(rows[j][2],110,14+j*44,680,38,rows[j][0],rows[j][1]); }
+      note(450,372,"");
+      setPanel("stage","C1000K"); setPanel("feat","固定成本被放大"); setPanel("limit","逐项资源墙"); setPanel("tip","容量≠只数连接");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"高并发模型的演进，核心是<b>摆脱「一连接一线程」</b>：从阻塞 I/O，到 <code>select</code>/<code>poll</code> 用单线程管多连接，再到 <code>epoll</code> 只处理就绪事件。",
+      steps:[
+        {text:"<b>阻塞 I/O</b>：每个连接占一个进程/线程并阻塞等待。连接一多，<b>切换、栈内存、调度</b>开销就压垮系统——这就是 C10K 的起点。", run:function(c){ apply({fills:{block:"active"}, panels:{stage:"阻塞 I/O",feat:"一连接一执行单元",limit:"线程/栈/切换成本高",tip:"C10K 起点"}, note:"① 一连接一线程"}); return c.wait(850);}},
+        {text:"<b>select</b>：单线程用一个集合监控多个 fd。但<b>集合大小受限、每次线性扫描</b>全部描述符。", run:function(c){ apply({fills:{block:"done",select:"active"}, panels:{stage:"select",feat:"单线程管多 fd",limit:"集合受限 + 线性扫描"}, note:"② select：能管多个但要全扫"}); return c.wait(800);}},
+        {text:"<b>poll</b>：改用数组管理 fd，去掉了集合大小限制，但<b>每次仍要遍历全部</b>描述符。", run:function(c){ apply({fills:{select:"done",poll:"active"}, panels:{stage:"poll",feat:"数组管理 fd",limit:"仍需遍历全部"}, note:"③ poll：去掉上限，仍全遍历"}); return c.wait(800);}},
+        {text:"<b>epoll</b>：内核只返回<b>就绪</b>的事件，开销随活跃连接而非总连接增长，<b>适合海量长连接</b>。", run:function(c){ apply({fills:{poll:"done",epoll:"done"}, panels:{stage:"epoll",feat:"只返就绪事件",limit:"按活跃数而非总数",tip:"适合大量长连接"}, note:"④ epoll：只处理就绪"}); return c.wait(850);}}
+      ]},
+    { intro:"<code>epoll</code> 有两种触发模式。<b>水平触发(LT)</b> 简单，<b>边缘触发(ET)</b> 更省事件但要配合非阻塞——而且 ET <b>不天然更快</b>。",
+      steps:[
+        {text:"<b>水平触发 LT</b>：只要描述符<b>仍可读写就持续通知</b>。这一帧没读完，下一帧还会再提醒你。", run:function(c){ apply({fills:{lt:"active"}, panels:{stage:"LT",feat:"持续通知",tip:"编程简单"}, note:"① LT：可读写就一直通知"}); return c.wait(800);}},
+        {text:"LT <b>编程简单</b>：少读一点也不会丢事件，适合作为默认选择。", run:function(c){ apply({fills:{lt:"done",lt2:"done"}, panels:{stage:"LT",feat:"容错高",tip:"默认首选"}, note:"② LT：不易丢事件"}); return c.wait(750);}},
+        {text:"<b>边缘触发 ET</b>：只在<b>状态变化时</b>通知一次，事件更少，但必须<b>配合非阻塞 I/O</b>。", run:function(c){ apply({fills:{lt:"done",lt2:"done",et:"active"}, panels:{stage:"ET",feat:"仅状态变化通知",limit:"须配非阻塞"}, note:"③ ET：变化才通知一次"}); return c.wait(800);}},
+        {text:"ET 下必须<b>循环读到 <code>EAGAIN</code></b>，否则残留数据收不到新的边缘事件。", run:function(c){ apply({fills:{et:"done",et2:"done"}, panels:{stage:"ET",feat:"读到 EAGAIN 为止",limit:"漏读即卡住"}, note:"④ ET：必须读干净"}); return c.wait(800);}},
+        {text:"关键提醒：<b>ET 不天然比 LT 快</b>。事件循环、缓冲区或错误处理写错，反而造成<b>连接卡死和饥饿</b>。先把 LT 用对再谈 ET。", run:function(c){ apply({fills:{warn:"fail"}, panels:{stage:"对比",feat:"按场景选",limit:"ET 易踩坑",tip:"先 LT 再 ET"}, note:"⚠ ET 不天然更快"}); return c.wait(900);}}
+      ]},
+    { intro:"到 <b>C1000K</b>（百万连接），瓶颈不再是 I/O 模型，而是<b>每个连接的固定成本被放大</b>。要逐项检查这些资源墙。",
+      steps:[
+        {text:"<b>文件描述符上限</b>：百万连接先撞 fd 上限——<code>ulimit -n</code>、<code>fs.file-max</code> 都要调够。", run:function(c){ apply({fills:{r1:"active"}, panels:{limit:"fd 上限",tip:"先调 fd"}, note:"① 文件描述符"}); return c.wait(800);}},
+        {text:"<b>内存</b>：每连接套接字缓冲 + 应用对象。按 ~20KiB/连接算，百万连接就要 ~20GiB，还没算其余开销。", run:function(c){ apply({fills:{r1:"done",r2:"active"}, panels:{limit:"内存放大",tip:"按单连接×N 估"}, note:"② 缓冲 + 对象内存"}); return c.wait(800);}},
+        {text:"<b>TCP 状态/定时器</b> 与 <b>conntrack 表</b>：海量连接撑大连接跟踪与定时器开销。", run:function(c){ apply({fills:{r2:"done",r3:"active",r4:"active"}, panels:{limit:"状态 + conntrack"}, note:"③ TCP 状态 / conntrack"}); return c.wait(800);}},
+        {text:"<b>队列与端口</b>：监听/接受队列（<code>somaxconn</code>、backlog）、临时端口范围都可能成为隐形上限。", run:function(c){ apply({fills:{r3:"done",r4:"done",r5:"active",r6:"active"}, panels:{limit:"队列 + 端口"}, note:"④ 队列 / 临时端口"}); return c.wait(800);}},
+        {text:"<b>软中断与事件循环</b>：网卡多队列/中断分布要均衡，且<b>事件循环里不能有阻塞操作</b>，否则单点拖垮整机。", run:function(c){ apply({fills:{r5:"done",r6:"done",r7:"active",r8:"warn"}, panels:{limit:"软中断 + 阻塞",tip:"reactor 别阻塞"}, note:"⑤ 软中断分布 + 别阻塞 reactor"}); return c.wait(850);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>从 C10K 到 C1000K：I/O 模型演进</strong><small>阻塞 → select → poll → epoll</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">模型演进</button><button data-ch="1">epoll 触发</button><button data-ch="2">C1000K 资源墙</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 392" role="img" aria-label="I/O 模型演进动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>模型/阶段</b><span data-panel="stage">—</span></div><div class="ka-panel"><b>特征</b><span data-panel="feat">—</span></div><div class="ka-panel"><b>限制</b><span data-panel="limit">—</span></div><div class="ka-panel"><b>提示</b><span data-panel="tip">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需注意</span><span><i style="background:#fecaca"></i>陷阱</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

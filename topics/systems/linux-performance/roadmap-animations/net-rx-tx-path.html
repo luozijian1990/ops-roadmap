@@ -1,0 +1,97 @@
+<!-- roadmap animation: net-rx-tx-path -->
+<!-- marker data-roadmap-animation-id="net-rx-tx-path" -->
+<script id="net-rx-tx-path-script">
+(function(){
+  "use strict";
+  var ID = "net-rx-tx-path";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null,packet:null,packetLabel:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#9ca3af"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; ui.packet=null; ui.packetLabel=null; }
+  function bar(key,y,title,sub){ var x=200,w=540,h=54; var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"10",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+18,y+h/2+5,title,14,800,INK,"start"); if(sub) txt(g,x+w-16,y+h/2+5,sub,11.5,600,MUTED,"end"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309",null); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function packetTo(key){ if(!ui.packet||!ui.nodes[key]) return; var cy=ui.nodes[key].cy; ui.packet.setAttribute("cy",cy); ui.packetLabel.setAttribute("y",cy+4); }
+  function apply(p){
+    if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k];
+    if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]);
+    if(p.packet) packetTo(p.packet);
+    if("note" in p && ui.note) ui.note.textContent=p.note;
+    paint();
+  }
+
+  var LAYERS=[["app",26,"应用进程","read / write"],["sock",100,"套接字缓冲区","内核内存，不计 RSS"],["stack",174,"协议栈 sk_buff","链路 / IP / TCP·UDP"],["ring",248,"网卡收发环 ring","驱动管理，DMA 区"],["nic",322,"网卡 NIC","物理收发"]];
+  function drawLayers(){ LAYERS.forEach(function(L){ bar(L[0],L[1],L[2],L[3]); }); }
+  function drawDirArrow(up){
+    var x=160;
+    if(up){ el("line",{x1:x,y1:340,x2:x,y2:50,stroke:"#1d4ed8","stroke-width":"3","marker-end":"url(#"+ID+"-arrow)"},svg); txt(svg,x-16,200,"接收 RX",12,800,"#1d4ed8","middle").setAttribute("transform","rotate(-90 "+(x-16)+" 200)"); }
+    else { el("line",{x1:x,y1:50,x2:x,y2:340,stroke:"#15803d","stroke-width":"3","marker-end":"url(#"+ID+"-arrow)"},svg); txt(svg,x-16,200,"发送 TX",12,800,"#15803d","middle").setAttribute("transform","rotate(-90 "+(x-16)+" 200)"); }
+  }
+  function drawPacket(){ ui.packet=el("circle",{cx:120,cy:349,r:"15",fill:WARN,stroke:INK,"stroke-width":"2"},svg); ui.packetLabel=txt(svg,120,353,"包",11,800,INK); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    drawLayers();
+    if(idx===0){ drawDirArrow(true); drawPacket(); packetTo("nic"); setPanel("dir","接收 RX（自底向上）"); setPanel("layer","网卡"); setPanel("buf","—"); setPanel("watch","ethtool -S"); }
+    else if(idx===1){ drawDirArrow(false); drawPacket(); packetTo("app"); setPanel("dir","发送 TX（自顶向下）"); setPanel("layer","应用"); setPanel("buf","—"); setPanel("watch","ss -m"); }
+    else { drawPacket(); packetTo("ring"); ui.packet.setAttribute("opacity","0"); setPanel("dir","三层缓冲区"); setPanel("layer","对比所有者"); setPanel("buf","ring / sk_buff / socket"); setPanel("watch","ethtool -g, ss -m, slabtop"); }
+    note(450,398,"");
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"<b>接收路径</b>自底向上：数据从网卡一路爬到应用。高包速下瓶颈往往不在带宽，而在<b>队列、中断、软中断或取包速度</b>。",
+      steps:[
+        {text:"网卡收到网络帧。", run:function(c){ apply({fills:{nic:"active"}, packet:"nic", panels:{layer:"网卡 NIC"}, note:"帧到达网卡"}); return c.wait(650);}},
+        {text:"通过 <b>DMA</b> 写入内存中的<b>接收环形队列 ring</b>。", run:function(c){ apply({fills:{nic:"done",ring:"active"}, packet:"ring", panels:{layer:"ring buffer",buf:"RX ring"}, note:"DMA → 接收环"}); return c.wait(750);}},
+        {text:"网卡触发<b>硬中断</b>，驱动安排 <b>NAPI 轮询 / 软中断</b>处理。", run:function(c){ apply({fills:{ring:"warn"}, panels:{layer:"硬中断+软中断"}, note:"硬中断 → NAPI/软中断"}); return c.wait(750);}},
+        {text:"内核构造 <b>sk_buff</b>，进入链路层、IP 层；TCP/UDP 按<b>四元组</b>找到对应套接字。", run:function(c){ apply({fills:{ring:"done",stack:"active"}, packet:"stack", panels:{layer:"协议栈",buf:"sk_buff"}, note:"逐层处理 + 找 socket"}); return c.wait(800);}},
+        {text:"数据进入<b>套接字接收缓冲区</b>排队。", run:function(c){ apply({fills:{stack:"done",sock:"active"}, packet:"sock", panels:{layer:"socket recv buf"}, note:"进入接收缓冲区"}); return c.wait(700);}},
+        {text:"应用通过 <b>read/recv</b> 取走数据。⚠ 接收缓冲区满 → 后续数据被丢，TCP 还会<b>重传、掉吞吐</b>。", run:function(c){ apply({fills:{sock:"done",app:"done"}, packet:"app", panels:{layer:"应用取走",watch:"ss -m, ethtool -S"}, note:"⚠ 缓冲区满 → 丢包 + 重传"}); return c.wait(800);}}
+      ]},
+    { intro:"<b>发送路径</b>大致相反，自顶向下。<b>发送缓冲区堆积</b>通常说明应用产数据比网络发得快。",
+      steps:[
+        {text:"应用调用 <b>write/send</b> 提交数据。", run:function(c){ apply({fills:{app:"active"}, packet:"app", panels:{layer:"应用"}, note:"应用提交数据"}); return c.wait(650);}},
+        {text:"数据复制/映射到<b>套接字发送缓冲区</b>。", run:function(c){ apply({fills:{app:"done",sock:"active"}, packet:"sock", panels:{layer:"socket send buf",buf:"发送队列"}, note:"进入发送缓冲区"}); return c.wait(750);}},
+        {text:"<b>TCP/UDP → IP → 链路层</b>逐层封装（加头），构造 sk_buff。", run:function(c){ apply({fills:{sock:"done",stack:"active"}, packet:"stack", panels:{layer:"协议栈封装"}, note:"逐层加头封装"}); return c.wait(750);}},
+        {text:"经<b>流量控制队列(qdisc)</b>与网卡驱动，进入<b>发送环</b>。", run:function(c){ apply({fills:{stack:"done",ring:"active"}, packet:"ring", panels:{layer:"qdisc + TX ring"}, note:"流控队列 → 发送环"}); return c.wait(750);}},
+        {text:"网卡通过 <b>DMA</b> 读取发送描述符并把数据发出；完成后由中断/轮询回收描述符。", run:function(c){ apply({fills:{ring:"done",nic:"done"}, packet:"nic", panels:{layer:"网卡发出"}, note:"DMA 发送，回收描述符"}); return c.wait(750);}},
+        {text:"⚠ <b>发送缓冲区堆积</b> = 应用产数据 > 实际发送速度，也可能是<b>对端窗口小 / 拥塞收缩 / 链路丢包 / 设备队列拥堵</b>。", run:function(c){ apply({fills:{sock:"warn"}, panels:{layer:"发送堆积",watch:"ss -m 看 Send-Q"}, note:"⚠ Send-Q 堆积排查"}); return c.wait(800);}}
+      ]},
+    { intro:"「网络缓冲区」不是<b>一块</b>地方。一次收包要经过三层不同<b>所有者、生命周期、观测方法</b>的缓冲——调优前必须先定位<b>哪一层</b>真在排队/丢包。",
+      steps:[
+        {text:"第一层 <b>网卡收发环 RX/TX ring</b>：驱动管理、网卡可 DMA 访问的主机内存，里面主要是<b>描述符</b>，不是无限大的包缓存。", run:function(c){ apply({fills:{ring:"active"}, panels:{buf:"ring（描述符）",watch:"ethtool -g / -S"}, note:"ring：描述符队列"}); return c.wait(800);}},
+        {text:"第二层 <b>sk_buff</b>：内核里的包描述对象，记录协议头位置/元数据，跨层时<b>移动指针而非每层复制</b>。", run:function(c){ apply({fills:{ring:"done",stack:"active"}, panels:{buf:"sk_buff",watch:"slabtop"}, note:"sk_buff：移指针，不复制"}); return c.wait(800);}},
+        {text:"第三层 <b>套接字缓冲区</b>：协议栈与应用之间排队，属内核内存、<b>不计入进程 RSS</b>，但随连接数与排队量增长。", run:function(c){ apply({fills:{stack:"done",sock:"active"}, panels:{buf:"socket queue",watch:"ss -m, /proc/net/sockstat"}, note:"socket：不计 RSS，会涨"}); return c.wait(800);}},
+        {text:"调优取舍：扩 <b>ring</b> 能吸收短时突发但增排队延迟；扩 <b>socket buffer</b> 改善高 BDP 链路吞吐，却可能<b>掩盖应用读取慢</b>、放大尾延迟。", run:function(c){ apply({fills:{ring:"warn",sock:"warn"}, panels:{layer:"先定位再调",watch:"slabtop 看 skbuff/conntrack"}, note:"先找到真正排队的层"}); return c.wait(850);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>网络协议栈：收发路径</strong><small>包如何在网卡 ↔ 应用之间逐层流动</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">接收 RX</button><button data-ch="1">发送 TX</button><button data-ch="2">三层缓冲</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 410" role="img" aria-label="网络收发路径动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>方向</b><span data-panel="dir">—</span></div><div class="ka-panel"><b>当前层</b><span data-panel="layer">—</span></div><div class="ka-panel"><b>缓冲对象</b><span data-panel="buf">—</span></div><div class="ka-panel"><b>怎么观测</b><span data-panel="watch">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前层</span><span><i style="background:#bbf7d0"></i>已通过</span><span><i style="background:#fde68a"></i>需警惕</span><span><i style="background:#fecaca"></i>瓶颈</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null,packet:null,packetLabel:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

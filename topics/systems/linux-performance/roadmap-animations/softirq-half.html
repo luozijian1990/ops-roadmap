@@ -1,0 +1,99 @@
+<!-- roadmap animation: softirq-half -->
+<!-- marker data-roadmap-animation-id="softirq-half" -->
+<script id="softirq-half-script">
+(function(){
+  "use strict";
+  var ID = "softirq-half";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"12",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,14,800); if(sub) txt(g,x+w/2,y+h/2+16,sub,11.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("nic",50,175,160,72,"网卡 NIC","数据包到达");
+      node("top",300,175,200,72,"上半部 · 硬中断","快：确认硬件");
+      node("mark",600,175,210,72,"调度软中断","标记 NET_RX");
+      edge(210,211,300,211,"触发硬中断");
+      edge(500,211,600,211,"① 只做最少事");
+      note(450,330,"");
+      setPanel("phase","上半部"); setPanel("defer","不可延迟"); setPanel("cost","极短"); setPanel("watch","/proc/interrupts");
+    } else if(idx===1){
+      node("sirq",40,175,180,72,"下半部 · 软中断","NET_RX");
+      node("stack",290,175,200,72,"网络协议栈","链路/IP/TCP");
+      node("sock",560,175,170,72,"套接字","socket 缓冲");
+      node("app",560,40,170,64,"应用","read / recv");
+      edge(220,211,290,211,"调度执行");
+      edge(490,211,560,211,"逐层处理");
+      edge(645,175,645,104,"数据就绪",true);
+      note(380,330,"");
+      setPanel("phase","下半部"); setPanel("defer","可延迟"); setPanel("cost","随包量增长"); setPanel("watch","top si%");
+    } else {
+      node("flood",40,170,180,76,"高速收包","软中断洪流");
+      node("ks",320,170,210,76,"ksoftirqd/N","每 CPU 一个内核线程");
+      node("cpu",620,170,200,76,"CPU 使用率","si% 飙高");
+      edge(220,208,320,208,"软中断过多");
+      edge(530,208,620,208,"接管处理");
+      note(450,320,"");
+      setPanel("phase","ksoftirqd"); setPanel("defer","内核线程"); setPanel("cost","si% 飙高"); setPanel("watch","/proc/softirqs");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"中断处理为什么拆成两半？因为硬中断期间通常<b>关中断</b>，必须越快越好。上半部只做最少的事，把重活留给下半部。",
+      steps:[
+        {text:"网卡收到数据包，触发<b>硬中断</b>通知 CPU。", run:function(c){ apply({fills:{nic:"active"}, panels:{phase:"上半部"}, note:"数据包到达"}); return c.wait(700);}},
+        {text:"<b>上半部（硬中断）</b>只做最少的事：确认硬件状态、读必要数据。它优先级高、要求尽快完成。", run:function(c){ apply({fills:{nic:"done",top:"active"}, panels:{cost:"极短",defer:"不可延迟"}, note:"快速响应硬件"}); return c.wait(800);}},
+        {text:"上半部把耗时的活儿<b>登记成软中断 NET_RX</b>，然后立刻返回——硬中断不会长时间阻塞。", run:function(c){ apply({fills:{top:"done",mark:"active"}, panels:{phase:"交给下半部"}, note:"① 调度 NET_RX 后返回"}); return c.wait(750);}}
+      ]},
+    { intro:"<b>下半部（软中断）</b>才是真正干活的地方，也是 <b>top 里 si% 的来源</b>。它可以延迟、可被打断地处理。",
+      steps:[
+        {text:"<b>软中断 NET_RX</b> 被调度执行——它可以稍后处理，不必像硬中断那样争分夺秒。", run:function(c){ apply({fills:{sirq:"active"}, panels:{phase:"下半部",defer:"可延迟"}, note:"软中断开始处理"}); return c.wait(700);}},
+        {text:"真正耗时的<b>网络协议栈处理</b>在这里：解析链路层、IP、TCP，逐层剥头。", run:function(c){ apply({fills:{sirq:"done",stack:"active"}, panels:{cost:"随包量增长"}, note:"协议栈逐层处理"}); return c.wait(800);}},
+        {text:"处理完的数据放进<b>套接字缓冲区</b>，应用通过 read/recv 取走。", run:function(c){ apply({fills:{stack:"done",sock:"active",app:"done"}, panels:{phase:"数据入 socket"}, note:"数据进入 socket"}); return c.wait(750);}},
+        {text:"软中断不止网络下半部，还有 <b>TIMER、SCHED、RCU、BLOCK</b> 等。包量大时这一段会吃掉可观 CPU = <b>si%</b>。", run:function(c){ apply({fills:{stack:"warn"}, panels:{watch:"top 的 si"}, note:"⚠ 高包量 → si% 上升"}); return c.wait(800);}}
+      ]},
+    { intro:"软中断<b>持续过多</b>时，内核会用专门的内核线程 <b>ksoftirqd</b> 接管——它的 CPU 飙高，正是软中断打满的信号。",
+      steps:[
+        {text:"每个 CPU 都有一个内核线程 <b>ksoftirqd/N</b>，专门兜底处理软中断。", run:function(c){ apply({fills:{ks:"active"}, panels:{phase:"ksoftirqd"}, note:"每 CPU 一个"}); return c.wait(700);}},
+        {text:"软中断量适中时，在<b>中断返回路径上就地处理</b>完，不必惊动 ksoftirqd。", run:function(c){ apply({fills:{ks:"done"}, panels:{cost:"正常"}, note:"量小：就地处理"}); return c.wait(700);}},
+        {text:"高速收包导致<b>软中断洪流</b> → 内核唤醒 ksoftirqd 接管，它的 CPU 会被打满。", run:function(c){ apply({fills:{flood:"warn",ks:"active",cpu:"fail"}, panels:{cost:"si% 飙高"}, note:"⚠ ksoftirqd CPU 飙高"}); return c.wait(800);}},
+        {text:"排查：<b>top</b> 看 si% 与 ksoftirqd；<b>/proc/softirqs</b> 配合 <code>watch -d</code> 看<b>哪类</b>软中断在涨。", run:function(c){ apply({fills:{cpu:"warn"}, panels:{watch:"watch -d /proc/softirqs"}, note:"定位涨得最快的类型"}); return c.wait(800);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>软中断：上半部 / 下半部</strong><small>硬中断为何要把活儿交给软中断</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">上半部·硬中断</button><button data-ch="1">下半部·软中断</button><button data-ch="2">ksoftirqd</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 360" role="img" aria-label="软中断上下半部动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>阶段</b><span data-panel="phase">—</span></div><div class="ka-panel"><b>能否延迟</b><span data-panel="defer">—</span></div><div class="ka-panel"><b>主要消耗</b><span data-panel="cost">—</span></div><div class="ka-panel"><b>怎么观测</b><span data-panel="watch">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需警惕</span><span><i style="background:#fecaca"></i>打满</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

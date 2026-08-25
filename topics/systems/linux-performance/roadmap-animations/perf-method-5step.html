@@ -1,0 +1,112 @@
+<!-- roadmap animation: perf-method-5step -->
+<!-- marker data-roadmap-animation-id="perf-method-5step" -->
+<script id="perf-method-5step-script">
+(function(){
+  "use strict";
+  var ID = "perf-method-5step";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,12.5,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      txt(svg,450,32,"核心不是跑遍所有工具，而是建立假设、用最小成本排除错误方向",12,800,INK);
+      node("s1",25,100,160,130,"① 明确问题","指标/起点/范围/变更/基线");
+      node("s2",200,100,160,130,"② 保护现场","存监控/日志/trace/变更");
+      node("s3",375,100,160,130,"③ 业务到资源","USE + 流量错误延迟饱和");
+      node("s4",550,100,160,130,"④ 形成并验证假设","现象→假设→证据→验证");
+      node("s5",725,100,160,130,"⑤ 修复和复盘","复测/灰度/回滚/补监控");
+      edge(185,165,200,165); edge(360,165,375,165); edge(535,165,550,165); edge(710,165,725,165);
+      note(450,270,"");
+      setPanel("stage","五步骤"); setPanel("focus","流程而非工具"); setPanel("act","建立假设"); setPanel("key","最小成本排错");
+    } else if(idx===1){
+      node("biz",320,14,260,42,"业务：吞吐/延迟/错误","");
+      node("q1",350,66,200,40,"入口 还是 依赖?","");
+      node("app",320,116,260,40,"应用指标 / 日志 / Trace","");
+      node("q2",350,166,200,40,"资源是否饱和?","");
+      node("cpu",20,222,160,46,"CPU","");
+      node("mem",196,222,160,46,"内存","");
+      node("io",372,222,160,46,"I/O","");
+      node("net",548,222,160,46,"网络","");
+      node("kern",724,222,160,46,"内核软件资源","");
+      node("conv",330,300,240,42,"进程 / 线程 / 函数","");
+      edge(450,56,450,66); edge(450,106,450,116); edge(450,156,450,166);
+      edge(450,206,100,222); edge(450,206,276,222); edge(450,206,452,222); edge(450,206,628,222); edge(450,206,804,222);
+      edge(100,268,420,300,"",true); edge(276,268,440,300,"",true); edge(452,268,450,300,"",true); edge(628,268,460,300,"",true); edge(804,268,480,300,"",true);
+      note(450,352,"");
+      setPanel("stage","业务到资源"); setPanel("focus","两路关联同一时间线"); setPanel("act","USE + RED"); setPanel("key","最终落到函数");
+    } else {
+      node("r1",120,14,660,46,"现象","P99 上升 + 磁盘 await 同时上升");
+      node("r2",120,72,660,46,"假设","日志同步写导致请求阻塞");
+      node("r3",120,130,660,46,"证据","pidstat 显示目标进程写入增加");
+      node("r4",120,188,660,46,"验证","strace / eBPF 显示高频 fsync");
+      node("r5",120,246,660,46,"修复","批量提交 + 隔离日志盘");
+      node("r6",120,304,660,46,"复测","相同负载下 P99 与 await 恢复");
+      edge(450,60,450,72); edge(450,118,450,130); edge(450,176,450,188); edge(450,234,450,246); edge(450,292,450,304);
+      note(450,366,"");
+      setPanel("stage","假设验证"); setPanel("focus","证据链闭环"); setPanel("act","现象→复测"); setPanel("key","相关≠因果");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"性能分析的核心<b>不是依次跑所有工具</b>，而是<b>建立假设、用最小成本排除错误方向</b>。固定五步走下来，结论才站得住。",
+      steps:[
+        {text:"<b>① 明确问题</b>：哪个业务指标异常、何时起、影响范围、是否刚发布/扩容/改配置、正常基线是多少。「机器很慢」不是可分析的问题。", run:function(c){ apply({fills:{s1:"active"}, panels:{stage:"①明确问题",focus:"可分析的描述"}, note:"① 把问题说清楚"}); return c.wait(900);}},
+        {text:"<b>② 保护现场</b>：保存监控窗口、日志、trace、profile、必要抓包，记录版本/配置/变更。<b>止损也要记录</b>，别盲改参数。", run:function(c){ apply({fills:{s1:"done",s2:"active"}, panels:{stage:"②保护现场",act:"先存证据"}, note:"② 保护现场再动手"}); return c.wait(850);}},
+        {text:"<b>③ 从业务到资源</b>：业务用流量/错误/延迟/饱和，系统资源用 <b>USE 方法</b>，两条路径关联到同一时间线。", run:function(c){ apply({fills:{s2:"done",s3:"active"}, panels:{stage:"③业务到资源",act:"USE + RED"}, note:"③ 业务↔资源对齐"}); return c.wait(850);}},
+        {text:"<b>④ 形成并验证假设</b>：现象→假设→证据→验证连成链。<b>相关性只能生成假设，不能直接证明因果</b>。", run:function(c){ apply({fills:{s3:"done",s4:"active"}, panels:{stage:"④验证假设",key:"相关≠因果"}, note:"④ 用证据验证假设"}); return c.wait(850);}},
+        {text:"<b>⑤ 修复和复盘</b>：相同负载复测、比较吞吐/尾延迟/错误、检查新瓶颈、灰度并设回滚条件、补监控告警、记录根因。", run:function(c){ apply({fills:{s4:"done",s5:"done"}, panels:{stage:"⑤修复复盘",act:"复测+灰度+复盘"}, note:"⑤ 复测 → 灰度 → 复盘"}); return c.wait(900);}}
+      ]},
+    { intro:"第三步的关键是<b>「从业务到资源」自上而下</b>：从业务表现切入，经应用指标，判断资源是否饱和，最终落到具体进程/线程/函数。",
+      steps:[
+        {text:"先看<b>业务层</b>：吞吐、延迟、错误是否异常——这是用户能感知的层面。", run:function(c){ apply({fills:{biz:"active"}, panels:{stage:"业务层",act:"看 RED"}, note:"① 业务表现"}); return c.wait(800);}},
+        {text:"判断是<b>入口还是依赖</b>，再看<b>应用指标 / 日志 / Trace</b> 缩小到具体调用。", run:function(c){ apply({fills:{biz:"done",q1:"active",app:"active"}, panels:{stage:"应用层",act:"指标/日志/Trace"}, note:"② 入口 vs 依赖"}); return c.wait(850);}},
+        {text:"再判断<b>资源是否饱和</b>，用 <b>USE 方法</b>逐项检查 <b>CPU / 内存 / I/O / 网络 / 内核软件资源</b>。", run:function(c){ apply({fills:{app:"done",q2:"active",cpu:"active",mem:"active",io:"active",net:"active",kern:"active"}, panels:{stage:"资源层",act:"USE 五类"}, note:"③ USE 扫五类资源"}); return c.wait(900);}},
+        {text:"最终把饱和的资源<b>收敛到具体进程/线程/函数</b>——两条路径（业务 RED + 资源 USE）汇到同一时间线。", run:function(c){ apply({fills:{cpu:"done",mem:"done",io:"done",net:"done",kern:"done",conv:"done"}, panels:{stage:"收敛",key:"落到函数"}, note:"④ 收敛到函数"}); return c.wait(850);}}
+      ]},
+    { intro:"第四步的<b>证据链</b>长这样（课程例子）：现象→假设→证据→验证→修复→复测，环环相扣才算闭环。",
+      steps:[
+        {text:"<b>现象</b>：P99 上升，且磁盘 <code>await</code> 同时上升——两个指标一起动。", run:function(c){ apply({fills:{r1:"warn"}, panels:{stage:"现象",act:"P99 + await↑"}, note:"① 现象：两指标同升"}); return c.wait(800);}},
+        {text:"<b>假设</b>：日志<b>同步写</b>导致请求阻塞——相关性给出方向，但还没证明。", run:function(c){ apply({fills:{r1:"done",r2:"active"}, panels:{stage:"假设",key:"相关≠因果"}, note:"② 假设：同步写阻塞"}); return c.wait(800);}},
+        {text:"<b>证据</b>：<code>pidstat</code> 显示目标进程<b>写入增加</b>——资源指标支持假设。", run:function(c){ apply({fills:{r2:"done",r3:"active"}, panels:{stage:"证据",act:"pidstat"}, note:"③ 证据：写入增加"}); return c.wait(800);}},
+        {text:"<b>验证</b>：<code>strace</code> 或 <b>eBPF</b> 显示<b>高频 fsync</b>——执行行为坐实根因。", run:function(c){ apply({fills:{r3:"done",r4:"active"}, panels:{stage:"验证",act:"strace/eBPF"}, note:"④ 验证：高频 fsync"}); return c.wait(800);}},
+        {text:"<b>修复</b>：批量提交 + 隔离日志盘 → <b>复测</b>：相同负载下 P99 与 await 恢复。证据链 = 业务表现 + 资源指标 + 执行行为。", run:function(c){ apply({fills:{r4:"done",r5:"done",r6:"done"}, panels:{stage:"修复+复测",key:"三类证据齐全"}, note:"⑤ 修复 → 复测闭环"}); return c.wait(900);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>性能问题分析五步法</strong><small>明确 → 现场 → 业务到资源 → 假设验证 → 复盘</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">五步骤</button><button data-ch="1">业务到资源</button><button data-ch="2">假设验证</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 366" role="img" aria-label="性能问题分析五步法动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>步骤</b><span data-panel="stage">—</span></div><div class="ka-panel"><b>关注</b><span data-panel="focus">—</span></div><div class="ka-panel"><b>动作</b><span data-panel="act">—</span></div><div class="ka-panel"><b>要点</b><span data-panel="key">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>现象/线索</span><span><i style="background:#fecaca"></i>待证实</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

@@ -1,0 +1,91 @@
+<!-- roadmap animation: packet-drop-path -->
+<!-- marker data-roadmap-animation-id="packet-drop-path" -->
+<script id="packet-drop-path-script">
+(function(){
+  "use strict";
+  var ID = "packet-drop-path";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null,packet:null,packetLabel:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); ui.nodes={}; ui.note=null; ui.packet=null; ui.packetLabel=null; }
+  function bar(key,y,title){ var x=210,w=470,h=46; var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"9",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+18,y+h/2+5,title,13.5,800,INK,"start"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b91c1c",null); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function packetTo(key){ if(!ui.packet||!ui.nodes[key]) return; var cy=ui.nodes[key].cy; ui.packet.setAttribute("cy",cy); ui.packetLabel.setAttribute("y",cy+4); }
+  function apply(p){
+    if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k];
+    if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]);
+    if(p.packet) packetTo(p.packet);
+    if("note" in p && ui.note) ui.note.textContent=p.note;
+    paint();
+  }
+
+  var LAYERS=[["up",14,"上游链路 / 交换网络"],["l1",70,"① 接口 · 驱动 · 接收环"],["l2",126,"② qdisc 流量控制"],["l3",182,"③ 协议统计 (IP / TCP / UDP)"],["l4",238,"④ Netfilter · conntrack"],["l5",294,"⑤ MTU · 分片"],["app",350,"应用队列与处理"]];
+  function drawLayers(){ LAYERS.forEach(function(L){ bar(L[0],L[1],L[2]); }); }
+  function drawPacket(){ ui.packet=el("circle",{cx:150,cy:37,r:"14",fill:WARN,stroke:INK,"stroke-width":"2"},svg); ui.packetLabel=txt(svg,150,41,"包",11,800,INK); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    drawLayers(); drawPacket();
+    if(idx===0){ packetTo("up"); setPanel("layer","全景"); setPanel("cause","每层都可能丢"); setPanel("cmd","逐层计数器"); setPanel("sign","上层有、下层无"); }
+    else if(idx===1){ packetTo("l1"); setPanel("layer","逐层定位"); setPanel("cause","看计数器"); setPanel("cmd","ethtool -S ..."); setPanel("sign","计数增长"); }
+    else { ui.packet.setAttribute("opacity","0"); setPanel("layer","多点抓包"); setPanel("cause","夹逼区间"); setPanel("cmd","tcpdump"); setPanel("sign","相邻点差异"); }
+    note(445,408,"");
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"偶发丢包最难的是<b>不知道丢在哪</b>。先建立全景：一个包从上游链路走到应用，要穿过这一串层，<b>每一层都可能把它丢掉</b>。",
+      steps:[
+        {text:"包从<b>上游链路 / 交换网络</b>进来，目标是抵达应用。", run:function(c){ apply({fills:{up:"active"}, packet:"up", panels:{layer:"上游"}, note:""}); return c.wait(650);}},
+        {text:"<b>① 接口·驱动·接收环</b>：队列满、网卡错误、overrun 都会在这里丢。", run:function(c){ apply({fills:{up:"done",l1:"warn"}, packet:"l1", panels:{layer:"① 接口/驱动",cause:"队列满 / 错误"}, note:"✗ 队列满 / 网卡错误"}); return c.wait(750);}},
+        {text:"<b>② qdisc 流量控制</b>：超过限速或队列溢出，包被丢弃。", run:function(c){ apply({fills:{l1:"done",l2:"warn"}, packet:"l2", panels:{layer:"② qdisc",cause:"超限 / 溢出"}, note:"✗ 限速 / 队列溢出"}); return c.wait(750);}},
+        {text:"<b>③ 协议栈 + ④ Netfilter/conntrack</b>：路由失败、<b>conntrack 表满</b>、防火墙规则都可能丢包。", run:function(c){ apply({fills:{l2:"done",l3:"warn",l4:"fail"}, packet:"l4", panels:{layer:"③④ 协议栈/防火墙",cause:"conntrack 满 / 规则"}, note:"✗ conntrack 表满 / iptables DROP"}); return c.wait(800);}},
+        {text:"<b>⑤ MTU·分片</b>：大包超过 MTU 且<b>禁止分片(DF)</b>，会被直接丢——典型现象是「小包正常、大包丢」。", run:function(c){ apply({fills:{l4:"done",l5:"warn"}, packet:"l5", panels:{layer:"⑤ MTU",cause:"超 MTU + DF"}, note:"✗ 大包超 MTU 被丢"}); return c.wait(800);}},
+        {text:"<b>排查口诀</b>：对每一层问两个问题 ——① 本层丢包计数是否增长？② 上一层看到了包，下一层是否没看到？", run:function(c){ apply({fills:{l5:"done",app:"done"}, packet:"app", panels:{layer:"方法论",sign:"两问定位"}, note:"逐层问：计数↑？上有下无？"}); return c.wait(800);}}
+      ]},
+    { intro:"全景之后是<b>逐层定位</b>——每一层都有对应的计数器和命令。哪层的丢包数在涨，问题就在哪层。",
+      steps:[
+        {text:"<b>① 接口·驱动·队列</b>：<code>ethtool -S eth0</code> / <code>ip -s link</code> 看 rx_dropped、errors、overruns。", run:function(c){ apply({fills:{l1:"active"}, packet:"l1", panels:{layer:"① 接口/驱动",cmd:"ethtool -S, ip -s link",sign:"dropped/errors↑"}, note:"驱动级丢包、队列、错误"}); return c.wait(800);}},
+        {text:"<b>② qdisc</b>：<code>tc -s qdisc show dev eth0</code> 看 dropped / overlimits / requeues。", run:function(c){ apply({fills:{l1:"done",l2:"active"}, packet:"l2", panels:{layer:"② qdisc",cmd:"tc -s qdisc",sign:"dropped/overlimits"}, note:"流控队列丢弃统计"}); return c.wait(800);}},
+        {text:"<b>③ 协议统计</b>：<code>netstat -s</code> / <code>nstat</code> 看各协议层的 drop、错误、重传。", run:function(c){ apply({fills:{l2:"done",l3:"active"}, packet:"l3", panels:{layer:"③ 协议统计",cmd:"netstat -s, nstat",sign:"重传/丢弃计数"}, note:"IP/TCP/UDP 层统计"}); return c.wait(800);}},
+        {text:"<b>④ Netfilter·conntrack</b>：<code>conntrack -S</code>、<code>iptables -L -v</code>，并比对 <code>nf_conntrack_count</code> 与 max——<b>表满会丢新连接</b>。", run:function(c){ apply({fills:{l3:"done",l4:"warn"}, packet:"l4", panels:{layer:"④ conntrack",cmd:"conntrack -S, iptables -nvL",sign:"count 逼近 max"}, note:"⚠ conntrack 表满丢新连接"}); return c.wait(850);}},
+        {text:"<b>⑤ MTU·分片</b>：检查接口 MTU；用 <code>ping -s &lt;大&gt; -M do</code> 复现「大包丢、小包通」。", run:function(c){ apply({fills:{l4:"done",l5:"active"}, packet:"l5", panels:{layer:"⑤ MTU",cmd:"ip link, ping -s -M do",sign:"大包失败"}, note:"大包探测确认 MTU 问题"}); return c.wait(800);}}
+      ]},
+    { intro:"计数器告诉你「哪层在丢」，但有时要<b>直接抓包</b>确认包走到哪。多点 tcpdump <b>由外向内夹逼</b>丢包区间。",
+      steps:[
+        {text:"先在<b>最外层（网卡入口）</b>抓包，确认包确实进了机器。", run:function(c){ apply({fills:{up:"active",l1:"active"}, panels:{layer:"外层抓包",cmd:"tcpdump -i eth0"}, note:"外层：包进来了吗"}); return c.wait(750);}},
+        {text:"在<b>更靠内的点</b>再抓一次，比较两点是否都看到同一个包。", run:function(c){ apply({fills:{l1:"done",l3:"active"}, panels:{layer:"内层抓包"}, note:"内层：还看得到吗"}); return c.wait(750);}},
+        {text:"<b>夹逼判据</b>：上游点抓到、下游点没抓到 → 丢包就发生在<b>这两点之间</b>那一层。", run:function(c){ apply({fills:{l3:"fail",l4:"fail"}, panels:{layer:"区间锁定",sign:"上有 / 下无"}, note:"✗ 丢包落在两点之间"}); return c.wait(800);}},
+        {text:"由外向内逐步<b>收紧区间</b>，直到把丢包锁定到某一层，再针对该层深入。", run:function(c){ apply({fills:{l4:"warn"}, panels:{layer:"逐步收紧"}, note:"收紧到具体一层"}); return c.wait(750);}},
+        {text:"注意：tcpdump 抓的是<b>经过该 hook 点</b>的包，要和计数器结合看，别被 offload / 镜像点误导。", run:function(c){ apply({fills:{l4:"done"}, panels:{layer:"结合计数器",cmd:"tcpdump + 计数器"}, note:"抓包 + 计数器交叉验证"}); return c.wait(800);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>丢包路径排查</strong><small>包从网卡到应用，每一层都可能丢</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">丢包全景</button><button data-ch="1">逐层定位</button><button data-ch="2">抓包夹逼</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 420" role="img" aria-label="丢包路径排查动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>当前层</b><span data-panel="layer">—</span></div><div class="ka-panel"><b>丢包原因</b><span data-panel="cause">—</span></div><div class="ka-panel"><b>排查命令</b><span data-panel="cmd">—</span></div><div class="ka-panel"><b>判据/现象</b><span data-panel="sign">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>检查中</span><span><i style="background:#bbf7d0"></i>已排除</span><span><i style="background:#fde68a"></i>可疑</span><span><i style="background:#fecaca"></i>丢包点</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null,packet:null,packetLabel:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

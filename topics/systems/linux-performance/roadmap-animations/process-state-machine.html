@@ -1,0 +1,149 @@
+<!-- roadmap animation: process-state-machine -->
+<!-- marker data-roadmap-animation-id="process-state-machine" -->
+<script id="process-state-machine-script">
+(function(){
+  "use strict";
+  var ID = "process-state-machine";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){
+    var n=document.createElementNS(NS, tag);
+    for(var k in attrs) n.setAttribute(k, attrs[k]);
+    if(parent) parent.appendChild(n);
+    return n;
+  }
+  function txt(parent,x,y,s,size,weight,fill,anchor){
+    var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent);
+    t.textContent=s; return t;
+  }
+  function defs(){
+    var d=el("defs",{},svg);
+    var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d);
+    el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m);
+  }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){
+    var g=el("g",{},svg);
+    var r=el("rect",{x:x,y:y,width:w,height:h,rx:"12",fill:PAPER,stroke:INK,"stroke-width":"2"},g);
+    txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,14.5,800);
+    if(sub) txt(g,x+w/2,y+h/2+16,sub,11.5,600,MUTED);
+    ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h};
+    return ui.nodes[key];
+  }
+  function edge(x1,y1,x2,y2,labelText,dash){
+    var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg);
+    if(dash) ln.setAttribute("stroke-dasharray","6 6");
+    if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED);
+    return ln;
+  }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){
+    if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k];
+    if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]);
+    if("note" in p && ui.note) ui.note.textContent=p.note;
+    paint();
+  }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("R",365,26,180,64,"R · 运行/就绪","占用或等待 CPU");
+      node("S",60,170,185,64,"S · 可中断睡眠","等事件，可被信号唤醒");
+      node("T",660,170,185,64,"T · 停止/跟踪","SIGSTOP / 调试器");
+      node("D",230,310,190,64,"D · 不可中断睡眠","等硬件 I/O");
+      node("Z",500,310,185,64,"Z · 僵尸","已退出，待父进程回收");
+      edge(365,72,245,180,"等待/唤醒",true);
+      edge(245,200,365,86,"",true);
+      edge(545,72,660,180,"SIGSTOP/CONT",true);
+      edge(420,90,360,310,"等 I/O",true);
+      edge(355,310,455,90,"I/O 完成",true);
+      edge(505,86,590,310,"exit()",true);
+      note(450,402,"");
+      setPanel("stat","—"); setPanel("event","选一幕开始"); setPanel("kill","—"); setPanel("watch","top / ps aux");
+    } else if(idx===1){
+      node("proc",110,165,185,74,"应用进程","read() / write()");
+      node("kio",380,55,190,74,"内核 I/O 子系统","提交并等待设备");
+      node("dev",645,165,190,74,"磁盘 / 设备","真正搬运数据");
+      edge(295,195,380,108,"提交 I/O");
+      edge(570,108,645,180,"下发请求");
+      edge(645,210,295,225,"完成唤醒",true);
+      note(360,330,"");
+      setPanel("stat","R"); setPanel("event","发起 I/O"); setPanel("kill","可"); setPanel("watch","iostat / iowait");
+    } else {
+      node("parent",80,50,190,70,"父进程","fork → 应 wait()");
+      node("child",80,255,190,70,"子进程","exit 后变 Z");
+      node("init",600,255,210,70,"init / systemd","PID 1，兜底回收");
+      edge(175,120,175,255,"fork");
+      edge(270,290,600,290,"父进程退出则收养",true);
+      edge(175,255,175,120,"wait() 回收",true);
+      note(420,170,"");
+      setPanel("stat","R"); setPanel("event","fork 子进程"); setPanel("kill","—"); setPanel("watch","ps -el | grep Z");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"Linux 进程不是只有「跑」和「停」。<b>ps</b> 的 STAT 列里这几个字母，每一个都对应一种等待原因——看懂它们，排查时才知道进程卡在哪。",
+      steps:[
+        {text:"<b>R（Running/Runnable）</b>：进程要么正在 CPU 上执行，要么在运行队列里排队等 CPU。", run:function(c){ apply({fills:{R:"active"}, panels:{stat:"R",event:"被调度",kill:"可",watch:"top 的 running"}, note:"R：占用 / 等待 CPU"}); return c.wait(700);}},
+        {text:"<b>S（可中断睡眠）</b>：等网络数据、等锁、sleep 都在这里。事件到了或<b>收到信号</b>就回到 R。", run:function(c){ apply({fills:{R:"done",S:"active"}, panels:{stat:"S",event:"等待事件",kill:"可",watch:"多数空闲进程"}, note:"S：可被信号唤醒"}); return c.wait(750);}},
+        {text:"<b>D（不可中断睡眠）</b>：通常在等硬件 I/O。这段时间<b>连信号都打不断</b>，必须等 I/O 完成——大量 D 正是排查重点。", run:function(c){ apply({fills:{S:"done",D:"warn"}, panels:{stat:"D",event:"等硬件 I/O",kill:"不可",watch:"配合 iowait"}, note:"D：信号也叫不醒"}); return c.wait(800);}},
+        {text:"<b>T（停止/跟踪）</b>：收到 SIGSTOP 或被调试器 attach 时暂停，SIGCONT 再恢复。", run:function(c){ apply({fills:{T:"active"}, panels:{stat:"T",event:"SIGSTOP / ptrace",kill:"需 CONT",watch:"gdb / kill -STOP"}, note:"T：被暂停"}); return c.wait(700);}},
+        {text:"<b>Z（僵尸）</b>：进程 exit 后并未立刻消失，先保留退出码等父进程回收，这就是 Z。", run:function(c){ apply({fills:{T:"done",Z:"warn"}, panels:{stat:"Z",event:"exit() 待回收",kill:"杀不掉",watch:"ps STAT=Z"}, note:"Z：等父进程 wait()"}); return c.wait(800);}}
+      ]},
+    { intro:"<b>D 状态</b>为什么排查时最让人头疼？因为它在等硬件，<b>kill -9 也杀不掉</b>。跟着一次磁盘 I/O 看它怎么进、怎么出。",
+      steps:[
+        {text:"进程调用 <b>read()/write()</b> 发起一次磁盘 I/O，把请求交给内核 I/O 子系统。", run:function(c){ apply({fills:{proc:"active"}, panels:{stat:"R→D",event:"提交 I/O"}, note:"提交请求，准备等待"}); return c.wait(700);}},
+        {text:"等设备返回数据期间，进程进入 <b>D</b>：不占 CPU，但<b>不可被信号唤醒</b>——此时 kill -9 也无效。", run:function(c){ apply({fills:{proc:"warn",kio:"active"}, panels:{stat:"D",event:"等设备",kill:"不可"}, note:"STAT=D：信号打不断"}); return c.wait(800);}},
+        {text:"设备完成 I/O，内核唤醒进程，它回到 <b>R</b> 继续执行。短暂的 D 完全正常。", run:function(c){ apply({fills:{dev:"done",kio:"done",proc:"done"}, panels:{stat:"D→R",event:"I/O 完成",kill:"可"}, note:"被唤醒，恢复 R"}); return c.wait(750);}},
+        {text:"真正要警惕的是：<b>D 进程持续不恢复 / 数量增加</b>，同时 <b>iowait 升高、负载被抬高</b>——多半是 I/O 瓶颈或设备故障。", run:function(c){ apply({fills:{proc:"fail",dev:"fail"}, panels:{stat:"D 堆积",event:"I/O 瓶颈",kill:"不可",watch:"iostat -x / dstat"}, note:"⚠ D 堆积 + iowait 高"}); return c.wait(800);}}
+      ]},
+    { intro:"<b>Z 僵尸</b>不是「卡死的进程」，它几乎不占内存和 CPU，但会<b>占用 PID</b>。问题永远出在父进程有没有回收。",
+      steps:[
+        {text:"父进程 <b>fork</b> 出子进程，子进程开始运行。", run:function(c){ apply({fills:{parent:"active",child:"active"}, panels:{stat:"R",event:"fork 子进程"}, note:"父子进程都在运行"}); return c.wait(700);}},
+        {text:"子进程 <b>exit()</b> 后并不消失，先变成 <b>Z</b>：只剩退出状态，等父进程来读。", run:function(c){ apply({fills:{parent:"active",child:"warn"}, panels:{stat:"Z",event:"子进程退出"}, note:"子进程 → Z 僵尸"}); return c.wait(750);}},
+        {text:"父进程调用 <b>wait()/waitpid()</b> 读走退出码，僵尸被回收、彻底消失。这是正常闭环。", run:function(c){ apply({fills:{parent:"active",child:"done"}, panels:{stat:"已回收",event:"wait() 回收"}, note:"wait() → 僵尸消失"}); return c.wait(750);}},
+        {text:"故障一：父进程<b>不调用 wait</b>（常见于父进程有 bug 或忙于别的事），僵尸越堆越多，<b>耗尽 PID</b>。", run:function(c){ apply({fills:{child:"fail"}, panels:{stat:"Z 堆积",event:"父进程不回收",watch:"ps -el grep Z 找父 PID"}, note:"⚠ 僵尸堆积 → 占满 PID"}); return c.wait(800);}},
+        {text:"故障二：父进程<b>先退出</b>，子进程被 <b>init/systemd（PID 1）</b>收养并回收，不会长期残留。", run:function(c){ apply({fills:{init:"done",child:"done"}, panels:{stat:"被收养",event:"PID 1 兜底"}, note:"孤儿进程 → init 回收"}); return c.wait(750);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div");
+    root.id=ID; root.className="ka-anim";
+    root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>进程状态机</strong><small>R · S · D · Z · T 之间怎么迁移</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">状态全景</button><button data-ch="1">D 不可中断</button><button data-ch="2">Z 僵尸进程</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 430" role="img" aria-label="进程状态机动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>ps STAT</b><span data-panel="stat">—</span></div><div class="ka-panel"><b>触发</b><span data-panel="event">—</span></div><div class="ka-panel"><b>能否 kill</b><span data-panel="kill">—</span></div><div class="ka-panel"><b>怎么观测</b><span data-panel="watch">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需警惕</span><span><i style="background:#fecaca"></i>故障</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg");
+    ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+
+  function mount(host){
+    buildDom(host);
+    player=window.RoadmapAnimations.createPlayer({
+      animationId:ID, root:root, chapters:CHAPTERS,
+      resetState:function(idx){ drawChapter(idx); },
+      render:function(){ paint(); },
+      finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; }
+    });
+  }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

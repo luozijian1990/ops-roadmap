@@ -6,7 +6,7 @@
 
 ![Topics](https://img.shields.io/badge/topics-24-1f2933?style=flat-square)
 ![Markdown notes](https://img.shields.io/badge/markdown_notes-64-1f2933?style=flat-square)
-![Roadmaps](https://img.shields.io/badge/roadmaps-65-f4c95d?style=flat-square)
+![Roadmaps](https://img.shields.io/badge/roadmaps-66-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
 [快速开始](#快速开始) · [内容导航](#内容导航) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
@@ -51,7 +51,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 64 份标准路线图和 Kubernetes 完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 64 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
@@ -127,4 +127,4 @@ LEARNING_ROADMAP_BUILDER=/path/to/build_roadmap.py ./scripts/build-roadmaps.sh
 ```
 
 > [!IMPORTANT]
-> `topics/cloud-native/kubernetes/full-animated-roadmap.html` 是保留的完整动画版，不会由普通批量生成命令重建。它的 `roadmap-animations/` sidecar 和截图需要一起维护。
+> `topics/systems/linux-performance/full-animated-roadmap.html` 和 `topics/cloud-native/kubernetes/full-animated-roadmap.html` 是保留的完整动画版，不会由普通批量生成命令重建。它们各自的 `roadmap-animations/` sidecar，以及存在的配套截图，需要与动画版一起维护。

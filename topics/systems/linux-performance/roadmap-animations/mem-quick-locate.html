@@ -1,0 +1,110 @@
+<!-- roadmap animation: mem-quick-locate -->
+<!-- marker data-roadmap-animation-id="mem-quick-locate" -->
+<script id="mem-quick-locate-script">
+(function(){
+  "use strict";
+  var ID = "mem-quick-locate";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,13.5,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,11,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function row(key,x,y,w,h,left,right){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"8",fill:PAPER,stroke:INK,"stroke-width":"1.8"},g); txt(g,x+14,y+h/2+5,left,12,800,INK,"start"); txt(g,x+w*0.5,y+h/2+5,"→",13,800,MUTED); txt(g,x+w-14,y+h/2+5,right,11.5,700,"#1d4ed8","end"); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("l1",70,110,220,90,"第一层 · 整体","free -h / top");
+      node("l2",340,110,220,90,"第二层 · 趋势","vmstat / sar / pidstat -r");
+      node("l3",620,110,220,90,"第三层 · 专项","按现象定位");
+      edge(290,155,340,155,"再看趋势");
+      edge(560,155,620,155,"再专项");
+      note(450,260,"");
+      setPanel("layer","第一层"); setPanel("look","available/Swap/OOM"); setPanel("sign","整体压力"); setPanel("verdict","缩小范围");
+    } else if(idx===1){
+      row("avail",90,28,720,40,"free 低但 available 高","大量可回收缓存，通常无压力");
+      row("down",90,74,720,40,"available 持续下降","匿名内存 / 不可回收 Slab / 工作集涨");
+      row("rss",90,120,720,40,"RSS 持续增长","泄漏 / 缓存 / 队列 / 分配器保留");
+      row("slab",90,166,720,40,"SUnreclaim 持续增长","内核对象泄漏或资源积压");
+      row("swapin",90,212,720,40,"主缺页 + si 高","Swap 换入导致慢访问");
+      row("oom",90,258,720,40,"OOM 日志出现","物理内存与回收路径已无法满足");
+      note(450,330,"");
+      setPanel("layer","现象判断"); setPanel("look","对照现象"); setPanel("sign","先判性质"); setPanel("verdict","再选工具");
+    } else {
+      node("alert",60,30,170,52,"内存告警/变慢","");
+      node("free",290,30,160,52,"free: available/Swap","");
+      node("trend",510,30,180,52,"vmstat/sar 趋势","");
+      node("rss",120,130,200,52,"RSS 增长","pidstat/pmap/smaps");
+      node("cache",380,130,200,52,"缓存增长","cachetop/slabtop");
+      node("swap",640,130,200,52,"Swap 活跃","zoneinfo/VmSwap");
+      node("leak",120,225,200,52,"是否泄漏？","");
+      node("yes",60,320,170,50,"是 → memleak/Profiler","");
+      node("no",290,320,200,50,"否 → 业务缓存/队列","");
+      edge(230,56,290,56,""); edge(450,56,510,56,"");
+      edge(290,82,220,130,"",true); edge(450,82,480,130,"",true); edge(600,82,720,130,"",true);
+      edge(220,182,220,225,""); edge(180,277,150,320,"",true); edge(260,277,360,320,"",true);
+      note(560,300,"");
+      setPanel("layer","专项定位"); setPanel("look","RSS 路径"); setPanel("sign","是否泄漏"); setPanel("verdict","memleak");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"内存排查分<b>三层递进</b>：先看整体、再看趋势、最后专项。每层都缩小范围，避免一上来就抓某个进程。",
+      steps:[
+        {text:"<b>第一层 · 整体</b>：<code>free -h</code> / <code>top</code>，优先看 <b>available、Swap、是否已 OOM 或延迟</b>——而不是只看 free。", run:function(c){ apply({fills:{l1:"active"}, panels:{layer:"第一层",look:"available/Swap/OOM"}, note:"① 看整体，别只看 free"}); return c.wait(800);}},
+        {text:"<b>第二层 · 趋势</b>：<code>vmstat 1</code> / <code>sar -r -S -W</code> / <code>pidstat -r</code>，确认是否<b>持续增长、缓存增长、换入换出</b>、谁的 RSS/缺页在变。", run:function(c){ apply({fills:{l1:"done",l2:"active"}, panels:{layer:"第二层",look:"增长/换页趋势",sign:"看变化"}, note:"② 看趋势，抓变化的那个"}); return c.wait(800);}},
+        {text:"<b>第三层 · 专项</b>：锁定主要现象后，用对应工具深入定位。", run:function(c){ apply({fills:{l2:"done",l3:"active"}, panels:{layer:"第三层",look:"按现象定位"}, note:"③ 专项工具"}); return c.wait(750);}},
+        {text:"三层递进：<b>整体 → 趋势 → 专项</b>，逐层收窄，结论才稳。", run:function(c){ apply({fills:{l3:"done"}, panels:{verdict:"逐层收窄"}, note:"逐层收窄"}); return c.wait(700);}}
+      ]},
+    { intro:"内存的现象最容易误判（free 低≠有压力）。这张<b>现象→判断</b>表帮你先定性，再决定专项工具。",
+      steps:[
+        {text:"<b>free 低但 available 高</b>：大量<b>可回收缓存</b>，通常不代表压力——别被 free 吓到。", run:function(c){ apply({fills:{avail:"done"}, panels:{look:"free 低/avail 高",verdict:"无压力"}, note:"可回收缓存，正常"}); return c.wait(750);}},
+        {text:"<b>available 持续下降</b>：进程匿名内存、不可回收 Slab 或工作集在增长。", run:function(c){ apply({fills:{down:"warn"}, panels:{look:"available↓",verdict:"匿名/Slab/工作集"}, note:"真正在变紧"}); return c.wait(750);}},
+        {text:"<b>RSS 持续增长</b>：泄漏、缓存、队列或分配器保留——需要专项区分。", run:function(c){ apply({fills:{rss:"warn"}, panels:{look:"RSS↑",verdict:"待区分泄漏"}, note:"进下一幕定位"}); return c.wait(750);}},
+        {text:"<b>SUnreclaim 持续增长</b>：内核对象泄漏或内核资源积压。", run:function(c){ apply({fills:{slab:"warn"}, panels:{look:"SUnreclaim↑",verdict:"内核泄漏"}, note:"内核侧问题"}); return c.wait(700);}},
+        {text:"<b>主缺页 + si 高</b>：Swap 换入导致慢访问（注意：Swap 已用但无 si/so 不一定有问题）。", run:function(c){ apply({fills:{swapin:"warn"}, panels:{look:"majflt + si",verdict:"Swap 换入"}, note:"换入拖慢访问"}); return c.wait(750);}},
+        {text:"<b>OOM 日志出现</b>：物理内存与回收路径已无法满足分配。<code>journalctl -k | grep oom</code> 查记录。", run:function(c){ apply({fills:{oom:"fail"}, panels:{look:"OOM",verdict:"已触发 OOM"}, note:"⚠ 回收已失效"}); return c.wait(800);}}
+      ]},
+    { intro:"以最常见的 <b>RSS 增长</b> 为例走一遍专项定位：先确认趋势，再分支，<b>判断是不是泄漏</b>。",
+      steps:[
+        {text:"内存告警 → <b>free</b> 看 available/Swap → <b>vmstat/sar</b> 确认趋势。", run:function(c){ apply({fills:{alert:"active",free:"active",trend:"active"}, panels:{look:"确认趋势"}, note:"先确认趋势"}); return c.wait(750);}},
+        {text:"按主要现象分支：<b>RSS 增长 / 缓存增长 / Swap 活跃</b>各走各的工具。", run:function(c){ apply({fills:{alert:"done",free:"done",trend:"done",rss:"active",cache:"active",swap:"active"}, panels:{look:"三类分支"}, note:"按现象分支"}); return c.wait(800);}},
+        {text:"<b>RSS 增长</b>分支：<code>pidstat</code> 找进程，<code>pmap</code>/<code>smaps</code> 看内存段构成。", run:function(c){ apply({fills:{cache:"done",swap:"done",rss:"active",leak:"warn"}, panels:{look:"pmap/smaps",sign:"是否泄漏"}, note:"看是不是一直涨不回"}); return c.wait(800);}},
+        {text:"判断<b>是否泄漏</b>：是 → <code>memleak</code> 或 Profiler 抓分配栈。", run:function(c){ apply({fills:{leak:"done",yes:"fail"}, panels:{verdict:"memleak/Profiler"}, note:"确认泄漏：抓分配栈"}); return c.wait(750);}},
+        {text:"否 → 多半是<b>业务缓存或队列</b>占用，调整缓存策略而非当泄漏修。", run:function(c){ apply({fills:{no:"done"}, panels:{verdict:"业务缓存/队列"}, note:"非泄漏：调缓存策略"}); return c.wait(750);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>内存快速定位：三层排查法</strong><small>整体 → 趋势 → 专项</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">三层排查</button><button data-ch="1">现象判断</button><button data-ch="2">泄漏定位</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 350" role="img" aria-label="内存快速定位动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>层级</b><span data-panel="layer">—</span></div><div class="ka-panel"><b>看什么</b><span data-panel="look">—</span></div><div class="ka-panel"><b>判性质</b><span data-panel="sign">—</span></div><div class="ka-panel"><b>结论/工具</b><span data-panel="verdict">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>已完成</span><span><i style="background:#fde68a"></i>需警惕</span><span><i style="background:#fecaca"></i>故障</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>

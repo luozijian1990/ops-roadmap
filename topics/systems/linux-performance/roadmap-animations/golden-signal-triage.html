@@ -1,0 +1,115 @@
+<!-- roadmap animation: golden-signal-triage -->
+<!-- marker data-roadmap-animation-id="golden-signal-triage" -->
+<script id="golden-signal-triage-script">
+(function(){
+  "use strict";
+  var ID = "golden-signal-triage";
+  var NS = "http://www.w3.org/2000/svg";
+  var INK="#1f2933", PAPER="#fffdf5", MUTED="#6b7280",
+      ACTIVE="#bfdbfe", DONE="#bbf7d0", WARN="#fde68a", FAIL="#fecaca";
+  var player=null, root=null, svg=null, ui={nodes:{},panels:{},note:null}, state={fills:{}};
+
+  function el(tag, attrs, parent){ var n=document.createElementNS(NS, tag); for(var k in attrs) n.setAttribute(k, attrs[k]); if(parent) parent.appendChild(n); return n; }
+  function txt(parent,x,y,s,size,weight,fill,anchor){ var t=el("text",{x:x,y:y,"text-anchor":anchor||"middle","font-size":size||13,"font-weight":weight||700,fill:fill||INK},parent); t.textContent=s; return t; }
+  function defs(){ var d=el("defs",{},svg); var m=el("marker",{id:ID+"-arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},d); el("path",{d:"M0,0 L10,5 L0,10 z",fill:"#6b7280"},m); }
+  function clearSvg(){ while(svg.firstChild) svg.removeChild(svg.firstChild); defs(); ui.nodes={}; ui.note=null; }
+  function node(key,x,y,w,h,title,sub){ var g=el("g",{},svg); var r=el("rect",{x:x,y:y,width:w,height:h,rx:"11",fill:PAPER,stroke:INK,"stroke-width":"2"},g); txt(g,x+w/2,sub?y+h/2-3:y+h/2+5,title,12.5,800); if(sub) txt(g,x+w/2,y+h/2+15,sub,10.5,600,MUTED); ui.nodes[key]={rect:r,cx:x+w/2,cy:y+h/2,x:x,y:y,w:w,h:h}; return ui.nodes[key]; }
+  function edge(x1,y1,x2,y2,labelText,dash){ var ln=el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#9ca3af","stroke-width":"2","marker-end":"url(#"+ID+"-arrow)"},svg); if(dash) ln.setAttribute("stroke-dasharray","6 6"); if(labelText) txt(svg,(x1+x2)/2,(y1+y2)/2-7,labelText,11,700,MUTED); return ln; }
+  function note(x,y,s){ ui.note=txt(svg,x,y,s||"",13,800,"#b45309"); }
+  function colorFor(name){ return name==="active"?ACTIVE:name==="done"?DONE:name==="warn"?WARN:name==="fail"?FAIL:PAPER; }
+  function paint(){ for(var k in ui.nodes){ ui.nodes[k].rect.setAttribute("fill", colorFor(state.fills[k])); } }
+  function setPanel(name,v){ if(ui.panels[name]) ui.panels[name].textContent=v; }
+  function apply(p){ if(p.fills) for(var k in p.fills) state.fills[k]=p.fills[k]; if(p.panels) for(var n in p.panels) setPanel(n,p.panels[n]); if("note" in p && ui.note) ui.note.textContent=p.note; paint(); }
+
+  function lane(tag,y,k1,t1,k2,t2,k3,t3){
+    txt(svg,62,y+38,tag,12.5,800,INK);
+    node(k1,118,y+6,212,56,t1,"");
+    node(k2,348,y+6,232,56,t2,"");
+    node(k3,598,y+6,282,56,t3,"");
+    edge(330,y+34,348,y+34); edge(580,y+34,598,y+34);
+  }
+
+  function drawChapter(idx){
+    clearSvg(); state.fills={};
+    if(idx===0){
+      node("user",350,14,200,46,"用户报告:系统异常","");
+      node("check",350,82,200,46,"检查四大黄金信号","延迟/流量/错误/饱和度");
+      node("q",350,150,200,46,"哪个信号异常?","");
+      node("lat",15,242,166,60,"延迟","成功 vs 失败?");
+      node("traf",190,242,166,60,"流量","上升 or 下降?");
+      node("err",365,242,166,60,"错误率","按服务分解");
+      node("sat",540,242,166,60,"饱和度","找瓶颈资源");
+      node("casc",715,242,170,60,"多个异常","级联失败");
+      edge(450,60,450,82); edge(450,128,450,150);
+      edge(450,196,98,242); edge(450,196,273,242); edge(450,196,448,242); edge(450,196,623,242); edge(450,196,800,242);
+      note(450,332,"");
+      setPanel("signal","四信号"); setPanel("branch","哪个异常"); setPanel("action","分诊到对应路径"); setPanel("key","先分诊再下钻");
+    } else if(idx===1){
+      lane("延迟",20,"la1","区分成功/失败","la2","成功高=性能问题","la3","查 USE → 优化资源/代码");
+      lane("流量",112,"tr1","上升 or 下降?","tr2","上升:查来源是否合法","tr3","合法→扩容 / 否→限流封禁");
+      lane("错误率",204,"er1","按服务分解","er2","4xx 客户端 / 5xx 服务端","er3","5xx→查依赖→降级熔断");
+      lane("饱和度",296,"sa1","识别瓶颈资源","sa2","CPU/内存/连接/磁盘","sa3","预测影响→主动扩容");
+      note(450,372,"");
+      setPanel("signal","逐信号下钻"); setPanel("branch","各走各的路"); setPanel("action","路径→处置"); setPanel("key","延迟/饱和度落到 USE");
+    } else {
+      node("multi",60,24,300,46,"多个信号同时异常","");
+      node("casc",60,92,300,46,"级联失败:相互放大","");
+      node("root",60,160,300,46,"找首要原因 → 优先怀疑饱和度","");
+      node("exp",60,228,300,46,"紧急扩容 / 止损","");
+      node("rec",60,296,300,46,"逐步恢复 + 复盘","");
+      edge(210,70,210,92); edge(210,138,210,160); edge(210,206,210,228); edge(210,274,210,296);
+      node("cavh",470,24,410,42,"易错提醒(进笔记前已驯化)","");
+      node("cav1",470,80,410,52,"① 4xx 多为客户端","但 429 / 坏部署也可能服务端");
+      node("cav2",470,144,410,52,"② 内存饱和 ≠ 一定泄漏","先区分增长与泄漏(见 2.4)");
+      node("cav3",470,208,410,52,"③ 吞吐升但错误多 ≠ 成功","每轮重看错误率与 P99");
+      note(210,348,"");
+      setPanel("signal","级联失败"); setPanel("branch","多信号同异常"); setPanel("action","先稳饱和度"); setPanel("key","止损也要记录");
+    }
+    paint();
+  }
+
+  var CHAPTERS=[
+    { intro:"这是<b>四大黄金信号</b>（延迟/流量/错误/<b>饱和度</b>，比 RED 多一维）的分诊起点：异常先<b>定位到哪个信号</b>，再决定走哪条调查路径。",
+      steps:[
+        {text:"用户报告异常 → 先<b>看四大黄金信号</b>，而不是一上来抓某台主机的 CPU。", run:function(c){ apply({fills:{user:"fail",check:"active"}, panels:{signal:"四信号",branch:"先看信号"}, note:"① 从黄金信号入手"}); return c.wait(800);}},
+        {text:"判断<b>哪个信号异常</b>——这一步决定后面所有动作。", run:function(c){ apply({fills:{check:"done",q:"active"}, panels:{branch:"哪个异常"}, note:"② 定位异常信号"}); return c.wait(750);}},
+        {text:"<b>延迟 / 流量 / 错误率 / 饱和度</b> 各自分诊到不同路径；若<b>多个同时异常</b>，多半是级联失败（第三幕）。", run:function(c){ apply({fills:{q:"done",lat:"active",traf:"active",err:"active",sat:"active",casc:"warn"}, panels:{action:"分诊到对应路径",key:"多异常→级联"}, note:"③ 五条出口"}); return c.wait(850);}},
+        {text:"分诊的价值：把「系统异常」这种模糊报告，<b>收敛成一条可执行的调查路径</b>，避免乱抓。", run:function(c){ apply({fills:{}, panels:{key:"先分诊再下钻"}, note:"先分诊，再下钻"}); return c.wait(750);}}
+      ]},
+    { intro:"定位到信号后<b>各走各的路</b>。注意：<b>延迟和饱和度</b>最终都会下沉到 <b>USE</b>（资源利用/饱和），与 5.7「RED 与 USE 的联合视角」一致。",
+      steps:[
+        {text:"<b>延迟</b>：先<b>区分成功/失败请求</b>。成功请求也慢=性能问题 → 查 <b>USE</b> 指标 → 优化资源或代码。（失败拖慢则是慢超时，要做快速失败/超时治理。）", run:function(c){ apply({fills:{la1:"active",la2:"active",la3:"done"}, panels:{signal:"延迟",branch:"成功 vs 失败",action:"查 USE→优化"}, note:"① 延迟 → 成功高=性能问题"}); return c.wait(900);}},
+        {text:"<b>流量</b>：先看<b>升还是降</b>。上升查来源是否合法（合法→扩容；恶意→限流/封禁）；下降则查上游是否断流。", run:function(c){ apply({fills:{la1:"done",la2:"done",tr1:"active",tr2:"active",tr3:"done"}, panels:{signal:"流量",branch:"升/降 + 合法?",action:"扩容 / 限流封禁"}, note:"② 流量 → 升降 + 合法性"}); return c.wait(900);}},
+        {text:"<b>错误率</b>：<b>按服务分解</b>定位问题服务。4xx 多为客户端，5xx 是服务端 → 查依赖健康 → 降级/熔断。", run:function(c){ apply({fills:{tr1:"done",tr2:"done",er1:"active",er2:"active",er3:"done"}, panels:{signal:"错误率",branch:"4xx vs 5xx",action:"查依赖→降级熔断"}, note:"③ 错误率 → 分服务 + 4xx/5xx"}); return c.wait(900);}},
+        {text:"<b>饱和度</b>：<b>识别瓶颈资源</b>（CPU/内存/连接/磁盘），各自处置，并<b>预测影响时间</b>提前主动扩容——这一支正是 USE 的「饱和」维度。", run:function(c){ apply({fills:{er1:"done",er2:"done",sa1:"active",sa2:"active",sa3:"done"}, panels:{signal:"饱和度",branch:"哪种资源",action:"预测→主动扩容",key:"饱和度=USE"}, note:"④ 饱和度 → 瓶颈资源 + 预测"}); return c.wait(900);}}
+      ]},
+    { intro:"<b>多个信号同时异常</b>，往往不是各自独立，而是<b>级联失败</b>。这时别平均用力，先找首要原因。",
+      steps:[
+        {text:"多个黄金信号<b>同时报警</b> → 怀疑<b>级联失败</b>：一个瓶颈把延迟、错误、饱和度一起推高。", run:function(c){ apply({fills:{multi:"warn",casc:"warn"}, panels:{signal:"级联失败",branch:"多信号同异常"}, note:"① 多异常 → 级联"}); return c.wait(850);}},
+        {text:"<b>找首要原因</b>：级联里<b>优先怀疑饱和度</b>（队列/连接/CPU 被打满，再引发超时和错误）。", run:function(c){ apply({fills:{casc:"done",root:"fail"}, panels:{action:"先稳饱和度",key:"优先查饱和度"}, note:"② 首因常在饱和度"}); return c.wait(850);}},
+        {text:"<b>紧急扩容/止损</b> → 再<b>逐步恢复</b>，并复盘。止损操作也要记录，便于事后解释指标变化。", run:function(c){ apply({fills:{root:"done",exp:"done",rec:"done"}, panels:{action:"扩容→逐步恢复",key:"止损也要记录"}, note:"③ 止损 → 恢复 → 复盘"}); return c.wait(850);}},
+        {text:"三个<b>易错提醒</b>（进笔记前已按全书口径驯化）：4xx 不全是客户端、内存饱和先<b>区分增长与泄漏</b>、<b>吞吐升但错误更多不算优化成功</b>。", run:function(c){ apply({fills:{cav1:"warn",cav2:"warn",cav3:"warn"}, panels:{key:"别被绝对化叶子骗"}, note:"⚠ 三个易错点"}); return c.wait(900);}}
+      ]}
+  ];
+
+  function buildDom(host){
+    if(host.querySelector("[data-roadmap-animation-id='"+ID+"']")) return;
+    root=document.createElement("div"); root.id=ID; root.className="ka-anim"; root.setAttribute("data-roadmap-animation-id", ID);
+    root.innerHTML=
+      '<div class="ka-head"><strong>按黄金信号分诊</strong><small>四信号分叉 · 逐信号下钻 · 级联失败</small><button class="ka-zoom" data-action="zoom">放大</button></div>'+
+      '<div class="ka-tabs"><button data-ch="0">四信号分叉</button><button data-ch="1">逐信号下钻</button><button data-ch="2">级联失败</button></div>'+
+      '<div class="ka-stage"><svg viewBox="0 0 900 360" role="img" aria-label="按黄金信号分诊动画"></svg></div>'+
+      '<div class="ka-panels"><div class="ka-panel"><b>信号</b><span data-panel="signal">—</span></div><div class="ka-panel"><b>分叉</b><span data-panel="branch">—</span></div><div class="ka-panel"><b>处置</b><span data-panel="action">—</span></div><div class="ka-panel"><b>要点</b><span data-panel="key">—</span></div></div>'+
+      '<div class="ka-caption" data-role="caption"></div>'+
+      '<div class="ka-ctrl"><button data-action="play">播放本幕</button><button data-action="step">下一步</button><button data-action="reset">重置本幕</button><label>速度 <select data-action="speed"><option value="1.6">慢</option><option value="1" selected>正常</option><option value="0.55">快</option></select></label></div>'+
+      '<div class="ka-legend"><span><i style="background:#bfdbfe"></i>当前</span><span><i style="background:#bbf7d0"></i>处置</span><span><i style="background:#fde68a"></i>需注意</span><span><i style="background:#fecaca"></i>异常/首因</span></div>';
+    host.appendChild(root);
+    svg=root.querySelector("svg"); ui.panels={};
+    root.querySelectorAll("[data-panel]").forEach(function(p){ ui.panels[p.dataset.panel]=p; });
+  }
+  function mount(host){ buildDom(host); player=window.RoadmapAnimations.createPlayer({ animationId:ID, root:root, chapters:CHAPTERS, resetState:function(idx){ drawChapter(idx); }, render:function(){ paint(); }, finishedText:function(){ return "<br><b>本幕结束</b>，可切换页签重看。"; } }); }
+  function unmount(){ if(player) player.destroy(); player=null; if(root) root.remove(); root=null; svg=null; ui={nodes:{},panels:{},note:null}; }
+  function init(){ window.RoadmapAnimations.register({animationId:ID, mount:mount, unmount:unmount}); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>
