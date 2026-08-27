@@ -4,16 +4,16 @@
 
 **一份持续整理的个人运维学习笔记与交互式路线图合集。**
 
-![Topics](https://img.shields.io/badge/topics-24-1f2933?style=flat-square)
-![Markdown notes](https://img.shields.io/badge/markdown_notes-64-1f2933?style=flat-square)
-![Roadmaps](https://img.shields.io/badge/roadmaps-66-f4c95d?style=flat-square)
+![Topics](https://img.shields.io/badge/topics-25-1f2933?style=flat-square)
+![Markdown notes](https://img.shields.io/badge/markdown_notes-72-1f2933?style=flat-square)
+![Roadmaps](https://img.shields.io/badge/roadmaps-74-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
 [快速开始](#快速开始) · [内容导航](#内容导航) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
 
 </div>
 
-Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前涵盖 Linux、计算机网络、容器、Kubernetes、可观测性、数据系统、持续交付、Web 基础设施、AIOps 和 AI Agent 等主题。`topics/` 中的系统学习笔记同时提供适合检索与编辑的 Markdown，以及适合系统学习的 Roadmap HTML；`cases/` 则保存尚在持续核验和提炼的企业实践案例。
+Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前涵盖 Linux、计算机网络、容器、Kubernetes、可观测性、数据系统、持续交付、Web 基础设施、AI 基础设施、AIOps 和 AI Agent 等主题。`topics/` 中的系统学习笔记同时提供适合检索与编辑的 Markdown，以及适合系统学习的 Roadmap HTML；`cases/` 则保存尚在持续核验和提炼的企业实践案例。
 
 > [!NOTE]
 > 运维与平台工程涉及的领域非常广泛，本仓库不以构建完整知识体系为目标。现有内容主要反映我的个人学习路径、工作经验和关注方向，难免存在遗漏，也会随着学习进度持续补充和修订。
@@ -51,7 +51,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 64 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 72 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
@@ -61,6 +61,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 | 数据系统 | [MySQL](./topics/data-systems/mysql/) · [Kafka](./topics/data-systems/kafka/) · [RabbitMQ](./topics/data-systems/rabbitmq/) |
 | 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) |
 | Web 基础设施 | [Nginx](./topics/web/nginx/) |
+| AI 基础设施 | [GPU AI Infrastructure](./topics/ai-infrastructure/gpu/) |
 | AIOps | [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |
 | AI Agent | [DeepAgent](./topics/ai-agents/deepagent/) · [Claude Agent SDK](./topics/ai-agents/claude-agent-sdk/) |
 
