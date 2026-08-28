@@ -18,6 +18,7 @@ while IFS= read -r -d '' note; do
 done < <(
   find "${repo_root}/topics" -type f -name '*.md' \
     ! -name 'outline.md' \
+    ! -name 'README.md' \
     ! -path '*/roadmap-animations/*' \
     -print0 | sort -z
 )
