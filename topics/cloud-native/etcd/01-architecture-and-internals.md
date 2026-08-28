@@ -875,7 +875,7 @@ etcdserver: mvcc: database space exceeded
 
 ```mermaid
 graph TB
-    Req[写请求] --> Check{当前 db 大小 + 请求大小 > 配额?}
+    Req[写请求] --> Check{"当前 db 大小 + 请求大小 > 配额?"}
     Check --> |是| Alarm[产生 NO SPACE 告警]
     Alarm --> Sync[通过 Raft 同步告警]
     Sync --> Persist[持久化告警到 db]
@@ -922,12 +922,12 @@ KVServer 会执行以下检查（Preflight Check）：
 
 ```mermaid
 graph TB
-    Req[写请求] --> C1{committed - applied > 5000?}
+    Req[写请求] --> C1{"committed - applied > 5000?"}
     C1 --> |是| E1[too many requests]
     C1 --> |否| C2{Token 有效?}
     C2 --> |否| E2[invalid auth token]
     C2 --> |是| C3{请求大小 > 1.5MB?}
-    C3 --> |是| E3[request is too large]
+    C3 --> |是| E3["request is too large"]
     C3 --> |否| Pass[通过检查]
     
     style E1 fill:#ffcdd2
@@ -959,7 +959,7 @@ graph LR
     subgraph "异常情况"
         CI2[committed index: 10000]
         AI2[applied index: 4000]
-        D2[差值: 6000 > 5000]
+        D2["差值: 6000 > 5000"]
     end
 ```
 
@@ -1094,7 +1094,7 @@ graph TB
 ```mermaid
 graph TB
     subgraph "Apply 模块执行流程"
-        Entry[Raft Entry<br/>Index=100] --> Check{Entry.Index <= consistent index?}
+        Entry[Raft Entry<br/>Index=100] --> Check{"Entry.Index <= consistent index?"}
         Check --> |是| Skip[跳过执行]
         Check --> |否| Execute[执行提案]
         Execute --> Update[更新 consistent index = 100]
@@ -1174,7 +1174,7 @@ etcd 重启时，不需要单独持久化全局版本号。它通过遍历 boltd
 ```mermaid
 graph TB
     subgraph "treeIndex 更新"
-        Cur[currentRevision=1] --> Inc[自增: revision={2,0}]
+        Cur[currentRevision=1] --> Inc["自增: revision={2,0}"]
         Inc --> Query[查询 key=hello 是否存在]
         Query --> |不存在| Create[创建 keyIndex]
         Query --> |存在| Update[追加 revision]
@@ -3505,7 +3505,7 @@ graph TB
     end
     
     Check[检查 key=hello] --> L11
-    L11 --> |O(log N)| Result[有权限]
+    L11 --> |"O(log N)"| Result[有权限]
 ```
 
 - 时间复杂度：O(log N)

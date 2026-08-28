@@ -998,7 +998,7 @@ graph TD
     C --> D[执行 return 404 ]
     D --> E{触发 error_page 404}
     E --> F[内部重定向到 /403.html]
-    F --> G{}/403.html 是否存在?}
+    F --> G{"/403.html 是否存在?"}
     G --> |存在| H[返回 403.html 内容状态码404]
     G --> |不存在| I[返回 find nothing状态码404]
 ```
