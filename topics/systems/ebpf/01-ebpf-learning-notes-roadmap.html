@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>eBPF 运维与故障排查学习笔记 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>eBPF 运维与故障排查学习笔记</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "eBPF 运维与故障排查学习笔记", "intro": "", "parts": [{"title": "第 1 章 · 运维为什么需要 eBPF", "sections": [{"title": "eBPF 解决哪些传统运维工具解决不了的问题", "content": "`top`、`ps`、`vmstat` 等工具按周期采样，适合持续负载，却容易漏掉瞬间退出的进程、偶发系统调用、短暂丢包和特定请求的慢路径。eBPF 把程序挂到内核或用户态事件上，事件发生时立即执行，把“看见结果”推进到“看见过程”。\n\n| 传统手段 | 盲区 | eBPF 补充 |\n| --- | --- | --- |\n| `top`、`ps` | 漏掉短时进程 | 监听 `execve` |\n| `tcpdump` | 看不到协议栈决策 | 跟踪 `kfree_skb`、TC、XDP |\n| 应用日志 | 依赖主动打印 | uprobe、USDT |\n| 修改内核 | 发布和回滚成本高 | 动态加载和卸载 |\n\n运维排障的关键不是“使用了新工具”，而是能把一个现象拆成可验证的事件。例如 CPU 飙高时，先判断是用户态计算、系统调用、软中断还是调度开销；网络延迟升高时，分别测量发送、协议栈、排队和应用读取时间。eBPF 可以在这些边界上留下时间戳和上下文。\n\n一个典型的事件记录至少包含以下字段：\n\n| 字段 | 用途 |\n| --- | --- |\n| 时间戳 | 计算耗时和事件顺序 |\n| PID/TID/comm | 关联进程和线程 |\n| cgroup ID | 关联容器或工作负载 |\n| CPU ID | 判断调度和 NUMA 影响 |\n| 事件类型 | 区分入口、返回、错误和丢弃 |\n| 参数和返回值 | 验证业务假设 |", "subs": []}, {"title": "eBPF 在监控、排障、网络和安全中的位置", "content": "eBPF 位于“内核事件”与“运维系统”之间。它负责采集和初步聚合，不负责替代 Prometheus、日志平台或告警系统。用户态程序应将结果转换成指标、日志、Trace span 或安全事件。\n\n```mermaid\nflowchart LR\n    Kernel[内核事件] --> Probe[eBPF Probe]\n    Probe --> Map[Map 聚合]\n    Map --> Agent[用户态 Agent]\n    Agent --> Metrics[指标]\n    Agent --> Logs[结构化日志]\n    Agent --> Traces[Trace]\n    Agent --> Alert[告警平台]\n```\n\n在生产环境中，eBPF 常与现有工具组合：Prometheus 保存低基数趋势，日志平台保存异常事件，分布式追踪保存请求上下文，eBPF 负责补齐系统调用、调度和网络路径的细节。\n\n如果只需要主机级 CPU 使用率，现有监控已经足够；当问题变成“哪个函数导致延迟”或“数据包在哪里被丢弃”时，才需要事件级观测。\n\n它也有明确边界：程序不能任意睡眠或分配内核内存，不能依赖所有内核函数都稳定存在，也不能绕过权限模型读取任意进程数据。采集粒度越细，事件量和 CPU 成本越高；网络路径越早，能观察到的应用语义越少。\n\n上线前要回答三个问题：数据是否真的能解释故障，采集开销是否低于故障成本，程序失效时是否有传统路径和卸载方法。只有三个问题都能回答，才适合把脚本放进生产节点。", "subs": []}, {"title": "eBPF 如何在不改内核的情况下扩展观测能力", "content": "LLVM/Clang 将程序编译为 BPF 字节码，`bpf()` 系统调用把字节码提交给内核。验证器检查指针、边界、循环和 helper 权限，验证通过后才解释执行或 JIT 编译。\n\n用户态生成并加载字节码，内核 verifier 通过后，程序才会挂载到 kprobe、uprobe、tracepoint 或 perf event。运维排障时可以沿这条链路定位失败：没有字节码是编译问题，verifier 拒绝是安全或兼容问题，没有事件输出则要检查挂载和 Map 读取。\n\n从运行时结构看，eBPF 可以拆成五个部分：指令与寄存器负责执行受限程序，Verifier 检查安全性，JIT 或解释器执行指令，Helper 提供受控内核能力，Map 保存跨事件共享状态。事件探针只是触发上下文，程序仍需从上下文参数确认谁在什么时间做了什么。\n\n| 模块 | 运维关注点 |\n| --- | --- |\n| 指令与寄存器 | 指令上限、栈大小 |\n| Verifier | 加载日志、指针边界 |\n| JIT/解释器 | 架构支持、执行开销 |\n| Helper | 程序类型、权限 |\n| Map | 内存、并发、生命周期 |\n\n```mermaid\nflowchart LR\n    Source[源代码] --> LLVM[LLVM]\n    LLVM --> Bytecode[BPF 字节码]\n    Bytecode --> Verify[Verifier]\n    Verify --> JIT[JIT]\n    JIT --> Hook[挂载点]\n```\n\n编译和加载是两个不同阶段。编译失败通常是头文件、Clang 版本或 C 语法问题；加载失败则多半是 verifier、权限、程序类型或内核能力问题。排障时先判断失败发生在哪一层，避免反复修改业务逻辑却忽略环境问题。\n\n```bash\n# 查看当前系统是否暴露 BTF\nls -l /sys/kernel/btf/vmlinux\n# 查看程序的 ELF section\nllvm-readelf -S program.bpf.o\n# 让 libbpf 输出详细加载日志\nLIBBPF_DEBUG=1 ./ebpf-agent --once\n```", "subs": []}, {"title": "程序、挂载点和 Map 怎样组成一条观测链路", "content": "内核程序在事件触发时读取上下文并更新 Map，用户态控制器负责加载、挂载、读取和展示结果。\n\n运维上最容易忽略的是生命周期管理。工具进程退出时，自动创建的对象通常会被释放；如果对象被 pin 到 `/sys/fs/bpf`，则会继续存在，可能导致旧程序和新程序同时运行。部署系统应给每个版本使用独立目录，并在升级前清理过期 link。\n\n```bash\nsudo find /sys/fs/bpf -maxdepth 2 -type f -print\nsudo bpftool prog show pinned /sys/fs/bpf/ebpf-agent/prog\n```\n\n```mermaid\nsequenceDiagram\n    participant E as 内核事件\n    participant P as eBPF 程序\n    participant M as BPF Map\n    participant O as 运维工具\n    E->>P: 触发\n    P->>M: 更新状态\n    O->>M: 读取\n    O->>O: 聚合输出\n```", "subs": []}]}, {"title": "第 2 章 · 部署工具链并跑通第一个观测案例", "sections": [{"title": "在 Linux 主机上准备 eBPF 排障环境", "content": "```bash\nsudo apt-get update\nsudo apt-get install -y clang llvm libbpf-dev linux-headers-$(uname -r) \\\n  bpftrace bpfcc-tools linux-tools-$(uname -r)\nuname -r\nbpftool version\nsudo bpftrace -l 'tracepoint:syscalls:sys_enter_execve'\n```\n\ndebugfs 未自动挂载时执行 `sudo mount -t debugfs debugfs /sys/kernel/debug`。生产环境应明确 `CAP_BPF`、`CAP_PERFMON` 等权限，不要长期依赖业务容器的 `--privileged`。\n\n准备环境时要区分开发机、诊断机和生产节点。开发机需要完整 LLVM、内核头文件和调试符号；诊断机需要与目标内核匹配的 `bpftool` 和 BTF；生产节点可以只部署编译好的 CO-RE 对象和轻量用户态 Agent。\n\n检查内核配置：\n\n```bash\ngrep -E 'CONFIG_BPF|CONFIG_DEBUG_INFO_BTF|CONFIG_BPF_LSM' /boot/config-$(uname -r)\ncat /proc/sys/kernel/unprivileged_bpf_disabled\ncat /proc/sys/kernel/perf_event_paranoid\n```\n\n如果目标是 Kubernetes 节点，还要确认 Agent 运行在 host PID/network namespace，能访问 `/sys/fs/bpf`、`/sys/kernel/debug` 和宿主机 cgroup 树。", "subs": []}, {"title": "bpftrace、BCC 和 libbpf 分别适合什么任务", "content": "| 工具 | 适合任务 | 特点 |\n| --- | --- | --- |\n| bpftrace | 临时排障 | 脚本短、反馈快 |\n| BCC | 快速开发诊断工具 | Python 封装成熟 |\n| libbpf | 长期生产运行 | CO-RE、低依赖 |\n| bpftool | 查看对象和 Map | 贴近内核状态 |\n\n常见路径是先用 bpftrace 验证假设，再用 BCC 做工具，稳定需求最终用 libbpf CO-RE 重写。\n\nBCC 工具并不只服务网络：VFS、文件系统、调度器、内存和应用运行时都有对应工具。运维排障时先按故障域选现成工具，再决定是否需要自定义 eBPF 程序，能显著缩短定位时间。\n\n| 故障域 | 首选工具 | 自定义方向 |\n| --- | --- | --- |\n| 文件和 VFS | `opensnoop`、`fileslower` | 特定路径和进程 |\n| 调度和 CPU | `runqlat`、`offcputime` | cgroup 和线程关联 |\n| 内存 | `memleak`、`slabratetop` | 按调用栈聚合 |\n| 网络 | `tcpconnect`、`tcpretrans` | socket 和容器关联 |\n| 进程 | `execsnoop`、`killsnoop` | 父子关系和退出码 |\n\n工具名称只是入口。运行前仍需查看脚本使用的 probe，确认目标内核存在对应 tracepoint 或函数，并评估输出频率。\n\n工具选择也取决于故障持续时间。五分钟内需要回答问题时，脚本启动速度和表达能力更重要；需要 24 小时持续采集时，事件丢失、内存上限、升级兼容和指标标签数量更重要。不要因为 libbpf 更底层，就把所有临时排障都做成完整 Agent。", "subs": []}, {"title": "用 BCC 观察一次系统调用", "content": "```python\nfrom bcc import BPF\n\nprogram = r\"\"\"\nint trace_openat(struct pt_regs *ctx) {\n    bpf_trace_printk(\"openat called\\\\n\");\n    return 0;\n}\n\"\"\"\nb = BPF(text=program)\nb.attach_kprobe(event=\"do_sys_openat2\", fn_name=\"trace_openat\")\nb.trace_print()\n```\n\n开发期可以快速打印，生产排障应尽快增加 PID、进程名、cgroup 过滤，并改用结构化事件输出。\n\n运行示例：\n\n```bash\nsudo python3 openat_trace.py\n# 另一个终端触发事件\ncat /etc/hosts >/dev/null\n```\n\n如果没有输出，依次检查目标函数是否存在、进程是否真的调用该函数、脚本是否有加载权限以及 trace pipe 是否被其他程序占用。注意不同发行版的内核函数名可能不同，优先改用对应 tracepoint。", "subs": []}, {"title": "如何确认程序已加载、挂载并产生数据", "content": "```bash\nsudo bpftool prog show\nsudo bpftool link show\nsudo bpftool map show\nsudo bpftool prog tracelog\n```\n\n没有程序通常是权限或 verifier 问题；有程序没有 link 要检查挂载点；Map 不更新则检查事件是否发生、过滤条件是否过严以及 namespace 是否正确。\n\n可以按下面的顺序定位：\n\n1. `bpftool prog show` 确认程序类型和 ID。\n2. `bpftool link show` 确认 link 指向的 `ifindex`、tracepoint 或 cgroup。\n3. 查看 Map 的 key/value 定义和当前计数。\n4. 暂时移除过滤条件，确认事件触发后再逐步恢复。\n5. 记录加载日志和内核版本，形成可复现的故障报告。", "subs": []}]}, {"title": "第 3 章 · 看懂 eBPF 的运行限制", "sections": [{"title": "eBPF 程序为什么不会像进程一样常驻运行", "content": "eBPF 程序由事件驱动，执行有限工作后返回；持续状态放在 Map，持续输出由用户态程序完成。它不能在内核中等待磁盘、执行 DNS 或运行复杂业务逻辑，复杂处理必须交给用户态。\n\n运维上，这意味着入口事件保存时间戳，返回事件计算差值；高频事件只更新计数器，低频异常才发送完整事件。把采集逻辑设计成“短路径 + Map 状态”，才能避免观测工具反过来放大故障。\n\n```mermaid\nstateDiagram-v2\n    [*] --> Loaded\n    Loaded --> Attached\n    Attached --> Running: 事件触发\n    Running --> Attached: 完成\n    Attached --> Detached: 卸载\n    Detached --> [*]\n```", "subs": []}, {"title": "运维排障需要理解哪些字节码基础", "content": "eBPF 使用 64 位寄存器。验证器会追踪寄存器中保存的是标量、上下文指针、Map 指针还是内核内存指针，并限制访问范围。常见错误是读取未初始化寄存器、越界访问和把错误类型的指针传给 helper。\n\n读取可变长度数据时必须先检查长度，再调用 `bpf_probe_read_kernel` 或 `bpf_probe_read_user`。访问 tracepoint 参数优先使用 `args->field`，不要假定不同内核的结构体偏移完全相同。\n\n对运维人员而言，理解这些限制是为了读懂加载错误和评估工具风险，而不是手写指令。遇到 verifier 报错时，把复杂程序拆成“只读取 PID”“只更新计数器”“最后读取参数”三个阶段，能快速定位是哪一步破坏了类型或边界。\n\n另外，eBPF 栈空间有限，大型结构体和深层函数调用会在加载阶段被拒绝。事件结构尽量使用定长整数和短字符串，把格式化、JSON 编码和标签补全放在用户态。", "subs": []}, {"title": "从源代码到内核执行中间经历了什么", "content": "```text\n高级语言 -> LLVM IR -> BPF ELF -> bpf() -> verifier -> JIT -> 挂载点\n```\n\n查看指令：\n\n```bash\nllvm-objdump -S program.bpf.o\nbpftool prog dump xlated id <PROG_ID>\n```\n\n解释执行便于调试，JIT 执行通常更快。可以用系统级 perf 观察程序自身开销，确认采集器没有成为被观测系统的新瓶颈。", "subs": []}, {"title": "验证器如何阻止不安全的排障脚本", "content": "验证器检查无限循环、指令上限、内存边界和 helper 权限。加载失败说明程序没有满足内核安全边界，应修正逻辑或权限，而不是绕过验证。\n\n验证器拒绝程序并不表示业务逻辑错误。不支持的 helper、未检查的用户指针和错误的程序类型都会导致加载失败。把 verifier 加载测试纳入 CI，可以在发布前发现问题。\n\n生产排障还要关注 verifier 的资源上限。一个包含大量分支和循环的程序，即使逻辑正确，也可能因为状态空间过大而无法验证；应减少分支、限制循环上界，并将字符串解析移到用户态。\n\n上线前建议保留一个最小安全版本。新功能加载失败时自动回退到只采集核心计数的版本，保证节点仍然有基本可观测性。", "subs": []}, {"title": "加载失败时如何阅读 verifier 日志", "content": "```bash\nsudo bpftool prog load program.bpf.o /sys/fs/bpf/demo \\\n  type tracepoint -d\n```\n\n从第一处 `invalid`、`pointer` 或寄存器错误读起，后续错误往往是连锁结果。优先确认程序类型、上下文边界、helper 参数和目标内核版本。\n\n| 日志关键词 | 检查项 |\n| --- | --- |\n| `permission denied` | capabilities、sysctl、LSM |\n| `invalid mem access` | 指针类型和边界 |\n| `unknown func` | helper 是否被支持 |\n| `loop detected` | 循环上界 |", "subs": []}]}, {"title": "第 4 章 · 掌握程序加载和数据取回", "sections": [{"title": "bpf 系统调用负责哪些运维动作", "content": "`bpf()` 负责加载程序、创建和更新 Map、查询对象、固定对象以及创建链接。理解对象生命周期可以解释为什么工具退出后 pinned 对象仍存在，或主机重启后对象消失。\n\nBPF 对象的运维生命周期可以分为创建 Map、加载程序、挂载 link、固定对象和查询对象。`pin` 让 Agent 重启后可以重新打开已有 Map，也意味着卸载时必须显式清理。\n\n| 动作 | 典型命令 | 失败方向 |\n| --- | --- | --- |\n| 创建 Map | `BPF_MAP_CREATE` | 类型和内存上限 |\n| 加载程序 | `BPF_PROG_LOAD` | verifier、权限、helper |\n| 挂载 | `BPF_PROG_ATTACH` | 接口、tracepoint、cgroup |\n| 固定 | `BPF_OBJ_PIN` | bpffs 和路径权限 |\n| 查询 | `BPF_OBJ_GET` | ID、路径、对象生命周期 |\n\n生产升级采用并行加载、健康验证、原子切换、旧版本清理的顺序。直接覆盖 pinned 文件会让排障人员无法判断当前 link 属于哪个版本。\n\n生产 Agent 常把对象 pin 到 bpffs，并按版本隔离目录：\n\n```bash\nsudo mount -t bpf bpf /sys/fs/bpf\nsudo mkdir -p /sys/fs/bpf/ebpf-agent/v1\n```\n\n升级时先加载新对象、验证新 link，再切换用户态读取路径，避免新旧 Map schema 不一致。", "subs": []}, {"title": "Map 怎样保存指标、状态和配置", "content": "| 类型 | 典型用途 |\n| --- | --- |\n| Array | 固定槽位配置、CPU 统计 |\n| Hash | PID、IP、端口映射 |\n| LRU Hash | 有界连接缓存 |\n| Ring Buffer | 事件输出 |\n| LPM Trie | CIDR 策略 |\n\n```bash\nsudo bpftool map show\nsudo bpftool map dump id <MAP_ID>\n```\n\n高频计数通常使用 per-CPU Map 减少锁竞争；连接缓存使用 LRU 限制内存；程序跳转或 sockmap 用于数据面组合。Map 不是无限数据库，必须设置容量并观察占用。\n\nMap 有内存上限，高基数 key 会持续占用内核内存。对连接和地址使用 LRU 或定期清理；输出 Prometheus 时不要把完整 URL、命令行或随机 ID 直接作为 label。", "subs": []}, {"title": "Helper 函数能读取和修改哪些内核信息", "content": "Helper 是内核暴露的受控 API，例如读取 PID、获取时间、访问 Map、读取用户字符串和重定向网络包。可用 helper 取决于程序类型，应以目标内核文档为准。\n\n`bpf_get_current_pid_tgid()` 用于关联线程，`bpf_ktime_get_ns()` 用于延迟测量，`bpf_perf_event_output()` 把事件送到用户态。这些 helper 是 verifier 按上下文授权的内核入口，不是普通函数库。\n\n读取用户字符串要处理截断和失败返回；保存状态时使用 ID 和标量，不要保存可能失效的内核指针。helper 返回负数时应计入错误指标，不能静默丢弃。\n\n可用 helper 的检查方法：\n\n```bash\nbpftool feature probe kernel | rg 'helper|ringbuf|bpf_loop'\n```\n\n不要仅依据编译机头文件判断生产节点能力，最终以目标内核的 feature probe 和实际加载结果为准。", "subs": []}, {"title": "如何把内核事件稳定输出到用户态", "content": "`bpf_trace_printk` 只适合开发验证。正式工具使用 Perf Buffer 或 Ring Buffer，由用户态批量读取；同时统计 buffer 满导致的丢失事件。\n\n事件结构应紧凑，内核态只发送必要字段，容器名称和服务名在用户态关联。突发流量下必须暴露 lost events 指标，否则看似稳定的结果可能只是数据被丢弃。\n\n用户态读取线程应设置 poll 超时、退出信号和 backpressure 策略。对于安全事件，宁可降低采样率也不要无限堆积内存；对于性能计数，则可以在内核侧聚合后定期读取。\n\n典型的用户态循环需要处理三种结果：正常事件、buffer 丢失和链接错误。三者分别进入不同指标，方便判断是“没有事件”“事件被丢弃”还是“程序已经失效”。", "subs": []}, {"title": "用 libbpf CO-RE 跨内核版本部署工具", "content": "CO-RE 根据目标内核 BTF 重定位结构字段，减少每台主机重新编译的需要：\n\n```bash\ntest -r /sys/kernel/btf/vmlinux && echo BTF-ready\nbpftool btf dump file /sys/kernel/btf/vmlinux format c | head\n```\n\nCO-RE 仍受程序类型、helper 和 BTF 完整性限制，发布时需要兼容性矩阵和降级方案。建议在 CI 中用最低支持内核、当前生产内核和开发内核运行加载测试。\n\n`vmlinux.h` 把运行内核的 BTF 类型导出为单一头文件，减少传统内核头文件的依赖。它解决的是类型描述和字段重定位问题，不会自动解决 helper 不存在、程序类型不支持等运行时差异。\n\n生成链路是：内核编译时保留 BTF，从 `/sys/kernel/btf/vmlinux` 读取，使用 `bpftool` 生成 `vmlinux.h`，Clang 编译 BPF 对象，再由 libbpf 在加载时完成字段重定位。\n\n```bash\nbpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h\nclang -O2 -g -target bpf -c trace.bpf.c -o trace.bpf.o\n```", "subs": []}]}, {"title": "第 5 章 · 根据故障现象选择观测点", "sections": [{"title": "跟踪内核函数时如何选择 kprobe 或 tracepoint", "content": "`kprobe` 可动态插入可探测内核函数，适合快速验证内部路径；`tracepoint` 由内核定义字段和语义，稳定性通常更好。返回值需要 `kretprobe`，但会增加上下文管理和开销。\n\n选择原则是先稳定、后深入：先用 tracepoint 确认事件是否发生，再用 kprobe 补充内部函数和调用栈。kprobe 目标被内联、改名或删除时会加载失败，因此生产工具要检测目标存在并允许跳过可选探针。\n\n如果需要函数耗时，入口和返回必须使用同一线程维度保存状态；如果只需要调用次数，入口 probe 就足够。对高频函数要先做采样，否则 probe 本身可能改变调度和缓存行为。\n\n排查期间要保存探针的加载时间和卸载时间，便于将观测结果与故障窗口对齐。卸载后观察指标是否恢复基线，也是验证采集开销的重要实验。", "subs": []}, {"title": "排查应用时如何选择 uprobe、uretprobe 或 USDT", "content": "`uprobe` 观察用户态函数入口，`uretprobe` 观察返回和耗时。编译型程序依赖 ELF 符号；解释型语言更适合跟踪解释器入口或 USDT 探针。\n\n应用排障还要考虑进程重启和二进制替换。滚动发布时重新挂载，不能把旧版本地址缓存到全局配置中。\n\n应用探针应带上请求或线程关联 ID，但不要把高基数请求参数全部送入内核事件。通常只在内核侧记录 PID、TID 和时间，用户态再结合应用 trace 做关联。\n\n对高并发服务，优先做比例采样或只记录慢于阈值的返回事件。例如只输出超过 10 ms 的调用，能把事件量从每秒数万条降到可分析的规模。", "subs": []}, {"title": "CPU 和性能问题如何使用 perf event 采样", "content": "perf event 可按 CPU 周期、指令、缓存 miss 或软件事件采样。它用统计方法定位热点，适合评估 CPU 成本和调用栈，不等同于记录每次函数调用。\n\n采样频率越高，定位精度越好，采集开销和 buffer 压力也越大。先低频建立热点轮廓，再针对目标 PID、线程或 cgroup 提高频率。\n\n采样结果要记录事件类型、频率、CPU 范围和时间窗口。只看 `Overhead` 百分比而不看样本数，容易把少量随机样本误认为稳定热点。\n\n采样应避开发布、扩容和缓存预热阶段，或在报告中单独标记这些阶段。对比两次实验时，CPU 亲和性、频率调节和虚拟机 steal time 也要保持一致。", "subs": []}, {"title": "网络故障中 XDP、TC、socket 和 cgroup 各看哪里", "content": "XDP 位于驱动收包早期，适合早期丢弃和快速转发；TC 位于网卡队列附近，适合策略、整形和重定向；socket/cgroup 程序更接近进程和容器身份。\n\nXDP 程序可以执行 Drop、Receive Local 或 Forward。它位于完整 TCP/IP 协议栈之前，适合 DDoS 过滤和高速转发，却不一定能拿到应用层身份。排障时不要用 XDP 的包计数直接替代 socket 层请求计数。\n\n网络程序返回值决定包的下一步动作，例如 `XDP_PASS`、`XDP_DROP`、`XDP_REDIRECT`。上线前明确每个返回值的故障后果，并保留切回 PASS 或传统路径的开关。\n\n挂载点越靠前，性能潜力越大，诊断字段越少。排障优先选择能提供足够上下文的 TC、socket 或 tracepoint，优化数据面再逐步前移到 XDP。\n\n对网络程序要额外监控 action 计数、redirect 失败、Map 查找失败和异常返回值。没有这些指标，数据面“运行正常”可能只是所有包都走了 fallback。", "subs": []}, {"title": "用故障类型反推最合适的挂载点", "content": "| 现象 | 首选观测点 |\n| --- | --- |\n| 短时进程漏采 | `sys_enter_execve` |\n| 内核函数延迟 | kprobe + kretprobe |\n| 应用函数耗时 | uprobe + uretprobe |\n| 网络早期丢包 | XDP、驱动统计 |\n| 协议栈丢包 | `kfree_skb` |\n| 容器异常执行 | LSM、cgroup、exec |", "subs": []}, {"title": "eBPF Hook 点和运维场景速查", "content": "选择 Hook 时要同时考虑挂载位置、上下文内容、稳定性、执行开销和返回值语义：\n\n| Hook / 类型 | 挂载位置 / 观察对象 | 主要特点 | 常见运维场景 |\n| --- | --- | --- | --- |\n| `tracepoint` | 内核预定义事件 | 字段和语义相对稳定 | syscall、调度、网络、块设备 I/O |\n| `raw_tracepoint` | tracepoint 原始参数 | 更轻量、更底层 | 高频 tracing、低开销统计 |\n| `kprobe` / `kretprobe` | 内核函数入口和返回 | 灵活但依赖内核实现 | 函数参数、返回值、疑难内核问题 |\n| `fentry` / `fexit` | 内核函数入口和出口 | 基于 BPF trampoline，通常更低开销，依赖 BTF | 函数 tracing、耗时分析 |\n| `uprobe` / `uretprobe` | 用户态程序或动态库函数 | 依赖符号和二进制版本 | libc、OpenSSL、应用函数 |\n| `XDP` | 网卡驱动收包早期 | 网络栈前处理，性能极高 | DDoS、过滤、负载均衡、防火墙 |\n| `TC` ingress / egress | Traffic Control | 可见完整 `skb`，可修改和重定向 | 容器流量、策略、QoS、NAT |\n| `Socket` | Linux Socket 层 | 接近应用 TCP/UDP 连接 | 连接分析、socket 统计 |\n| `Cgroup` | cgroup 和进程组边界 | 天然关联容器和进程 | `connect`、`bind`、容器网络策略 |\n| `LSM` | Linux 安全决策点 | 可审计或阻断访问 | 文件、权限、运行时安全 |\n| `perf_event` | CPU PMU 和性能事件 | 采样硬件或软件计数 | hotspot、cycles、cache miss |\n\n几个边界尤其容易混淆：`tracepoint` 通常比猜测函数参数的 kprobe 稳定；`fentry/fexit` 需要 BTF 和较新的内核；XDP 虽然最早、最快，但应用身份和完整 `skb` 信息较少；`perf_event` 是统计采样，不是逐次调用追踪。\n\n现场选择建议遵循“稳定性优先、距离现象最近、最后追求更早更快”：先用 tracepoint 或 socket 确认事实，再用 kprobe/fentry 深入内核路径，网络性能优化时才把处理前移到 TC 或 XDP。", "subs": []}]}, {"title": "第 6 章 · 内核故障排查实战", "sections": [{"title": "在主机上查找可用的内核跟踪点", "content": "```bash\nsudo cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_execve/format\nsudo perf list\nsudo bpftrace -l 'tracepoint:syscalls:*'\n```\n\n`/proc/kallsyms` 能提供符号列表，但内核函数是不稳定接口。优先使用 tracepoint，必须使用 kprobe 时记录函数名、内核版本和回滚方式。", "subs": []}, {"title": "用 bpftrace 确认函数参数和返回值", "content": "```bash\nsudo bpftrace -lv tracepoint:syscalls:sys_enter_execve\nsudo bpftrace -lv tracepoint:syscalls:sys_exit_execve\nsudo bpftrace -e 'tracepoint:syscalls:sys_enter_execve { printf(\"%d %s\\\\n\", pid, str(args->filename)); }'\n```", "subs": []}, {"title": "用 tracepoint 找出 top 看不到的短时进程", "content": "```bash\nsudo bpftrace -e 'tracepoint:syscalls:sys_enter_execve { printf(\"%d %s\\\\n\", pid, str(args->filename)); }'\n```\n\n`top` 按间隔采样，短时进程可能在两次采样之间结束；事件触发可以完整记录创建过程。生产脚本应按 PID、comm、cgroup 或路径过滤。\n\n排查时可以先不加过滤观察一分钟，确认事件量级后再限制目标：\n\n```bash\nsudo bpftrace -e 'tracepoint:syscalls:sys_enter_execve { @[comm] = count(); }'\n```\n\n如果事件量很大，说明问题可能是部署脚本、健康检查或崩溃重启循环；如果只关心某个服务，则用 cgroup 或父进程关系进一步筛选。", "subs": []}, {"title": "用过滤、聚合和调用栈缩小故障范围", "content": "```bash\nsudo bpftrace -e 'kprobe:vfs_read /comm == \"nginx\"/ { @[ustack] = count(); }'\nsudo bpftrace -e 'kprobe:kfree_skb /comm == \"curl\"/ { print(kstack); }'\n```\n\n先过滤目标，再聚合计数，最后输出调用栈，是控制开销和提高可读性的基本顺序。\n\n聚合结果适合回答“哪个路径最多”，调用栈适合回答“为什么发生”。二者要结合采样窗口和事件总数解读，不能把一次偶然调用栈当作稳定根因。", "subs": []}, {"title": "什么时候把临时脚本做成 BCC 或 libbpf 工具", "content": "一次性验证使用 bpftrace；需要参数解析、配置和多种输出时使用 BCC；需要跨主机分发、长期运行和低依赖时选择 libbpf。工具化时补充版本检测、权限提示、信号处理和自监控指标。\n\n从脚本到工具的判断标准是重复性和风险，而不是代码量。脚本适合现场验证，团队工具要有稳定 CLI、过滤和 JSON 输出，平台组件还要有升级、租户隔离和审计。", "subs": []}, {"title": "内核符号变化时如何避免误判和误操作", "content": "记录 `uname -r`、BTF、程序版本和挂载点。加载前验证目标对象存在，加载后用 `bpftool` 确认 link，卸载时只删除本工具创建的 pinned 对象。\n\n内核升级前在预发布节点执行探针回放，把缺失函数、字段变化和 verifier 差异记录到兼容矩阵。发生变化时优先切换到稳定 tracepoint，而不是强行恢复旧 kprobe。", "subs": []}]}, {"title": "第 7 章 · 应用性能与运行时排查", "sections": [{"title": "为编译型应用准备符号和 uprobe", "content": "```bash\nreadelf -Ws /path/to/app | less\nnm -D /path/to/lib.so\n```\n\nuprobe 依赖目标二进制版本。容器升级后应通过 `/proc/<pid>/exe` 和实际 rootfs 定位文件，而不是假定宿主机路径。\n\n挂载前先验证符号和进程：\n\n```bash\nPID=$(pgrep -n my-service)\nreadlink /proc/$PID/exe\nreadelf -Ws /proc/$PID/exe | rg 'target_function'\n```\n\n若程序被 strip、函数被内联或运行在 JIT 中，uprobe 可能没有可用符号，应改用 USDT、解释器入口或应用自身的 profiling 接口。", "subs": []}, {"title": "Go、Java、Python 应用分别能观测到什么", "content": "Go 可跟踪部分符号，但内联和优化会改变函数边界；Java 方法由 JIT 生成，需要 perf map 或运行时探针；Python 应优先观察解释器函数、USDT 或现成运行时工具。报告中要标明观测的是应用、解释器还是 native 层。\n\n同一个“接口变慢”现象可能来自不同层：Go 可能在 GC 或 syscall 等待，Java 可能在 safepoint 或 JIT 编译，Python 可能在解释器锁或 native 扩展。eBPF 结果必须和应用指标、运行时日志以及请求 trace 对齐。\n\n应用层证据要和内核层证据使用同一时间基准。建议同时记录请求 ID、线程 ID 和单调时间戳，再用 trace 或日志平台完成跨层关联。", "subs": []}, {"title": "用 uprobe 和 uretprobe 定位函数慢在哪里", "content": "入口记录开始时间，返回事件按线程 ID 查找并计算耗时：\n\n```text\nuprobe:   start[tid] = nsecs\nuretprobe: latency = nsecs - start[tid]\n```\n\n不能只按 PID 保存状态，因为一个进程可能有多个并发线程。递归、异常返回和线程退出都需要清理 Map。\n\n耗时统计还要处理丢失返回事件、函数递归和跨 CPU 迁移。对高频函数建议使用直方图而不是保存每次原始耗时：\n\n```text\nlatency_us < 10       -> bucket 0\n10 <= latency_us < 100 -> bucket 1\nlatency_us >= 100     -> bucket 2\n```", "subs": []}, {"title": "用 USDT 观察解释器和运行时关键事件", "content": "USDT 是应用或运行时主动提供的稳定探针，通常比猜测内部函数名更适合生产观测：\n\n```bash\nsudo bpftrace -l 'usdt:/usr/bin/python3:*'\n```\n\nUSDT 参数描述通常比普通 uprobe 更明确，但探针名称和参数仍可能随版本变化。升级运行时后必须重新执行 `bpftrace -l`，并在 CI 或节点启动检查中验证探针存在。", "subs": []}, {"title": "应用调用栈和参数采集的常见陷阱", "content": "常见问题包括调试符号缺失、帧指针省略、JIT 地址无法解析、用户指针读取失败和参数结构变化。报告应保存 Build ID、镜像摘要、内核版本和采样命令。\n\n当调用栈出现大量 `[unknown]` 时，先检查采样时使用的二进制是否仍在磁盘上，再检查动态库搜索路径和容器 rootfs。不要仅凭未知地址判断“应用没有执行该函数”。\n\n如果无法补齐符号，仍可使用 syscall、调度、网络和内核 tracepoint 形成间接证据，并在报告中明确“函数级结论不可用”的限制。", "subs": []}]}, {"title": "第 8 章 · 网络问题定位与丢包排查", "sections": [{"title": "沿 Linux 网络协议栈确定观测位置", "content": "```mermaid\nflowchart LR\n    App[应用] --> Sock[Socket]\n    Sock --> TCP[TCP UDP]\n    TCP --> IP[IP 路由]\n    IP --> TC[TC]\n    TC --> Driver[网卡驱动]\n    Driver --> XDP[XDP]\n```\n\n发送路径从应用到网卡，接收路径反向经过驱动、XDP、协议栈和 socket。不同位置看到的包集合不同，不能用一个抓包点解释全链路。", "subs": []}, {"title": "从 SKB 生命周期回溯丢包路径", "content": "SKB 是 Linux 网络栈描述数据包的核心结构。`consume_skb` 多表示正常释放，`kfree_skb` 常在异常或丢弃路径出现。跟踪释放函数并回溯调用栈，可以找到过滤器、路由、协议错误或资源不足所在的路径。\n\n丢包排查必须区分“真正丢弃”和“引用计数归零”。同一个 SKB 可能在多个路径释放，`kfree_skb` 本身不是完整错误码。应结合调用栈、协议统计、网卡 drop 计数和应用重传数据共同判断。\n\n排查步骤是先确认丢包发生在哪一跳，再判断是策略丢弃、校验失败、队列溢出还是对端关闭。把所有释放事件直接标记为“网络丢包”会产生大量误报。", "subs": []}, {"title": "用 kfree_skb 和调用栈定位丢包原因", "content": "```bash\nsudo bpftrace -e 'kprobe:kfree_skb /comm == \"curl\"/ { printf(\"drop\\\\n\"); print(kstack); }'\n```\n\n验证时同时生成可控流量、记录网卡统计和 tcpdump，再对照 eBPF 调用栈。如果只看到 `kfree_skb` 而没有业务请求，应检查过滤条件和进程上下文。\n\n建议固定五元组和请求频率，先建立正常调用栈，再注入 MTU、连接跟踪、队列溢出等故障。这样可以比较正常释放与异常释放的调用路径，而不是只保存一张无法复现的截图。", "subs": []}, {"title": "网络过滤、捕获和重定向该选哪类程序", "content": "| 目标 | 推荐程序 |\n| --- | --- |\n| 尽早丢弃恶意包 | XDP |\n| 队列策略和整形 | TC |\n| 按进程控制 | cgroup/socket |\n| 协议栈路径 | kprobe/tracepoint |\n| 请求层观测 | uprobe/USDT |", "subs": []}, {"title": "把 tcpdump 结果和 eBPF 观测交叉验证", "content": "先确定每个工具的观测位置和时间窗口，再比较五元组、包数和错误码。XDP 已丢弃的包不会出现在高层 socket 抓包点；联合验证可以区分线路、驱动、协议栈和应用问题。\n\n一个实用的证据表如下：\n\n| 层 | 证据 | 结论 |\n| --- | --- | --- |\n| 网卡 | `ethtool -S` drop/error | 驱动或硬件方向 |\n| XDP/TC | action 计数 | 早期策略方向 |\n| 协议栈 | `kfree_skb` 调用栈 | 内核路径方向 |\n| Socket | `ss -s`、连接状态 | 队列或连接资源 |\n| 应用 | 超时、重试、trace | 业务感知结果 |", "subs": []}]}, {"title": "第 9 章 · 容器安全事件发现与阻断", "sections": [{"title": "容器进程的 namespace 和 cgroup 观测边界", "content": "容器是进程隔离与资源控制的组合。eBPF 在主机内核观察到宿主机 PID、mount namespace、network namespace 和 cgroup；工具需要把这些标识映射回容器、Pod 和工作负载。\n\n同一个 PID 在容器内外可能不同，采集器应使用 host PID、cgroup ID 和 mount namespace 做关联。Kubernetes 场景还要补充 Pod UID、容器 ID、节点名和镜像摘要，否则安全事件只能定位到一串难以操作的数字。\n\n身份关联失败时，安全事件仍可保留原始内核字段，但不能直接下发阻断动作。应先补齐容器元数据，再执行高风险策略。", "subs": []}, {"title": "发现容器中的异常执行和文件访问", "content": "跟踪 `execve`、文件打开、权限变化和网络连接，建立容器、进程、文件、命令行、时间事件。重点是检测偏离基线的行为，例如镜像中没有的 shell、敏感路径访问和异常外连。\n\n检测规则应区分开发和生产工作负载。调试容器可能允许 shell，数据库容器却不应访问 `/etc/shadow`；规则要支持 namespace、cgroup、镜像签名和服务账号等上下文，避免单纯按命令名告警造成噪声。\n\n事件字段要避免直接包含完整命令行和秘密参数，可以在采集端脱敏，在检测端使用哈希或白名单比对。", "subs": []}, {"title": "用 LSM、seccomp 和 cgroup 程序实施安全策略", "content": "LSM 适合在安全检查点实施访问控制；seccomp 限制系统调用集合；cgroup 程序按工作负载控制网络或进程行为。阻断策略上线前必须提供审计模式、白名单和回滚开关。\n\nKubernetes API 下发 SecurityPolicy 后，KubeArmor 将策略转换为内核侧的 LSM/eBPF 检查，并把事件带上容器身份写入日志。运维上要同时监控策略同步延迟、规则命中数和阻断失败数。策略执行链路是“API 对象 -> 节点 Agent -> LSM/eBPF hook -> 系统资源 -> 审计事件”。\n\n阻断的优先级应低于证据完整性。先记录事件并验证误报率，再对高置信规则启用阻断；对生产核心服务设置超时和自动回退，避免安全策略本身造成大面积不可用。\n\n审计模式运行期间要统计命中量、误报原因和业务影响。只有规则在多个版本、节点和异常场景中稳定后，才逐步扩大阻断范围。", "subs": []}, {"title": "从安全事件采集到告警和阻断", "content": "```mermaid\nflowchart LR\n    Event[内核安全事件] --> Collect[eBPF 采集]\n    Collect --> Enrich[容器身份关联]\n    Enrich --> Detect[规则检测]\n    Detect --> Alert[告警]\n    Detect --> Block[阻断隔离]\n```", "subs": []}, {"title": "Falco、Cilium 等现成工具如何落地安全能力", "content": "Falco 偏运行时检测和规则告警，Cilium 将 eBPF 用于网络策略、可观测性和服务通信。生产环境先评估兼容矩阵、事件丢失指标和升级策略，再决定是否自定义程序。\n\n选型时重点查看规则覆盖范围、升级时的 link 管理、事件导出协议以及对 Kubernetes 身份的关联能力。自定义规则要纳入代码审查和回放测试。\n\nCilium 的数据面在 XDP、TC、socket 和 L7 proxy 之间组合多类 eBPF 程序。它说明“使用 eBPF”并不等于只挂一个 probe，而是由控制面写入 Map、多个挂载点共同完成策略和转发。\n\n一条进入 Pod 的流量可能先经过物理网卡 XDP，再经过宿主机 TC、veth/Pod 侧 TC 或 socket hook，必要时进入用户态 L7 proxy。排查连接失败时，应先确认包在哪一层消失，再读取对应 Map 和 action 计数。\n\n| 层次 | 常见职责 | 典型证据 |\n| --- | --- | --- |\n| XDP | 早期过滤、重定向 | action 计数 |\n| TC | 路由、隧道、策略 | BPF link、TC 规则 |\n| Socket | 服务发现、连接重定向 | sockmap、连接统计 |\n| L7 proxy | HTTP/gRPC 策略 | proxy access log |\n\n选型时重点查看规则覆盖范围、内核版本支持、升级时的 link 管理、事件导出协议以及对 Kubernetes 身份的关联能力。自定义规则要纳入代码审查和回放测试，避免只在真实攻击发生时验证。", "subs": []}]}, {"title": "第 10 章 · 用 eBPF 优化网络性能", "sections": [{"title": "用容器搭建 Nginx 负载均衡基线", "content": "```bash\ndocker run -itd --name=http1 --hostname=http1 feisky/webserver\ndocker run -itd --name=http2 --hostname=http2 feisky/webserver\ndocker run -itd --name=client alpine\ndocker run -itd --name=nginx nginx\n```\n\n先确认 Nginx 能轮询两个后端，再做性能对比，避免把配置错误误判为 eBPF 性能问题。\n\n基线还应记录 Nginx worker 数、容器 CPU 限额、网卡队列、连接跟踪和内核版本。性能实验中一次只改变一个变量，并保存 `docker inspect`、配置文件和压测命令。", "subs": []}, {"title": "用 wrk 建立吞吐量和延迟基线", "content": "```bash\ndocker exec -it client sh\napk add curl wrk --update\nwrk -c100 http://<nginx-ip>\n```\n\n记录并发连接数、持续时间、Requests/sec、平均延迟、P99 和错误数；优化前后保持相同请求、CPU 配额和网络拓扑。\n\n除了应用层指标，还要同步采集节点侧的软中断、上下文切换、CPU cycles、网卡丢包和队列长度。吞吐提升但 CPU 消耗翻倍，或者平均延迟下降但 P99 上升，都不能视为无条件收益。", "subs": []}, {"title": "把转发逻辑前移到 XDP 和 TC", "content": "XDP 在驱动层快速判断和重定向，TC 适合协议栈附近的策略、隧道和负载均衡。路径越早，绕过的内核工作越多，但可获得的协议和应用信息越少。\n\nXDP native、generic 和 offload 模式的性能与能力不同。网卡不支持 offload 时，程序仍可在驱动或 generic 模式运行，但应重新测量吞吐和 CPU 成本，不能直接套用硬件卸载结果。", "subs": []}, {"title": "用 Map 管理后端、连接和健康状态", "content": "后端 IP、端口、权重和连接状态放入 Map，由用户态控制器更新。数据面只做快速查表和转发，Map 更新要考虑原子替换、版本号和旧连接排空。\n\n控制面与数据面要解耦：控制器负责服务发现、健康检查和配置版本，数据面只读取当前快照。更新失败时保留上一版本，健康检查连续失败时摘除后端，恢复后再逐步加权。", "subs": []}, {"title": "如何验证内核数据面的性能收益", "content": "性能收益要用对照实验验证：吞吐、尾延迟、每包 CPU cycles、软中断、丢包率和连接建立速率都要采集。只看 Requests/sec 容易忽略 CPU 饱和和尾延迟恶化。\n\n建议至少做三组实验：传统 Nginx、eBPF 数据面、故障回退路径。每组重复多轮并报告中位数和高分位数，排除首次编译、连接预热和容器启动造成的偏差。", "subs": []}, {"title": "上线前必须补齐的观测、切换和回滚能力", "content": "生产方案要有健康检查、后端摘除、灰度比例、数据面回退、Map 版本管理和链路指标，并保留传统路径作为 fallback：\n\n```bash\nsudo bpftool link show\nsudo bpftool link detach id <LINK_ID>\n```\n\n回滚演练要验证三件事：卸载后新连接能否进入传统路径，已有连接是否正常排空，控制器重启后是否会重新加载旧版本。没有演练过的回滚命令不能算生产能力。", "subs": []}]}, {"title": "第 11 章 · eBPF 生产运维方法论", "sections": [{"title": "从故障现象到挂载点的排障决策树", "content": "```mermaid\nflowchart TD\n    A[故障现象] --> B{CPU 调度问题}\n    B -->|是| C[perf 或内核跟踪]\n    A --> D{应用延迟}\n    D -->|是| E[uprobe USDT]\n    A --> F{网络丢包}\n    F -->|是| G[XDP TC kfree_skb]\n    A --> H{容器异常}\n    H -->|是| I[LSM Cgroup Exec]\n```", "subs": []}, {"title": "临时排障、团队工具和平台产品如何取舍", "content": "一次性验证使用 bpftrace；重复问题沉淀为带参数、过滤和输出格式的工具；跨集群长期运行的需求再纳入平台，统一权限、成本和数据保留治理。\n\n工具进入平台前应有明确的 SLO：加载成功率、事件丢失率、CPU 和内存上限、数据延迟以及故障时的自动卸载时间。平台只负责通用生命周期，业务规则仍应保持可审查和可版本化。\n\n还要定义使用边界：哪些探针允许线上启用，哪些只能在维护窗口运行，哪些字段禁止采集。权限审批和审计日志应覆盖加载、参数变更和卸载操作。", "subs": []}, {"title": "权限、内核版本和调试符号兼容性检查", "content": "上线前检查内核版本、BTF、helper、程序类型、`CAP_BPF`/`CAP_PERFMON`、debugfs 和目标二进制符号。兼容性矩阵应作为发布物的一部分。\n\n检查结果应落成机器可读的 preflight 输出，部署系统据此决定通过、降级或跳过，而不是把加载失败写成普通业务日志。跳过某个可选探针时，要在指标中明确暴露原因。\n\n兼容检查还应包含 CPU 架构、网卡驱动、虚拟化环境和容器运行时。相同内核版本在不同发行版配置下，也可能拥有不同的 BPF 能力。", "subs": []}, {"title": "控制采样开销并判断数据是否可信", "content": "高频事件优先过滤、采样和聚合；避免 `bpf_trace_printk`；记录 Ring Buffer 或 Perf Buffer 丢失数；报告中写明窗口、事件数和过滤条件。\n\n可靠性判断至少包括：事件是否覆盖故障窗口、过滤条件是否排除了目标、时间戳是否使用单调时钟、符号是否匹配以及 buffer 是否发生丢失。采样结果必须带上这些元数据，才能支持复盘。\n\n当数据不足以支持结论时，应明确标记为“线索”而不是“根因”。eBPF 观测应和指标、日志、trace、配置变更及节点事件组成证据链。", "subs": []}, {"title": "从实验脚本走向可维护的生产工具", "content": "生产工具至少应有内核和权限检查、启动与卸载流程、结构化输出、采样开关、丢失指标、版本化 Map schema、超时和信号处理、灰度与回滚文档。eBPF 的价值是快速取得可验证证据，同时不扩大原有故障。\n\n最终交付物不只是一个 `.bpf.o` 文件，还应包括运行手册、兼容性矩阵、最小权限清单、指标说明、故障演练记录和数据保留策略。这样其他运维同学才能在没有原作者陪同的情况下安全使用。\n\n建议为每个工具提供三个命令：`check` 做环境预检，`run` 启动观测，`stop` 清理 link 和 pinned 对象。文档同时给出正常输出、失败输出和最小回滚步骤，降低现场操作风险。", "subs": []}]}, {"title": "第 12 章 · 常见故障现场 Runbook", "sections": [{"title": "CPU 飙高时如何用 eBPF 建立证据链", "content": "先用 `uptime`、`mpstat` 和 `pidstat` 判断是用户态、内核态、软中断还是调度竞争，再用 eBPF 观察高频函数或短时任务。不要一上来对所有 syscall 打印完整参数。\n\n```bash\nuptime\nmpstat -P ALL 1\npidstat -u -w 1\nsudo bpftrace -e 'tracepoint:syscalls:sys_enter_execve { @[comm] = count(); }'\n```\n\n如果 `us` 高且某个进程占满 CPU，使用 perf event 或 uprobe 定位函数；如果 `sy` 和软中断高，优先检查网络、调度和上下文切换；如果短时进程数量异常，回到 `execve` 事件分析启动循环。", "subs": []}, {"title": "top 看不到进程时如何追踪启动和退出", "content": "```bash\nsudo bpftrace -e '\ntracepoint:syscalls:sys_enter_execve\n{\n  printf(\"pid=%d ppid=%d comm=%s file=%s\\\\n\", pid, ppid, comm, str(args->filename));\n}'\n```\n\n先按命令名聚合，确认是否存在重启风暴；再把 PID、父 PID、cgroup 和命令行写入事件。对启动脚本、健康检查和 supervisor 管理的进程，应沿父子关系回溯真正的触发者。", "subs": []}, {"title": "应用延迟升高时如何组合 uprobe 和 trace", "content": "先从请求 trace 确认慢的是应用函数、系统调用还是下游网络，再选择 uprobe、uretprobe 或内核 tracepoint。入口保存 TID 级时间戳，返回时输出超过阈值的事件。\n\n```text\nif duration_us > 10000:\n    emit(pid, tid, function, duration_us)\n```\n\n同时记录 GC、锁等待、调度延迟和网络 RTT，避免把应用线程被阻塞的时间误认为函数自身计算时间。符号解析失败时，报告应明确降级到运行时或 syscall 级结论。", "subs": []}, {"title": "网络丢包时如何从网卡追到应用", "content": "按网卡、XDP/TC、协议栈、socket、应用五层采证：\n\n```bash\nethtool -S eth0\nip -s link show dev eth0\nss -s\nsudo bpftrace -e 'kprobe:kfree_skb { @[kstack] = count(); }'\nsudo tcpdump -ni eth0 host <CLIENT_IP>\n```\n\n每层都要记录时间窗口和五元组。只有协议栈丢弃、网卡错误、socket 队列和应用超时能够相互对齐时，才可以下结论。", "subs": []}, {"title": "容器出现异常行为时如何先审计再阻断", "content": "第一阶段只采集 exec、文件访问和网络连接，补齐容器身份并统计误报；第二阶段对高置信规则做告警；第三阶段才启用 LSM、cgroup 或网络阻断。每一步都保留旧策略和自动回退。\n\n```text\n事件 -> 身份关联 -> 规则命中 -> 审计 -> 人工确认 -> 灰度阻断\n```\n\n阻断动作要带原因、策略版本和过期时间，避免临时排障规则永久留在节点上。", "subs": []}, {"title": "eBPF 数据面异常时如何快速回滚", "content": "回滚顺序是停止控制器更新、切回传统转发、卸载 eBPF link、保留 Map 快照、验证新连接和已有连接，最后再清理旧对象。\n\n```bash\nsudo bpftool link show\nsudo bpftool map show\nsudo bpftool link detach id <LINK_ID>\ncurl -fsS http://<SERVICE>/healthz\n```\n\n回滚记录要包含开始时间、影响范围、失败原因和恢复验证结果。只有经过演练的回滚流程，才适合在高峰期执行。", "subs": []}]}, {"title": "第 13 章 · 运维速查表与证据标准", "sections": [{"title": "用一张表判断应该观察哪一层", "content": "| 现象 | 先看什么 | 再看什么 | 避免的误判 |\n| --- | --- | --- | --- |\n| CPU 使用率高 | `mpstat`、`pidstat` | perf、run queue、软中断 | 把 idle 或 iowait 当计算热点 |\n| 进程频繁重启 | exec 事件 | 父进程、退出码、cgroup | 只看当前存活进程 |\n| 应用接口慢 | trace、uprobe | syscall、调度、网络 | 把线程阻塞时间算成函数耗时 |\n| 连接失败 | socket、TC | XDP、路由、kfree_skb | 只看一个抓包点 |\n| 容器越权 | exec、LSM | 文件、网络、身份 | 未关联容器身份就阻断 |\n\n这张表体现一个重要原则：先用最接近现象的稳定观测点建立事实，再向更底层或更细粒度的 probe 深挖。底层并不自动意味着证据更好。", "subs": []}, {"title": "解释 BPF 程序类型时要同时说明入口和返回值", "content": "只写“使用 XDP”是不完整的。需要同时说明程序挂载到哪个接口、触发方向、返回值含义以及失败时的 fallback：\n\n| 程序 | 入口 | 返回/动作 | 典型 fallback |\n| --- | --- | --- | --- |\n| XDP | 网卡驱动收包 | PASS、DROP、REDIRECT | PASS 到协议栈 |\n| TC ingress | 网卡或 veth 入方向 | allow、drop、redirect | 继续协议栈 |\n| cgroup skb | cgroup 网络路径 | 接受或拒绝 | 内核默认策略 |\n| sockops | TCP socket 状态变化 | 更新 Map、重定向 | 普通 socket 路径 |\n| LSM | 安全检查点 | allow、deny、audit | 现有 LSM 策略 |\n\n写 Runbook 时把这些信息列出来，现场人员才能判断“卸载程序后流量会去哪里”。", "subs": []}, {"title": "Map 和用户态输出如何避免把观测系统做成瓶颈", "content": "Map 负责状态，Ring Buffer/Perf Buffer 负责事件，用户态负责格式化和外部发送。三者职责不能混用：\n\n```text\n高频计数 -> per-CPU Map -> 周期读取 -> 指标\n低频异常 -> Ring Buffer -> 用户态 enrich -> 日志或告警\n调用栈   -> stackid Map -> 符号解析 -> 排障报告\n```\n\n如果把每个包、每次 syscall 都作为完整 JSON 写出，CPU、内存和网络开销会迅速上升。优先在内核侧聚合，再按需抽样原始事件。", "subs": []}, {"title": "生产排障报告应该包含哪些上下文", "content": "一份可复核的报告至少包含：\n\n1. 故障开始和结束时间，以及时间基准。\n2. 节点名、内核版本、CPU 架构和容器运行时。\n3. BPF 程序类型、挂载点、Map schema 和工具版本。\n4. 过滤条件、采样频率、事件总数和丢失数。\n5. 目标二进制 Build ID、调试符号和镜像摘要。\n6. 正常基线、异常样本、结论和未验证假设。\n7. 卸载命令、回滚结果和后续改进项。\n\n这些元数据决定了其他人能否复现结果，也决定了升级内核或应用后还能否使用旧报告。", "subs": []}, {"title": "把图片中的架构关系转成可执行检查", "content": "架构图的价值不在于记住方框，而在于把每条箭头转换成检查动作：用户态到 verifier 对应加载日志，程序到 Map 对应 Map 计数，XDP 到 TC 对应 action 统计，控制面到安全 hook 对应策略版本，控制器到数据面对应健康检查和回滚。\n\n```bash\nuname -r\nbpftool feature probe kernel\nbpftool prog show\nbpftool link show\nbpftool map show\ntc filter show dev eth0 ingress\n```\n\n当这些命令的结果能够按时间顺序串起来时，架构理解才真正转化成运维能力。", "subs": []}]}, {"title": "第 14 章 · P0 深入：从加载失败到可复用工具", "sections": [{"title": "用运行时五个模块解释一次故障", "content": "当工具没有结果时，应按运行时模块逐层排查：\n\n| 模块 | 需要确认的事实 | 常见故障 |\n| --- | --- | --- |\n| 指令与寄存器 | ELF 中有 BPF section，寄存器访问合法 | 编译 target 错误、栈超限 |\n| Verifier | 程序通过安全检查 | 指针越界、循环无法证明终止 |\n| Interpreter/JIT | 程序被实际执行 | 架构或内核能力差异 |\n| Helper | 当前程序类型允许调用 | `unknown func` |\n| Map/Buffer | 状态和事件能被用户态读到 | key 错误、buffer 丢失 |\n\n```bash\nllvm-readelf -S program.bpf.o\nsudo bpftool prog show\nsudo bpftool prog dump xlated id <PROG_ID>\nsudo bpftool map show\n```\n\n这套顺序能把问题定位到编译、加载、执行、通信或展示阶段。", "subs": []}, {"title": "阅读 BPF 指令和 verifier 状态", "content": "`r1` 通常保存程序上下文，`r0` 保存返回值，`r10` 是只读栈指针。`ldx` 从指针读取，`stx` 向栈或 Map 写入，`call` 调用 helper，`exit` 结束程序。看到 `R0 !read_ok`，通常表示某条路径没有给返回寄存器赋值。\n\n```text\nr1 = ctx\nr2 = map_key\ncall bpf_map_lookup_elem\nif r0 == 0 goto exit\nread r0->field\nexit\n```\n\nVerifier 会为每条分支保存寄存器状态。先判断 Map lookup 是否为空，再访问字段，验证器才能证明安全；把边界检查写在读取位置附近，也能减少状态空间。", "subs": []}, {"title": "用 bpf 系统调用还原用户态动作", "content": "需要确认工具实际动作时，可以使用：\n\n```bash\nsudo strace -f -e bpf,perf_event_open,ioctl \\\n  bpftrace -e 'tracepoint:syscalls:sys_enter_execve { @[comm] = count(); }'\n```\n\n典型顺序是创建 Map、加载程序、打开 perf event、使用 `PERF_EVENT_IOC_SET_BPF` 绑定，再从 buffer 读取结果。加载成功但没有输出时，重点检查事件绑定和用户态读取。", "subs": []}, {"title": "用 BCC 和 libbpf 重写同一个 execve 工具", "content": "三种实现都可以采用“内核读取事件、Map/Buffer 传递、用户态格式化”的模型：\n\n| 实现 | 运行时编译 | 依赖 | 长期运行能力 |\n| --- | --- | --- | --- |\n| bpftrace | 通常需要 | bpftrace、LLVM | 低 |\n| BCC | 通常需要 | Python/C++、LLVM | 中 |\n| libbpf | 预编译 ELF | libbpf、BTF | 高 |\n\n从 BCC 迁移到 libbpf 时，不能只翻译语法，还要重做对象生命周期、Ring Buffer、退出信号、兼容性检查和指标导出。", "subs": []}, {"title": "从内核源码交叉引用到可用探针", "content": "选择 kprobe 前先找到函数声明、真正定义和调用点，确认目标场景确实会经过该函数：\n\n```bash\nrg -n 'kfree_skb\\\\s*\\\\(' /usr/src/linux\nsudo bpftrace -l '*kfree_skb*'\n```\n\n函数存在不代表一定命中。内联、架构差异、错误路径未触发都可能造成零样本。最终要用可控请求验证命中次数，并保存内核版本和源码提交信息。", "subs": []}]}, {"title": "第 15 章 · P1 深入：网络数据面与容器安全", "sections": [{"title": "XDP 的执行模式和运维取舍", "content": "XDP 有 generic、native/driver 和 offload 三种常见模式。generic 兼容性好但路径更晚；native 依赖网卡驱动，性能通常更好；offload 把程序交给网卡硬件，能力和调试方式受硬件限制。\n\n| 模式 | 优点 | 风险 |\n| --- | --- | --- |\n| Generic | 几乎不依赖驱动 | 性能收益有限 |\n| Native | 高性能、可重定向 | 驱动兼容性 |\n| Offload | CPU 开销最低 | 硬件能力和可观测性受限 |\n\n上线时先以 PASS 模式验证统计，再逐步启用 DROP 或 REDIRECT。必须监控 action 计数和 redirect 失败，保留卸载或回退开关。", "subs": []}, {"title": "TC、HTB 与 direct-action 的区别", "content": "TC 位于网卡队列和协议栈之间，既能做 ingress/egress 策略，也能配合 qdisc 进行流量整形。HTB 用层级令牌桶把带宽拆成父子 class；direct-action 则让 BPF 程序直接返回动作，不再依赖传统 classifier 链。\n\n排障时分别查看 BPF filter、qdisc 统计和网卡队列，不能只看某一个计数器：\n\n```bash\ntc qdisc show dev eth0\ntc filter show dev eth0 ingress\ntc -s filter show dev eth0 egress\n```", "subs": []}, {"title": "程序类型的运维全景", "content": "常见程序类型可按运维任务分组：\n\n| 分组 | 类型 | 典型场景 |\n| --- | --- | --- |\n| 跟踪 | KPROBE、TRACEPOINT、PERF_EVENT | 函数、事件、采样 |\n| 用户态 | UPROBE、USDT | 应用和运行时 |\n| 网络 | XDP、SCHED_CLS、SK_SKB、SOCK_OPS、SK_LOOKUP | 过滤、转发、连接 |\n| 容器 | CGROUP_SKB、CGROUP_SOCK、CGROUP_DEVICE、CGROUP_SYSCTL | 工作负载策略 |\n| 安全 | LSM | 访问控制和审计 |\n| 扩展 | STRUCT_OPS、FLOW_DISSECTOR、LWT | 内核行为和协议处理 |\n\n程序类型决定上下文、可用 helper、返回值和挂载方式。写工具说明时必须同时记录这四项。", "subs": []}, {"title": "容器身份关联和安全证据", "content": "安全事件至少要关联 host PID、容器 PID、cgroup ID、mount namespace、network namespace、Pod UID、容器 ID 和镜像摘要。只有命令名而没有身份上下文的事件，不足以触发阻断。\n\n```bash\nlsns -p <HOST_PID>\ncat /proc/<HOST_PID>/status | rg 'NSpid|CapEff|CapBnd'\ndocker inspect <CONTAINER>\n```\n\n策略链路是 API 对象、节点 Agent、LSM/cgroup hook、资源访问和审计事件。排查时要比较策略版本和节点实际加载版本，防止控制面已更新而数据面仍执行旧策略。", "subs": []}, {"title": "Cilium 多层数据面的排障方法", "content": "一条进入 Pod 的流量可能经过物理网卡 XDP、宿主机 TC、veth/Pod 侧 TC、socket hook 和 L7 proxy。每一层关注的信息不同：XDP 关注 action，TC 关注路由和策略，socket 关注连接重定向，L7 关注 HTTP/gRPC 语义。\n\n```text\n物理 NIC -> XDP -> host TC -> veth TC -> socket -> L7 proxy -> Pod\n```\n\n连接失败时从最接近故障现象的层开始，逐层比较包数、Map 状态、策略版本和应用日志，避免把 XDP 的包计数直接当成应用请求计数。", "subs": []}]}, {"title": "第 16 章 · P1 深入：应用符号与负载均衡实战", "sections": [{"title": "用户态符号、DWARF 和 Build ID", "content": "uprobe 能否命中取决于目标 ELF、符号和进程实际加载的文件。`-g` 保留 DWARF 调试信息，strip 会移除符号，Build ID 则用于确认采样数据和二进制是否匹配。\n\n```bash\nreadelf -n /proc/<PID>/exe | rg 'Build ID'\nreadelf -Ws /proc/<PID>/exe | rg 'target_function'\n```\n\n容器场景应使用 `/proc/<PID>/root` 作为符号根目录。出现 `[unknown]` 时，先确认版本、动态库和 JIT 映射，再判断是否真的没有执行目标函数。", "subs": []}, {"title": "Go、Java 和 Python 的运行时差异", "content": "Go 的内联和编译优化可能改变函数边界；Java 方法由 JIT 运行时生成，常需要 perf map 或运行时工具；Python 代码经过解释器执行，通常跟踪解释器函数或 USDT 更稳定。\n\n| 运行时 | 优先观测 | 主要限制 |\n| --- | --- | --- |\n| Go | ELF 符号、syscall、runtime | 内联、goroutine 调度 |\n| Java | USDT、JIT map、async profiler | JIT 地址变化 |\n| Python | 解释器 probe、USDT | 函数级语义有限 |\n\n应用慢请求分析不能只依赖函数耗时，还要结合 GC、锁等待、调度延迟、系统调用和网络 RTT。", "subs": []}, {"title": "Map 和 Helper 的生产选型原则", "content": "计数器、事件和配置应使用不同的数据结构：per-CPU Map 适合高频计数，Ring Buffer 适合低频结构化事件，LPM Trie 适合 CIDR 策略，sockmap 适合 socket 重定向，stack trace Map 适合调用栈去重。\n\nHelper 也按职责分组：身份获取、时间测量、内存读取、Map 操作、事件输出和网络重定向。每次选 helper 都要核对当前程序类型和最低支持内核版本。", "subs": []}, {"title": "Nginx 与 eBPF 负载均衡的数据面差异", "content": "Nginx 作为用户态代理，需要接收请求、解析协议、建立后端连接并复制数据；eBPF 数据面可以在 socket、TC 或 XDP 层提前完成查表和重定向，减少上下文切换和用户态复制。\n\n但 eBPF 数据面不天然理解 HTTP 请求。长连接和 HTTP/2 多路复用可能让多个请求共享一个 TCP 连接，四层负载均衡只能按连接选择后端，不能保证请求级均衡。需要按 Header、路径或方法分流时仍需 L7 proxy 或应用层负载均衡。", "subs": []}, {"title": "负载均衡实验如何避免错误结论", "content": "实验至少包含传统 Nginx、eBPF 数据面和 fallback 三个对照组，并固定客户端并发数、容器 CPU 限额、网卡队列、内核版本和后端响应体。\n\n```bash\nwrk -t2 -c100 -d30s http://<VIP>\nmpstat -P ALL 1\ncat /proc/net/softnet_stat\n```\n\n同时记录吞吐、P50/P99 延迟、错误率、CPU cycles/packet、软中断、Map 查找失败和 redirect 失败。只有应用层和节点层指标同时改善，才能认为优化有效。", "subs": []}, {"title": "负载均衡上线、摘除和回滚", "content": "控制面负责服务发现、健康检查和 Map 版本，数据面只读取当前快照。后端异常时先从 Map 摘除，等待已有连接排空；新版本异常时停止控制面更新、切回传统路径，再卸载 BPF link。\n\n```bash\nsudo bpftool link show\nsudo bpftool map dump id <BACKEND_MAP_ID>\nsudo bpftool link detach id <LINK_ID>\ncurl -fsS http://<VIP>/healthz\n```\n\n回滚演练必须验证新连接、已有连接、控制器重启和节点重启四种状态，不能只验证一个 `curl` 请求。", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
