@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>架构设计学习笔记 · 第五册：微服务治理、演进与综合案例 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>架构设计学习笔记 · 第五册：微服务治理、演进与综合案例</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "架构设计学习笔记 · 第五册：微服务治理、演进与综合案例", "intro": "架构最终要进入团队协作、发布和长期运行。微服务拆分、平台治理、重构和规模化案例都应回到同一个问题：如何让系统在业务增长和技术变化中保持可交付、可观测、可回滚。本册作为前四册的综合落地。", "parts": [{"title": "第 1 章 · 微服务拆分要服务于治理目标", "sections": [{"title": "微服务不是把单体切成更多进程", "content": "微服务强调围绕业务能力拆分、轻量标准化通信和独立交付。它把进程内调用变成网络调用，因而引入超时、重试、序列化、服务发现和部分失败；拆分收益必须抵消这些运行时成本。\n\n拆分决策至少要同时满足三个条件：业务边界能由一个团队负责，数据写入有明确 owner，且存在独立发布、扩缩容或故障隔离需求。只因为“大家都在用容器”而拆分，通常只会把单体故障变成分布式故障。\n\n运维验证应比较拆分前后的变更前置时间、跨服务调用扇出、P95 延迟、告警数量和故障影响半径；若这些指标恶化，应暂停继续拆分并优先治理平台能力。", "subs": []}, {"title": "识别过细拆分的信号", "content": "服务之间调用关系密集、一次请求跨越过多服务、必须共享数据库事务、团队经常同时修改多个仓库，通常说明拆分粒度过细或边界不清。还应关注每个服务是否有独立 SLO、值班 owner 和发布节奏；没有这些条件的“服务”只是远程模块。\n\n可以用调用扇出、共同变更比例、共享表数量和跨服务事务数设阈值。例如一次请求同步调用超过 5 个下游，或连续三个月所有发布都成组进行，就应评估合并或改为异步边界。评估必须基于链路和发布数据，而不是团队偏好。\n\n整改时先冻结新增拆分，合并高耦合服务或引入聚合层，再用故障注入验证隔离是否真实存在。", "subs": []}, {"title": "微服务基础设施是运维产品", "content": "服务注册发现、配置、网关、认证、限流、熔断、日志、指标、追踪、发布和回滚应有统一约束。平台的价值是把这些能力做成可自助使用的运维产品：模板声明输入，控制器执行变更，指标和审计记录结果。\n\n平台不能替服务隐瞒资源需求和业务 SLO。每个服务仍需声明 CPU、内存、连接数、依赖超时和降级策略，平台只负责校验默认值、提供安全边界和生成观测面板。\n\n验收时应演练注册中心不可用、配置回滚和网关限流，确认已有流量可以继续运行且操作者能从审计记录还原变更。", "subs": []}]}, {"title": "第 2 章 · 服务治理和中台边界", "sections": [{"title": "先治理共性问题再建设中台", "content": "中台适合沉淀多个业务都需要且变化相对稳定的能力，例如身份、支付、营销规则或基础数据。判断标准不是调用方数量，而是规则是否稳定、责任是否清楚、失败是否可隔离。\n\n建设前应列出各业务的共性和差异，定义版本化接口、数据 owner 和 SLO。若每个调用方都需要特殊参数、专属流程和同步会议，说明这是业务编排中心而非可复用平台，继续抽象会放大协调成本。\n\n运维上要单独核算中台的容量、租户隔离和升级窗口，并提供退出路径；下游能够在中台异常时使用缓存、降级或本地规则完成核心流程。", "subs": []}, {"title": "服务治理需要可观测的契约", "content": "每个服务应声明负责人、依赖、SLO、资源配额、发布策略、接口版本、数据所有权和应急开关，并把声明纳入部署校验。契约不仅描述成功响应，还要写清超时、限流、重试、幂等和错误码语义。\n\n平台侧至少要能回答服务是否健康、谁在调用、哪个版本产生错误、延迟在哪一跳增加。建议将契约字段映射到服务目录、追踪标签和告警规则，缺失 owner 或 SLO 的服务不能进入生产。\n\n每季度随机抽查一次契约与实际流量，验证文档、指标和配置一致；发现漂移时由 owner 在变更窗口内修复。", "subs": []}, {"title": "数据所有权比服务目录更重要", "content": "共享数据库会让服务边界失效：任一团队都能绕过接口修改别人的状态，迁移和回滚也无法独立进行。应明确谁负责写入、谁可以读取、如何发布 schema 变更，以及哪些字段允许最终一致。\n\n对跨服务流程，应选择事件、Saga 或显式编排，并记录重试、补偿和对账规则。异步事件只能传递事实，不能替代业务规则澄清；修复脚本必须经过权限审批并留下审计证据。\n\n可以通过数据库账号权限、schema 变更检查和写入审计验证所有权是否真正落地。发现跨服务直写时，先封禁新调用，再安排兼容 API 和数据迁移。", "subs": []}]}, {"title": "第 3 章 · 架构重构和架构演进", "sections": [{"title": "重构修复质量问题，演进应对新的复杂度", "content": "架构重构通常不改变系统对外能力，目标是修复性能、可用性、可维护性等质量问题；架构演进则是业务规模、业务模型或技术条件变化后，设计新的系统结构。两者都需要明确目标、时间窗口和可验收结果。\n\n立项时把“保持不变的行为”和“允许变化的内部实现”分开，建立基线指标与回滚点。重构验收看质量指标是否改善，演进验收还要看新能力是否支持业务目标；不能用代码行数或组件数量作为结果。", "subs": []}, {"title": "先局部优化，再进行结构调整", "content": "重构应从影响明确、边界可控的局部开始，保留旧路径作为回退，使用双写、旁路读、灰度和对账逐步迁移。大范围一次性替换会同时改变数据、流量和运行方式，难以区分问题来源。\n\n```mermaid\nflowchart LR\n  A[旧路径] --> B[旁路验证]\n  B --> C[双写或双读]\n  C --> D[小流量灰度]\n  D --> E[逐步放量]\n  E --> F[旧路径下线]\n  F --> G[复盘与文档更新]\n```", "subs": []}, {"title": "演进应由业务和技术信号驱动", "content": "业务增长带来新的数据量、并发和组织复杂度；技术发展提供新的存储、调度和交付方法。提前布局要有证据，快速响应也要控制范围。任何演进都应保留回滚和停止条件。\n\n可用四类信号触发评审：SLO 连续消耗、容量预测越过阈值、组织协作阻塞、故障半径扩大。每个信号都要链接到观测数据和决策记录，避免以“未来可能需要”提前引入复杂组件。", "subs": []}]}, {"title": "第 4 章 · 用规模化案例练习架构决策", "sections": [{"title": "IM、秒杀和消息队列案例的共同方法", "content": "不同案例虽然业务不同，但都可以按同一顺序分析：明确核心场景和失败后果，建立流量与数据模型，识别性能和可用复杂度，设计备选方案，比较成本与团队能力，最后安排演练和渐进交付。\n\n分析结果应形成一页假设表：峰值请求、连接数、数据写入、允许丢失的数据、恢复时间和预算。对每个关键假设给出来源、置信度和验证实验；没有证据的数字只能用于估算，不能直接决定拓扑。", "subs": []}, {"title": "规模增长不等于组件数量线性增长", "content": "十万、百万或千万用户规模变化时，首先变化的是峰值、数据分布、连接数、消息积压和故障域。应根据瓶颈和质量目标逐步引入缓存、分片、异步化、多机房或专用基础设施，而不是预先堆叠所有组件。\n\n每次扩容都应回答“哪个资源先耗尽、增加一倍资源能改善什么、失败时如何退回”。通过压测和容量曲线确定拐点，并把扩容动作写入 Runbook；否则只是把故障推迟到更大规模。", "subs": []}, {"title": "秒杀等突发业务优先保护核心路径", "content": "秒杀系统需要估算突发流量、库存一致性、请求资格、缓存热点、排队长度和失败反馈。非核心查询、推荐和报表可以降级；库存扣减、订单创建和支付状态必须有清晰的幂等、补偿和对账方案。\n\n入口先完成资格校验和令牌桶削峰，再把有限请求放入排队系统。库存服务只接受带幂等键的扣减，订单状态机记录支付超时和取消补偿。活动前通过压测、故障注入和库存对账验证“少卖、不超卖、可恢复”三个目标。", "subs": []}]}, {"title": "第 5 章 · 把架构决策接入日常运维", "sections": [{"title": "架构文档应连接发布和排障", "content": "文档至少包含组件关系、依赖、配置来源、端口和协议、资源边界、健康检查、告警、Runbook、灰度步骤、回滚条件和数据恢复方式。图不是装饰，读者应能从图上找到故障影响范围和操作入口。\n\n发布流水线应引用文档中的版本和配置，告警链接到对应 Runbook，Runbook 再指向验证命令与权限要求。这样值班人员可以从告警沿着“服务—依赖—动作—回滚”路径操作，而不是在多个 wiki 页面之间搜索。", "subs": []}, {"title": "用变更评审控制架构漂移", "content": "每次新增依赖、改变数据路径、调整副本或修改限流，都应说明影响的 SLO、故障域、容量和回滚。定期对比实际拓扑、配置和服务目录，清理已经失效的假设。\n\n评审至少包含调用方、数据 owner 和当班运维三类角色。变更合并前检查依赖图、资源预算和演练记录；上线后比较实际拓扑与设计差异，连续两次漂移未修复时应阻止扩大流量。", "subs": []}, {"title": "以复盘结果更新设计", "content": "事故、压测、演练和容量告警都是架构反馈。复盘不只记录“谁操作错了”，还要追问为什么系统允许错误扩散、为什么没有及时发现、为什么恢复步骤过长，并把改进项写入架构约束和自动化检查。\n\n复盘输出应区分止损、修复和演进三类行动，每项都有 owner、截止时间、验证指标和失效条件。下次演练要回放同一故障，确认改进确实缩短检测或恢复时间。", "subs": []}]}, {"title": "第 6 章 · 综合设计模板", "sections": [{"title": "从需求到方案", "content": "1. 写清业务目标、用户、关键路径和不可接受的失败；\n2. 估算正常和峰值流量、数据增长以及保留周期；\n3. 用 4R 描述角色、分层、关系和协作规则；\n4. 分别分析性能、可用、扩展、安全、成本和可运维性；\n5. 设计 2-3 个有差异的备选方案；\n6. 按业务优先级、技术复杂度和团队能力做取舍；\n7. 设计灰度、演练、监控、回滚和复盘机制。", "subs": []}, {"title": "方案评审输出应可执行", "content": "最终文档应有架构图、关键时序、容量表、风险清单、决策记录、SLO/SLI、告警和 Runbook 入口。每个未解决问题都要有负责人、截止时间和验证方式。\n\n评审结束前做一次“值班模拟”：给出延迟升高、依赖超时或数据不一致的症状，要求参与者在文档中找到定位指标和止损动作。若无法在约定时间内找到入口，说明方案仍不可运维。", "subs": []}, {"title": "综合验收清单", "content": "- 能否在 10 分钟内说明核心请求和故障传播路径；\n- 是否能从指标定位到具体组件、版本或配置；\n- 扩容、切换、降级和回滚是否经过演练；\n- 数据修复、消息补偿和人工介入是否有安全边界；\n- 架构复杂度是否与当前业务、团队和预算匹配。", "subs": ["能否在 10 分钟内说明核心请求和故障传播路径", "是否能从指标定位到具体组件、版本或配置", "扩容、切换、降级和回滚是否经过演练", "数据修复、消息补偿和人工介入是否有安全边界", "架构复杂度是否与当前业务、团队和预算匹配"]}]}, {"title": "第 7 章 · 微服务运行基线", "sections": [{"title": "服务必须声明运行契约", "content": "每个服务至少声明端口、协议、资源请求、并发上限、依赖、超时、重试、SLO、告警、发布方式和回滚方式。契约应可被部署工具读取，生成探针、限额和监控规则。\n\n上线前校验必填字段和默认值，运行中比较声明值与实际值，例如连接池、线程数和请求超时。偏差超过阈值时，先限制发布，再由 owner 更新契约或恢复配置。", "subs": []}, {"title": "追踪跨服务请求", "content": "请求 ID、Trace ID、租户、版本和区域标签应贯穿网关、服务、消息和数据库。没有关联 ID 时，跨服务故障只能依赖时间猜测。\n\n消息异步化后要把 trace context 写入消息头，并记录生产、消费和重试跨度。采样策略不能丢失错误和慢请求；定期抽样检查链路是否在网关、队列和数据库边界断开。", "subs": []}, {"title": "配置和密钥分离", "content": "普通配置需要版本、校验、灰度和回滚；密钥需要权限、轮换、审计和最小暴露。配置中心故障时，服务应有最后一次有效快照。\n\n配置发布先在影子实例验证格式和连通性，再按故障域放量。快照要带生成时间、来源和校验和；恢复时禁止把过期密钥或已撤销开关重新加载。", "subs": []}]}, {"title": "第 8 章 · 重构迁移的风险控制", "sections": [{"title": "先建立旧系统基线", "content": "记录关键接口成功率、延迟、数据量、依赖和人工操作，确定哪些行为必须保持兼容。没有基线无法证明重构收益。\n\n基线至少覆盖一个完整业务周期和高峰窗口，并固定查询口径。把异常样本、边界数据和人工补偿流程列成兼容性清单，迁移期间持续对比而不是只比较平均值。", "subs": []}, {"title": "双写必须有差异处理", "content": "双写失败时要记录待补偿事件；双读比对要区分格式和业务差异；回填要支持断点、限速和重复执行。\n\nOutbox 或变更日志应保证主事务与待发送事件同时提交，补偿消费者使用幂等键。差异按可忽略格式、可重试暂态和业务错误分类，业务错误必须阻止扩大灰度并进入人工审核。", "subs": []}, {"title": "灰度按故障域逐步扩大", "content": "先按实例、租户、地域或业务等级放量。每个阶段都应有进入条件、观察指标、暂停条件和回滚动作。\n\n灰度批次要保持足够观察窗口，覆盖缓存 TTL、异步消费和结算周期。回滚前检查数据写入方向和 schema 兼容性；若新路径已经产生不可逆数据，应切换读流量并执行补偿，而不是盲目回退二进制。", "subs": []}]}, {"title": "第 9 章 · 规模化案例的分析模板", "sections": [{"title": "IM 系统关注连接和状态", "content": "用户规模增长会影响长连接、在线状态、消息路由、离线存储和推送。应分别估算连接数、消息峰值、热点和跨区同步。\n\n运维上把连接接入、路由、会话状态和消息持久化分开观测：连接数看网关和 FD，路由看分片倾斜，状态看过期与漂移，消息看端到端延迟。扩容演练应包含节点重启和跨区断链。", "subs": []}, {"title": "秒杀系统关注资格和库存", "content": "入口尽早校验资格并削峰；库存扣减需要幂等、原子性和超卖校验；订单和支付可以异步化，但要提供状态查询和补偿。\n\n每个请求携带活动、用户和幂等标识，资格结果可短期缓存但不能绕过最终校验。压测要验证令牌耗尽、库存热点、支付超时和重复回调，活动后用订单、支付、库存三方对账确认无超卖。", "subs": []}, {"title": "消息系统关注积压和恢复", "content": "分析生产突增、消费变慢、poison message、分区热点和 broker 故障。恢复时控制消费者并发，先隔离坏消息。\n\n积压告警应同时展示增长速率、预计清空时间和最老消息年龄。恢复流程先暂停坏分区或转入死信，再逐步提高消费者并发；重放必须带批次号、幂等键和审计记录，避免恢复动作制造重复副作用。", "subs": []}]}, {"title": "第 10 章 · 架构治理的持续机制", "sections": [{"title": "服务目录和依赖图要自动更新", "content": "从部署、注册中心、网关和配置中生成服务清单，定期与人工文档比对，清理未登记服务和孤立依赖。\n\n采集时保留来源、更新时间和置信度，区分“真实调用”与“配置声明”。依赖图至少标出同步/异步、关键路径、owner 和故障域；服务下线前先观察调用量归零，再回收凭证和告警。", "subs": []}, {"title": "变更评审关注架构漂移", "content": "新增依赖、扩大副本、改变数据路由和修改限流都可能改变故障域。变更单应关联架构图、容量影响、监控变化和回滚。", "subs": []}, {"title": "事故复盘要改系统而不只改流程", "content": "如果事故依赖人工判断、手工登录或临时脚本，应优先增加探针、自动化和权限边界，不能只要求加强培训。\n\n复盘报告要把事件时间线、传播路径、检测延迟、恢复动作和数据影响量化，并把行动项映射到架构约束。下次值班或演练必须能验证改进项，否则行动项仍只是文档承诺。", "subs": []}]}, {"title": "第 11 章 · 综合练习", "sections": [{"title": "练习一：服务拆分评审", "content": "选择一个模块化单体，列出拆分收益、跨服务事务、调用扇出、发布收益和运维成本，给出保留或拆分的证据。提交依赖图、四周基线和一页 ADR，并说明一个反对拆分的证据。", "subs": []}, {"title": "练习二：设计一次灰度迁移", "content": "为 schema 或消息格式变更写出加字段、双写、校验、灰度、回滚和旧字段下线步骤，补充指标和停止条件。要求给出一次故障注入（新写入失败或消费落后）以及数据修复和审计方案。", "subs": []}, {"title": "练习三：用事故推动演进", "content": "根据缓存雪崩、数据库故障或消息积压事故，提出立即止损、短期修复和长期演进措施，并标注验证方式。每项措施要绑定 SLO 指标、责任人和复测时间，避免把“加强监控”当作唯一答案。", "subs": []}]}, {"title": "第 12 章 · 微服务拆分的决策证据", "sections": [{"title": "从单体痛点而不是流行词开始", "content": "微服务改造的起点应是一组可复核的痛点：某个模块需要独立扩容、发布窗口被其他团队阻塞、故障影响范围过大，或代码库已经无法由一个团队安全修改。把“想使用容器”“公司要求微服务”当成目标，会把技术动作和业务收益脱钩。建议先建立四周基线：变更前置时间、回滚次数、跨团队提交比例、接口 P95、数据库锁等待和事故影响用户数。只有基线能在改造后比较，才知道拆分是否真的改善质量。\n\n| 证据 | 可能的拆分收益 | 需要警惕的代价 |\n| --- | --- | --- |\n| 结算模块夜间批处理占满在线资源 | 独立扩容、隔离资源 | 跨服务订单状态一致性 |\n| 推荐功能频繁变更且压垮主接口 | 独立发布、可降级 | 调用链和数据同步 |\n| 团队按领域分组并拥有独立值班 | 服务责任清晰 | 平台和测试投入增加 |", "subs": []}, {"title": "按业务边界划分限界上下文", "content": "DDD 的限界上下文不是把名词分成几个文件夹，而是明确每个团队对概念、规则和数据的解释。例如“订单”在交易上下文中代表可支付的合同，在履约上下文中代表待发货任务，在财务上下文中代表记账凭证。若三个服务共享同一张订单表，任何一方改变字段含义都会影响另外两方，边界实际上仍然存在于数据库里。划分时记录领域事件、核心不变量和团队负责人，先让语言稳定，再决定是否进程拆分。", "subs": []}, {"title": "用依赖图识别拆分顺序", "content": "把模块作为节点、同步调用和共享表作为边，给边标注调用频率、是否关键路径、是否需要事务。高频强耦合的节点应先保持在同一部署单元；低频、异步、责任清楚的边适合优先拆出。可以用下面的简单评分做初筛：拆分收益 = 独立变更收益 + 独立扩容收益 + 故障隔离收益；拆分成本 = 网络调用成本 + 数据迁移成本 + 运维负担。评分不是自动决策，而是迫使团队说清假设。\n\n```mermaid\nflowchart TD\n  A[收集调用与共享表] --> B[标注频率和事务边界]\n  B --> C{是否需要独立发布或扩容}\n  C -- 否 --> D[保持模块化单体]\n  C -- 是 --> E{是否有稳定数据所有者}\n  E -- 否 --> F[先治理数据和契约]\n  E -- 是 --> G[旁路拆分并灰度]\n```", "subs": []}, {"title": "何时应合并服务", "content": "合并不是失败，而是降低分布式复杂度的正常动作。若两个服务总是一起发布、共享同一事务、由同一团队维护，并且没有独立扩缩容需求，合并通常能减少网络超时、联调和告警噪声。合并前仍需保留接口兼容层，先统计调用方，再安排版本迁移；不要直接删除旧服务导致隐藏调用方在生产爆炸。", "subs": []}, {"title": "服务粒度与团队吞吐的关系", "content": "服务数量应与团队能够维护的运行单元数量匹配。十人团队同时值守几十个有状态服务，通常会把时间消耗在证书、配置、发布和告警上，而不是业务交付。可用“每个团队可独立负责的服务数”“每次需求涉及的仓库数”“一次发布需要协调的值班角色数”作为约束。服务目录中的 owner 缺失、连续三个月无独立发布、依赖扇出超过约定阈值，都是重新评估粒度的信号。", "subs": []}]}, {"title": "第 13 章 · 服务契约与数据所有权", "sections": [{"title": "接口契约必须描述失败语义", "content": "只写成功响应的 OpenAPI 文档不足以支撑运维。契约还应定义超时建议、可重试错误、幂等键、限流响应、分页上限、字段兼容策略和敏感字段处理。例如支付接口的“请求超时”不能被客户端直接判定为失败，必须提供查询接口；库存扣减返回重复请求时应返回第一次处理结果。契约评审应由调用方和提供方共同签字，并纳入消费者驱动测试。", "subs": []}, {"title": "版本兼容采用加法优先", "content": "服务演进通常遵循“先加后删”：先增加可选字段或新端点，部署能够同时理解新旧格式的提供方，再升级消费者，最后在观察窗口后删除旧字段。枚举值增加、字段从整数改字符串、默认值改变都可能破坏旧客户端。对消息格式尤其要记录 schema 版本和未知字段处理方式，不能只依赖编译器报错。", "subs": []}, {"title": "数据所有权和读取方式", "content": "一个服务应是某类业务数据的最终写入者，其他服务通过 API、只读投影或事件订阅获取数据。直接跨库读取短期方便，却会绕过校验、锁和审计，最终形成无法迁移的隐式契约。若确有报表需求，可构建 CDC 投影库，并明确秒级或分钟级延迟；实时交易路径不得依赖投影库的最终一致状态。", "subs": []}, {"title": "跨服务一致性要显式建模", "content": "把订单、库存、支付拆开后，不能继续假设一个数据库事务覆盖所有动作。应定义业务状态机和补偿动作：订单创建后库存预占失败进入待处理，支付超时进入待确认，最终由对账任务关闭或人工介入。每个状态应有超时、重试上限和审计记录，避免“定时任务再试一次”成为没有边界的万能方案。\n\n```mermaid\nstateDiagram-v2\n  [*] --> Created\n  Created --> Reserved: reserve_stock\n  Reserved --> Paid: payment_confirmed\n  Reserved --> Cancelled: reserve_timeout\n  Paid --> Completed: fulfill\n  Paid --> PendingReconcile: payment_unknown\n  PendingReconcile --> Paid: query_success\n  PendingReconcile --> ManualReview: retry_exhausted\n  ManualReview --> Cancelled: operator_decision\n```", "subs": []}, {"title": "数据修复的权限和审计", "content": "生产修复脚本必须区分查询、预览和提交权限，默认以 dry-run 输出影响行数与样例。提交操作带工单号、操作者、审批人和回滚依据，批量更新按主键范围限速。修复后重新跑对账，而不是只看脚本返回 0；涉及金钱、库存和权限的数据必须保留前后值审计。", "subs": []}]}, {"title": "第 14 章 · 微服务基础设施的最小闭环", "sections": [{"title": "基础设施按风险优先级建设", "content": "课程中的基础设施全貌包括网关、流控、降级、注册发现、路由、容错、配置、日志、追踪、消息、自动化测试、容器编排和灰度发布。运维落地不必一次买齐，而应优先补齐能降低当前最大风险的能力：先有统一日志和健康检查，再有发布回滚，再建设追踪和流量治理，最后才是复杂的服务网格或多活控制面。每个基础设施都必须有 owner、SLO 和故障降级方式。", "subs": []}, {"title": "注册发现故障不能阻断已有流量", "content": "服务启动时从注册中心获取实例列表并缓存本地快照；注册中心短暂不可用时，存量实例继续使用最后一次有效列表，新实例则进入受控失败。客户端负载均衡应剔除连续失败实例，但避免所有客户端同时刷新造成惊群。健康检查分为进程存活、依赖就绪和业务可用三层，不能用一个返回 200 的接口代表全部状态。", "subs": []}, {"title": "配置发布需要版本和回滚", "content": "配置中心的发布流程应包括语法校验、静态规则检查、小范围推送、指标观察和全量发布。配置与密钥分离，密钥轮换不能触发全部服务同时重启。服务保存最近一次有效配置，并对关键阈值设置上下界，例如线程池不能被误配为零，超时不能大于上游 SLO。回滚应恢复完整版本，而不是手工改回某几个键。", "subs": []}, {"title": "网关是策略执行点，不是业务垃圾桶", "content": "网关适合处理认证、路由、基础限流、请求体大小和统一审计；复杂业务编排放在领域服务中，否则网关会成为发布瓶颈和单点故障。网关规则变更应按租户或地域灰度，保留命中规则和拒绝原因指标。发生策略误配时可先关闭新规则、恢复上一版本，再检查是否有请求已经被错误转发。", "subs": []}, {"title": "可观测性要以请求为主线", "content": "Trace ID 应从入口生成并贯穿同步调用、异步消息和数据库操作；日志必须包含服务、版本、区域、租户和采样标记。指标至少包括请求量、错误率、延迟分位数、队列积压、线程池拒绝、连接池等待和依赖状态。追踪采样不能只保留成功请求，错误和高延迟请求应强制采样，否则最需要的证据会被丢掉。", "subs": []}]}, {"title": "第 15 章 · 中台与平台化运维边界", "sections": [{"title": "中台解决共享复杂度而非追求最大复用", "content": "中台适合多个业务都需要、规则相对稳定、可以通过清晰契约服务化的能力。身份、统一风控、支付账务常有共享价值；一次性活动规则、某条业务线的特殊审批往往不适合放中台。判断标准不是“是否能复用代码”，而是共享后能否降低总复杂度并保持各业务独立交付。\n\n| 建设方式 | 适合场景 | 运维风险 |\n| --- | --- | --- |\n| 共享库 | 算法、序列化、客户端 | 版本耦合、升级不同步 |\n| 共享服务 | 规则稳定且需统一数据 | 依赖扩散、容量争抢 |\n| PaaS 平台 | 多团队重复使用运行能力 | 平台成为新单点 |\n| 业务中台 | 多业务共享完整流程 | 需求排队、边界争议 |", "subs": []}, {"title": "平台产品必须提供自助和退出机制", "content": "平台不能只提供一个审批入口。服务创建、权限申请、环境配置、扩容、发布、回滚和审计应有自助 API，并且用户能看到配额、成本和依赖。平台升级要支持版本并存，业务方可以在窗口内退出旧能力；没有退出机制的“中台”会把所有业务锁在一个发布节奏上。", "subs": []}, {"title": "中台的统一与差异化", "content": "统一的是协议、审计、身份、容量和故障处理方式，不一定统一所有业务规则。支付中台可以统一账务流水和幂等语义，但不同业务的优惠、退款和风控策略应通过扩展点实现。若每个差异都变成中台参数，最终会产生难以测试的配置矩阵，应该把稳定核心与业务插件分开。", "subs": []}, {"title": "平台自身的 SLO 和容量", "content": "平台的故障会同时影响多个业务，必须定义比普通服务更严格的可用性目标。注册中心、配置中心、发布系统和密钥服务应有独立故障域、只读降级和恢复演练。容量评估不能只看平台 QPS，还要看发布并发、配置推送扇出、日志写入峰值和租户隔离；平台排队时应保护已经在线的服务。", "subs": []}]}, {"title": "第 16 章 · 架构重构的迁移工程", "sections": [{"title": "局部优化与架构重构的分界", "content": "加索引、调大连接池、增加缓存副本通常属于局部优化；引入消息队列、拆分服务、替换存储角色会改变 4R 关系，属于架构重构。分界影响验收方式：局部优化要证明原功能不变且质量指标改善，架构重构还要证明新旧路径兼容、数据完整和故障边界成立。不要用“代码改动很少”来低估架构风险。", "subs": []}, {"title": "旁路模式降低首次迁移风险", "content": "新系统先订阅旧系统产生的事件或复制数据，旁路计算结果但不影响主流程。经过一段时间的比对，确认结果差异可解释，再让小比例请求使用新路径。旁路期间要限制新系统资源，防止验证流量反过来压垮旧系统；验证指标包括结果差异率、延迟、资源消耗和异常类型分布。", "subs": []}, {"title": "双写和 Outbox", "content": "应用同时写两个存储时，第二次写失败会留下不一致。更稳妥的方式是在主事务中写入业务数据和 outbox 事件，再由可靠发布器投递到新系统；消费者以事件 ID 幂等处理，失败进入可重放队列。双写不能替代对账，迁移完成前要定期比较主数据、计数和关键聚合值，并定义差异阈值。\n\n```mermaid\nsequenceDiagram\n  participant API\n  participant OldDB\n  participant Outbox\n  participant Relay\n  participant NewStore\n  API->>OldDB: write business row\n  API->>Outbox: write event in same tx\n  Relay->>Outbox: claim unpublished event\n  Relay->>NewStore: idempotent apply\n  NewStore-->>Relay: ack(event_id)\n  Relay->>Outbox: mark published\n```", "subs": []}, {"title": "回填、限速和断点", "content": "大表回填应按主键范围或时间窗口切片，记录 checkpoint、扫描行数、成功数、失败数和耗时。限速依据线上 CPU、IO、锁等待和复制延迟动态调整；发现延迟超过阈值立即暂停，而不是继续追求迁移进度。回填任务必须可重复执行，使用 upsert 或版本条件避免覆盖新写入，失败片段可以单独重试。", "subs": []}, {"title": "双读比对的差异分类", "content": "双读阶段不要把所有差异都当成新系统错误。先区分序列化格式、时间精度、默认值、排序稳定性和真实业务差异，给每类差异一个处理策略。比对日志要采样脱敏，不能把用户隐私全部复制到日志平台；对金额、库存等关键字段使用全量校验，对普通展示字段可抽样。", "subs": []}, {"title": "灰度与回滚闸门", "content": "灰度按实例、租户、地域或业务等级逐步扩大，每一步预先写出进入条件、观察窗口、暂停条件和回滚动作。回滚不仅是把流量切回旧服务，还要处理已经写入新数据的请求，确保旧路径能理解新状态或提供补偿。任何不可逆 schema 变更都必须拆成兼容期和清理期，不能与首次灰度绑定发布。", "subs": []}, {"title": "迁移结束的下线清单", "content": "下线旧路径前确认：所有调用方已迁移、旧消息无积压、对账连续多个周期通过、备份可恢复、告警和 Runbook 已更新、成本下降符合预期。关闭旧服务应先停止写入，再保留只读观察窗口，最后回收权限、域名、证书和监控。下线动作本身也要有回滚期限，避免发现漏迁调用方时只能紧急重建。", "subs": []}]}, {"title": "第 17 章 · 按规模演进的 IM 案例", "sections": [{"title": "十万用户：先证明核心闭环", "content": "十人左右团队、单聊、好友上限和消息短期保留的 IM 产品，首要目标是注册、登录、加好友和加密消息可靠可用。可以采用模块化单体加独立长连接接入层，消息写入主库、离线消息按用户分区；通过 Redis 保存短期在线状态，但不把 Redis 当作唯一消息事实来源。此阶段过早建设多机房和复杂服务网格，会消耗验证产品的时间。", "subs": []}, {"title": "十万规模的容量假设", "content": "假设注册用户 100,000、日活 20%、每个活跃用户每天 100 条消息，则日消息量约 2,000,000，平均约 23 条/秒。峰值按平均 20 倍估算约 460 条/秒，再分别估算长连接心跳、登录突发和推送重试。计算结果只是初始假设，必须用压测和线上计数校正；“三年一千万用户”不能直接当成今天的峰值容量。", "subs": []}, {"title": "百万用户：群聊和团队分工改变边界", "content": "用户接近百万、团队增长到三十人并增加群聊后，消息路由、群成员变更和离线存储成为新的热点。此时可以按用户、会话或地域分片，拆出消息、关系和用户服务，但应保持每个服务的数据所有权。平台需要统一配置、追踪和发布，业务团队仍负责自身 SLO；不要因为用户尚未达到百万整数就盲目切换全部架构。", "subs": []}, {"title": "千万用户：分级架构和业务域", "content": "千万日活意味着组织和业务线也会扩大，单一微服务目录会变成管理瓶颈。可以建立“业务域架构师负责域内服务，总架构师负责域间边界和基础技术平台”的分级模型。基础平台包括运维、测试、存储、大数据、全链路压测、追踪和异地多活，但每个平台都要有明确的服务对象和成本预算。业务域划分是业务、组织和技术共同决策，不是架构师单方面画图。", "subs": []}, {"title": "亿级用户：成本与开放性成为主问题", "content": "用户达到亿级后，稳定性、开放平台和基础设施成本比单纯扩容更重要。分区架构可以按地域接入和数据归属减少跨区流量，自建机房或深度定制组件可能降低长期成本，但会增加采购、运维和故障责任。开放平台要隔离第三方租户、设置配额和审计，不能直接暴露内部服务；“有钱”也不能跳过容量、合规和恢复验证。\n\n```mermaid\nflowchart LR\n  A[十万: 模块化单体] --> B[百万: 关键服务拆分]\n  B --> C[千万: 业务域+基础平台]\n  C --> D[亿级: 分区、开放、成本优化]\n  A -.不可预测的业务变化.-> E[持续评估]\n  B -.技术变化.-> E\n  C -.组织变化.-> E\n  D --> E\n```", "subs": []}, {"title": "规模演进不能只乘以十", "content": "消息量扩大十倍后，连接数、热点用户、跨区同步、故障恢复时间和团队协作成本不一定也只扩大十倍。群聊会改变扇出模型，支付会引入合规和账务约束，外部开放会引入租户隔离。每次演进都重新计算关键路径和故障域，不能把上一阶段的公式简单乘十后采购机器。", "subs": []}]}, {"title": "第 18 章 · 秒杀与交易平台案例", "sections": [{"title": "业务和技术假设", "content": "毕业设计场景是日活约一百万、单机房、已有微服务的电商平台，在 6.18 活动中销售一千个充电宝和十台手机。设计前要补充假设：活动开始时在线人数、请求峰值、商品资格规则、库存扣减时限、支付超时和订单保留时间。假设必须写在文档顶部，压测数据变化时更新，而不是把“万无一失”当成可验证的技术指标。", "subs": []}, {"title": "秒杀入口的分层保护", "content": "DNS/CDN 负责静态资源和基础缓存，网关校验登录、活动时间和设备签名，资格服务限制重复请求，令牌桶控制进入排队的速率。库存服务只处理经过削峰的请求，订单服务异步创建并返回可查询状态。每层都要有拒绝计数和降级页面，避免流量直接打到数据库。\n\n```mermaid\nflowchart TD\n  U[用户请求] --> CDN[CDN/静态资源]\n  CDN --> GW[网关: 认证+限流]\n  GW --> Q[资格校验与排队]\n  Q --> Inv[库存原子扣减]\n  Inv --> MQ[订单消息]\n  MQ --> Order[订单服务]\n  Order --> Pay[支付与状态查询]\n  Inv --> Fail[失败/售罄反馈]\n```", "subs": []}, {"title": "库存一致性和防超卖", "content": "库存扣减需要原子条件，例如 `UPDATE stock SET available=available-1 WHERE sku=? AND available>0`，并以请求幂等键防止客户端重试重复占用。缓存库存只能作为快速拒绝手段，最终结果必须由可靠存储确认。预扣后订单未支付要有超时释放任务，释放动作同样幂等并记录原因，不能依赖人工修改库存。", "subs": []}, {"title": "订单、支付和补偿", "content": "库存成功而订单消息丢失时，outbox 或事务消息负责重投；支付回调重复时按支付流水号幂等。订单状态机应区分待支付、支付确认中、已支付、已取消和人工审核，前端提供查询接口而不是把超时直接显示为失败。对账任务每天比较库存、订单和支付三方流水，差异进入人工队列并设置最大处理时延。", "subs": []}, {"title": "单机房的现实边界", "content": "当前只有单机房时，首要工作是跨可用区或机架的冗余、数据库备份恢复和活动前演练，而不是直接设计异地多活。单机房无法消除区域级灾难风险，方案应明确这一残余风险、RTO/RPO 和业务沟通方式。活动期间冻结非必要发布，预留人工刹车和静态降级页，避免控制面故障让流量保护失效。", "subs": []}, {"title": "活动前验收表", "content": "| 项目 | 验收问题 | 失败动作 |\n| --- | --- | --- |\n| 入口限流 | 峰值请求是否能在网关被拒绝 | 降低令牌速率并扩大静态缓存 |\n| 库存 | 重试和并发是否会超卖 | 关闭新流量，执行库存对账 |\n| 消息 | 消费延迟和死信是否可见 | 降低生产速率，隔离坏消息 |\n| 支付 | 回调重复和超时是否可恢复 | 开启查询补偿，暂停发货 |\n| 数据库 | 备份能否在目标时间恢复 | 切换只读并启动恢复预案 |", "subs": []}]}, {"title": "第 19 章 · 架构漂移、变更和复盘", "sections": [{"title": "漂移来自未记录的事实", "content": "架构图过期往往不是文档团队的问题，而是生产变化没有进入设计流程：临时增加了外部依赖、某个副本被手工调大、消息 topic 被多个团队复用。服务目录应从部署平台、注册中心、网关和配置中心自动生成，再与人工声明的 owner、SLO 和数据边界比对。差异先告警，经过确认后才更新基线，避免把错误配置自动写入文档。", "subs": []}, {"title": "变更单的最小字段", "content": "每次会影响流量、数据或故障域的变更，至少记录目标、影响组件、容量变化、SLO 风险、观测指标、灰度范围、停止条件、回滚步骤和负责人。把“无影响”作为结论时也要给证据，例如压测结果或依赖方确认。变更完成后自动关联发布版本和事故记录，形成可查询时间线。", "subs": []}, {"title": "事故复盘回到架构约束", "content": "复盘要回答三个层次：哪一个组件先失效，故障沿什么关系传播，哪些设计约束本可阻止扩散。若每次都靠人工登录执行脚本，应增加探针、自动摘除、权限边界和一键 Runbook；若告警过多无人处理，应重设聚合规则和 SLO。行动项必须有验收指标和截止日期，不能只写“加强监控”。", "subs": []}, {"title": "设计债务和淘汰机制", "content": "为每项架构债务记录引入原因、当前代价、触发阈值和偿还方案。债务达到阈值时进入季度规划，例如共享数据库锁等待超过 SLO、旧协议调用方降到零、平台版本停留超过两个大版本。淘汰旧组件需要迁移负责人、最后使用者确认和数据保留期限；没有明确退出日期的临时方案会永久化。", "subs": []}]}, {"title": "第 20 章 · 第五册实战检查清单", "sections": [{"title": "服务拆分检查", "content": "- 是否有可量化的拆分动机和改造前基线？\n- 每个服务是否有稳定的业务边界、owner 和数据所有权？\n- 跨服务事务是否转化为状态机、事件和补偿？\n- 调用扇出、超时、重试和故障隔离是否经过压测？\n- 是否明确何时合并服务以及如何退出平台能力？", "subs": ["是否有可量化的拆分动机和改造前基线？", "每个服务是否有稳定的业务边界、owner 和数据所有权？", "跨服务事务是否转化为状态机、事件和补偿？", "调用扇出、超时、重试和故障隔离是否经过压测？", "是否明确何时合并服务以及如何退出平台能力？"]}, {"title": "迁移检查", "content": "- 是否先建立旧路径基线并准备旁路验证？\n- 双写、outbox、回填和对账是否幂等、可暂停、可重放？\n- 灰度是否按故障域扩大，具备明确观察窗口和回滚？\n- schema 删除是否经过兼容期，旧调用方是否可发现？\n- 下线前是否完成备份、权限回收、监控和 Runbook 更新？", "subs": ["是否先建立旧路径基线并准备旁路验证？", "双写、outbox、回填和对账是否幂等、可暂停、可重放？", "灰度是否按故障域扩大", "schema 删除是否经过兼容期", "下线前是否完成备份、权限回收、监控和 Runbook 更新？"]}, {"title": "规模化案例检查", "content": "- 规模假设、峰值倍数、数据保留和团队能力是否写明？\n- IM 的连接、消息扇出、热点和跨区同步是否分别估算？\n- 秒杀的资格、排队、库存、订单、支付和对账是否闭环？\n- 是否说明哪些结论只适用于当前规模，哪些可迁移？\n- 成本、合规和残余风险是否与“高可用”一起评估？", "subs": ["规模假设、峰值倍数、数据保留和团队能力是否写明？", "IM 的连接、消息扇出、热点和跨区同步是否分别估算？", "秒杀的资格、排队、库存、订单、支付和对账是否闭环？", "是否说明哪些结论只适用于当前规模", "成本、合规和残余风险是否与“高可用”一起评估？"]}, {"title": "运行和治理检查", "content": "- 服务目录、依赖图、配置、发布和告警是否能相互跳转？\n- 平台是否有自身 SLO、容量、降级和退出机制？\n- 事故、压测和演练的结果是否更新架构约束？\n- 关键人工操作是否有审批、审计、限速和回滚？\n- 新增复杂度是否有负责人和偿还时间，而不是只留在 PPT 中？", "subs": ["服务目录、依赖图、配置、发布和告警是否能相互跳转？", "平台是否有自身 SLO、容量、降级和退出机制？", "事故、压测和演练的结果是否更新架构约束？", "关键人工操作是否有审批、审计、限速和回滚？", "新增复杂度是否有负责人和偿还时间"]}]}, {"title": "第 21 章 · 服务通信的运维取舍", "sections": [{"title": "同步调用适合短链路决策", "content": "同步 RPC 适合需要立即返回的资格校验、库存查询和权限判断，但调用链越长，尾延迟和故障传播越明显。每一跳都应设置小于上游预算的超时，并把剩余 deadline 透传；不能让每个服务都使用 3 秒默认超时。对非关键通知、索引更新和报表计算，优先使用消息或任务队列，接受最终一致性换取隔离。", "subs": []}, {"title": "异步消息需要可见的状态", "content": "消息化后，调用方不能只得到“已提交”三个字。接口应返回业务请求 ID，提供状态查询和失败原因；消费者记录处理开始、成功、重试和死信时间。消息延迟指标要区分生产延迟、队列等待和处理耗时，否则只看消费 QPS 无法判断用户是否真的得到结果。", "subs": []}, {"title": "重试预算与幂等键", "content": "重试是恢复手段，不是可靠性的替代品。每个请求应有最大重试次数、总时间预算和退避策略，服务端按幂等键保存第一次结果。下游超时但实际已成功时，客户端重试会制造重复订单或重复扣款；因此支付、库存和发券接口都应优先提供查询而不是无限重试。", "subs": []}]}, {"title": "第 22 章 · 发布、灰度与回滚控制", "sections": [{"title": "版本发布的四个阶段", "content": "将发布拆成构建验证、预生产验证、小范围灰度和全量观察四阶段。构建阶段检查依赖和镜像漏洞，预生产验证迁移脚本与回滚，灰度阶段按故障域观察错误率、延迟、资源和业务转化，全量阶段保留人工刹车。任何阶段失败都应能回到上一稳定版本，不允许把数据库破坏性变更当成普通代码发布。", "subs": []}, {"title": "业务指标和技术指标同时看", "content": "版本可能让 HTTP 错误率保持正常，却导致支付成功率、消息送达率或订单转化下降。灰度看板至少包含一个业务指标、一个延迟指标、一个资源指标和一个依赖指标。指标按版本、租户和地域切分，避免平均值掩盖某个小流量故障域。", "subs": []}, {"title": "回滚前先判断数据方向", "content": "代码回滚并不等于数据回滚。新版本写入的新字段、状态或事件可能无法被旧版本理解，回滚前要确认兼容性；必要时先关闭新写入、启用兼容读取，再切换流量。不可逆数据变更需准备补偿脚本和人工审核，不得在告警触发后临时编写未经演练的 SQL。", "subs": []}]}, {"title": "第 23 章 · 安全与合规融入演进", "sections": [{"title": "服务身份和最小权限", "content": "服务间认证应使用可轮换身份，权限按动作而不是按数据库全库授权。拆分服务后，原单体中的隐式信任会变成横向移动风险；每个服务只读取所需表或 API，管理接口与业务接口分离。权限变更记录调用方、审批人和有效期限，过期自动回收。", "subs": []}, {"title": "敏感数据的日志边界", "content": "Trace、消息和重试日志容易复制手机号、支付标识或聊天内容。定义字段分级和脱敏规则，日志平台按租户隔离并设置保留期限。调试开关必须自动过期，不能让生产长期输出密文或完整请求体；审计日志要独立存储，避免业务服务被攻破后同时删除证据。", "subs": []}, {"title": "删除和保留同样需要架构", "content": "阅后即焚、账户注销和合规删除需要覆盖缓存、消息队列、搜索索引、备份和异步副本。架构文档应说明删除延迟、不可立即删除的备份窗口和验证方法。只删除主库记录而保留日志或备份，不应宣称数据已经完全删除。", "subs": []}]}, {"title": "第 24 章 · 运维平台的产品化", "sections": [{"title": "黄金路径和例外路径", "content": "平台为常见服务提供黄金路径：模板化仓库、默认监控、资源配额、发布流水线和回滚按钮。例外路径允许高风险服务申请不同配置，但需要记录理由、审批期限和补齐计划。所有服务都走同一条强制流程会阻碍创新，完全自由则无法形成可靠基线。", "subs": []}, {"title": "自助扩容和成本可见", "content": "扩容接口应显示当前配额、预计成本、依赖瓶颈和生效时间。只增加应用副本而数据库、连接池或下游配额不变，可能把故障推向下一层；平台应提示联动资源并设置上限。账单按团队、服务和环境拆分，事故后的临时扩容要自动标记，便于复盘成本。", "subs": []}, {"title": "运行手册即平台接口", "content": "Runbook 不只是文字文档，应链接到查询、摘除、扩容、回滚和验证命令，并在执行前校验环境、权限和影响范围。高风险动作默认 dry-run，显示预计实例和数据范围；执行结果写回事件时间线。手册长期未执行时应通过演练或自动检查发现过期步骤。", "subs": []}]}, {"title": "第 25 章 · 架构评审工作坊", "sections": [{"title": "评审前材料", "content": "发起人提前提供上下文图、关键时序、容量估算、故障模式、备选方案和迁移计划。评审不接受只有组件 Logo 的拓扑图；每条连线需说明协议、方向、超时和数据语义。参会者包括业务负责人、开发、运维、安全和数据所有者，避免只在架构师之间闭环。", "subs": []}, {"title": "评审中的问题顺序", "content": "先问系统必须保护的业务目标，再问最大流量和最坏故障，最后讨论组件选型。对每个方案记录“解决的复杂度、引入的新复杂度、验证方式和退出条件”。如果争议来自不同假设，先把假设写成可测量问题，而不是用资历投票。", "subs": []}, {"title": "评审后的决策记录", "content": "ADR 至少包含背景、决策、被拒方案、后果、监控和复审日期。决策随着规模或组织变化可能失效，应设置触发阈值，例如跨区流量超过预算、服务依赖超过扇出上限或团队无法承担值班。ADR 关联代码、配置和 Runbook，才能在事故中快速找到原始意图。", "subs": []}]}, {"title": "第 26 章 · 故障注入与恢复验证", "sections": [{"title": "从依赖级故障开始", "content": "先注入单个依赖超时、连接池耗尽、配置中心只读和消息消费变慢，再组合成区域级故障。每次实验限定流量、租户和时间，准备停止开关。目标是验证降级、隔离、告警和恢复顺序，而不是追求“系统一定不出错”。", "subs": []}, {"title": "恢复成功的定义", "content": "恢复不应只看进程重新启动。验收包括错误率回到基线、积压清零、数据对账通过、用户状态可查询和人工操作记录完整。记录检测时间、决策时间、修复时间和业务恢复时间，分别对应 MTTD、MTTA、MTTR 与实际影响，避免用平均恢复时间掩盖长尾事件。", "subs": []}, {"title": "演练结果进入下一次设计", "content": "演练发现的手工步骤、权限不足、指标缺失和数据冲突都转成有 owner 的改进项。下次演练必须验证改进是否生效，不能只重复同一脚本。对无法自动化的步骤写清人工刹车条件和最大允许风险，必要时降低系统承诺的 SLO。", "subs": []}]}, {"title": "第 27 章 · 课程案例的迁移边界", "sections": [{"title": "学生管理系统案例", "content": "学生系统从外包单体到云平台的案例，适合说明需求不清、角色冲突和容量假设如何影响架构；它不能直接证明某种微服务框架适合所有组织。迁移到平台工程时，应关注租户隔离、批量导入、权限审计、教务高峰和数据保留，而不是复制课程中的组件数量。", "subs": []}, {"title": "手游交易平台案例", "content": "手游交易案例说明单体问题可能同时来自团队协作、性能、爬虫和业务耦合，因此解决方案组合了组件化、微服务、冷热分离和读写分离。运维实践中先找每类问题的证据，再选择最小改造；若只是某个查询慢，直接拆成服务可能增加故障面而没有收益。", "subs": []}, {"title": "IM 案例", "content": "IM 案例通过十万到亿级展示规模演进，但其中的用户数、消息模型和团队结构都是假设。可迁移的是分阶段决策：先验证核心闭环，再按新复杂度拆边界、建平台和做分区；不可迁移的是具体机器数、分片键和时间节点。学习者应重新用自己的业务数据算一遍，而不是背诵结论。", "subs": []}, {"title": "秒杀毕业设计", "content": "秒杀作业要求十页内表达完整设计，适合训练取舍能力。高质量答案不需要覆盖所有中间件，而要说明哪些设计不做、为什么不做、残余风险如何沟通。运维版答案还应增加压测模型、活动冻结窗口、人工刹车、恢复演练和事后对账，这些往往比多画几个组件更重要。", "subs": []}]}, {"title": "第 28 章 · 个人学习与团队传承", "sections": [{"title": "把架构知识转成操作卡片", "content": "每学完一个模式，写一张卡片：适用问题、关键机制、两个替代方案、三个指标、一个故障演练和一个不适用场景。卡片链接到仓库中的具体 Runbook 或实验，而不是只保留抽象定义。这样新同事能从“为什么”走到“怎么值班”。", "subs": []}, {"title": "通过复述发现空白", "content": "让设计者在十分钟内讲清请求路径、数据所有权、容量瓶颈和故障恢复；听众只记录不懂的名词和未解释的跳转。若无法回答某个指标来自哪条链路、某个回滚是否影响数据，说明设计仍停留在图层。复述材料可以作为变更评审和 On-call 培训的基础。", "subs": []}, {"title": "维护一份反模式目录", "content": "记录真实事故中的过细拆分、共享数据库、无限重试、无界缓存、无回滚 schema 和万能中台等反模式。每条反模式写出触发条件、观测信号和修复路线，避免只把失败归因于“执行不到位”。当新方案再次出现同样信号时，评审工具可以自动提示。", "subs": []}]}, {"title": "第 29 章 · 交付前自测题", "sections": [{"title": "题目一：该不该拆服务", "content": "一个订单模块由两个团队共同修改，每月发布两次，线上主要问题是数据库锁等待。请列出至少两种不拆服务的局部优化，再列出拆分后新增的事务、追踪和发布成本。只有当独立扩容或责任边界能抵消这些成本时，才进入迁移设计。", "subs": []}, {"title": "题目二：消息格式升级", "content": "消费者仍有三个旧版本，生产者想把金额从整数分改成 decimal。请设计兼容字段、schema 版本、双读窗口、指标和下线条件。答案必须包含旧消费者无法识别新字段时的处理，以及回滚后已经写入新格式数据的策略。", "subs": []}, {"title": "题目三：区域故障", "content": "单机房秒杀系统的数据库复制延迟持续升高，同时网关错误率上升。请写出五分钟内的止损顺序、需要观察的指标和何时触发只读降级。再说明哪些动作不能在没有备份确认时执行。", "subs": []}, {"title": "题目四：架构漂移", "content": "服务目录显示支付服务只有两个依赖，但追踪发现它调用了三个未登记接口。请设计发现、确认、补录、权限审查和后续评审流程。重点说明如何区分临时调试调用和已经成为生产契约的真实依赖。", "subs": []}]}, {"title": "第 30 章 · 设计数据和证据链", "sections": [{"title": "假设登记表", "content": "架构文档开头列出用户数、活跃比例、峰值倍数、数据保留、团队人数、预算和合规约束。每个数字标注来源、置信度和复核日期；没有数据时写范围而不是伪造精确值。压测、日志和账单产生新证据后更新假设，并在 ADR 中记录哪些决策因此改变。", "subs": []}, {"title": "证据到决策的映射", "content": "容量表中的每个结论应能追溯到请求计数、采样日志或业务访谈。评审时抽查三条链路：峰值 QPS 如何影响副本数，副本数如何影响数据库连接，连接数如何影响故障恢复。无法追溯的“经验值”可以作为初始值，但必须安排验证任务和过期时间。", "subs": []}, {"title": "反事实检查", "content": "对最终方案提出反事实问题：如果峰值只有估算的一半，哪些组件仍值得保留？如果用户增长停滞，哪些平台成本会浪费？如果业务增加支付或群聊，哪个边界最先失效？反事实能发现过度设计，也能提前暴露无法演进的硬编码约束。", "subs": []}]}, {"title": "第 31 章 · 依赖治理与故障隔离", "sections": [{"title": "依赖分级", "content": "将依赖分为关键同步、关键异步、可选同步和离线四类。关键同步依赖决定主请求 SLO，需要超时、熔断和容量预留；可选同步依赖应有缓存或默认值；离线任务不得反向阻塞在线链路。服务清单中记录依赖等级和降级行为，告警按等级聚合。", "subs": []}, {"title": "扇出与并行化", "content": "一个请求同时调用十个服务，即使平均延迟很低，尾延迟也会显著增加。限制同步扇出，合并稳定查询，或把非关键部分异步化。并行调用要设置总 deadline 和部分失败策略，不能简单 `Promise.all` 后把任一失败升级为全局失败。追踪中标记被降级的分支，便于判断用户体验。", "subs": []}, {"title": "级联故障演练", "content": "定期模拟一个下游返回慢响应、连接数耗尽或错误码突增，观察上游是否快速摘除、队列是否有界、重试是否放大流量。演练记录每层的请求量变化和恢复顺序；若某服务没有降级路径，应明确这是业务选择还是遗漏，并评估是否需要调整 SLO。", "subs": []}]}, {"title": "第 32 章 · 多租户和业务域治理", "sections": [{"title": "租户隔离层次", "content": "隔离可以发生在请求路由、线程池、缓存键、数据库 schema、实例和机房多个层次。普通租户可共享实例但必须有配额和公平调度，高价值或强合规租户可能需要独立资源。只在数据库加 tenant_id 不等于完整隔离，日志、缓存、消息和对象存储也要检查跨租户泄漏。", "subs": []}, {"title": "noisy neighbor 识别", "content": "按租户切分 QPS、CPU、缓存命中、队列等待和错误率，发现单个租户拖慢其他租户时优先限速或迁移，而不是盲目扩容。配额变更经过审批并记录成本归属。压测应包含一个高流量租户与多个普通租户，验证公平性和故障影响范围。", "subs": []}, {"title": "域间契约", "content": "业务域之间只通过公开 API 或事件交互，禁止为了报表临时读取对方内部表。域间契约包含数据延迟、版本、错误处理和联系人。跨域需求若持续增加，说明域划分可能不合理，应在季度架构评审中重新评估，而不是不断添加点对点接口。", "subs": []}]}, {"title": "第 33 章 · 自动化架构护栏", "sections": [{"title": "静态检查", "content": "在 CI 中检查依赖方向、禁止跨域包引用、配置敏感值、schema 兼容性和服务元数据完整性。静态规则只阻止明确违反约束的变更，复杂业务判断留给评审。规则版本化并提供豁免期限，避免开发者为了通过检查而绕路。", "subs": []}, {"title": "动态验证", "content": "预生产执行契约测试、故障注入、数据库恢复和消息重放；生产发布执行小流量探针和自动回滚判断。动态验证的流量、数据和权限应与真实场景相近，不能只用健康检查接口。结果进入发布记录，失败样本保留足够上下文供复盘。", "subs": []}, {"title": "拓扑和配置漂移检测", "content": "定时从部署平台、服务注册和网关导出实际拓扑，与 Git 中的声明文件比较。新增未申报依赖、配置值越界、端口暴露或副本低于基线时产生工单。自动修复只适用于低风险字段，高风险漂移先通知 owner，避免控制面错误扩大生产影响。", "subs": []}]}, {"title": "第 34 章 · 成本驱动的架构演进", "sections": [{"title": "把成本映射到业务指标", "content": "成本优化不能只看机器单价。把存储、网络、日志、跨区流量和平台人力分摊到每次请求、每个租户或每条消息，再与收入、SLO 和合规要求比较。降低副本可能节省费用却提高恢复风险，应在决策记录中同时写出成本变化和质量变化。", "subs": []}, {"title": "资源右-sizing", "content": "根据 CPU、内存、IO、连接和队列曲线调整实例规格，避免只依据平均利用率。峰值保护可以用弹性副本、队列削峰和预留容量组合实现；有状态服务扩容前先确认分片、重平衡和恢复时间。每次右-sizing 后观察完整业务周期，避免短期低谷导致错误缩容。", "subs": []}, {"title": "自研和深度定制的边界", "content": "亿级场景可能考虑自研代理、存储或网络组件，但必须比较开源方案的许可、性能、运维人力和升级路径。自研组件要有测试平台、故障演练、源码 owner 和退出方案；不能因为单次压测领先就承担长期维护。优先深度配置和贡献上游，只有瓶颈可重复且收益覆盖人力时才自研。", "subs": []}]}, {"title": "第 35 章 · 变更窗口和业务协同", "sections": [{"title": "高峰冻结策略", "content": "秒杀、节假日和账期等窗口前冻结非必要发布，保留安全修复和经过演练的紧急流程。冻结范围写入服务日历，例外需要业务负责人和 on-call 共同批准。冻结不是停止观察，期间仍应完成容量巡检、备份验证和告警演练。", "subs": []}, {"title": "业务降级协议", "content": "技术团队不能单方面决定关闭推荐、图片或群聊。提前与业务确认降级等级、用户提示、最长持续时间和恢复顺序，写入 Runbook。发生故障时按协议执行并持续更新状态页，恢复后核对转化、投诉和数据补偿，防止技术成功但业务损失未被发现。", "subs": []}, {"title": "外部供应商依赖", "content": "短信、支付、CDN 和云服务都要记录服务等级、配额、故障联系人和替代路径。供应商切换需考虑数据格式、合规和账务对账，不能在事故中首次测试。定期演练超时、限额和区域不可用，确认本地队列和人工处理能承受窗口。", "subs": []}]}, {"title": "第 36 章 · 文档结构和读者路径", "sections": [{"title": "先读摘要再下钻", "content": "架构文档首屏给出业务目标、关键路径、主要约束、当前风险和决策结论；后续章节展开部署、数据、容量、故障和迁移。值班工程师通常先看依赖图和 Runbook，开发者关注契约和本地环境，评审者关注取舍和证据。按读者组织内容比按课程章节堆砌更易维护。", "subs": []}, {"title": "图表的最小语义", "content": "每张图标注边界、方向、协议、同步/异步、存储所有权和故障域；图下写出读图结论和未画出的内容。颜色只表达一种维度，避免把状态、团队和环境混在一起。图与部署清单定期校验，不能让示意图暗示不存在的高可用能力。", "subs": []}, {"title": "版本和废弃标记", "content": "文档标题注明适用版本、环境和最后验证日期；旧方案保留决策背景但明确不可用于新部署。删除章节前检查是否仍被 Runbook、培训或事故链接引用。文档构建时检查内部链接和 Mermaid 语法，避免发布后才发现关键操作入口失效。", "subs": []}]}, {"title": "第 37 章 · 最终交付模板", "sections": [{"title": "一页架构摘要", "content": "摘要包括目标用户和规模、请求主链路、数据主链路、SLO、主要故障域、成本假设和当前阶段。用三句话说明为什么选择当前方案、放弃了什么、下一次演进的触发条件。摘要不放无法验证的宣传词，如“无限扩展”或“绝对高可用”。", "subs": []}, {"title": "运行附录", "content": "附录提供服务清单、端口和协议、资源配额、依赖联系人、告警查询、发布步骤、回滚步骤、数据修复权限和演练记录。命令示例使用占位变量并提示生产确认，避免读者直接复制到错误环境。每条高风险操作标注影响范围、预计时长和停止条件。", "subs": []}, {"title": "审阅签字和复审", "content": "开发、运维、安全、数据和业务 owner 对各自部分签字，未解决问题进入风险登记表。设置按规模、版本或日期触发的复审，不要等事故后才重新看架构。复审结论更新 ADR、服务目录、Roadmap 和培训材料，保证学习内容与生产实践互相校正。", "subs": []}]}, {"title": "第 38 章 · 运行指标到行动", "sections": [{"title": "SLO 预算驱动变更", "content": "将可用性和延迟错误预算分配到服务、依赖和发布窗口。预算消耗过快时暂停非必要演进，先修复容量、告警或回滚缺陷；预算充足时可安排架构实验。每次变更记录消耗了多少预算以及预计收益，避免 SLO 只停留在仪表盘。", "subs": []}, {"title": "指标异常的分层定位", "content": "先看业务 SLI，再看入口、服务、依赖和资源层，沿请求时间线找第一处偏离。错误率升高但 CPU 正常可能是下游超时或配置变化；延迟升高但 QPS 不变可能是锁等待、队列积压或网络重传。排障记录保存查询语句、时间范围和结论，便于复盘重复使用。", "subs": []}, {"title": "告警去重和升级", "content": "同一故障在网关、服务和数据库产生多条告警时，按 trace、依赖和时间窗口聚合为一个事件，并保留原始证据。告警分为自动修复、值班处理和专家升级，设置未确认、未恢复的升级时限。低价值告警进入日报，不得与需要立即止损的信号使用同一通道。", "subs": []}]}, {"title": "第 39 章 · 数据与消息迁移细节", "sections": [{"title": "读写路径切换", "content": "迁移存储时先切读、再切写，或使用按租户/分片键的路由开关。每次切换记录旧新路径的成功率、延迟、数据版本和回退位置。读路径先灰度验证，确认缓存和索引一致后再扩大；写路径切换前必须保证新库可恢复，并暂停不可逆清理任务。", "subs": []}, {"title": "消息重放和顺序", "content": "重放消息前按业务键分组，确认消费者幂等和顺序要求。并行重放可提高速度，却可能打乱同一订单或会话的状态；必要时按分区串行并设置速率上限。重放产生的副作用要带 replay 标记，避免再次发送通知、扣款或触发外部系统。", "subs": []}, {"title": "死信处理", "content": "死信队列按错误类型分类：格式错误、业务拒绝、依赖暂时不可用和代码缺陷。格式错误不能无限重试，应修复生产者或提供转换器；暂时错误可在窗口内重放；业务拒绝进入人工审核。死信数量、年龄和最老消息时间都应告警，并在 Runbook 中写出安全处理步骤。", "subs": []}]}, {"title": "第 40 章 · 组织与责任模型", "sections": [{"title": "服务 owner 的责任边界", "content": "owner 对 SLO、容量、依赖契约、发布和事故响应负责，不意味着一个人承担所有开发工作。团队应有主备联系人、升级路径和服务生命周期状态。owner 变更必须同步服务目录、告警群和权限，防止人员离职后出现无人维护的关键服务。", "subs": []}, {"title": "平台团队与业务团队协作", "content": "平台团队提供默认能力和自助接口，业务团队负责正确使用、业务降级和数据修复。平台不应替业务决定领域规则，业务也不应绕过平台直接修改生产基础设施。季度共同评估平台采用率、例外数量、事故贡献和成本，决定哪些能力继续统一。", "subs": []}, {"title": "事故指挥权", "content": "事故期间指定 Incident Commander、技术负责人、沟通负责人和记录员，避免所有人同时修改配置。指挥官根据预案决定限流、回滚、切换和人工刹车，业务负责人确认用户影响和补偿。事故结束后保留时间线和决策依据，不能用事后结果苛责当时信息不足的选择。", "subs": []}]}, {"title": "第 41 章 · 复习路径和实践产物", "sections": [{"title": "第一阶段：画出现状", "content": "选择一个真实服务，绘制上下文图、部署图和请求时序，标注 owner、数据所有权、SLO、依赖和故障域。用追踪和配置核对图上的至少三条边，记录不一致之处。产物是现状架构页和漂移清单，不先提出重构方案。", "subs": []}, {"title": "第二阶段：做一次小改造", "content": "选择一个低风险问题，例如旁路构建只读投影、增加限流或拆出离线任务。写出基线、方案、灰度、指标、停止条件和回滚，先在测试环境注入故障再上线。产物包括 ADR、Runbook、压测结果和迁移对账报告。", "subs": []}, {"title": "第三阶段：组织评审和演练", "content": "邀请开发、运维、安全和业务 owner 评审改造结果，专门讨论被拒方案和残余风险。随后演练下游超时、消息积压或数据库只读，测量检测、决策、修复和业务恢复时间。将演练结论回写到架构约束、告警和培训材料中，完成闭环。", "subs": []}]}, {"title": "第 42 章 · 迁移期间的日常值班", "sections": [{"title": "观察窗口", "content": "迁移每次放量后保持完整业务周期的观察窗口，覆盖高峰、低谷、批处理和备份时段。值班表写明谁看技术指标、谁确认业务指标、谁有权暂停。窗口结束后由迁移负责人签署继续、暂停或回滚结论，不能因为暂时没有报警就自动放量。", "subs": []}, {"title": "人工刹车", "content": "刹车开关应位于网关、消费端和写入端等多个层级，至少能停止新流量而保留查询和恢复。开关操作需要权限、审计和过期时间，避免永久停在半迁移状态。刹车后检查队列、连接和数据差异，再决定恢复旧路径或修复新路径。", "subs": []}, {"title": "值班交接", "content": "交接记录当前版本、灰度比例、最近指标、未处理差异、下一观察时间和回滚位置。口头交接不能替代文档，所有决策写入事件时间线。若迁移跨越节假日，安排主备值班和升级联系人，确保出现数据问题时能及时冻结清理任务。", "subs": []}]}, {"title": "第 43 章 · 失败模式目录", "sections": [{"title": "过细拆分", "content": "症状是调用扇出增加、一次需求修改多个仓库、告警同时爆发。短期措施是合并强耦合服务、收紧超时和减少同步调用；长期措施是重画限界上下文和数据所有权。验收看发布前置时间、跨服务事务数量和根因定位时间是否下降。", "subs": []}, {"title": "共享数据库", "content": "症状是服务互相读写表、字段修改没有 owner、迁移无法安排窗口。先建立访问清单和只读投影，禁止新增跨域写入，再按业务优先级迁移数据。任何临时直读都要有过期日期和替代接口，防止临时方案变成永久契约。", "subs": []}, {"title": "无限重试", "content": "症状是下游故障时流量反而升高、线程池和队列耗尽。立即设置总 deadline、退避和重试上限，隔离不可重试错误；随后补充幂等键和查询接口。验收通过故障注入确认流量曲线有界，恢复后积压能按计划消化。", "subs": []}, {"title": "万能中台", "content": "症状是所有业务需求都排队等平台、配置组合不可测试、平台发布影响全公司。拆分稳定核心与业务扩展点，给租户独立配额和版本，允许业务保留局部实现。中台每季度以采用率、事故数和交付时延评估是否继续统一。", "subs": []}]}, {"title": "第 44 章 · 章节收束", "sections": [{"title": "关键原则", "content": "微服务、重构和规模化架构都不是终点，价值在于降低当前最痛的复杂度，并让下一次变化可控。每项设计都应说明假设、机制、取舍、运维动作、故障边界和验证证据。无法回滚、无法观测或无人负责的能力，即使拓扑图完整，也不应进入生产基线。", "subs": []}, {"title": "与其他主题的边界", "content": "本册讲跨技术栈的决策、治理、迁移和运行方法；MySQL、Kafka、Kubernetes 等主题负责产品原理、配置和命令。引用其他主题时只链接到具体实践，不复制完整操作章节。这样架构笔记保持稳定，产品笔记可以随版本更新。", "subs": []}, {"title": "下一步实践", "content": "从自己的一个服务开始：补齐服务契约和依赖图，建立一周基线，选择一个低风险质量问题做旁路改造，安排一次故障演练，再用 ADR 记录是否继续演进。完成这些产物，比背下更多组件名称更能证明已经掌握架构设计的运维视角。", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

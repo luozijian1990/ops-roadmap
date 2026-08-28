@@ -13,6 +13,13 @@ flowchart LR
   systems --> linuxPerformance[Linux 性能优化]
   systems --> ebpf[eBPF 运维与故障排查]
 
+  root --> architecture[架构设计]
+  architecture --> architectureFoundations[基础、复杂度与质量]
+  architecture --> architecturePerformance[性能、容量与流量治理]
+  architecture --> architectureDistributed[数据与分布式系统]
+  architecture --> architectureReliability[高可用与灾备]
+  architecture --> architectureEvolution[微服务治理、演进与案例]
+
   root --> cloudNative[云原生]
   cloudNative --> docker[Docker]
   cloudNative --> helm[Helm]
@@ -53,7 +60,7 @@ flowchart LR
   classDef rootNode fill:#1d4ed8,stroke:#1e3a8a,color:#ffffff,stroke-width:3px
   classDef categoryNode fill:#dbeafe,stroke:#3b82f6,color:#172554,stroke-width:2px
   class root rootNode
-  class systems,cloudNative,observability,dataSystems,delivery,webInfra,aiInfra,aiops,aiAgent categoryNode
+  class systems,architecture,cloudNative,observability,dataSystems,delivery,webInfra,aiInfra,aiops,aiAgent categoryNode
 ```
 
 > 说明：思维导图用于展示知识版图；README 中原有的内容导航表格仍更适合作为可点击入口。

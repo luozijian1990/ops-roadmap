@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>架构设计学习笔记·第二册：性能、容量与流量治理 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>架构设计学习笔记·第二册：性能、容量与流量治理</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "架构设计学习笔记·第二册：性能、容量与流量治理", "intro": "性能架构的核心是把业务行为转换为容量模型，再用分层、并行、削峰和保护机制控制资源消耗。本册将课程模块二的进程、网络、缓存、存储、任务分解与任务分配，和模块五的缓存、负载均衡、接口高可用串成一条可运维的链路。", "parts": [{"title": "第 1 章·业务行为与容量模型", "sections": [{"title": "用户量、活跃度、QPS 与并发", "content": "注册用户是规模，DAU/MAU 是活跃度，QPS 是单位时间到达率，并发数是同时占用线程、连接和内存的请求数。1000 万注册用户不等于 1000 万 QPS。容量表须单列客户端重试、后台任务、探针和内部调用。\n\n运维上要把“人数”转换为时间序列：按接口记录请求到达、成功、重试和拒绝四条曲线，并按租户或地域拆分偏斜。QPS 适合估算处理速率，并发更适合估算连接池和内存；当平均耗时上升时，即使 QPS 不变，在途请求也会膨胀。验收时用历史峰值回放，确认模型能解释实例数、连接数和下游调用量，而不是只对齐一个平均值。", "subs": []}, {"title": "行为模型推导请求量", "content": "```text\n日请求量 = 日活 × 人均事件次数 × 每事件请求数\n平均QPS = 日请求量 / 有效服务秒数\n峰值QPS = 平均QPS × 峰值系数 × 活动放大系数\n依赖QPS = 入口QPS × 调用次数 × (1 + 重试放大) × (1 - 命中率)\n```\n\n例如 100 万 DAU、每人每天 30 次读取、服务 12 小时、峰值系数 4，平均约 694 QPS，峰值约 2778 QPS。每次读取调用 3 个后端、命中率 80% 时，数据库回源约 1667 QPS。假设、来源和有效期必须写入表格。", "subs": []}, {"title": "峰值事件与时间分布", "content": "| 事件 | 频率 | 高峰窗口 | 典型放大 | 保护 |\n| --- | ---: | --- | ---: | --- |\n| 登录 | 2/人 | 30 分钟 | 3x | 令牌缓存 |\n| 列表 | 20/人 | 2 小时 | 2x | CDN、分页 |\n| 活动写入 | 4/人 | 10 分钟 | 20x | 限流、排队 |\n| 夜间任务 | 批次 | 1 小时 | 5x | 独立队列 |\n\n平均乘固定系数会掩盖突发。应按事件记录用户比例、次数、窗口和后台任务，线上用真实时间序列修正。", "subs": []}, {"title": "Little 定律与并发预算", "content": "稳定状态下 `并发 = 到达率 × 平均延迟`。2000 QPS、100ms 约 200 个在途请求；依赖变慢到 2 秒时，QPS 不变并发却到 4000，线程池和连接池会先耗尽。容量评审必须同时给出 QPS、P99、超时预算和最大在途请求数。\n\nLittle 定律只在近似稳定、到达和离开速率相等时成立，排队尚未清空的突发阶段不能直接套用。应分别计算入口、每个依赖和异步队列的并发，并把超时请求视为占用资源直到真正取消。压测中固定 QPS 后逐步增加依赖延迟，记录 active、queue、timeout 和 reject；若并发曲线偏离模型，优先检查重试、连接泄漏或采样窗口。", "subs": []}, {"title": "存储增长与副本", "content": "```text\n原始增长 = 日新增记录 × 平均记录大小\n在线容量 = 原始增长 × (1 + 索引比例 + 预留比例) × 副本数\n备份容量 = 日备份大小 × 保留天数 × 版本数\n```\n\n还需考虑压缩比、写放大、compaction、日志和临时文件。监控增长斜率、磁盘延迟、IOPS、inode 和最早可删除分区，不只看百分比。", "subs": []}, {"title": "一次请求的依赖展开", "content": "订单请求可能包含鉴权、库存读、价格计算、订单写、消息发布和审计。每一步记录调用次数、串并行、缓存命中和重试。客户端重试 2%、服务端重试 5% 会使依赖量至少乘以 1.02×1.05。容量表应按依赖逐行展开。\n\n并行扇出缩短端到端延迟，却会同时占用更多连接、线程和内存；串行调用资源峰值较低，但依赖延迟会累加。对每条边写明 timeout、deadline、最大并发和重试责任层，并标注失败时是快速失败、读旧值还是继续执行。通过 trace 的 span 数量和下游 access log 对账，验证实际扇出没有因 SDK 默认重试而悄悄增加。", "subs": []}, {"title": "基线、峰值、故障与降级容量", "content": "容量目标建议分正常基线、计划峰值、单节点故障、保护模式四档。故障档可以关闭推荐和报表，但核心读写仍满足最低 SLO。余量过大增加成本，过小无法承受节点故障；每档都应有流量开关和验收指标。", "subs": []}]}, {"title": "第 2 章·单机性能模型", "sections": [{"title": "进程、网络、缓存和存储四模型", "content": "```mermaid\nflowchart LR\n R[请求]-->P[进程/线程]\n P-->N[网络事件]\n N-->C[缓存]\n C-->S[存储]\n S-->O[响应]\n P-.CPU/锁.->B[瓶颈]\n N-.连接/队列.->B\n C-.命中/淘汰.->B\n S-.IOPS/延迟.->B\n```\n\n进程决定隔离，网络决定连接复用，缓存减少重复工作，存储决定随机/顺序访问。没有证据就拆服务或上集群，通常只是把局部问题扩散。", "subs": []}, {"title": "多进程与多线程", "content": "多进程有地址空间和故障隔离，代价是 IPC 与内存复制；多线程共享内存，代价是锁、死锁和 GC 竞争。无状态服务可用多进程承载故障域、线程池处理并发；共享状态应优先外置。压测进程崩溃、线程池耗尽和重启期间的请求丢失。\n\n选择时至少比较两种部署：多进程便于按 CPU 核隔离和滚动重启，多线程共享缓存更省内存但单个死锁可拖垮实例。容器中还要考虑 PID 限制、cgroup CPU throttling 和优雅终止时间；进程数增加不应超过下游连接配额。验收记录单进程崩溃、滚动发布和 OOM 时的错误率、重试量与未完成请求，确认故障只影响预期实例。", "subs": []}, {"title": "线程池和下游容量", "content": "CPU 密集任务线程数接近核数，I/O 密集任务可更多，但受连接池、下游并发和内存限制。不同依赖使用独立池，慢依赖不能占满核心池。观测 active、queued、rejected、task latency；调大线程池而吞吐不升，说明瓶颈已经转移。\n\n线程池大小应由“目标并发 × 任务内存”与下游最大并发共同约束，而不是凭经验设成 CPU 的几十倍。核心池可采用有界队列和快速拒绝，后台池采用低优先级与独立连接；无限队列会把过载隐藏成延迟。故障演练让一个依赖固定阻塞，检查核心请求是否仍能获得线程、拒绝是否带有可识别原因，以及恢复后队列是否会二次冲击下游。", "subs": []}, {"title": "Reactor、PPC 与连接模型", "content": "Reactor 用少量事件线程处理海量连接，再把计算交给工作池；PPC/TPC 让连接与线程对应，代码简单但连接多时上下文切换昂贵。选择取决于连接数、阻塞调用和语言运行时。用事件循环延迟、连接数和工作队列验证，而不是把“异步”当成性能保证。\n\nReactor 的关键边界是事件线程不能执行阻塞 I/O 或长时间序列化，否则所有连接共享的事件循环会被拖住；PPC/TPC 则要防止线程数随连接数线性增长。可用固定连接数、固定请求大小做 A/B 压测，比较 event-loop lag、上下文切换、CPU 和 P99。生产排障时先定位阻塞调用栈，再决定迁移到工作池或回退到更简单的线程模型。", "subs": []}, {"title": "锁竞争与共享状态", "content": "CPU 高可能是自旋、上下文切换或全局锁，不是业务计算。分片锁、线程本地累加、无锁队列可降低争用，却增加合并成本或一致性复杂度。结合 profile、线程 dump、运行队列和锁等待判断，避免用更多副本掩盖热点。", "subs": []}, {"title": "网络容量三边界", "content": "带宽、连接数、新建连接速率是三个独立边界。长连接占文件描述符，短连接占握手和 TLS。检查 keep-alive、空闲超时、连接池、SYN backlog 和网卡重传：\n\n```bash\nss -s\nss -tan state established | wc -l\ncat /proc/sys/net/core/somaxconn\n```", "subs": []}, {"title": "I/O 与资源隔离", "content": "日志追加偏顺序写，索引查询偏随机读；SSD 降低延迟但不能消除队列和写放大。在线请求、批处理、监控和日志应使用独立线程池、cgroup、连接池或磁盘配额。注入后台任务的 CPU、磁盘和连接占用，确认核心 SLO 不受影响。", "subs": []}]}, {"title": "第 3 章·缓存与多级路径", "sections": [{"title": "Cache 与 Buffer", "content": "Cache 保存可由源系统重建的数据；Buffer 暂存尚未传递的数据。浏览器、page cache、InnoDB buffer pool 和 Redis 属于广义缓存；消息积压和写缓冲更像 Buffer。缓存丢失通常回源，缓冲丢失可能意味着未交付，恢复等级不能混用。", "subs": []}, {"title": "3W1H 缓存设计", "content": "回答 What、Why、Where、How，并补 TTL、容量、淘汰、版本、权限和观测。每个键写出源数据、最大陈旧时间、空值策略、回源限额。缓存不能成为没有边界的共享状态。", "subs": []}, {"title": "多级缓存命中路径", "content": "```mermaid\nflowchart LR\n U[客户端]-->CDN[CDN]\n CDN-->L[本地缓存]\n L-->R[Redis]\n R-->DB[数据库]\n DB-->R-->L-->CDN-->U\n```\n\n每层定义 miss 下一跳、超时、旧值策略和回源并发。总命中率不够，必须拆分各层命中率、回源 QPS 和回源延迟。", "subs": []}, {"title": "本地、独立与 SSD 缓存", "content": "本地延迟最低但不一致；独立缓存共享容量却引入网络、分片和集群故障；SSD 容量大但延迟和写放大更高。极热短 TTL 放本地，跨实例共享放独立集群，大对象或可重建结果放 SSD。以回源成本与陈旧容忍度选型。\n\n选型要把故障处理写进去：本地缓存失效可回源，独立缓存不可达时需限回源或读旧值，SSD 缓存则要监控磁盘队列和重建时间。跨实例一致性要求高时不能只因延迟低就选本地；共享缓存还需评估网络分区、分片迁移和副本成本。用同一工作集测命中率、P99、回源 QPS 与恢复时间，避免只比较单次 get 延迟。", "subs": []}, {"title": "淘汰、工作集与预热", "content": "LRU 适合近期重复访问，LFU 保护长期热点但响应突发较慢，TTL 适合明确时效。工作集超过容量会造成命中率断崖。扩容或切换后可离线扫描、热点列表、异步加载预热；预热脚本必须限速、可暂停和可重复。清空缓存后用真实回放验收。", "subs": []}, {"title": "缓存容量与成本", "content": "`内存需求 = 键数 × (键+值+元数据) × 副本数 × (1+碎片率)`。要预留故障迁移和扩容空间。成本还包括网络、备份、监控和值班；可重建数据不应盲目配置与主库相同的持久化等级。", "subs": []}]}, {"title": "第 4 章·缓存一致性与故障", "sections": [{"title": "Cache-aside、Read-through、Write-through", "content": "Cache-aside 简单且源系统权威；Read-through 让缓存层代读但复杂度集中；Write-through 写一致性较好却依赖缓存；Write-behind 吞吐高但有丢失和顺序风险。选择前写清最大陈旧时间、写后读要求和删除失败补偿。", "subs": []}, {"title": "写库删缓存的窗口", "content": "先写库再删缓存仍可能因删除失败、并发回填和复制延迟产生旧值。重试队列、延迟双删、版本号和变更订阅可以缩小窗口，但会增加写放大和运维复杂度。并发写读压测应统计旧版本暴露时长。\n\n“延迟双删”只是在时间上错开竞态，不能替代可靠事件；删除事件丢失时仍需补偿扫描或按版本拒绝旧值。对允许最终一致的列表可读旧值，对余额、库存等写后读场景应绕过缓存或携带版本校验。测试要并发执行写库、读回填、缓存删除失败和副本延迟，记录旧版本比例、最长暴露时间及补偿完成率。", "subs": []}, {"title": "穿透与空值", "content": "参数校验、权限检查、短 TTL 空值和布隆过滤器可拦截不存在键。布隆过滤器有误判，删除和扩容需维护；空值 TTL 过长会掩盖新建数据。监控空值命中、误判、异常键和回源 QPS。", "subs": []}, {"title": "击穿与请求合并", "content": "热点键过期时用互斥锁、singleflight、租约或后台刷新让一个请求回源，其余等待或读旧值。锁和等待队列必须有上限，持锁进程崩溃要能过期。并发过期压测检查源库 QPS、锁等待和旧值比例。\n\n互斥锁适合单实例控制，分布式租约适合跨实例但要防时钟漂移和租约过期后的双写；后台刷新牺牲少量陈旧换取稳定延迟。等待请求必须设置 deadline，不能因为“合并请求”而把入口线程全部挂住。故障注入持锁实例宕机、回源超时和锁服务不可达，验收锁自动释放、回源上限和用户可见错误均符合预案。", "subs": []}, {"title": "雪崩与热点分片", "content": "随机 TTL、分批预热和后台刷新缓解时间雪崩；多副本、降级旧值和源限流缓解故障雪崩。热点键即使哈希也可能集中在单分片，可做键打散、多副本读或专用热点集群。按键采样而非节点平均值识别热点。", "subs": []}, {"title": "失效事件审计", "content": "批量删除、版本切换和预热都应记录操作者、键范围、原因、时长和回滚动作。大范围失效先小样本、限速并检查源容量；风暴时可暂停任务、延长旧 TTL 或打开降级。指标包括命中率、回源、旧版本、锁等待和缓存错误。", "subs": []}]}, {"title": "第 5 章·负载均衡与任务分配", "sections": [{"title": "DNS、四层、七层和网关", "content": "DNS/GSLB 处理地域但受 TTL 影响；四层性能高且协议透明；七层可按路径和 Header 路由但承担代理 CPU；网关还承担认证、限流和审计。每层写明故障域、健康检查、摘除条件、恢复条件和配置责任。\n\n多级负载均衡要避免重复重试和健康检查放大：DNS 可能在 TTL 内继续返回故障地址，四层只能看到 TCP 成功，七层才能识别业务错误。路由规则应能按版本灰度并快速回滚，网关配置发布需有语法校验和小流量观察。演练一个地域不可达、一个可用区高延迟和网关规则误配，检查流量迁移时间、旧连接排空及客户端错误码。", "subs": []}, {"title": "健康检查与排空", "content": "存活探针只说明进程，Ready 要反映是否可接收流量，业务探针验证关键依赖。探针过重会放大故障，过轻会暴露坏实例。下线先 NotReady、停止新请求、等待短请求、迁移长连接与任务，再终止。监控 in-flight、连接和终止原因。", "subs": []}, {"title": "算法与异构容量", "content": "轮询适合同构，随机简单，加权适合异构，最少连接适合长请求，Hash 适合会话和数据本地性。自适应算法能参考延迟但可能振荡。混合请求压测比较 P99、分布偏差和摘除恢复，错误权重会把故障节点继续推入流量。", "subs": []}, {"title": "会话保持与无状态化", "content": "源地址 Hash、Cookie 粘滞会造成热点和扩缩容迁移；外置会话或短期令牌实现无状态但增加远程读取或校验。可重建状态不要绑定实例。扩容、摘除和跨区切换时验证登录状态与流量分布。", "subs": []}, {"title": "任务分配器", "content": "后台任务还需要租约、优先级、幂等、重试和重平衡，不能只轮询。SDK 简单但业务耦合，独立调度器集中但自身需要高可用。模拟 worker 崩溃、分配器不可用和任务超时，检查重复、丢失和饥饿。", "subs": []}]}, {"title": "第 6 章·限流、排队与异步化", "sections": [{"title": "限流层次", "content": "入口保护总吞吐，租户保护公平性，接口保护依赖，数据库连接保护存储，队列保护消费者。每个限流器写明 key、容量、速率、拒绝响应和旁路策略，不能只做一个全局阈值。\n\n层次之间要定义优先级和扣减顺序：先按租户配额再按接口配额，还是先保护数据库连接，决定了被拒绝请求的归因。关键租户可预留令牌，低优先级流量应在全局过载时先被拒绝。验证时分别压测单租户突发、全租户均匀流量和限流器故障，比较公平性、核心成功率、拒绝码及旁路流量。", "subs": []}, {"title": "固定窗口和滑动窗口", "content": "固定窗口简单但边界突发可能翻倍；滑动窗口平滑却保存更多时间片。分布式窗口需要原子计数、时钟和网络一致性。边界压测验证拒绝曲线，配置值本身不是证据。\n\n固定窗口适合低成本粗粒度保护，滑动窗口适合对突发敏感的 API；令牌桶更适合“平均速率+短突发”的入口。分布式实现要明确计数存储不可用时 fail-open 还是 fail-closed，并防止多地域时钟偏差造成配额漂移。用两个窗口边界连续发压，检查实际允许量、拒绝延迟和计数服务负载。", "subs": []}, {"title": "漏桶与令牌桶", "content": "漏桶固定处理速率，令牌桶允许桶容量内短突发。令牌桶参数为平均速率 `r` 和容量 `b`，`b` 不应超过下游瞬时承受能力。限流器故障须定义 fail-open/closed 和关键接口白名单。", "subs": []}, {"title": "排队边界", "content": "队列必须有最大长度、消息 TTL、消费并发、重试和死信。同步接口不能无限等待，应返回任务 ID 并提供状态查询。告警同时看长度、最老消息年龄、消费速率和拒绝率。", "subs": []}, {"title": "异步化的状态语义", "content": "异步写入带来最终一致。事务成功而消息失败、消息成功而事务失败要用 Outbox、事务消息或补偿扫描处理。消费者必须幂等，状态要能从处理中转为成功、失败和人工介入。注入重复消息和消费者宕机验收。", "subs": []}]}, {"title": "第 7 章·超时、重试、降级与熔断", "sections": [{"title": "超时预算", "content": "入口 1 秒预算需分配给鉴权、业务和依赖，不能每个下游都设置 1 秒。超时应释放线程、连接和锁，并传播 deadline。Trace 记录超时阶段和取消传播，判断等待发生在哪一层。\n\n超时设置有两种常见策略：固定每跳 timeout 简单但会叠加超预算，按剩余 deadline 动态计算更准确但要求协议传播。连接池获取、排队、网络读写和业务处理应分别计时，否则“下游 1 秒超时”无法解释。注入慢 DNS、连接建立和响应体读取，确认取消信号能到达下游并释放资源，避免超时请求继续占用线程。", "subs": []}, {"title": "重试放大", "content": "只对瞬时错误和幂等操作重试，使用指数退避和抖动，限制次数与总时间。入口、SDK、消息多层重试会相乘，应指定唯一责任层。观测 retry count、放大倍数、成功率和下游拒绝。\n\n重试预算应从入口超时预算中扣除：例如 800ms 总 deadline，首次调用 300ms 后只剩 500ms，不能再无条件执行两次 300ms 重试。对非幂等写请求需使用幂等键或去重表，否则重试可能产生重复订单。故障注入 5xx、连接重置和超时三类错误，确认只有允许的错误被重试，且退避抖动不会形成新的同步峰值。", "subs": []}, {"title": "降级策略", "content": "降级可以关闭推荐、返回旧缓存、缩短结果、延迟处理或限制功能；扣款、库存和权限不能静默降级。每项策略须有触发阈值、用户提示、审计和恢复动作，灰度打开并验证核心成功率。", "subs": []}, {"title": "熔断状态机", "content": "```mermaid\nstateDiagram-v2\n [*] --> Closed\n Closed --> Open: 错误/慢调用超阈值\n Open --> HalfOpen: 冷却结束\n HalfOpen --> Closed: 探测成功\n HalfOpen --> Open: 探测失败\n```\n\n阈值要考虑最小样本、慢调用比例和冷却时间。半开探测需分散到实例，配置变更可审计、可回滚。", "subs": []}, {"title": "舱壁隔离", "content": "按依赖、租户和请求类型隔离线程池、连接池、队列和并发信号量，限制级联故障。舱壁牺牲复用效率换取可预测性。注入慢依赖，确认核心池、连接和 CPU 不被占满。", "subs": []}]}, {"title": "第 8 章·压测与排障闭环", "sections": [{"title": "压测场景", "content": "稳态验证长期平衡，阶梯寻找拐点，突发验证限流，故障压测验证摘除和依赖失败。脚本要包含真实读写比例、缓存命中、数据分布、登录态和后台任务，并记录版本、配置和压测机瓶颈。\n\n压测方案应先定义停止条件：错误率、P99、队列年龄、数据库连接或磁盘队列任一越线即停止加压。阶梯压测每档至少持续一个完整 GC 和缓存周期，避免只测到热身阶段；突发压测要区分入口拒绝和下游保护。报告附带压测流量、数据种子、服务版本及监控时间窗，确保结果可复现。", "subs": []}, {"title": "容量曲线", "content": "横轴为 QPS/并发，纵轴同时画成功率、P99、CPU、队列和下游延迟。吞吐增加而 P99 急升，表示排队和竞争已出现；安全工作区应位于拐点前并留出故障余量。\n\n```mermaid\nxychart-beta\n title \"吞吐与延迟\"\n x-axis \"QPS\" [500,1000,1500,2000,2500,3000]\n y-axis \"P99(ms)\" 0 --> 1000\n line [80,90,110,160,420,900]\n```", "subs": []}, {"title": "排障顺序", "content": "确认时间、范围、首个异常指标；区分流量增加和单请求变慢；沿队列、线程、连接、缓存、网络、存储检查；先用可回滚的限流、降级或扩容止血，再用 profile、trace 和慢查询确认根因。", "subs": []}, {"title": "生产闭环", "content": "上线前建基线，上线中阶梯放量并设置错误率、P99、队列和数据库负载停止阈值，上线后比较预测与真实曲线，更新峰值系数、重试倍数和余量。事故复盘要把结论写回容量表、告警和 Runbook。", "subs": []}]}, {"title": "第 9 章·综合案例与验收", "sections": [{"title": "案例：热点详情接口", "content": "平时 500 QPS、峰值 2 万 QPS、允许陈旧 30 秒。只用 Redis 的方案组件少但热点过期会打满源库；CDN+本地+Redis、请求合并和后台刷新增加运维复杂度，却能把回源限制在数百 QPS。演练热点同时过期，验证源库 QPS、锁等待、旧值比例和暂停失效的回滚开关。", "subs": []}, {"title": "案例：秒杀入口", "content": "1 分钟百万请求而库存每秒只能处理 2000 次。同步排队会耗尽连接；网关令牌桶快速拒绝超额请求，合法请求进入带 TTL 的订单队列，消费者按 2000/s 处理，用户通过任务 ID 查询结果。还必须设计重复提交、队列满、消费者宕机、库存回滚和死信处理。", "subs": []}, {"title": "性能验收表", "content": "| 项目 | 证据 |\n| --- | --- |\n| 容量与增长 | 假设版本、峰值表、阶梯压测 |\n| 缓存 | 分层命中、失效和热点演练 |\n| 均衡 | 摘除、排空、扩缩容记录 |\n| 保护 | 限流、队列、超时和重试注入 |\n| 运行 | 指标、告警、Runbook、回滚 |", "subs": []}, {"title": "自测问题", "content": "1. 为什么平均 QPS 不能决定线程池大小？\n2. 多级缓存命中率上升但数据库仍打满，可能是什么原因？\n3. 令牌桶容量与下游瞬时能力如何关联？\n4. 多层重试怎样计算放大倍数并确定责任层？\n5. 缓存雪崩演练要保留哪些指标和回滚证据？", "subs": []}, {"title": "容量工作表模板", "content": "```yaml\nservice: order-api\nversion: 2026-08\ntraffic:\n  baseline_rps: 800\n  planned_peak_rps: 3000\n  burst_seconds: 60\n  growth_90d: 1.5\nlatency:\n  p99_ms: 300\n  timeout_ms: 800\ndependencies:\n  - name: inventory\n    calls_per_request: 2\n    cache_hit: 0.8\n    retry_limit: 1\nresources:\n  cpu_reserve: 0.3\n  memory_reserve: 0.25\n  failure_capacity: 0.7\n```\n\n模板中的数值不应直接复制到生产。发布评审时逐项附上来源：业务埋点、日志聚合、压测报告或历史峰值。`failure_capacity` 表示扣除一台节点或一个可用区后的目标，不是正常运行时的利用率。每次流量模型改变都要提升版本号，旧版本保留用于事故对比。", "subs": []}, {"title": "入口指标与依赖指标", "content": "入口至少监控 RPS、并发、P50/P95/P99、4xx/5xx、超时和请求体大小；应用监控线程池、GC、进程重启、CPU throttling 和内存水位；依赖监控连接池等待、查询延迟、锁等待、缓存回源、队列 lag 和重试放大。指标标签按接口、租户、地域和版本拆分，但要限制高基数，单键热点可用采样而非无界标签。", "subs": []}, {"title": "告警阈值的分层", "content": "预警表示趋势需要人工检查，严重告警表示已影响 SLO，紧急告警表示需要立即止血。示例：P99 连续 10 分钟超过目标 1.5 倍为预警，超过 3 倍或错误率超过 5% 为严重；队列最老消息年龄超过业务 SLA 为紧急。阈值必须经过基线校准，避免固定百分比在低流量时产生噪声。每个告警链接到 Runbook 和回滚开关。", "subs": []}, {"title": "PromQL 观察示例", "content": "```promql\nhistogram_quantile(0.99,\n  sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))\n\nsum(rate(http_requests_total{status=~\"5..\"}[5m]))\n  / sum(rate(http_requests_total[5m]))\n\nmax by (pool) (thread_pool_queue_depth)\nsum(rate(cache_backend_requests_total{result=\"miss\"}[5m]))\n```\n\n查询应与服务的 SLO 窗口一致，并按版本和地域对比。只展示全局平均会掩盖单个可用区或少数租户的长尾。", "subs": []}, {"title": "压测数据准备", "content": "压测数据应接近生产的键分布、对象大小、冷热比例和索引选择性。全新顺序 ID 会低估热点和索引页竞争；全部随机数据又可能高估缓存失效率。对隐私字段使用保持长度和分布的脱敏数据，记录生成脚本的版本和种子。压测结束后清理临时数据、队列和缓存，避免污染共享环境。", "subs": []}, {"title": "k6 场景示例", "content": "```javascript\nimport http from 'k6/http';\nimport { check, sleep } from 'k6';\n\nexport const options = {\n  scenarios: {\n    ramp: { executor: 'ramping-arrival-rate', startRate: 200,\n      timeUnit: '1s', preAllocatedVUs: 100,\n      stages: [{target: 1000, duration: '5m'}, {target: 2500, duration: '5m'}] }\n  },\n  thresholds: { http_req_failed: ['rate<0.01'], http_req_duration: ['p(99)<300'] }\n};\n\nexport default function () {\n  const res = http.get(`${__ENV.BASE_URL}/orders?cursor=0`);\n  check(res, { 'status ok': r => r.status === 200 });\n  sleep(1);\n}\n```\n\n脚本只说明流量形状，不能替代业务数据校验。压测报告要同时附应用、数据库、缓存和负载均衡监控截图或查询结果。", "subs": []}, {"title": "故障注入矩阵", "content": "| 注入项 | 预期保护 | 关键观测 | 恢复动作 |\n| --- | --- | --- | --- |\n| Redis 不可达 | 本地缓存/旧值/限回源 | miss、回源、错误 | 恢复节点或切只读 |\n| 数据库延迟 2 秒 | 超时、熔断、降级 | pool wait、P99 | 降低流量、处理慢查询 |\n| 一个实例宕机 | LB 摘除、连接排空 | 分布、重试 | 替换实例 |\n| 消费者停止 | 队列限长、告警 | lag、最老年龄 | 恢复消费者、补偿 |\n| 网关规则错误 | 配置回滚 | 4xx/5xx、路由命中 | 回滚版本 |\n\n每项注入先在低流量环境验证，再进行小范围生产演练。演练记录开始条件、止血人、停止阈值和恢复证据。", "subs": []}, {"title": "负载均衡排障命令", "content": "```bash\ncurl -fsS http://gateway/ready\ncurl -fsS http://gateway/metrics | rg 'upstream|connection|latency'\nss -tanp | awk '{print $4}' | sort | uniq -c | sort -nr | head\n```\n\n命令输出仅用于现场判断，不应直接作为自动化探针。探针脚本要设置超时、重试上限和退出码，并避免访问会修改状态的接口。", "subs": []}, {"title": "连接池估算", "content": "若每个实例最大并发 200、同步依赖平均等待 50ms、目标 RPS 1000，可先按并发预算估算池大小，再用压测校准。数据库最大连接数 2000 时，20 个实例不能各自配置 200 个连接，否则理论总量已达 4000。连接池上限要乘以实例数、故障转移后的扩容倍数和重试连接，留出管理连接与副本切换余量。", "subs": []}, {"title": "自动扩缩容的信号选择", "content": "CPU 适合计算密集服务，RPS/实例适合无状态网关，队列最老消息适合异步消费者，并发和 P99 适合延迟敏感接口。单一 CPU 触发会在请求等待 I/O 时失真；单一 P99 触发可能因采样不足抖动。扩容冷启动时间必须小于流量增长时间，缩容要遵守连接排空和任务迁移。", "subs": []}, {"title": "缓存指标面板", "content": "建议面板按层排列：客户端/CDN 命中、应用本地命中、分布式缓存命中、回源 QPS、回源延迟、热点键 TopN、淘汰率、内存碎片、连接数、复制延迟和错误率。图表同时显示发布、批量失效和扩容事件。命中率升高但 P99 变差时，检查序列化、网络和锁，而不是继续提高 TTL。", "subs": []}, {"title": "保护配置的变更流程", "content": "限流、熔断、超时和缓存 TTL 属于高风险运行配置。变更单应包含目标、旧值、新值、影响范围、预计资源变化、观察窗口和回滚命令。先在一个实例或租户灰度，观察至少一个完整峰值周期；紧急变更也要补审计。配置中心不可用时，服务应使用最后一个已验证版本，而不是空配置启动。", "subs": []}, {"title": "性能回归基线", "content": "每次代码或依赖升级都保存固定数据集下的吞吐、P99、CPU、GC、分配速率、数据库 QPS 和缓存命中。回归阈值可按接口风险设置，例如 P99 退化超过 15% 阻断发布，低频接口改为人工复核。基线环境和生产硬件差异要标明，避免把绝对数值误当成生产承诺。", "subs": []}, {"title": "运行手册最小结构", "content": "Runbook 至少写：现象和影响、确认命令、首选止血动作、禁止操作、回滚步骤、升级联系人、恢复验证和事后清理。性能类 Runbook 应包含“先限流还是先扩容”的决策树，以及缓存回源、队列积压和连接池耗尽的分支。每次事故后由实际值班人员更新，保持命令可执行。", "subs": []}, {"title": "发布停止条件", "content": "阶梯发布每阶段至少观察错误率、P99、关键业务成功率、依赖延迟、缓存命中和队列年龄。任一严重指标越过阈值立即停止放量并保留现场；不能用“整体平均正常”覆盖单地域异常。停止后先恢复旧版本或降低流量，再决定是否继续定位新版本根因。", "subs": []}, {"title": "复盘问题清单", "content": "复盘不只问“为什么 CPU 高”，还要问：容量模型漏掉了哪个行为？峰值系数是否过期？哪个保护动作没有生效？重试由几层叠加？告警在用户受影响前多久触发？止血是否产生数据一致性副作用？最终将答案转为指标、配置、自动化测试或架构决策记录。", "subs": []}]}, {"title": "扩展专题：从课程模型到生产容量", "sections": [{"title": "容量估算的输入契约", "content": "容量估算不是架构师单方面猜数字，而是和产品、运营、财务共同确认输入契约。至少记录用户总量、活跃用户、行为频率、峰值窗口、请求成功定义、数据保留期限和增长日期。对 ToB 系统还要记录租户数、最大租户规模和租户间的流量偏斜。每个数字附上来源、采集时间和置信等级（已观测、业务承诺、类比推断）。没有来源的数字只能作为待验证假设，不能直接转化为实例数。", "subs": []}, {"title": "端到端容量工作表", "content": "| 维度 | 输入 | 推导 | 验证证据 | 失效动作 |\n| --- | --- | --- | --- | --- |\n| 入口 | DAU、事件次数、峰值窗口 | 峰值 QPS | 网关 access log | 更新峰值系数 |\n| 计算 | QPS、平均耗时、CPU 配额 | 实例数与并发 | 压测报告 | 扩容或拆分 |\n| 缓存 | 键数、对象大小、TTL | 内存与回源 | 命中率、回源 QPS | 降级/扩容 |\n| 存储 | 记录量、索引、复制 | 容量、IOPS | 慢查询、磁盘队列 | 分层/归档 |\n| 异步 | 入队速率、消费速率 | 队列长度、积压时间 | lag、最老消息 | 增加消费者 |\n\n工作表必须区分平均值、P95 峰值和单节点故障值，并注明是否包含重试、探针、批处理和跨服务调用。容量评审时逐行质询“这一项如果翻倍，哪一个资源先到红线”。", "subs": []}, {"title": "峰值系数的统计方法", "content": "固定使用 4 倍峰值系数会在低频业务上浪费成本，在突发活动上又不够。应从至少四周的分钟级时间序列计算日内峰均比、周内峰均比和活动峰值，并分别取 P95/P99。对新业务可用相似业务的分位数作为先验，但上线后必须自动回填实际值。容量模型中同时保留“计划活动峰值”和“异常重试峰值”，两者的保护动作不同。", "subs": []}, {"title": "依赖扇出与资源乘数", "content": "请求量不是唯一放大器，扇出和串并行关系也会改变下游压力。假设入口 1200 QPS，调用用户服务 1 次、商品服务 3 次且其中 20% 重试，则商品服务压力为 `1200×3×1.2=4320 QPS`。并行调用缩短端到端延迟，却会扩大瞬时连接和内存；串行调用减少并发，却把下游延迟叠加到总预算。依赖图应标注调用次数、最大并发、超时和重试责任层。\n\n```mermaid\nflowchart TD\n  A[入口 1200 QPS] --> B[鉴权 1x]\n  A --> C[商品 3x]\n  A --> D[库存 1x]\n  C --> E[重试 20%]\n  E --> F[商品实际 4320 QPS]\n```", "subs": []}, {"title": "计算实例数与故障余量", "content": "实例数不能只按平均 CPU 反推。先用压测确定单实例在目标 P99 下的安全吞吐 `q_safe`，再按 `ceil(q_peak/q_safe)` 计算基线实例；随后增加故障余量，例如 N+1 或跨可用区的 30%。若自动扩容冷启动 90 秒，而流量 30 秒内翻倍，必须提前预热或保留更多热实例。把扩容后的连接、缓存副本和下游配额一并纳入计算，避免只扩应用层造成数据库雪崩。", "subs": []}, {"title": "存储 IOPS 与写放大", "content": "业务写入 TPS 不是磁盘 IOPS。一次逻辑写可能产生索引更新、WAL、复制发送和 compaction，实际 IOPS 是逻辑写乘以写放大系数。随机读还受到缓存命中和页大小影响。评估时分别测顺序写、随机写、随机读和 fsync 延迟，并记录队列深度；SSD 规格中的峰值 IOPS 不能当作稳定上限。在线表、归档表和备份任务使用不同卷或调度窗口，避免 compaction 与高峰写入竞争。", "subs": []}, {"title": "资源预算与 SLO 预算联动", "content": "把 SLO 错误预算转化为容量动作：当 P99 连续两个窗口超过目标但错误预算尚未耗尽，可先扩容；错误预算快速消耗时，停止发布并启用保护模式。CPU、内存、连接和队列分别设置告警预警线和硬上限。资源预算表应包含“可牺牲功能”的优先级，确保降级顺序由业务预先认可，而不是事故中临时争论。", "subs": []}]}, {"title": "扩展专题：单机与集群性能机制", "sections": [{"title": "CPU 火焰图与运行队列", "content": "CPU 使用率高并不等于有效吞吐高。先区分 user、system、iowait 和 steal，再查看运行队列是否超过 CPU 核数。使用 `pidstat -u -t 1`、`perf top` 或 eBPF profile 找到热点函数和锁等待；GC、序列化和日志格式化常常占据大量 CPU。优化后必须用同一流量和数据集复测，比较每请求 CPU，而不是只看总利用率。\n\n```bash\npidstat -u -r -d -p $(pgrep -n myservice) 1 10\nvmstat 1 5\nperf stat -p $(pgrep -n myservice) -e cycles,instructions,cache-misses sleep 10\n```", "subs": []}, {"title": "线程池隔离实验", "content": "为核心请求、慢查询和后台任务建立独立执行池，分别设置最大线程、队列长度和拒绝策略。实验步骤是先让慢依赖固定延迟 2 秒，再逐步增加入口流量，观察核心池 active、queue、reject 和 P99。若后台池耗尽仍能保持核心 SLO，说明隔离有效；若共享连接池仍被占满，则还需隔离连接和超时预算。拒绝策略必须记录原因并返回可识别错误码。", "subs": []}, {"title": "网络连接生命周期", "content": "短连接把成本集中在握手、TLS 和内核分配，长连接则消耗文件描述符、内存和心跳。连接池大小需满足并发需求但不能超过下游连接上限；空闲超时应小于中间负载均衡的回收时间，避免大量半开连接。排障时同时检查客户端池、服务端 accept 队列、NAT 表和 TLS 握手失败，单看 established 数量会漏掉连接建立瓶颈。", "subs": []}, {"title": "任务分解的切分信号", "content": "课程中的“多个篮子”不仅是加机器，也可以把读、写、批处理和实时计算拆成不同角色。切分依据包括资源类型不同、扩缩容节奏不同、故障影响不同和发布频率不同。过度切分会增加任务分配器、网络跳数和跨角色一致性；切分后要为每个角色定义输入队列、最大并发、重试和排空流程。用一张角色容量表说明为什么该角色不能与其他角色混部。", "subs": []}, {"title": "任务分配算法对比", "content": "| 算法 | 适用 | 优点 | 风险 | 验证 |\n| --- | --- | --- | --- | --- |\n| 轮询 | 同构短请求 | 简单 | 忽略实例差异 | 请求分布 |\n| 加权 | 异构实例 | 利用规格差异 | 权重过期 | 每实例 P99 |\n| 最少连接 | 长请求 | 避免连接堆积 | 状态同步成本 | in-flight |\n| 一致性 Hash | 本地缓存 | 减少迁移 | 热点倾斜 | key 分布 |\n| 自适应 | 延迟波动 | 响应实时 | 振荡与反馈环 | 权重变化 |\n\n算法切换必须可回滚，权重变化应有最小步长和稳定观察窗口。节点健康恢复时不要一次性灌入全部流量，可采用渐进加权。\n\n异构实例的权重应来自可观测容量（CPU 配额、连接上限、实测 q_safe），而不是只按机器规格静态配置。最少连接在请求耗时差异大时更均衡，但需要同步 in-flight 状态；一致性 Hash 减少缓存迁移，却会放大热点。演练节点摘除、恢复和权重配置错误，验证分布偏差、恢复时间以及是否出现回流风暴。", "subs": []}]}, {"title": "扩展专题：缓存路径与热点治理", "sections": [{"title": "缓存命中率的正确解读", "content": "全局命中率会掩盖关键接口的回源风暴。至少拆分按接口、租户、缓存层和状态码的命中率，并同时计算字节命中率和请求命中率。小对象命中率高不代表大对象回源成本低；命中率升高但 P99 变差，可能是序列化、网络或锁竞争。面板应叠加发布、失效、扩容和故障事件，避免把相关性误判为因果。", "subs": []}, {"title": "热点键识别与隔离", "content": "按键采样统计 TopN、请求频率、对象大小和过期时间，节点平均 QPS 只能发现不了单键热点。热点键可采用本地副本、键打散、多副本只读或专用缓存池；写入仍需保留单一权威源。打散会增加聚合读取和失效复杂度，适用于读多写少且热点可预测的对象。热点治理完成后验证单分片最大 QPS和跨节点分布。", "subs": []}, {"title": "预热与失效的安全流程", "content": "预热任务要有键范围、并发、速率、超时、暂停和断点续跑；先导入 1% 样本，确认回源 QPS 未超过源系统预算，再逐步放大。批量失效先按租户或时间分片，保留旧版本读取或临时延长 TTL。任何“清空缓存”命令都必须经过二次确认、审计和自动回滚开关，避免运维操作直接把压力转移到数据库。\n\n```bash\nredis-cli --scan --pattern 'product:v3:*' | head -100\nredis-cli INFO stats | rg 'keyspace_hits|keyspace_misses|evicted_keys'\n```", "subs": []}, {"title": "缓存案例：微博热点时间线", "content": "微博类时间线同时具备热点集中、读远高于写和内容时效短的特征。可将热点榜单放 CDN/本地缓存，用户时间线使用分布式缓存，未命中时按游标从存储增量读取；热点作者更新时只刷新受影响的聚合片段，而不是全量重建。故障时允许读旧时间线、关闭个性化推荐，但发布和删除接口仍需走权威存储。验收关注热点键 TopN、回源峰值、旧数据暴露时长和删除传播延迟。", "subs": []}]}, {"title": "扩展专题：接口保护的参数化设计", "sections": [{"title": "限流参数如何从容量得到", "content": "令牌桶速率 `r` 应低于下游稳定处理能力，容量 `b` 依据允许的突发窗口设置，而不是随意取很大。例如下游安全速率 800 QPS、允许 2 秒突发，可取 `r=800,b=1600`，同时配置租户和接口级上限。压测验证令牌耗尽时间、拒绝比例和恢复速度；限流器故障时，核心写接口通常 fail-closed，查询接口可短时 fail-open 但必须有全局熔断。", "subs": []}, {"title": "排队长度与等待时间", "content": "队列长度应由可接受等待时间和消费者速率推导。若消费者稳定处理 500 条/秒，允许最大等待 10 秒，则队列硬上限约 5000 条；超过后应拒绝、丢弃低优先级或转入死信。告警不能只看长度，还要看最老消息年龄，因为消费速率变化会使同样长度代表完全不同的风险。同步请求排队必须返回任务 ID，禁止让连接无限占用。", "subs": []}, {"title": "重试预算与抖动", "content": "重试次数、退避上限和总 deadline 共同决定放大倍数。客户端、网关和 SDK 只能指定一个主要重试责任层，其他层最多透传错误。指数退避加入随机抖动，避免所有实例在同一时刻重试；对非幂等写请求必须携带幂等键。指标记录原始请求、重试请求和最终成功请求三条曲线，才能计算真实放大。", "subs": []}, {"title": "降级开关的业务分级", "content": "把接口分成核心交易、重要查询和可选体验三类，分别定义可用性、陈旧容忍和降级结果。核心交易只能降低并发或排队，不能返回假成功；重要查询可读旧缓存或缩短字段；可选体验可直接关闭。开关默认值、变更人、过期时间和恢复条件进入配置仓库，避免事故后遗留永久降级。", "subs": []}, {"title": "故障注入矩阵（扩展）", "content": "| 场景 | 注入方式 | 预期用户结果 | 保护指标 | 退出条件 |\n| --- | --- | --- | --- | --- |\n| Redis 延迟 500ms | tc/netem | 旧值或有限错误 | 回源 QPS、P99 | 源库超预算 |\n| 单 AZ 丢包 | 网络故障演练 | 流量转移 | AZ 分布、重试 | 错误率 > SLO |\n| 下游 50% 5xx | mock/sidecar | 熔断与降级 | open rate、核心成功率 | 核心失败 |\n| 队列消费者减半 | 停止实例 | 延迟上升但不丢失 | oldest age、lag | 超过 RTO |\n| 配置错误 | 灰度下发 | 自动回滚 | 配置版本、4xx | 任一红线 |\n\n每个实验都记录注入时间、流量比例、观察窗口、止血人和恢复证据；没有恢复验证的“故障演练”只能算功能演示。", "subs": []}]}, {"title": "扩展专题：案例验收与运行闭环", "sections": [{"title": "案例：微信红包类突发写入", "content": "红包场景的难点不是平均吞吐，而是同一时刻大量请求争抢有限余额和库存。入口采用令牌桶和排队把突发整形成可处理速率，资格校验和金额计算尽量前置缓存，最终扣减由幂等消费者串行化处理；队列必须有最大等待时间和死信。不能为了“全部成功”无限扩容，因为热点账户、数据库锁和下游支付仍是硬边界。验收包括峰值 10 倍流量、重复请求、消费者重启、缓存失效和订单对账。", "subs": []}, {"title": "案例：千万学生平台的读高峰", "content": "学生管理平台在开学、选课和成绩发布时读流量集中，用户数据、课程目录和成绩查询的时效性不同。课程目录可长 TTL 多级缓存，成绩查询采用短 TTL 和按班级预热，写入走主库并通过变更事件更新缓存；按学校或班级分片避免单租户热点。故障时关闭统计报表，保留登录、选课和成绩核心查询。验收表需分别记录租户峰值、热点班级、回源比例和跨分片查询耗时。", "subs": []}, {"title": "性能验收工作表", "content": "| 检查项 | 目标 | 实测 | 结论 |\n| --- | --- | --- | --- |\n| 峰值 QPS | 模型 P99 峰值 |  |  |\n| P99 延迟 | 接口 SLO |  |  |\n| 单实例安全吞吐 | 拐点前 70% |  |  |\n| 单节点故障 | 错误率不越红线 |  |  |\n| 缓存失效 | 回源不超过预算 |  |  |\n| 队列积压 | 在 RTO 内清空 |  |  |\n| 降级恢复 | 开关可回滚 |  |  |\n\n验收必须附压测版本、数据集、配置快照和监控查询。只提供“平均延迟很好”的截图不能作为通过依据。", "subs": []}, {"title": "生产巡检清单", "content": "每日检查缓存命中和回源、连接池等待、线程池拒绝、队列最老消息、实例权重、限流拒绝和熔断状态；每周检查容量预测、峰值系数、扩缩容事件和保护配置变更；每月执行一次低风险故障注入和 Runbook 演练。巡检结果写入时间序列或工单，连续三次异常必须转为容量或架构改进项。", "subs": []}, {"title": "交付前的架构评审问题", "content": "评审人应逐项追问：峰值从哪个行为模型得出？哪一个依赖先成为瓶颈？缓存失效时数据库能承受多少回源？负载均衡如何排空长连接？限流拒绝谁、排队多久、是否可重试？降级会不会伪造业务成功？单节点和单可用区故障时是否满足最低功能？这些问题没有明确答案时，方案仍处于概念阶段。", "subs": []}, {"title": "性能预算分配示例", "content": "假设外部接口 SLO 为 P99 800ms，可以先按鉴权 50ms、业务计算 150ms、库存依赖 250ms、订单存储 250ms、网络与序列化 100ms 分配预算，并保留 10% 余量。预算不是把每个下游都配置成 800ms，而是沿调用树传播 deadline：父请求剩余 300ms 时，子调用只能使用其中一部分。每次依赖升级都重新检查预算，避免局部优化后总链路仍然超时。", "subs": []}, {"title": "P50、P95、P99 的容量含义", "content": "P50 反映典型用户，P95 反映尾部用户，P99 更接近容量和故障边界。平均延迟无法发现少量请求因锁、GC 或重试被拖慢。容量曲线应同时画 P50/P95/P99；当 P99 急升而 P50 平稳，通常是队列、连接池或热点分片问题。跨实例聚合时使用 histogram 或可合并分位数，不能简单平均各实例的 P99。", "subs": []}, {"title": "反压（Backpressure）设计", "content": "反压是让上游感知下游已接近容量，而不是无限创建任务。同步服务通过信号量限制 in-flight，异步服务通过队列长度和消费速率限制生产者，流式系统通过窗口确认或暂停读取实现反压。没有反压的系统会把内存、连接和磁盘队列当成“无限缓存”，最终以 OOM 或超时雪崩结束。验收时逐级降低消费者速率，确认上游能限速、拒绝或转移低优先级任务。\n\n```mermaid\nsequenceDiagram\n  participant P as Producer\n  participant Q as Queue\n  participant C as Consumer\n  P->>Q: publish\n  Q-->>P: queue depth / credit\n  C->>Q: fetch(max N)\n  Q-->>C: records\n  C-->>Q: ack\n  Q-->>P: pause when full\n```", "subs": []}, {"title": "GC 与内存水位", "content": "高吞吐服务中，分配速率、堆外内存、缓存对象和连接缓冲共同决定内存压力。监控 heap used、allocation rate、GC pause、RSS、page fault 和 OOM kill；只看堆使用会漏掉 native buffer。设置软水位触发采样和限流，硬水位触发摘除实例，避免内核直接杀死正在处理核心请求的进程。压测需包含长响应和大对象，验证回收后的延迟是否恢复。", "subs": []}, {"title": "文件描述符与端口预算", "content": "一个实例的文件描述符预算应包含入站连接、出站连接、日志文件、管道和临时文件。出站连接数约为依赖数乘连接池上限，再乘并发请求和重试系数；短连接还受本地临时端口范围限制。用 `lsof -p PID | wc -l`、`cat /proc/PID/limits` 和 `ss -s` 检查实际值。提高 ulimit 只能延后耗尽，仍需限制连接池、启用复用并告警使用率。", "subs": []}, {"title": "NUMA 与容器 CPU 配额", "content": "多路服务器上跨 NUMA 节点访问内存会增加延迟；容器 CPU quota 过低会产生 throttling，即使宿主机整体 CPU 仍有余量。监控 `container_cpu_cfs_throttled_seconds_total`、运行队列和 NUMA 命中率，检查线程池是否超过配额。对延迟敏感服务可使用 CPU pinning 或 guaranteed QoS，但会降低调度弹性，必须用故障迁移测试验证。", "subs": []}, {"title": "网络抖动与尾延迟", "content": "平均 RTT 正常并不表示网络健康，丢包、队头阻塞和重传会放大 P99。按可用区、节点和目标服务拆分 TCP 重传、连接建立耗时、TLS 握手和应用处理时间。`mtr`、`ss -ti` 和网卡错误计数可定位路径问题；应用层要设置合理的读写超时，不要把网络抖动误判为业务失败后无限重试。", "subs": []}, {"title": "一致性 Hash 的迁移成本", "content": "增加缓存节点时，一致性 Hash 减少键迁移但不能消除热点和冷缓存。虚拟节点数量影响分布方差与路由表大小；节点权重变化应渐进执行。迁移期间同时观察命中率、回源 QPS、网络流量和单节点内存，必要时先扩容源系统再扩缓存。切换完成后保留旧节点短暂只读窗口，便于回滚和追查丢失键。", "subs": []}, {"title": "CDN/边缘缓存的运维边界", "content": "CDN 适合静态资源和允许陈旧的公共内容，不适合强个性化、强权限或必须立即撤销的数据。缓存键应明确 Host、Path、Query、Header 和压缩变体；错误配置可能泄露跨租户数据。发布时先小比例刷新，检查命中率、回源带宽和 4xx/5xx，再扩大范围。撤销流程要同时覆盖 CDN、应用本地缓存和浏览器缓存，不能只删除源文件。", "subs": []}, {"title": "负载均衡健康检查的分层", "content": "Liveness 只验证进程仍在运行，Readiness 验证实例能否接收新流量，深度业务检查验证关键依赖。深度检查过于频繁会把依赖故障放大为探针风暴，因此应设置缓存结果、超时和熔断。摘除阈值要结合连续失败次数和恢复抖动，恢复时采用慢启动。验收包括依赖只读、依赖超时和实例正在排空三种状态。", "subs": []}, {"title": "网关路由与配置发布", "content": "路由规则、权重、超时和限流属于同一份可审计配置。发布前用离线请求样本验证路径匹配、Header 条件和默认路由，防止新规则覆盖旧服务。采用版本化配置、灰度实例和自动回滚；配置中心不可用时使用最后一个已验证快照。网关指标要按 route、upstream、status 和 retry 拆分，避免总量图掩盖单接口异常。", "subs": []}, {"title": "低优先级流量治理", "content": "把探针、报表、推荐、批处理和用户核心交易分为不同优先级，使用独立队列或并发信号量。过载时先拒绝低优先级流量，保留核心容量；恢复时按优先级逐步放开，避免积压任务突然冲击系统。优先级必须在接口契约中声明，不能依赖调用方自觉。演练时验证恶意或错误客户端无法伪造核心优先级。", "subs": []}, {"title": "性能问题的最小复现", "content": "现场排障先固定时间窗、请求样本、版本、配置和数据分布，再构造最小流量重现。最小复现应保留导致尾延迟的关键因素，如热点键、并发写、慢依赖或重试；删除无关依赖以降低噪声。复现脚本加入自动清理和随机种子，保证不同版本可比较。修复后同时跑正常流量和故障流量，避免只优化理想路径。", "subs": []}, {"title": "容量预测与线性伸缩检查", "content": "每周用过去 4-8 周的 QPS、存储、队列和实例数拟合增长趋势，并标记活动、版本和故障点。线性伸缩要求增加实例后吞吐近似增长、P99 不恶化、共享依赖仍有余量；若增加实例后数据库连接或锁竞争非线性增长，说明瓶颈在共享层。预测报告给出乐观、基线和保守三条曲线，以及达到红线的日期和提前量。", "subs": []}, {"title": "保护机制的配置示例", "content": "```yaml\nrequest:\n  timeout_ms: 800\n  max_retries: 1\n  retry_on: [connect_reset, 503]\nlimiter:\n  rate_per_second: 800\n  burst: 1600\n  key: tenant_id\ncircuit_breaker:\n  min_requests: 100\n  error_rate: 0.5\n  open_seconds: 30\nbulkhead:\n  core_max_inflight: 200\n  background_max_inflight: 20\n```\n\n配置示例只是起点，实际值必须由压测和下游承诺校准。上线前检查单位、默认值和 fail-open/fail-closed 语义，避免把每秒、每分钟或百分比混用。所有参数都应提供热更新回滚和生效范围查询。", "subs": []}, {"title": "课程知识到运维动作映射", "content": "| 课程概念 | 运维动作 | 证据 |\n| --- | --- | --- |\n| 鸡蛋篮子叠加 | 按故障域和资源类型拆分实例 | 扩容/故障演练 |\n| 多级缓存 | 分层命中与失效审计 | 回源和陈旧指标 |\n| 任务分配 | 权重、排空、慢启动 | 流量分布 |\n| 漏桶/令牌桶 | 阈值、拒绝和队列告警 | 拒绝率/最老年龄 |\n| 接口高可用 | 限流、降级、熔断组合 | SLO 与错误预算 |\n\n这张映射表用于值班培训和评审，不替代具体产品文档。每个动作都应链接到 Runbook、监控面板和最近一次演练记录。", "subs": []}, {"title": "读写比例与缓存收益估算", "content": "把接口按读写比例拆开，才能判断缓存是否值得引入。若总流量 5000 QPS、读占 90%、缓存命中率目标 85%，理论回源读约 `5000×0.9×0.15=675 QPS`；写流量仍需直接进入权威存储。命中率提升 5 个百分点带来的收益，要和缓存网络、序列化、失效广播成本比较。写多读少或数据变化频繁的接口，缓存可能只增加复杂度，不会带来稳定收益。", "subs": []}, {"title": "并发连接与线程池联算", "content": "Little 定律得到的在途请求数必须和线程池、连接池逐层对齐。入口 3000 QPS、P99 200ms，预计约 600 个并发；若 60% 请求等待数据库，数据库连接池不能简单配置 600，而要按批量、事务持有时间和下游最大连接数分配。线程池大于连接池会形成排队，连接池大于数据库承受能力会形成拒绝和重试。把每层上限画成阶梯图，任何一级都不能无限放大。", "subs": []}, {"title": "速率限制的公平性", "content": "全局限流保护系统，但不能保证租户公平。应先设置全局硬上限，再按租户配额、优先级和突发额度分配令牌；大租户不能因为请求少量突发就耗尽所有令牌。配额变化要考虑租户迁移和跨地域时钟差异。面板按租户显示允许量、拒绝量和排队时间，发现单租户长期占用超过预算时，优先调整配额或引导其异步化。", "subs": []}, {"title": "热点探测的采样误差", "content": "全量记录键名会增加日志和隐私风险，可使用哈希后的键、TopK sketch 或按比例采样。采样率需与热点阈值配套：采样 1% 时，低频键无法可靠进入 TopN，不能用采样结果证明“没有热点”。对支付、权限等敏感键只记录租户和资源类型，不记录原始值。探测规则变更后保留版本号，便于解释命中率和热点趋势的突变。", "subs": []}, {"title": "性能回归的统计显著性", "content": "两次压测差异可能来自压测机、网络或数据缓存状态，而不是代码。每个版本至少运行三轮，报告中位数、置信区间和暖机阶段；随机化请求顺序，分开冷缓存与热缓存结果。对 P99 使用足够样本量，避免几十个请求就下结论。将回归阈值和接口重要性绑定，核心交易的 5% 退化可能比低频后台接口的 20% 更值得阻断。", "subs": []}, {"title": "异步消费者扩容与分区", "content": "消费者数量增加不一定提高吞吐，瓶颈可能在分区数、下游写入或顺序约束。扩容前确认分区/分片数量、单消费者处理时间和最大并发；扩容后观察每分区 lag 是否均衡。顺序敏感的任务不能跨分区随意并行，应按业务键固定路由，并为热点键单独限速。缩容遵守停止拉取、完成在途、提交位点的顺序，避免重复处理。", "subs": []}, {"title": "失效风暴的时间预算", "content": "缓存雪崩和批量重试通常在数十秒内形成，扩容冷启动可能需要数分钟。保护设计要在时间尺度上匹配：入口限流和旧值返回负责秒级止血，扩容和预热负责分钟级恢复，数据归档和模型调整负责天级治理。Runbook 按时间线列出第 0-30 秒、第 1-5 分钟和 5 分钟后的动作，避免值班人员一开始就执行耗时操作。", "subs": []}, {"title": "故障域容量矩阵", "content": "| 故障域 | 可用容量 | 目标流量 | 保护动作 |\n| --- | ---: | ---: | --- |\n| 正常三 AZ | 100% | 100% | 正常策略 |\n| 单实例 | 97% | 100% | LB 排空、自动补充 |\n| 单 AZ | 66% | 100% | 跨区接管、降级 |\n| 缓存集群半数 | 50% | 100% | 旧值、限回源 |\n| 数据库只读 | 读能力 | 100% 读 | 禁止非必要写 |\n\n矩阵中的数字来自实际压测和配额，而不是拓扑图上的节点数量。若单 AZ 余量不足以承受全量流量，应明确业务降级和人工限流，而不是把风险留给自动重试。", "subs": []}, {"title": "观测字段的统一命名", "content": "入口、网关、服务和依赖应统一 trace_id、request_id、tenant_id、route、upstream、retry_count、cache_status、queue_age 等字段。没有统一字段时，跨层关联只能依赖时间猜测。高基数字段如原始 URL、用户 ID 不应直接作为指标标签，可在日志中采样或脱敏。指标、日志和 Trace 的保留期限按排障需要设计，不能为了省成本删除唯一证据。", "subs": []}, {"title": "从事故到容量模型的反馈", "content": "事故复盘要把新增事实写回模型：真实峰值、重试倍数、缓存命中下降、故障域容量、恢复时间和人工操作延迟。更新模型后重新计算红线和扩容日期，并创建一个可验证的工程任务，例如增加单租户指标、补充缓存失效演练或改为按队列年龄扩容。模型若只在文档中更新、不接入告警和发布门禁，很快会再次失真。", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
