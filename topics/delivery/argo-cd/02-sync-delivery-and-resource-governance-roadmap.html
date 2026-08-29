@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Argo CD 同步、交付策略与资源治理学习笔记 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Argo CD 同步、交付策略与资源治理学习笔记</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Argo CD 同步、交付策略与资源治理学习笔记", "intro": "", "parts": [{"title": "第 1 章 · 从 Reconcile 理解状态比较与健康判断", "sections": [{"title": "一次 Reconcile 如何发现 OutOfSync 并决定是否行动", "content": "Controller 读取目标 revision，调用 Repository Server 生成期望资源，再从 Kubernetes API 获取实时资源并比较。`OutOfSync` 只表示资源不同，不代表一定应自动修复；同步窗口、项目策略、暂停注解和自动同步配置共同决定行动。\n\n#### 比较结果的三步核对\n\n先确认比较使用的 revision，再确认 manifest 是否成功生成，最后确认实时对象来自正确的集群和 namespace。revision 错误会把正常状态误判为漂移，集群上下文错误则可能把别的环境当成故障现场。\n\n```bash\nargocd app get payments-prod\nargocd app diff payments-prod --revision 8f31c2a\nkubectl -n payments get deploy payments -o yaml\n```", "subs": ["比较结果的三步核对"]}, {"title": "Diff 策略如何处理默认值、Webhook 和 Server-Side Diff", "content": "默认值、字段排序、Webhook 注入和 Server-Side Apply 都可能制造非业务差异。优先修正源配置或 schema，再使用 diff strategy；Server-Side Diff 可提前获得服务端合并结果，但会增加 API 请求和权限要求。", "subs": []}, {"title": "在应用级和系统级忽略非业务差异", "content": "`ignoreDifferences` 可按 group、kind、name、jsonPointers 或 jq 表达式忽略字段。系统级配置影响所有 Application，风险高；每条忽略规则都应记录原因、责任人和退出条件，避免把真实漂移永久隐藏。\n\n例如 HPA 修改 `spec.replicas` 是可接受的控制器差异，但镜像 tag、Service selector 和 RBAC 规则通常不能忽略。忽略后仍可用 sync 将 Git 字段写回，因此要同时检查 compare 与 apply 行为。", "subs": []}, {"title": "健康评估、Lua 自定义与父子资源健康传播", "content": "Health 判断回答“资源能否提供服务”，Sync 判断“资源是否与 Git 一致”。内置检查不足时可用 Lua 自定义，但脚本要覆盖 Progressing、Healthy、Degraded 和 Unknown，并验证父资源不会因子资源短暂初始化而误报失败。", "subs": []}, {"title": "识别孤儿资源、排除对象与资源跟踪异常", "content": "孤儿资源是命名空间内未被 Application 认领的对象。排除规则适用于集群级共享对象，但应有明确 owner；跟踪标签冲突、installation ID 错误或手工改标签都会造成归属异常。", "subs": []}, {"title": "暂停 Reconcile 的适用场景和恢复风险", "content": "维护窗口、集群迁移和大规模故障时可暂停调谐。暂停期间 Git 与集群持续分叉，恢复后可能产生集中同步；恢复前先查看 diff、资源健康和变更窗口。", "subs": []}]}, {"title": "第 2 章 · 建立可控的自动同步策略", "sections": [{"title": "automated、prune、selfHeal 与 allowEmpty 如何组合", "content": "`automated` 开启自动同步，`prune` 允许删除 Git 中消失的资源，`selfHeal` 修复集群手工漂移，`allowEmpty` 允许结果为空。生产通常先启用 automated+selfHeal，经过删除演练后再开启 prune。\n\n推荐分阶段启用：先手工同步并观察，再开启 automated；确认资源删除审计和恢复流程后开启 prune；只有确实允许空应用时才开启 allowEmpty。`enabled: false` 可暂时关闭自动同步而保留其他字段，适合变更窗口。\n\n```yaml\nsyncPolicy:\n  automated:\n    prune: true\n    selfHeal: true\n    allowEmpty: false\n  syncOptions:\n    - PruneLast=true\n```", "subs": []}, {"title": "自动同步的触发、去重、重试和回滚限制", "content": "提交、Webhook、轮询和资源事件可触发同步；相同 revision 与参数会去重。失败重试要设置退避和上限，自动回滚不能替代 Git revert，且对 hooks、外部副作用和数据库迁移无事务保证。", "subs": []}, {"title": "NoPrune、PruneLast、Replace 与 ServerSideApply 改变了什么", "content": "`NoPrune` 禁止删除，`PruneLast` 将删除放到其他资源健康后，`Replace` 用 replace/create 规避 patch 限制但可能重建对象，`ServerSideApply` 交给服务端字段管理。每项都应在非生产验证字段所有权和停机影响。", "subs": []}, {"title": "删除确认、传播策略和资源保留如何防止误删", "content": "生产删除应用前要求显式确认，并选择 foreground、background 或 orphan 传播策略。`Prune=false`、资源保留注解和项目级保护可形成多层防线；删除后检查 CRD、PVC 和外部负载均衡器是否仍被依赖。", "subs": []}, {"title": "选择性同步和 kubectl 同步适合怎样的应急场景", "content": "选择性同步适合只修复一个 Deployment 或 ConfigMap 的应急操作，完成后必须把修复写回 Git。kubectl 直接 apply 只用于恢复控制面或 Argo CD 不可用时的临时动作，并记录审计事件。", "subs": []}]}, {"title": "第 3 章 · 用 Phase、Wave 与 Hook 编排发布顺序", "sections": [{"title": "PreSync、Sync、PostSync、SyncFail 与 PostDelete 如何执行", "content": "PreSync 做迁移或前置检查，Sync 创建业务资源，PostSync 做验证和通知，SyncFail 处理失败，PostDelete 在应用删除后清理。Hook 通过 `argocd.argoproj.io/hook` 注解声明。", "subs": []}, {"title": "Sync Wave、Kind 和名称如何共同决定顺序", "content": "Argo CD 先按 phase，再按 wave，再按资源 kind 和名称排序。低 wave 的 CRD 和配置先于工作负载；同一 wave 中不要依赖未声明的隐式顺序。\n\n常见编排是 CRD wave -2、Namespace wave -1、配置和 RBAC wave 0、Deployment wave 1、验证 Job wave 2。Wave 间仍受资源健康阻塞影响，不能用 wave 替代 readiness probe 或数据库迁移锁。", "subs": []}, {"title": "Hook 删除策略、失败处理和幂等性怎样设计", "content": "使用 `BeforeHookCreation`、`HookSucceeded` 或 `HookFailed` 控制清理。Job 必须可重复执行、带超时和明确退出码；外部迁移要设计幂等锁和回滚脚本。", "subs": []}, {"title": "自定义 Resource Action 何时有用，何时违背 GitOps", "content": "Resource Action 适合重启、刷新证书等明确运维动作。它不应成为长期配置入口；动作脚本需 RBAC、审计、超时和 dry-run 设计。", "subs": []}]}, {"title": "第 4 章 · 设计发布策略、变更入口与删除边界", "sections": [{"title": "Branch、Tag 与 Commit Pinning 的速度和可审计性差异", "content": "Branch 追求自动获取最新变更，Tag 适合发布批次，Commit pinning 提供最强可复现性。生产应用可由自动化更新固定 commit，并保留变更单与回滚 commit。", "subs": []}, {"title": "配置仓库与源码仓库为什么应该分离", "content": "源码仓库关注构建，配置仓库关注环境和审批。分离后可独立审计、回滚和授权，也避免应用构建权限直接获得生产部署权限。", "subs": []}, {"title": "CI 应更新 Git 还是直接调用 Argo CD", "content": "CI 最好提交镜像 digest 或版本到配置仓库，Argo CD 再同步。直接调用 API 可用于触发刷新或读取结果，但不应绕过 Git 写入最终配置。", "subs": []}, {"title": "App of Apps 如何完成集群引导和级联删除", "content": "根 Application 指向一组子 Application，适合集群 bootstrap。删除根应用可能级联删除子应用和业务资源，应设置 orphan 或保留策略并在演练中验证。", "subs": []}, {"title": "Sync Window 如何实现冻结期、允许窗口与人工覆盖", "content": "Sync Window 按项目、应用、集群和时间表达允许或拒绝同步。紧急变更可人工 override，但需审批、时限和事后审计。", "subs": []}, {"title": "Application 附加信息如何帮助值班人员定位负责人和文档", "content": "使用 annotations、labels、外部 URL 和运行手册链接标注 owner、服务等级、值班组和变更系统。信息应稳定、可机器查询，避免把敏感数据放入元数据。", "subs": []}]}, {"title": "第 5 章 · 建立通知、事件与告警闭环", "sections": [{"title": "Notifications Controller 如何连接触发器、模板、订阅和服务", "content": "Controller 读取触发器条件，渲染模板，再调用 Slack、Webhook、PagerDuty 等服务。服务凭据放 Secret，模板只输出必要上下文，投递失败要能重试并暴露指标。", "subs": []}, {"title": "在 Application、AppProject 与全局配置中声明订阅", "content": "全局订阅适合平台级故障，项目订阅适合团队，Application 注解适合单服务。优先使用较窄范围，防止所有事件广播造成噪声。", "subs": []}, {"title": "编写 Trigger、条件表达式与幂等 oncePer 规则", "content": "Trigger 用条件筛选 Sync、Health 和 Operation 状态；`oncePer` 以 revision 或状态字段去重。条件要覆盖 Unknown 和恢复事件，避免只告警不告警恢复。", "subs": []}, {"title": "用 Template、context、secret 和时区生成可行动消息", "content": "模板包含应用名、revision、差异摘要、owner、外部链接和建议动作。Secret 通过 context 引用，时间统一时区，消息中不输出 Token、仓库私钥或完整 Secret。", "subs": []}, {"title": "按 ChatOps、事件管理、监控和自动化目标选择通知服务", "content": "ChatOps 适合协作，事件管理适合升级和确认，监控系统适合指标告警，Webhook 适合内部自动化。按可靠性、重试、签名和限流能力选择，不以渠道数量代替闭环质量。", "subs": []}, {"title": "接入 PagerDuty、Opsgenie、Alertmanager、Grafana 与 New Relic", "content": "事件管理服务要映射 severity、dedup key 和恢复状态；Alertmanager/Grafana 要避免重复告警。先在测试服务验证签名、TLS、超时和失败重试，再切生产路由。\n\n通知内容至少带上 Application、集群、namespace、revision、失败资源和 runbook URL。只有“同步失败”没有资源和 revision 的消息无法指导值班动作，反而会促使人工重复点击重试。", "subs": []}, {"title": "用 Webhook、GitHub 与 SQS 串联外部交付流程", "content": "Webhook 可触发变更单、回归或审计流程；GitHub 集成需最小权限；SQS 适合异步削峰。消费者必须幂等、校验签名并处理重复消息。", "subs": []}, {"title": "监控通知投递并排查命令、配置与运行时错误", "content": "排查顺序是 ConfigMap/Secret、订阅注解、触发器条件、Controller 日志、网络和服务端响应。保存事件时间、Application revision 和请求 ID，形成可复用证据包。\n\n#### 端到端演练：一次安全发布\n\n1. 在配置仓库提交镜像 digest，CI 运行 schema、渲染和策略检查。\n2. Webhook 触发 refresh，值班人员查看 `argocd app diff`，确认只有预期资源变化。\n3. 先同步 CRD、配置和一个 canary Deployment，等待 Health 变为 `Healthy`。\n4. 检查业务 SLI 和通知投递，再放开剩余批次；失败时停止后续 wave。\n5. 回滚使用 Git revert，确认旧 revision 已同步并记录失败资源、时间线和根因。\n\n这条流程把 Git、diff、wave、health、通知和回滚连成闭环，适合作为新团队的演练脚本。", "subs": ["端到端演练：一次安全发布"]}]}, {"title": "第二册实践补充：把状态、同步和治理串成可执行流程", "sections": [{"title": "实验环境与基线", "content": "#### 建立隔离命名空间\n\n实验不应直接使用生产 Application。使用专用 namespace 和临时 Git 分支，确保 prune、Replace 和删除传播策略不会影响其他工作负载。\n\n```bash\nkubectl create namespace argocd-lab\nkubectl create namespace demo-payments\nkubectl -n argocd get applications\nargocd app list --project default\n```\n\n基线记录至少包括以下信息：\n\n| 项目 | 示例 | 目的 |\n| --- | --- | --- |\n| Argo CD 版本 | v3.2.0 | 解释参数和状态差异 |\n| Kubernetes 版本 | v1.31 | 识别 API 与默认字段 |\n| Git revision | 8f31c2a | 复现 manifest |\n| 目标集群 | lab | 防止误操作 |\n| namespace | demo-payments | 限制资源范围 |\n| Application | payments-lab | 查询和审计主键 |\n\n#### 保存初始证据\n\n```bash\nargocd app get payments-lab -o yaml > /tmp/payments-app-before.yaml\nargocd app resources payments-lab -o wide > /tmp/payments-resources-before.txt\nargocd app history payments-lab > /tmp/payments-history-before.txt\nkubectl -n demo-payments get all -o yaml > /tmp/payments-live-before.yaml\n```\n\n文件名中包含时间或 revision，便于把一次演练与通知、Controller 日志关联起来。不要把 Secret 原文上传到工单；导出时可以使用 `jq 'del(.. | .data?)'` 删除敏感字段。", "subs": ["建立隔离命名空间", "保存初始证据"]}, {"title": "比较结果的证据链", "content": "#### 先验证期望 manifest\n\n`argocd app manifests` 失败时，比较和同步都没有意义。先确认仓库凭据、revision、路径和生成工具。\n\n```bash\nargocd app manifests payments-lab --revision 8f31c2a > /tmp/payments-manifests.yaml\nargocd app manifests payments-lab --source-position 1\nargocd app get payments-lab -o json | jq '.status.operationState, .status.sync.revision'\n```\n\n常见错误与证据如下：\n\n| 错误 | 典型日志 | 处理 |\n| --- | --- | --- |\n| 路径不存在 | `path ... does not exist` | 检查 source.path 和分支 |\n| 工具缺失 | `failed to load generator` | 核对 repo-server 镜像和插件 |\n| Values 不存在 | `open values-prod.yaml` | 检查 ref、路径和大小写 |\n| YAML 无效 | `yaml: line ...` | 在 CI 中先跑 parser |\n| 权限拒绝 | `authentication required` | 轮换仓库凭据 |\n\n#### 再验证实时对象\n\n```bash\nkubectl -n demo-payments get deploy,svc,cm -o wide\nkubectl -n demo-payments describe deploy payments\nkubectl -n demo-payments get events --sort-by=.lastTimestamp | tail -30\n```\n\n实时对象的 `managedFields` 能显示 Server-Side Apply 的字段管理者，但不应直接把整段字段复制回 Git。只提取造成差异的字段和控制器名称，避免把集群生成字段固化为人工配置。\n\n#### 最后阅读 diff\n\n```bash\nargocd app diff payments-lab --revision 8f31c2a\nargocd app diff payments-lab --hard-refresh\n```\n\n`--hard-refresh` 会重新获取仓库和集群信息，适合排查缓存陈旧；频繁使用会增加 Git 和 Kubernetes API 压力。差异审查应回答三件事：变化是否来自本次提交，变化是否会影响可用性，变化是否会改变资源所有权。", "subs": ["先验证期望 manifest", "再验证实时对象", "最后阅读 diff"]}, {"title": "Diff 策略的实验矩阵", "content": "#### 默认值差异\n\n例如 Deployment 未在 Git 中填写 `spec.replicas`，Kubernetes 默认写入 1。若渲染器和 API 默认行为不同，Application 可能持续 OutOfSync。优先在源文件中显式写出业务关键字段：\n\n```yaml\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: payments\n```\n\n显式值比全局忽略更容易审计，也能避免不同集群版本使用不同默认值。\n\n#### Mutating Webhook 注入\n\n服务网格或安全代理可能向 Pod 注入 initContainer、volume 和 annotation。先用 jq 找出注入字段，再决定是否只忽略由注入器负责的字段：\n\n```bash\nkubectl -n demo-payments get deploy payments -o json \\\n  | jq '.spec.template.metadata.annotations, .spec.template.spec.initContainers'\n```\n\n忽略规则应限制到明确 group、kind、name，并使用 comment 记录注入组件版本。不要对整个 Pod template 使用宽泛 jq 表达式，否则镜像、命令和探针也可能被隐藏。\n\n#### Server-Side Diff 的判断\n\nServer-Side Diff 模拟服务端合并，能够提前发现 schema 和字段所有权冲突，但需要额外 API 请求。启用前检查：\n\n1. Argo CD ServiceAccount 是否有读取 OpenAPI schema 的权限。\n2. CRD 是否提供结构化 schema。\n3. 目标集群 API Server 的 QPS 限制是否足够。\n4. 失败时是否有回退到普通 diff 的值班动作。\n\n```yaml\ndata:\n  resource.customizations: |\n    _:\n      compareOptions: ServerSideDiff=true\n```\n\n实验中分别在旧版和新版 Kubernetes 上运行 `argocd app diff`，比较字段排序、默认值和错误提示，记录差异而不是凭印象决定策略。", "subs": ["默认值差异", "Mutating Webhook 注入", "Server"]}, {"title": "ignoreDifferences 规则审查", "content": "#### 规则字段与优先级\n\n```yaml\nspec:\n  ignoreDifferences:\n    - group: autoscaling\n      kind: HorizontalPodAutoscaler\n      jsonPointers:\n        - /spec/replicas\n    - group: apps\n      kind: Deployment\n      name: payments\n      namespace: demo-payments\n      jqPathExpressions:\n        - .spec.template.metadata.annotations[\"sidecar.example.com/status\"]\n```\n\n应用级规则只影响当前 Application，系统级 `resource.customizations` 影响所有应用。规则匹配越窄越好：先写 group/kind，再补 name/namespace，最后选择单一字段。\n\n#### Compare 与 Apply 的区别\n\n忽略差异默认只影响比较，不一定阻止同步时把 Git 值写回集群。需要验证 `RespectIgnoreDifferences=true` 是否符合意图：\n\n```yaml\nsyncPolicy:\n  syncOptions:\n    - RespectIgnoreDifferences=true\n```\n\n对 HPA replicas 使用该选项时，Deployment 的副本值不会覆盖 HPA 计算结果；对镜像字段使用则可能阻止紧急回滚，必须经过评审。\n\n#### 规则退出条件\n\n每条规则都登记以下字段：\n\n| 字段 | 内容 |\n| --- | --- |\n| 原因 | 哪个控制器写入字段 |\n| 范围 | group、kind、name、namespace |\n| 风险 | 可能隐藏的业务变化 |\n| 负责人 | 团队或平台角色 |\n| 复查日期 | 控制器升级后的日期 |\n| 删除条件 | 哪个版本或配置修复后移除 |\n\n没有退出条件的 ignore 规则会逐年累积，最终让 `Synced` 失去可信度。", "subs": ["规则字段与优先级", "Compare 与 Apply 的区别", "规则退出条件"]}, {"title": "健康评估与状态传播", "content": "#### 资源状态和应用状态分层\n\nApplication 健康是资源健康的聚合结果，不是简单的 Ready 数量。Deployment 可能因新 ReplicaSet 未就绪而 Progressing，Service 可能 Healthy 但没有 Endpoints，Job 可能成功后被删除导致状态 Unknown。\n\n```bash\nargocd app get payments-lab\nargocd app resources payments-lab --output tree=detailed\nkubectl -n demo-payments get endpointslice -l kubernetes.io/service-name=payments\n```\n\n排障顺序是先定位最底层 Degraded 资源，再沿 ownerReferences 向上检查。不要只截取 Application 顶层状态。\n\n#### Lua 健康脚本的最小结构\n\n```lua\nhs = {}\nif obj.status == nil then\n  hs.status = \"Progressing\"\n  hs.message = \"等待控制器写入 status\"\n  return hs\nend\nif obj.status.conditions ~= nil then\n  for _, condition in ipairs(obj.status.conditions) do\n    if condition.type == \"Ready\" and condition.status == \"True\" then\n      hs.status = \"Healthy\"\n      hs.message = \"Ready condition is true\"\n      return hs\n    end\n  end\nend\nhs.status = \"Progressing\"\nhs.message = \"Ready condition is not true\"\nreturn hs\n```\n\n脚本要处理 nil、未知 condition 和失败 reason。不要把任何非空 status 都判为 Healthy；这会把控制器错误传播成成功。\n\n#### 父子资源的传播规则\n\nApplication → Deployment → ReplicaSet → Pod 是常见树。父资源健康通常依赖子资源，但自定义资源的传播由脚本或内置逻辑决定。删除中间 owner 或手工修改 tracking label，会让资源树断裂，产生孤儿或 Unknown。", "subs": ["资源状态和应用状态分层", "Lua 健康脚本的最小结构", "父子资源的传播规则"]}, {"title": "孤儿资源与资源跟踪", "content": "#### 孤儿扫描步骤\n\n```bash\nargocd app resources payments-lab --orphaned\nkubectl -n demo-payments get all,configmap,secret -l app.kubernetes.io/part-of=payments\n```\n\n发现孤儿后先分类：临时调试对象、平台共享对象、已删除 Application 遗留对象、tracking label 被覆盖的受管对象。只有确认不再需要且有删除授权时才清理。\n\n#### 三种跟踪方式的取舍\n\n| 方式 | 特点 | 风险 |\n| --- | --- | --- |\n| label | 兼容性好，查询简单 | label 可能被覆盖 |\n| annotation | 可保存完整实例标识 | 某些工具不保留 annotation |\n| label+installationID | 多套 Argo CD 共存 | 配置错误会导致全量失认领 |\n\n在同一集群运行多套 Argo CD 时，必须设置不同 installation ID，并在迁移期间验证新旧控制器不会同时管理同一对象。", "subs": ["孤儿扫描步骤", "三种跟踪方式的取舍"]}, {"title": "暂停与恢复调谐", "content": "#### 暂停前检查\n\n```bash\nargocd app get payments-lab\nargocd app diff payments-lab\nkubectl -n argocd get app payments-lab -o jsonpath='{.metadata.annotations}'\n```\n\n记录当前 revision、健康状态、未同步资源和暂停原因。暂停只是延后控制器动作，不会冻结 Git、Kubernetes 控制器或外部系统。\n\n#### 恢复后的分阶段动作\n\n1. 先恢复单个低风险 Application。\n2. 观察 Controller 队列、API QPS 和事件。\n3. 确认 diff 后再恢复批量应用。\n4. 对 prune 应用先关闭自动删除。\n5. 处理积压 OutOfSync，再恢复常规策略。", "subs": ["暂停前检查", "恢复后的分阶段动作"]}, {"title": "自动同步状态机", "content": "#### 触发来源\n\n| 触发 | 典型延迟 | 是否需要 webhook |\n| --- | --- | --- |\n| Git webhook | 秒级 | 是 |\n| 轮询 | 分钟级 | 否 |\n| 手工 refresh | 立即 | 否 |\n| 集群资源事件 | 近实时 | 否 |\n| Controller 重启 | 启动后重新排队 | 否 |\n\n不同触发可能合并为同一 revision 操作。审计日志要以 operation UID 和 revision 为主键，而不是以“点击次数”统计发布次数。\n\n#### 去重和重试\n\n同一 source、参数和 revision 的操作通常会被去重；但 Hook、外部 API 和通知可能已经产生副作用。重试参数示例：\n\n```yaml\nretry:\n  limit: 5\n  backoff:\n    duration: 10s\n    factor: 2\n    maxDuration: 5m\n```\n\n重试前区分瞬时错误和确定性错误。权限拒绝、YAML 解析失败、资源 schema 不兼容通常不会因重试自行恢复，应先修复配置。\n\n#### 自动回滚的边界\n\nGit revert 是最可审计的回滚；Argo CD 的 rollback 操作适合临时恢复历史 revision，但仍应把最终状态写回配置仓库。数据库迁移、消息发送和云资源创建不可自动事务回滚，必须由 Hook 或外部流程提供补偿。", "subs": ["触发来源", "去重和重试", "自动回滚的边界"]}, {"title": "同步选项深度练习", "content": "#### PruneLast\n\n```yaml\nsyncPolicy:\n  syncOptions:\n    - PruneLast=true\n```\n\nPruneLast 把删除放到其他资源完成后，适合替换 ConfigMap、Service 或旧 Deployment。它不会修复错误的 selector，也不会保证外部依赖已经切流。演练时观察旧资源在新资源 Healthy 前是否仍存在。\n\n#### Replace\n\n```yaml\nmetadata:\n  annotations:\n    argocd.argoproj.io/sync-options: Replace=true\n```\n\nReplace 可能导致资源重建和短暂中断，且会影响 resourceVersion、字段所有权和 immutable 字段。适合对象过大、patch 超限或需要完全重建的场景；生产启用前要做容量和连接保持测试。\n\n#### ServerSideApply\n\n```yaml\nmetadata:\n  annotations:\n    argocd.argoproj.io/sync-options: ServerSideApply=true\n```\n\nServer-Side Apply 依赖字段管理者。迁移时先在单个资源上启用，查看 `managedFields` 是否出现预期 manager；冲突时使用显式 fieldManager 和资源级例外，不要全局强制覆盖。\n\n#### Validate=false\n\n`Validate=false` 允许跳过客户端 schema 校验，适合部分非结构化 CRD，但会把错误推迟到 API Server。该选项必须绑定具体资源，并配合 admission、dry-run 和回滚检查。", "subs": ["PruneLast", "Replace", "ServerSideApply", "Validate=false"]}, {"title": "删除安全实验", "content": "#### 传播策略\n\n| 策略 | 行为 | 适用 |\n| --- | --- | --- |\n| foreground | 等待子资源删除后返回 | 需要确认完整清理 |\n| background | 立即删除父对象，子资源异步删 | 大量短生命周期资源 |\n| orphan | 保留子资源 | 迁移和接管场景 |\n\n删除 Application 前先导出资源清单。对 PVC、CRD、LoadBalancer 和数据库对象逐项确认保留策略。\n\n#### 删除前门禁脚本\n\n```bash\nset -e\napp=payments-lab\nargocd app get \"$app\" -o yaml > \"/tmp/$app-delete.yaml\"\nargocd app resources \"$app\" --output wide\nread -r confirmation\ntest \"$confirmation\" = \"DELETE-$app\"\nargocd app delete \"$app\" --cascade=false\n```\n\n脚本示例只展示门禁思想，生产中应把确认接入变更系统，避免依赖终端输入。`--cascade=false` 只删除 Application 对象，资源是否保留还要结合 tracking 和 ownerReferences 验证。", "subs": ["传播策略", "删除前门禁脚本"]}, {"title": "选择性同步与应急修复", "content": "#### 资源级同步\n\n```bash\nargocd app sync payments-lab \\\n  --resource apps:Deployment:demo-payments/payments\nargocd app sync payments-lab \\\n  --resource :ConfigMap:demo-payments/payments-config\n```\n\n选择性同步适合修复单个坏资源，但可能跳过依赖的 CRD、Secret 或 Hook。操作前检查资源树和 wave，操作后立即创建 Git 变更，避免下一次全量同步覆盖手工修复。\n\n#### kubectl 应急 apply\n\n只有在 Argo CD API 或 Controller 不可用、业务恢复有明确时限时才使用 `kubectl apply`。记录操作者、文件来源、命令、时间和后续 Git 回填任务。恢复 Argo CD 后先暂停自动同步，比较临时对象与 Git，再决定保留还是回滚。", "subs": ["资源级同步", "kubectl 应急 apply"]}, {"title": "Phase、Wave 与 Hook 的可视化", "content": "#### 发布顺序示例\n\n```mermaid\nflowchart TD\n    P0[PreSync 检查] --> Wm2[Wave -2 CRD]\n    Wm2 --> Wm1[Wave -1 Namespace RBAC]\n    Wm1 --> W0[Wave 0 Config Service]\n    W0 --> W1[Wave 1 Deployment]\n    W1 --> W2[Wave 2 Smoke Job]\n    W2 --> Post[PostSync 通知]\n    W1 --> Fail[SyncFail 处理]\n```\n\nHook 失败会阻断后续阶段，但不会自动回滚已经成功的资源。Smoke Job 应验证真实依赖和关键路径，而不是只执行 `kubectl get`。\n\n#### Hook 示例\n\n```yaml\napiVersion: batch/v1\nkind: Job\nmetadata:\n  generateName: payments-precheck-\n  annotations:\n    argocd.argoproj.io/hook: PreSync\n    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookFailed\nspec:\n  backoffLimit: 0\n  activeDeadlineSeconds: 120\n  template:\n    spec:\n      restartPolicy: Never\n      serviceAccountName: payments-checker\n      containers:\n        - name: check\n          image: registry.example.com/payments-check:v4\n          args: [\"verify-schema\", \"--timeout=90s\"]\n```\n\nHook 镜像应固定 digest，ServiceAccount 只允许读取所需资源。`generateName` 防止名称冲突，但会产生历史 Job，必须通过删除策略和 TTL 控制数量。", "subs": ["发布顺序示例", "Hook 示例"]}, {"title": "Wave 设计检查表", "content": "#### 依赖分类\n\n| 类别 | 推荐 wave | 先决条件 |\n| --- | ---: | --- |\n| CRD | -2 | API discovery 成功 |\n| Namespace | -1 | 项目允许目标 namespace |\n| RBAC、ConfigMap | 0 | Secret 和配置完整 |\n| Service、Deployment | 1 | 镜像可拉取 |\n| Ingress、Route | 2 | Service 有 Endpoints |\n| Smoke Job | 3 | 业务端口和依赖可用 |\n\n负数 wave 不是越小越好。过多层级会延长发布时间并增加排障复杂度；只有存在真实依赖时才增加 wave。\n\n#### 健康阻塞\n\nController 会等待当前 wave 的资源达到可接受状态。一个长期 Progressing 的 Deployment 会阻塞后续波次，因此 readinessProbe、启动超时和 PodDisruptionBudget 需要与 wave 一起设计。", "subs": ["依赖分类", "健康阻塞"]}, {"title": "Resource Action 的治理", "content": "#### 动作声明\n\nResource Action 适合“重启 rollout”“重新生成证书”“触发缓存刷新”等有限动作。动作脚本应是只读配置之外的显式操作，并在 UI、CLI 和 API 中留下审计记录。\n\n#### 动作审查项\n\n| 审查项 | 问题 |\n| --- | --- |\n| 授权 | 谁能执行 action |\n| 幂等 | 重复执行是否安全 |\n| 超时 | 最长运行多久 |\n| 输出 | 是否返回可读结果 |\n| 回滚 | 失败后如何恢复 |\n| 审计 | 是否记录参数和操作者 |\n\n若动作需要输入大量业务参数，通常说明它已经变成变更系统，应迁移到专用工作流，而不是继续扩展 Action。", "subs": ["动作声明", "动作审查项"]}, {"title": "Branch、Tag 与 Commit 的发布演练", "content": "#### 三种引用的行为\n\n```yaml\nsource:\n  repoURL: https://github.com/example/platform-config.git\n  targetRevision: main\n  path: apps/payments\n```\n\n`main` 适合开发环境；`v2026.08.29` 适合发布批次；`8f31c2a` 适合生产冻结。生产自动化可以先创建 tag，再把 Application 更新到 commit，并在变更单记录两者映射。\n\n#### 回滚判据\n\n| 现象 | 动作 |\n| --- | --- |\n| 新 revision 渲染失败 | 回退 source revision |\n| 同步成功但探针失败 | Git revert 并检查运行时 |\n| 只有单个资源漂移 | 资源级同步或修正 Git |\n| 外部依赖故障 | 暂停后续 wave，保留 revision |\n\n不要通过修改 tag 指向来隐藏历史；不可变 tag 和 commit 记录更利于审计。", "subs": ["三种引用的行为", "回滚判据"]}, {"title": "配置仓库与 CI 边界", "content": "#### 推荐流水线\n\n```mermaid\nflowchart LR\n    Source[源码仓库] --> CI[测试构建扫描]\n    CI --> Image[镜像 digest]\n    Image --> Config[配置仓库 PR]\n    Config --> Review[审批和策略检查]\n    Review --> Argo[Argo CD 同步]\n    Argo --> Verify[健康和 SLI 验证]\n```\n\nCI 不应在构建完成后直接执行 `kubectl apply`。它可以调用 Argo CD refresh、读取同步结果或创建回滚 PR，但最终期望状态仍应进入 Git。\n\n#### 配置仓库变更检查\n\n```bash\nkubeconform -strict -summary rendered/*.yaml\nconftest test rendered/ --policy policy/\ngit diff --check\n```\n\n检查包括 schema、策略、镜像来源、资源请求、探针、owner 标签和敏感字段扫描。Argo CD 的 diff 是最后一道运行时检查，不替代 CI。", "subs": ["推荐流水线", "配置仓库变更检查"]}, {"title": "App of Apps 与级联删除", "content": "#### 根应用示例\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: platform-root\n  namespace: argocd\nspec:\n  project: platform\n  source:\n    repoURL: https://github.com/example/platform-config.git\n    targetRevision: main\n    path: clusters/prod/apps\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: argocd\n  syncPolicy:\n    automated:\n      prune: false\n```\n\n根应用只管理子 Application，不应同时直接管理业务 Deployment。删除根应用前要确认子应用的级联策略，平台引导场景通常先使用 `orphan` 做迁移演练。\n\n#### 引导验收\n\n1. 根应用创建成功。\n2. 子应用数量与目录清单一致。\n3. 子应用 project、destination 和 namespace 符合策略。\n4. 删除一个目录后只删除对应子应用。\n5. 删除根应用不会意外删除共享 CRD 和集群级资源。", "subs": ["根应用示例", "引导验收"]}, {"title": "Sync Window 与人工覆盖", "content": "#### 冻结窗口示例\n\n```yaml\napiVersion: v1alpha1\nkind: AppProject\nmetadata:\n  name: payments\n  namespace: argocd\nspec:\n  syncWindows:\n    - kind: deny\n      schedule: \"0 22 * * 1-5\"\n      duration: 10h\n      applications: [\"payments-*\"]\n```\n\n窗口配置要使用统一时区，并在变更前用日历验证跨午夜、夏令时和节假日行为。人工 override 需要审批、理由和有效期，不宜通过长期修改项目配置实现。\n\n#### 窗口排障\n\n```bash\nargocd proj get payments -o yaml\nargocd app get payments-prod | rg 'SyncWindow|Sync Status|Operation'\nargocd app sync payments-prod --force\n```\n\n`--force` 不是绕过所有策略的万能开关。若同步被窗口拒绝，应先确认是否具备 override 权限，并把 override 记录到变更系统。", "subs": ["冻结窗口示例", "窗口排障"]}, {"title": "Application 附加信息", "content": "#### 推荐标签\n\n```yaml\nmetadata:\n  labels:\n    app.kubernetes.io/part-of: payments\n    ops.example.com/team: checkout\n    ops.example.com/criticality: high\n  annotations:\n    notifications.argoproj.io/subscribe.on-sync-failed.slack: checkout-oncall\n    runbook.example.com/url: https://runbooks.example.com/payments\n```\n\n标签用于查询和策略匹配，注解用于链接和通知。owner、服务等级和 runbook URL 应可公开给值班人员；Token、内部私钥和个人手机号不能放入元数据。", "subs": ["推荐标签"]}, {"title": "Notifications 配置实验", "content": "#### 服务、模板和触发器\n\n```yaml\ndata:\n  service.webhook.ops: |\n    url: https://ops.example.com/argocd/events\n    headers:\n      - name: X-Signature\n        value: $webhook-signature\n  template.app-sync-failed: |\n    webhook:\n      ops:\n        method: POST\n        body: '{\"app\":\"{{.app.metadata.name}}\",\"revision\":\"{{.app.status.sync.revision}}\"}'\n  trigger.on-sync-failed: |\n    - description: Application 同步失败\n      send: [app-sync-failed]\n      when: app.status.operationState.phase == 'Failed'\n```\n\n真实配置中 Secret 引用通过 `context` 或 Secret key 完成，不能把签名直接写入 ConfigMap。模板的 JSON 必须经过转义和测试，尤其是 commit message、错误详情可能包含引号和换行。\n\n#### oncePer 去重\n\n```yaml\ntrigger.on-sync-succeeded: |\n  - when: app.status.operationState.phase == 'Succeeded'\n    oncePer: app.status.sync.revision\n    send: [app-sync-succeeded]\n```\n\n以 revision 去重可以避免同一 revision 每次刷新都通知；恢复通知应使用新的状态或 revision，避免故障恢复被吞掉。对于高频健康变化，不要使用过于细粒度的字段作为 key。\n\n#### 通知验证命令\n\n```bash\nkubectl -n argocd logs deploy/argocd-notifications-controller --since=15m\nkubectl -n argocd get cm argocd-notifications-cm -o yaml\nkubectl -n argocd get secret argocd-notifications-secret\nargocd app set payments-lab --sync-policy automated\n```\n\n测试时使用专用 webhook 接收器，记录 HTTP 状态码、响应时间和重试次数。验证完成后删除测试订阅，防止生产事件继续发送到临时地址。", "subs": ["服务、模板和触发器", "oncePer 去重", "通知验证命令"]}, {"title": "通知故障分类", "content": "| 层级 | 证据 | 常见修复 |\n| --- | --- | --- |\n| 配置 | 模板或服务 key 缺失 | 修正 ConfigMap/Secret |\n| 匹配 | trigger 条件为 false | 调整条件或状态字段 |\n| 渲染 | 模板解析错误 | 在测试应用复现 |\n| 网络 | timeout、DNS、TLS | 检查 NetworkPolicy 和 CA |\n| 对端 | 401、429、5xx | 轮换凭据或限流 |\n| 消费 | 对端已收但未处理 | 查 request ID 和消费者日志 |\n\n每次通知应携带 Application、project、cluster、namespace、revision、operation UID、失败资源、runbook URL 和时间。事件字段要稳定，以便 PagerDuty dedup、Grafana 链接和内部自动化消费。", "subs": []}, {"title": "综合故障演练：同步失败到恢复", "content": "#### 场景\n\n配置仓库把镜像 digest 更新为不存在的值。自动同步开始，Deployment 创建新 ReplicaSet，但 Pod 进入 `ImagePullBackOff`，Application 进入 `Degraded`，通知发送到值班频道。\n\n#### 证据收集\n\n```bash\nargocd app get payments-prod -o yaml > /tmp/incident-app.yaml\nargocd app history payments-prod\nargocd app resources payments-prod --output wide\nkubectl -n demo-payments describe pod -l app=payments\nkubectl -n argocd logs deploy/argocd-application-controller --since=20m\n```\n\n#### 处置顺序\n\n1. 暂停自动同步，避免重试产生更多 ReplicaSet。\n2. 确认失败 revision 和镜像 digest。\n3. 通过配置仓库 revert 修复期望状态。\n4. 等待新 revision 渲染成功，检查 diff 只包含回滚资源。\n5. 手工同步或恢复 automated，观察 Pod 和业务 SLI。\n6. 核对失败、恢复通知是否各发送一次。\n\n#### 复盘问题\n\n| 问题 | 改进 |\n| --- | --- |\n| 为什么 CI 允许不存在 digest | 增加镜像仓库存在性检查 |\n| 为什么自动同步重试过多 | 设置失败分类和 retry 上限 |\n| 为什么通知缺少资源名 | 补充模板上下文 |\n| 为什么回滚依赖手工命令 | 建立 revert PR 模板 |", "subs": ["场景", "证据收集", "处置顺序", "复盘问题"]}, {"title": "第二册自测题", "content": "#### 状态与 diff\n\n1. `Synced + Degraded` 时首先查 Git 还是 Pod？为什么？\n2. 哪些字段适合用 `ignoreDifferences`，哪些字段不应忽略？\n3. Server-Side Diff 增加了哪些权限和性能成本？\n4. 如何证明 manifest 生成成功但目标集群不可写？\n\n#### 自动同步\n\n1. `prune`、`selfHeal`、`allowEmpty` 分别解决什么问题？\n2. 为什么 Git revert 比直接 rollback 更适合作为长期回滚记录？\n3. `Replace=true` 可能带来哪些停机风险？\n4. kubectl 应急 apply 后如何回填 Git？\n\n#### 编排与删除\n\n1. 为什么 wave 不能替代 readinessProbe？\n2. Hook Job 如何保证幂等、超时和清理？\n3. foreground、background、orphan 删除传播分别适合什么场景？\n4. App of Apps 根应用删除前需要验证哪些对象？\n\n#### 通知\n\n1. `oncePer` 如何避免重复通知又不吞掉恢复事件？\n2. 429、TLS 失败和模板解析错误的排查顺序是什么？\n3. 一条可行动的同步失败通知至少包含哪些字段？", "subs": ["状态与 diff", "自动同步", "编排与删除", "通知"]}, {"title": "第二册发布前检查清单", "content": "#### 比较和健康\n\n- [ ] 每个生产 Application 都能成功生成固定 revision 的 manifest。\n- [ ] `OutOfSync`、`Degraded`、`Unknown` 的值班动作已写入 runbook。\n- [ ] ignore 规则具备范围、负责人、原因和退出日期。\n- [ ] 自定义 Lua 脚本覆盖 nil、Progressing、Healthy、Degraded 和 Unknown。\n- [ ] 孤儿资源扫描不会把共享资源误判为待删除。\n\n#### 同步和删除\n\n- [ ] automated、prune、selfHeal、allowEmpty 按阶段启用并完成演练。\n- [ ] retry 有上限、退避和错误分类。\n- [ ] Replace、ServerSideApply、PruneLast 只在经过资源级验证后启用。\n- [ ] 删除 Application 前有导出、确认和传播策略检查。\n- [ ] 应急 kubectl 操作有审计和 Git 回填流程。\n\n#### 编排和发布\n\n- [ ] CRD、RBAC、配置、工作负载和验证任务的 wave 依赖明确。\n- [ ] Hook 镜像固定 digest，Job 可重复执行并设置 deadline。\n- [ ] SyncFail、PostSync 和 PostDelete 行为已在测试环境验证。\n- [ ] 生产 source 使用 tag 或 commit pinning，回滚通过 Git 记录。\n- [ ] CI 不直接写集群，配置仓库 PR 经过 schema 和策略检查。\n\n#### 通知和审计\n\n- [ ] 失败和恢复 trigger 均有测试事件。\n- [ ] 模板不泄露 Secret，并包含 revision、资源和 runbook。\n- [ ] oncePer 去重键经过重复刷新验证。\n- [ ] 对端 2xx、4xx、429、5xx 和超时都有处理记录。\n- [ ] 事件可由 operation UID 关联到 Controller 日志和变更单。", "subs": ["比较和健康", "同步和删除", "编排和发布", "通知和审计"]}, {"title": "运行手册模板", "content": "#### 事件摘要\n\n```text\nApplication: payments-prod\nProject: payments\nCluster: prod-east\nNamespace: demo-payments\nRevision: 8f31c2a\nOperation UID: 4f8b...\nPhase: Failed\nHealth: Degraded\nFirst seen: 2026-08-29T10:15:00+08:00\nRunbook: https://runbooks.example.com/payments/argocd-sync\n```\n\n#### 处置记录\n\n```text\n10:15 发现 Deployment/payments ImagePullBackOff\n10:18 暂停 automated，保留失败 revision\n10:22 配置仓库提交 revert\n10:24 manifest 生成成功，diff 仅回滚镜像\n10:27 同步完成，Pod Ready\n10:35 SLI 恢复，关闭事件\n```\n\n#### 关闭条件\n\n- Application 为 `Synced` 且关键资源 `Healthy`。\n- 业务 SLI 在观察窗口内恢复。\n- 失败和恢复通知均已送达或有明确豁免。\n- 临时注解、暂停标记和测试订阅已清理。\n- Git、Argo CD history、Controller 日志和工单证据可互相对应。\n\n这份模板的作用是让同步事件从“点击重试”变成可审计的交付流程；它也为第三册的批量 ApplicationSet 发布和第四册的生产排障提供统一证据格式。", "subs": ["事件摘要", "处置记录", "关闭条件"]}]}, {"title": "交付治理附录", "sections": [{"title": "同步选项速查表", "content": "| 选项 | 默认 | 影响 | 主要风险 | 适合先在哪验证 |\n| --- | --- | --- | --- | --- |\n| `Prune` | false | 允许删除 Git 中消失的对象 | 误删持久化资源 | 临时 namespace |\n| `PruneLast` | false | 将删除放到最后一波 | 旧对象占用配额 | canary 应用 |\n| `Replace` | false | replace/create 对象 | 重建和连接中断 | 无状态 Deployment |\n| `Force` | false | 强制替换冲突对象 | 破坏字段所有权 | 单个 ConfigMap |\n| `ServerSideApply` | false | 服务端合并字段 | manager 冲突 | 单个 CRD 实例 |\n| `Validate=false` | false | 跳过 schema 校验 | 错误延迟到运行时 | 非结构化 CRD |\n| `CreateNamespace` | false | 自动创建目标 namespace | 绕过命名空间审批 | 开发集群 |\n| `FailOnSharedResource` | false | 共享资源时报错 | 多应用互相阻塞 | 平台基础设施 |\n| `RespectIgnoreDifferences` | false | apply 时尊重忽略规则 | 关键字段无法回滚 | HPA replicas |\n| `ApplyOutOfSyncOnly` | false | 只 apply 漂移对象 | 依赖刷新不完整 | 大型只读资源 |", "subs": []}, {"title": "同步失败分类矩阵", "content": "| 错误类别 | 典型 phase | 首个命令 | 下一步 |\n| --- | --- | --- | --- |\n| Manifest 解析 | Failed | `argocd app manifests` | 查看 repo-server 日志 |\n| 认证失败 | Failed | `argocd repo list` | 检查 Secret 和 CA |\n| 目标不可达 | Failed | `argocd cluster get` | 测试 API endpoint |\n| 权限不足 | Failed | `kubectl auth can-i` | 收紧或补充 RBAC |\n| Admission 拒绝 | Failed | `kubectl get events` | 阅读 webhook reason |\n| 健康超时 | Running | `argocd app resources` | 查探针和 Pod 事件 |\n| Hook 失败 | Failed | `kubectl logs job/...` | 修复幂等和输入 |\n| 删除卡住 | Running | `kubectl get ... -o yaml` | 查 finalizer 和依赖 |", "subs": []}, {"title": "API 与 CLI 操作配方", "content": "#### 查看操作状态\n\n```bash\nargocd app get payments-prod --show-operation\nargocd app get payments-prod -o json \\\n  | jq '{phase:.status.operationState.phase,message:.status.operationState.message,started:.status.operationState.startedAt,finished:.status.operationState.finishedAt}'\n```\n\n#### 手工刷新和等待\n\n```bash\nargocd app get payments-prod --refresh\nargocd app wait payments-prod --sync --health --timeout 600\n```\n\n等待命令超时不代表同步失败；必须结合 operation phase、资源 health 和业务指标判断。脚本中应把超时标记为待调查，而不是直接执行第二次同步。\n\n#### 终止卡住的操作\n\n```bash\nargocd app terminate-op payments-prod\nargocd app get payments-prod --show-operation\n```\n\n终止只停止 Argo CD 当前操作，已经发送到 Kubernetes API 的变更不会撤销。终止后先读取实时资源和事件，再决定继续、修复或 revert。", "subs": ["查看操作状态", "手工刷新和等待", "终止卡住的操作"]}, {"title": "Kubernetes 权限验证", "content": "#### 读取权限\n\n```bash\nkubectl auth can-i get deployments -n demo-payments \\\n  --as=system:serviceaccount:argocd:argocd-application-controller\nkubectl auth can-i list pods -n demo-payments \\\n  --as=system:serviceaccount:argocd:argocd-application-controller\n```\n\n#### 写入和删除权限\n\n```bash\nkubectl auth can-i patch deployments -n demo-payments \\\n  --as=system:serviceaccount:argocd:argocd-application-controller\nkubectl auth can-i delete services -n demo-payments \\\n  --as=system:serviceaccount:argocd:argocd-application-controller\n```\n\n生产检查中，读取权限和写入权限分开记录。若启用 prune，还要明确哪些资源允许 delete；不要用 `*` 规则掩盖 Application project 配置错误。", "subs": ["读取权限", "写入和删除权限"]}, {"title": "Admission 与同步的交互", "content": "#### 预提交检查\n\n在提交前运行与集群相同或更严格的策略：\n\n```bash\nkubectl apply --dry-run=server -f rendered/\nconftest test rendered/ --policy policy/\nkyverno apply policies/ --resource rendered/\n```\n\n服务端 dry-run 能发现 webhook 和 schema 问题，但它不一定模拟实际 namespace、ServiceAccount 或外部依赖。Argo CD 同步失败时仍需读取目标集群的 Admission 事件。\n\n#### 典型拒绝\n\n| reason | 可能原因 | 修复 |\n| --- | --- | --- |\n| disallowed image | 镜像仓库不在 allowlist | 更换镜像或更新策略 |\n| runAsNonRoot required | 安全上下文缺失 | 添加 securityContext |\n| resource limit required | 未设置 requests/limits | 补充资源配置 |\n| hostNetwork forbidden | 使用了主机网络 | 评估替代方案 |\n| immutable field | 尝试修改不可变字段 | 重建对象或迁移 |", "subs": ["预提交检查", "典型拒绝"]}, {"title": "Hook 失败处理树", "content": "```mermaid\nflowchart TD\n    Start[Hook Failed] --> Logs[查看 Job 日志]\n    Logs --> Input{输入错误?}\n    Input -->|是| FixGit[修正 Git 配置]\n    Input -->|否| Permission{权限错误?}\n    Permission -->|是| FixRBAC[修正 ServiceAccount]\n    Permission -->|否| Timeout{超时?}\n    Timeout -->|是| Tune[调整 deadline 或依赖]\n    Timeout -->|否| External[检查外部系统]\n    FixGit --> Retry[新 revision 重试]\n    FixRBAC --> Retry\n    Tune --> Retry\n    External --> Retry\n```\n\n#### Job 日志采集\n\n```bash\nkubectl -n demo-payments get jobs --sort-by=.metadata.creationTimestamp\nkubectl -n demo-payments logs job/payments-precheck-abc --all-containers\nkubectl -n demo-payments describe job/payments-precheck-abc\n```\n\nJob 使用 `generateName` 时名称会变化，运行手册不能写死名称。通过 ownerReferences、label 或最近创建时间定位对应 Hook。", "subs": ["Job 日志采集"]}, {"title": "Wave 卡住的诊断", "content": "#### 资源树定位\n\n```bash\nargocd app resources payments-prod --output tree=detailed\nargocd app sync payments-prod --dry-run\n```\n\n如果低 wave 资源处于 Progressing，后续 wave 不会开始。常见原因是：\n\n- Deployment readinessProbe 指向尚未创建的 Service。\n- CRD 已创建但 controller 尚未启动。\n- Service 有 selector，但 Pod 标签不匹配。\n- PDB 与副本数冲突，滚动升级无法驱逐旧 Pod。\n- PostSync Job 依赖的数据库迁移未完成。\n\n#### 处置原则\n\n先修复阻塞资源本身，不要随意提高 wave 或跳过健康检查。临时跳过某资源后，必须把跳过原因和补偿动作登记在变更记录中。", "subs": ["资源树定位", "处置原则"]}, {"title": "删除和 finalizer", "content": "#### 查看 finalizer\n\n```bash\nkubectl -n demo-payments get application payments-prod -o json \\\n  | jq '.metadata.finalizers'\nkubectl -n demo-payments get pvc -o json \\\n  | jq '.items[] | {name:.metadata.name,finalizers:.metadata.finalizers}'\n```\n\nArgo CD Application 的资源 finalizer 控制级联删除。外部控制器也可能在资源上设置 finalizer，导致删除长期 Pending。移除 finalizer 前必须确认对应清理逻辑已经执行，否则会留下云资源或数据盘。\n\n#### 删除演练记录\n\n```text\n目标 Application: payments-lab\n传播策略: orphan\n预期保留: PVC、CRD\n预期删除: Deployment、Service、ConfigMap\n实际结果: 与预期一致\n残留对象: 0 个未认领业务对象\n```", "subs": ["查看 finalizer", "删除演练记录"]}, {"title": "共享资源治理", "content": "#### 识别共享对象\n\n常见共享对象包括 Namespace、CRD、ClusterRole、IngressClass 和集群级证书。平台 Application 管理共享对象，业务 Application 只引用它们。启用 `FailOnSharedResource=true` 可以在所有权冲突时快速失败：\n\n```yaml\nspec:\n  syncPolicy:\n    syncOptions:\n      - FailOnSharedResource=true\n```\n\n#### 迁移共享资源所有权\n\n1. 暂停旧 Application 自动同步。\n2. 导出资源和 tracking 信息。\n3. 在新 Application 中声明相同对象。\n4. 使用 orphan 或保留策略切换 owner。\n5. 观察资源树没有双重归属。\n6. 删除旧 Application 时确认共享对象仍存在。", "subs": ["识别共享对象", "迁移共享资源所有权"]}, {"title": "大型应用的性能控制", "content": "#### 只同步漂移资源\n\n`ApplyOutOfSyncOnly=true` 可以减少已同步资源的 API 写入，适合资源数量较多、绝大多数对象稳定的 Application。它不应替代完整刷新；首次部署、CRD 变更和 Hook 仍需完整验证。\n\n#### API 压力观测\n\n```bash\nkubectl get --raw /metrics | rg 'argocd_app|argocd_kubectl|argocd_redis'\nkubectl top pod -n argocd\n```\n\n观察 Application Controller CPU、工作队列长度、Kubernetes API 429 和 repo-server manifest 生成耗时。增加同步并发前先确认目标 API Server 的限流和 etcd 延迟。", "subs": ["只同步漂移资源", "API 压力观测"]}, {"title": "通知渠道适配表", "content": "| 渠道 | 关键信息 | 去重字段 | 失败策略 |\n| --- | --- | --- | --- |\n| Slack | 应用、revision、资源、runbook | thread/revision | 重试并告警 |\n| PagerDuty | severity、dedup key、恢复 | application+revision | 保留事件 |\n| Alertmanager | labels、annotations、generatorURL | fingerprint | 交给路由器 |\n| Grafana | dashboard、panel、时间窗 | alert rule | 链接回 Argo |\n| SQS | JSON 事件、schema 版本 | operation UID | DLQ |\n| GitHub | issue/comment、commit | comment key | API 重试 |", "subs": []}, {"title": "事件字段契约", "content": "```json\n{\n  \"schemaVersion\": \"1\",\n  \"application\": \"payments-prod\",\n  \"project\": \"payments\",\n  \"cluster\": \"prod-east\",\n  \"namespace\": \"demo-payments\",\n  \"revision\": \"8f31c2a\",\n  \"operationUID\": \"4f8b\",\n  \"phase\": \"Failed\",\n  \"health\": \"Degraded\",\n  \"resource\": \"Deployment/payments\",\n  \"reason\": \"ImagePullBackOff\",\n  \"runbookURL\": \"https://runbooks.example.com/payments\",\n  \"occurredAt\": \"2026-08-29T10:15:00+08:00\"\n}\n```\n\n事件消费者应忽略未知字段、校验 schemaVersion，并以 operationUID 做幂等。不要把完整 Kubernetes Secret、用户 Token 或仓库 URL 中的凭据发送到外部渠道。", "subs": []}, {"title": "通知限流与降噪", "content": "#### 事件分级\n\n| 级别 | 条件 | 渠道 |\n| --- | --- | --- |\n| P1 | 生产核心应用 Degraded 且 SLI 下降 | PagerDuty、电话 |\n| P2 | 生产同步失败但服务仍可用 | ChatOps、事件系统 |\n| P3 | 开发环境 OutOfSync | 团队频道 |\n| Info | 同步成功、恢复 | 汇总频道 |\n\n健康抖动时使用持续时间条件、oncePer 和汇总消息。不要为每个 Pod 重启发送一条 Argo CD 通知，Pod 级细节应留在监控系统。", "subs": ["事件分级"]}, {"title": "端到端演练：删除保护", "content": "#### 目标\n\n验证配置仓库删除一个 Service 后，`prune`、`PruneLast`、PVC 保留和通知行为符合预期。\n\n#### 步骤\n\n1. 复制 Application 到实验 namespace。\n2. 开启 `automated.prune=true` 和 `PruneLast=true`。\n3. 为 PVC 添加保留注解。\n4. 提交删除 Service 的 PR。\n5. 观察 diff 和 operation phase。\n6. 确认新资源先达到 Healthy，再删除 Service。\n7. 验证 PVC、外部负载均衡器和 CRD 是否按设计保留。\n8. 检查通知中包含被删除资源。\n\n#### 验收命令\n\n```bash\nargocd app history payments-lab\nkubectl -n demo-payments get svc,pvc\nargocd app notifications list payments-lab\n```", "subs": ["目标", "步骤", "验收命令"]}, {"title": "端到端演练：Sync Window", "content": "#### 目标\n\n验证冻结窗口拒绝自动同步，人工 override 有权限边界，窗口结束后应用能够自动恢复。\n\n#### 观察项\n\n| 时间 | 期望 |\n| --- | --- |\n| 窗口开始前 | 自动同步成功 |\n| 窗口内提交 | OutOfSync，operation 未执行 |\n| 无 override 用户 | API 返回权限或窗口拒绝 |\n| 有 override 用户 | 记录人工原因后执行 |\n| 窗口结束 | 未处理 revision 自动进入队列 |\n\n演练结束后删除临时窗口，避免测试规则影响其他项目。把时区、cron、override 用户和审计位置写入项目文档。", "subs": ["目标", "观察项"]}, {"title": "端到端演练：选择性同步回填 Git", "content": "#### 场景\n\n单个 Deployment 因节点迁移进入异常状态，业务需要先恢复该资源，其余资源保持不动。\n\n#### 步骤\n\n```bash\nargocd app diff payments-prod\nargocd app sync payments-prod --resource apps:Deployment:demo-payments/payments\nargocd app wait payments-prod --health --timeout 300\ngit checkout -b repair/payments-deployment\n```\n\n同步后不应直接关闭 OutOfSync 告警。若修复依赖修改 replicas、探针或镜像，必须提交配置 PR；若只是 Pod 临时故障，则记录资源已恢复并观察 controller 是否重新稳定。", "subs": ["场景", "步骤"]}, {"title": "生产变更评审模板", "content": "#### 变更内容\n\n```text\nApplication:\nProject:\nSource revision:\nTarget cluster:\nExpected resources:\nSync options:\nHook and wave changes:\nPrune impact:\nRollback revision:\nOwner and approver:\n```\n\n#### 风险问题\n\n- 是否新增或删除 CRD、ClusterRole、PVC、LoadBalancer？\n- 是否改变 Service selector、端口或 Ingress 路由？\n- 是否使用 Replace、Force 或 Validate=false？\n- 是否存在数据库迁移、外部 API 调用或不可逆 Hook？\n- 自动同步、窗口和通知是否覆盖这次变更？\n- 失败时是 revert、terminate、暂停还是人工修复？", "subs": ["变更内容", "风险问题"]}, {"title": "复盘指标", "content": "每次发布至少记录以下指标：\n\n| 指标 | 计算方式 | 用途 |\n| --- | --- | --- |\n| 变更前等待时间 | 提交到首次 sync | 衡量队列和窗口影响 |\n| 同步耗时 | operation started 到 finished | 识别 wave 或 API 瓶颈 |\n| 健康恢复时间 | Degraded 到 Healthy | 衡量运行时恢复 |\n| 首次成功率 | 首次 operation 成功数/总数 | 衡量配置质量 |\n| 回滚率 | 回滚次数/发布次数 | 识别变更风险 |\n| 通知送达率 | 成功投递/触发数 | 验证闭环可靠性 |\n\n不要只看 Argo CD operation 成功率；同步成功但 SLI 下降仍属于交付失败，应与监控系统的业务指标关联。", "subs": []}, {"title": "最终复核清单", "content": "#### 文件结构\n\n- [ ] 只有一个 H1，章节使用 H2，知识点使用 H3，补充内容使用 H4。\n- [ ] Mermaid 节点和边文本不包含会破坏解析的复杂标点。\n- [ ] YAML、JSON、Lua、Shell 代码块均闭合且命令上下文完整。\n- [ ] 示例 namespace、Application 和 revision 使用一致的实验名称。\n\n#### 内容边界\n\n- [ ] 所有补充都服务于比较、同步、编排、发布边界和通知闭环。\n- [ ] 没有把 ApplicationSet、多集群生成器或 OIDC 认证展开成第三、四册内容。\n- [ ] 每个危险操作都说明前置检查、影响、回滚和审计要求。\n- [ ] 每个命令示例都能说明“成功输出如何判读”和“失败后查什么”。\n\n#### 运行准备\n\n- [ ] 实验命名空间和临时 webhook 已清理。\n- [ ] 暂停注解、测试 Sync Window 和临时 ignore 规则已删除。\n- [ ] 生产配置没有遗留 `Validate=false`、`Force=true` 或宽泛资源通配符。\n- [ ] 运行手册中的 URL、owner、revision 和时区经过校验。", "subs": ["文件结构", "内容边界", "运行准备"]}]}, {"title": "故障案例集", "sections": [{"title": "案例一：Webhook 到达但应用没有刷新", "content": "#### 现象\n\nGit 服务显示 webhook 返回 200，但 Argo CD Application 仍显示旧 revision，自动同步没有开始。\n\n#### 分层检查\n\n```bash\nkubectl -n argocd get svc argocd-server\nkubectl -n argocd logs deploy/argocd-server --since=20m | rg 'webhook|refresh'\nargocd app get payments-prod -o json | jq '.status.reconciledAt,.status.sync.revision'\n```\n\n先确认 webhook 发到正确的 API Server 地址，再确认仓库 URL 与 Application source 匹配。仓库凭据配置为 repository credential template 时，URL 前缀不匹配会导致刷新后仍无法取 revision。\n\n#### 可能原因\n\n| 原因 | 证据 | 修复 |\n| --- | --- | --- |\n| Secret 不匹配 | server 日志认证失败 | 更新 webhook Secret |\n| URL 前缀不同 | webhook 事件无匹配应用 | 统一 repoURL 格式 |\n| Application 被暂停 | 注解存在 | 记录原因后恢复 |\n| repo-server 缓存 | hard refresh 后恢复 | 检查缓存和轮询 |\n| 分支未变化 | revision 相同 | 以 commit SHA 验证 |\n\n#### 关闭条件\n\n刷新时间更新，manifest revision 与 Git commit 一致，且没有重复操作。不要仅凭 webhook HTTP 200 关闭事件。", "subs": ["现象", "分层检查", "可能原因", "关闭条件"]}, {"title": "案例二：应用持续 OutOfSync", "content": "#### 现象\n\nApplication 每次同步后短暂变为 Synced，数十秒后又回到 OutOfSync。\n\n#### 采样命令\n\n```bash\nargocd app diff payments-prod --refresh\nkubectl -n demo-payments get deploy payments -o json \\\n  | jq '.metadata.managedFields[] | {manager,fieldsType,operation}'\nkubectl -n argocd get cm argocd-cm -o yaml | rg 'resource.customizations|compareOptions'\n```\n\n比较差异字段的写入者。如果字段由 HPA、Webhook、Operator 或 Kubernetes 默认值产生，先在源配置中显式声明，再评估最小化 ignore 规则。\n\n#### 错误做法\n\n- 对整个 `spec` 使用 jq 忽略。\n- 全局忽略所有 annotation。\n- 直接关闭 OutOfSync 告警。\n- 把集群生成的字段复制回 Git。\n\n#### 正确闭环\n\n1. 记录差异 JSON pointer。\n2. 识别唯一写入者。\n3. 判断该字段是否属于业务期望状态。\n4. 若不属于，添加资源级规则并登记退出条件。\n5. 重新同步并观察至少两个 reconcile 周期。", "subs": ["现象", "采样命令", "错误做法", "正确闭环"]}, {"title": "案例三：Prune 删除了错误对象", "content": "#### 现象\n\n配置仓库目录重命名后，Application 计划删除旧对象；旧对象实际承载了外部流量。\n\n#### 立即处置\n\n```bash\nargocd app set payments-prod --auto-prune=false\nargocd app get payments-prod\nargocd app diff payments-prod\nkubectl -n demo-payments get svc,ingress -o wide\n```\n\n暂停 prune 后确认 tracking label、资源名称和 selector。若只是目录重命名，优先使用迁移注解或分阶段保留旧对象，避免“删除后重新创建”造成流量中断。\n\n#### 预防措施\n\n| 控制 | 说明 |\n| --- | --- |\n| PR 资源清单 | 在评审中显示删除对象 |\n| NoPrune | 对关键资源设置资源级保护 |\n| PruneLast | 让替代对象先健康 |\n| 删除窗口 | 禁止高峰期执行 prune |\n| 备份 | 保存 PVC、LB 和证书信息 |", "subs": ["现象", "立即处置", "预防措施"]}, {"title": "案例四：PostSync 通知未发送", "content": "#### 现象\n\nApplication 已 Synced/Healthy，但团队频道没有收到成功通知。\n\n#### 排查\n\n```bash\nkubectl -n argocd get cm argocd-notifications-cm -o yaml\nkubectl -n argocd get secret argocd-notifications-secret -o json \\\n  | jq '.data | keys'\nkubectl -n argocd logs deploy/argocd-notifications-controller --since=30m\n```\n\n检查订阅范围、trigger 条件和 oncePer 字段。`PostSync` Hook 成功不等于 Notifications Controller 已成功投递；二者有独立的队列和失败状态。\n\n#### 验证策略\n\n1. 在测试 Application 上提交一个唯一 revision。\n2. 观察 Controller 是否渲染模板。\n3. 记录对端 HTTP 状态码和响应体。\n4. 重复 refresh，确认 oncePer 不重复发送。\n5. 产生失败并恢复，确认两类事件都送达。", "subs": ["现象", "排查", "验证策略"]}, {"title": "案例五：选择性同步造成依赖缺失", "content": "#### 现象\n\n只同步 Deployment 后 Pod 创建失败，日志显示 ConfigMap 或 ServiceAccount 不存在。\n\n#### 处理\n\n```bash\nargocd app resources payments-prod --output tree=detailed\nargocd app sync payments-prod --resource :ConfigMap:demo-payments/payments-config\nargocd app sync payments-prod --resource :ServiceAccount:demo-payments/payments\nargocd app sync payments-prod --resource apps:Deployment:demo-payments/payments\n```\n\n资源级同步不是依赖解析器。应按资源树从配置、身份、Service 到工作负载补齐，或终止当前操作后执行完整同步。生产脚本需显式列出允许的资源集合，避免通配符扩大范围。", "subs": ["现象", "处理"]}, {"title": "案例六：Sync Window 结束后积压发布", "content": "#### 现象\n\n冻结窗口结束，多个 Application 同时进入同步，Kubernetes API 延迟升高。\n\n#### 缓解\n\n1. 暂时关闭低优先级 Application 的 automated。\n2. 按业务优先级分批恢复。\n3. 观察 API 429、Controller queue 和 repo-server CPU。\n4. 每批等待 Health 稳定再继续。\n5. 恢复常规窗口和 retry 参数。\n\n```bash\nargocd app list --project payments -o name\nkubectl get --raw /metrics | rg 'workqueue|apiserver_request_total'\n```\n\n窗口是治理工具，不是流量闸门。大规模恢复需要发布编排器或批次策略，不能依赖所有 Application 同时被唤醒。", "subs": ["现象", "缓解"]}, {"title": "案例七：Server-Side Apply 字段冲突", "content": "#### 现象\n\n同步报 `conflicts with manager`，目标资源已有其他控制器管理同一字段。\n\n#### 判断\n\n```bash\nkubectl -n demo-payments get deploy payments -o json \\\n  | jq '.metadata.managedFields[] | select(.fieldsV1 != null) | {manager,operation,time}'\n```\n\n确认字段是否应该由 Argo CD 管理。若应由 Git 管理，先迁移字段所有权并在低风险环境验证；若不应管理，则从 manifest 删除字段或使用精确 ignore 规则。不要直接使用强制覆盖解决所有冲突。", "subs": ["现象", "判断"]}, {"title": "案例八：Hook 重试导致重复迁移", "content": "#### 现象\n\nPreSync Job 失败后自动重试，数据库迁移已经部分执行，再次执行报重复列或锁冲突。\n\n#### 设计修复\n\n- 使用数据库迁移工具的版本表和事务边界。\n- Job 启动前检查当前 schema 版本。\n- 对已完成版本返回成功而不是失败。\n- 使用 `backoffLimit: 0`，把重试交给经过审计的 Argo operation。\n- 为长任务设置 deadline，并输出可解析的版本信息。\n\n```yaml\nspec:\n  backoffLimit: 0\n  activeDeadlineSeconds: 900\n  template:\n    spec:\n      restartPolicy: Never\n```", "subs": ["现象", "设计修复"]}, {"title": "案例九：Application 资源树出现双重归属", "content": "#### 现象\n\n两个 Application 都显示管理同一个 ConfigMap，修改其中一个后另一个反复回写。\n\n#### 排查\n\n```bash\nkubectl -n demo-payments get cm shared-config -o yaml \\\n  | rg 'tracking|instance|managed-by'\nargocd app get app-a --show-operation\nargocd app get app-b --show-operation\n```\n\n共享资源应由一个平台 Application 管理，业务 Application 只引用。迁移时暂停旧 owner、转移 tracking、确认新 owner 成功后再删除旧声明。启用 `FailOnSharedResource` 可将未来冲突变成显式失败。", "subs": ["现象", "排查"]}, {"title": "案例十：回滚成功但业务仍未恢复", "content": "#### 现象\n\nGit revert 已同步，Application 为 Synced/Healthy，但请求仍然失败。\n\n#### 可能原因\n\n- 数据库迁移不可逆。\n- 外部配置或 Feature Flag 未回滚。\n- Service selector 指向了错误版本。\n- 缓存、队列或 DNS 仍保留新版本状态。\n- 业务依赖在发布期间发生独立故障。\n\n#### 复盘方式\n\n把 Argo CD revision 时间线与业务 SLI、数据库 schema、外部系统审计日志放在同一时间轴。Git 回滚只证明声明被恢复，不证明所有外部副作用都被撤销。", "subs": ["现象", "可能原因", "复盘方式"]}]}, {"title": "操作命令索引", "sections": [{"title": "状态和历史", "content": "```bash\nargocd app list\nargocd app get APP\nargocd app history APP\nargocd app resources APP\nargocd app manifests APP\nargocd app diff APP\n```", "subs": []}, {"title": "同步和回滚", "content": "```bash\nargocd app sync APP\nargocd app sync APP --dry-run\nargocd app sync APP --prune\nargocd app sync APP --resource GROUP:KIND:NAMESPACE/NAME\nargocd app rollback APP ID\nargocd app terminate-op APP\n```", "subs": []}, {"title": "自动同步和窗口", "content": "```bash\nargocd app set APP --auto-prune\nargocd app set APP --self-heal\nargocd app set APP --sync-policy none\nargocd proj get PROJECT\nargocd proj windows list PROJECT\n```", "subs": []}, {"title": "资源证据", "content": "```bash\nkubectl get events -A --sort-by=.lastTimestamp\nkubectl -n NAMESPACE describe KIND NAME\nkubectl -n NAMESPACE get KIND NAME -o yaml\nkubectl auth can-i VERB RESOURCE -n NAMESPACE --as=SERVICEACCOUNT\n```", "subs": []}, {"title": "通知证据", "content": "```bash\nkubectl -n argocd get cm argocd-notifications-cm -o yaml\nkubectl -n argocd get secret argocd-notifications-secret\nkubectl -n argocd logs deploy/argocd-notifications-controller --since=15m\n```\n\n命令只是入口，不能代替结果判读。每次执行都应在记录中写出预期、实际和下一步，避免把命令输出堆积成无法复用的日志。\n\n#### 发布前五分钟检查\n\n- [ ] Git revision 已冻结并可访问。\n- [ ] 目标集群 API latency 正常。\n- [ ] Application 没有进行中的 operation。\n- [ ] Sync Window 当前允许发布。\n- [ ] 变更负责人和回滚负责人在线。\n\n#### 发布中五分钟检查\n\n- [ ] PreSync Hook 已成功。\n- [ ] 当前 wave 资源数量符合预期。\n- [ ] Pod 未出现 Pending、CrashLoopBackOff 或 ImagePullBackOff。\n- [ ] 业务 SLI 没有超过错误预算阈值。\n- [ ] 通知服务返回成功状态码。\n\n#### 发布后十五分钟检查\n\n- [ ] Application 为 Synced。\n- [ ] 关键资源为 Healthy。\n- [ ] Service Endpoints 数量正常。\n- [ ] Ingress 或 Gateway 路由命中新版本。\n- [ ] 没有遗留 Hook Job 或临时注解。\n\n#### Diff 审查问句\n\n1. 变化的资源是否都在变更单中？\n2. 是否包含 ClusterRole、CRD、PVC 或外部入口？\n3. 资源名称是否发生替换而不是原地更新？\n4. 是否有字段从显式值变为空值？\n5. 是否有由 Webhook 注入的噪声差异？\n6. 是否出现不属于本次服务的 namespace？\n7. 是否修改了 selector、ownerReferences 或 finalizer？\n8. 是否有删除计划但没有替代对象？\n\n#### Health 审查问句\n\n1. Degraded 是父资源还是最底层 Pod？\n2. Progressing 的 deadline 是否符合业务启动时间？\n3. Service 是否存在 Endpoints 和 EndpointSlice？\n4. Job 成功后被清理是否会让健康状态变为 Unknown？\n5. 自定义 Lua 是否覆盖了 status 缺失情况？\n6. 健康脚本是否把警告当成 Healthy？\n\n#### Retry 审查问句\n\n- 确定性错误是否会被无意义重试？\n- Hook 是否能安全重复执行？\n- 外部 API 是否有幂等键？\n- 重试退避是否超过依赖系统恢复时间？\n- 达到上限后是否会通知负责人？\n\n#### Prune 审查问句\n\n- 删除对象是否由目录删除导致？\n- 是否有同名对象将被重新创建？\n- PVC、Secret、证书和云资源是否有保留要求？\n- 旧对象是否仍承载流量？\n- `PruneLast` 是否覆盖了真实依赖？\n- 删除事件是否会触发值班通知？\n\n#### Hook 代码审查问句\n\n- 镜像是否使用 digest 而不是浮动 tag？\n- ServiceAccount 是否只读所需资源？\n- Job 是否设置 activeDeadlineSeconds？\n- 失败退出码是否明确？\n- 是否有 BeforeHookCreation 或 TTL 清理？\n- 是否能在第二次执行时返回同样结果？\n\n#### Wave 代码审查问句\n\n- 每个负数 wave 是否有实际依赖？\n- 同一 wave 内是否存在隐式排序？\n- CRD controller 是否在下一 wave 前可用？\n- 新 Deployment 是否在旧 Service 切流前 Ready？\n- Smoke Job 是否验证真实请求而非只查对象存在？\n\n#### Application 元数据检查\n\n```bash\nargocd app get payments-prod -o yaml \\\n  | jq '{name:.metadata.name,project:.spec.project,labels:.metadata.labels,annotations:.metadata.annotations}'\n```\n\n元数据应能回答“谁负责、在哪里运行、如何处理”。若 runbook URL 失效、owner 标签缺失或 criticality 不一致，通知和批量治理都会失去上下文。\n\n#### Project 边界检查\n\n```bash\nargocd proj get payments -o yaml\nargocd proj roles list payments\n```\n\n检查 sourceRepos、destinations、namespaceResourceWhitelist 和 clusterResourceWhitelist。允许同步的资源范围不应大于团队实际职责；项目角色的 sync、override 和 delete 权限要分别评审。\n\n#### 事件时间线模板\n\n```text\nT-10m 变更审批通过\nT-02m webhook 到达\nT+00m Application refresh\nT+01m PreSync 开始\nT+02m Wave 0 完成\nT+04m Wave 1 Deployment Progressing\nT+07m Wave 1 Healthy\nT+08m PostSync 成功\nT+10m SLI 观察通过\n```\n\n时间线应同时记录 Git commit、operation UID 和 Kubernetes event 时间，避免时钟不同步导致误判。生产集群启用 NTP，并统一在报告中使用 UTC 或明确的本地时区。\n\n#### 资源树采样模板\n\n```text\nApplication payments-prod  Synced/Healthy\n  Namespace demo-payments   Synced/Healthy\n  ConfigMap payments-config Synced/Healthy\n  Service payments          Synced/Healthy\n  Deployment payments       Synced/Healthy\n    ReplicaSet payments-7d  Synced/Healthy\n      Pod payments-abc      Synced/Healthy\n  Job payments-smoke        Synced/Healthy\n```\n\n资源树样例用于值班培训。实际报告应保留失败资源的 message、health reason 和最后一次变更 revision，不能只记录绿色状态。\n\n#### 应急操作授权记录\n\n```text\n操作者: oncall@example.com\n授权人: change-manager@example.com\n原因: Argo CD API Server 不可用，核心流量恢复\n命令: kubectl apply -f hotfix.yaml\n开始: 2026-08-29T12:10:00+08:00\n结束: 2026-08-29T12:16:00+08:00\nGit 回填 PR: #1842\n```\n\n没有授权、命令和回填记录的应急修改不应被视为完成。Argo CD 恢复后需要重新比较并关闭临时 drift。\n\n#### 变更失败通知模板\n\n```text\n[P2] Argo CD sync failed\nApplication: payments-prod\nProject: payments\nCluster: prod-east\nNamespace: demo-payments\nRevision: 8f31c2a\nResource: Deployment/payments\nPhase: Failed\nReason: admission denied\nAction: see runbook and revert PR\n```\n\n失败通知不要包含整个 manifest 或 Secret。资源级摘要足以指导值班人员进入 Argo CD 和 Kubernetes 获取更多证据。\n\n#### 恢复通知模板\n\n```text\n[RESOLVED] Argo CD application healthy\nApplication: payments-prod\nRevision: 7b19e10\nSync duration: 96s\nHealth duration: 142s\nChanged resources: Deployment/payments\nRunbook: https://runbooks.example.com/payments\n```\n\n恢复事件应引用导致恢复的 revision，而不是失败 revision。这样事件系统能够正确关闭原告警并保留修复证据。\n\n#### 每周治理巡检\n\n- [ ] 列出所有 `automated.prune=true` 的 Application。\n- [ ] 检查过去七天的 SyncFailed 和 Degraded。\n- [ ] 扫描长期未使用的 ignoreDifferences 规则。\n- [ ] 清理历史 Hook Job 和测试 webhook。\n- [ ] 复核 Sync Window 是否覆盖节假日。\n- [ ] 检查通知失败、429 和 DLQ 消息。\n- [ ] 对共享资源运行 ownership 检查。\n- [ ] 对高风险项目抽查一次删除演练记录。\n\n#### 每月治理巡检\n\n- [ ] 统计首次成功率和回滚率趋势。\n- [ ] 校验项目角色和删除权限。\n- [ ] 复查 source revision 是否仍使用浮动 branch。\n- [ ] 评估 repo-server manifest 生成耗时。\n- [ ] 评估 Controller 队列和 Kubernetes API 限流。\n- [ ] 轮换通知、仓库和 webhook 凭据。\n- [ ] 演练一次暂停、恢复和 Git revert。\n\n#### 交付成熟度分级\n\n| 等级 | 特征 | 下一步 |\n| --- | --- | --- |\n| L0 | 手工同步、无审计 | 建立 Git source 和 history |\n| L1 | 自动同步但无删除保护 | 增加 diff 审批和 NoPrune |\n| L2 | 有 wave、Hook 和通知 | 增加 SLI 验证和回滚演练 |\n| L3 | 有窗口、项目边界和指标 | 建立错误预算和容量模型 |\n| L4 | 多团队可审计、可恢复 | 持续优化批次、成本和证据 |\n\n成熟度不是启用选项越多越高，而是每项能力都有清晰边界、可观测证据和经过演练的恢复路径。\n\n#### 知识点到动作映射\n\n| 知识点 | 日常动作 | 故障动作 |\n| --- | --- | --- |\n| Diff | 评审 revision 和删除 | hard refresh、导出 diff |\n| Health | 看底层资源 reason | 查 Pod、事件、探针 |\n| Automated | 观察队列和重试 | 暂停、分类、revert |\n| Prune | 审核删除清单 | 关闭 prune、保留资源 |\n| Wave | 检查依赖顺序 | 定位阻塞 wave |\n| Hook | 验证幂等和清理 | 查 Job 日志和外部锁 |\n| Window | 维护冻结日历 | 审批 override |\n| Notification | 验证送达率 | 查模板、网络、对端 |\n\n#### 学习输出要求\n\n完成第二册后，读者应能独立写出一份 Application 同步策略，解释每个 sync option 的代价；能从 OutOfSync、Degraded、Failed 和 Unknown 的证据中定位层级；能设计至少两波发布和一个幂等 Hook；能在删除、窗口冻结和通知失败场景下执行有审计的恢复；能把临时 kubectl 操作回填为 Git 变更。\n\n#### 值班交接摘要\n\n```text\n当前发布: payments-prod\n当前 revision: 8f31c2a\n同步状态: Synced\n健康状态: Healthy\n未解决差异: 无\n自动同步: 开启，prune 关闭\n窗口: 工作日 22:00-08:00 冻结\n最近事件: 10:35 恢复通知已送达\n下一步: 观察至 11:00，确认错误预算无回升\n```\n\n交接摘要应只保留会影响下一位值班人员决策的内容。完整日志、manifest 和事件证据放在工单链接中，避免摘要过长而掩盖风险。\n\n#### 变更完成定义\n\n一次 Argo CD 交付只有同时满足以下条件才算完成：\n\n- Git revision 已记录并可复现。\n- Application operation 成功结束。\n- 关键资源的 Health 达到目标状态。\n- 业务 SLI 在观察窗口内正常。\n- 删除、Hook、共享资源没有超出批准范围。\n- 失败和恢复事件都可由 operation UID 关联。\n- 临时暂停、override、ignore 和 kubectl 修复均已清理或登记。\n\n#### 第二册与后续章节的接口\n\nApplicationSet 会复用本册的 syncPolicy、wave、窗口和通知约束；安全与可靠性章节会复用本册的审计、最小权限、指标和证据包。先把单 Application 的同步闭环做可靠，再扩展批量生成和多集群发布，能够显著降低故障半径。\n\n#### 练习评分表\n\n| 能力 | 通过标准 | 得分 |\n| --- | --- | ---: |\n| Diff 审查 | 能指出三类非业务差异并给出最小规则 | 20 |\n| Health 判断 | 能从资源树定位最底层失败对象 | 15 |\n| 自动同步 | 能解释四个 automated 字段和副作用 | 15 |\n| 删除治理 | 完成一次 prune 和 orphan 演练 | 15 |\n| Wave/Hook | 写出至少两波且 Hook 可幂等重试 | 15 |\n| 通知闭环 | 完成失败、恢复和去重验证 | 10 |\n| 应急恢复 | 将 kubectl 修复回填 Git | 10 |\n\n总分达到 80 分才建议在生产打开 prune 和 selfHeal；低于 80 分先补齐实验和运行手册。评分重点是能否解释证据和风险，而不是能否记住 CLI 参数。\n\n#### 交付记录字段\n\n```text\nchangeID: CHG-20260829-1842\napplication: payments-prod\nproject: payments\nsourceRepo: platform-config\nsourceRevision: 8f31c2a\ntargetCluster: prod-east\nsyncPolicy: automated+selfHeal\nprune: false\nwaves: -1,0,1,2\nhooks: PreSync,PostSync\noperator: oncall@example.com\napprover: change-manager@example.com\nresult: Synced/Healthy\n```\n\n这些字段可以被通知模板、审计索引和变更报表复用。字段命名保持稳定，后续接入 ApplicationSet 时只需增加 generator 和批次信息，不改变单应用证据格式。\n\n#### 章节完成核对\n\n- [ ] 能用 diff 区分期望状态和实时状态。\n- [ ] 能解释健康状态不等于同步状态。\n- [ ] 能安全组合 automated、prune、selfHeal 和 allowEmpty。\n- [ ] 能选择合适的同步选项并说明风险。\n- [ ] 能设计 Hook 删除策略和幂等行为。\n- [ ] 能用 wave 表达真实依赖而不是制造隐式顺序。\n- [ ] 能用 Sync Window 管理冻结期和紧急 override。\n- [ ] 能为通知配置模板、触发器、去重和恢复。\n- [ ] 能从日志、指标、事件和资源树构造证据包。\n- [ ] 能把一次失败发布完整复盘并形成改进项。\n\n#### 值班演练复述\n\n请在不查看命令帮助的情况下复述以下流程：先读取 Application 的 revision、operation 和资源树；再用 diff 确认变化；如果自动同步失败，区分渲染、权限、Admission、健康和外部依赖；需要止损时暂停自动同步而不是盲目重试；修复通过 Git revert 或新的 PR 进入；最后等待 Synced、Healthy 和业务 SLI 同时恢复，并核对通知。\n\n复述能够覆盖整条闭环，说明学习者理解的是控制模型而不是孤立命令。团队可以在季度演练中随机选择一个案例，让值班人员现场完成证据收集和处置记录。\n\n#### 最小生产基线\n\n```yaml\nsyncPolicy:\n  automated:\n    prune: false\n    selfHeal: true\n    allowEmpty: false\n  retry:\n    limit: 3\n    backoff:\n      duration: 10s\n      factor: 2\n      maxDuration: 2m\n  syncOptions:\n    - PruneLast=true\n```\n\n这是一套保守基线，不代表所有团队都应直接复制。启用 prune、Replace、Force 或 ServerSideApply 前，必须完成资源级演练、风险评审和回滚验证。基线的价值在于提供可解释的默认值，让例外配置显式出现。\n\n#### 复盘输出模板\n\n```text\n事件标题:\n影响范围:\n发现时间:\n恢复时间:\n受影响 revision:\n失败资源:\n直接原因:\n促成因素:\n止损动作:\n恢复动作:\n缺失证据:\n长期改进:\n负责人和截止日期:\n```\n\n复盘避免只写“重新同步后恢复”。应说明为什么第一次同步失败、为什么告警在该时刻触发、哪些控制能够提前阻止事故，以及如何验证改进已经生效。\n\n#### 维护窗口沟通模板\n\n```text\n窗口名称: payments-weekday-freeze\n生效时区: Asia/Singapore\n冻结时间: 22:00-08:00\n覆盖应用: payments-*\n允许 override: change-manager 角色\n恢复动作: 窗口结束后分批同步\n联系人: checkout-oncall\n```\n\n窗口配置提交后先在非生产项目验证跨午夜行为，再通知各团队。任何临时窗口都必须设置删除日期，防止测试规则变成永久冻结。\n\n#### 发布风险接受条件\n\n- 资源删除有明确替代对象或保留方案。\n- Hook 的外部副作用有幂等键或补偿动作。\n- 业务 SLI 的观察窗口覆盖启动、切流和缓存预热。\n- 回滚 revision 已在相同集群或等价环境验证。\n- 通知接收人确认失败和恢复消息均可行动。\n\n满足这些条件后，Argo CD 的同步状态才可以作为交付证据的一部分；单独的绿色 `Synced` 标签不足以证明业务发布成功。\n\n#### 最终交付口令\n\n发布负责人应能明确回答：本次变更来自哪个 revision，哪些资源会变化，哪个 wave 正在执行，失败时谁有权暂停，回滚通过哪个 Git 变更完成，通知发给谁，何时可以关闭事件。若其中任一问题没有答案，发布应停留在评审阶段。\n\n这套口令把本册的比较、同步、编排、删除、窗口和通知知识压缩成现场决策清单，适合放在值班手册首页。\n\n#### 交付结束确认\n\n确认 Git、Argo CD history、Kubernetes 事件、业务监控和通知记录可以互相链接；确认没有遗留临时权限、暂停标记、测试窗口或未关闭工单；确认下一轮 reconcile 仍保持预期状态。完成这些确认后，本次交付才真正结束。\n\n记录结束时间、最终 revision、健康状态和观察窗口结果，作为变更单关闭依据。\n\n交付记录应保留：\n\n- 最终 revision 和 operation UID。\n- 资源树和关键事件摘要。\n- SLI 观察结果与通知投递结果。\n- 临时措施的清理状态。\n- 后续改进项、负责人和截止日期。\n\n这些记录让下一次发布可以复用证据，而不是从零开始猜测上次发生了什么。\n\n第二册正文至此形成完整的比较、同步、编排、删除和通知闭环。\n\n所有操作均应以 Git 为最终事实来源，并保留可审计的恢复路径。", "subs": ["发布前五分钟检查", "发布中五分钟检查", "发布后十五分钟检查", "Diff 审查问句", "Health 审查问句", "Retry 审查问句", "Prune 审查问句", "Hook 代码审查问句", "Wave 代码审查问句", "Application 元数据检查", "Project 边界检查", "事件时间线模板", "资源树采样模板", "应急操作授权记录", "变更失败通知模板", "恢复通知模板", "每周治理巡检", "每月治理巡检", "交付成熟度分级", "知识点到动作映射", "学习输出要求", "值班交接摘要", "变更完成定义", "第二册与后续章节的接口", "练习评分表", "交付记录字段", "章节完成核对", "值班演练复述", "最小生产基线", "复盘输出模板", "维护窗口沟通模板", "发布风险接受条件", "最终交付口令", "交付结束确认"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

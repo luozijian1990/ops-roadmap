@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Argo CD 安全、高可用与生产运营学习笔记 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Argo CD 安全、高可用与生产运营学习笔记</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Argo CD 安全、高可用与生产运营学习笔记", "intro": "", "parts": [{"title": "第 1 章 · 建立身份认证、授权与最小权限模型", "sections": [{"title": "Authentication、Authorization、Dex 与 OIDC 的边界是什么", "content": "Authentication 证明用户是谁，Authorization 决定能做什么；Dex/OIDC 负责把外部身份映射为 Argo CD 用户和组，RBAC 决定资源动作。认证成功不等于拥有 Application 同步权限，组映射和默认策略必须分开审查。\n\n一次登录至少经过三层：身份提供商签发 JWT，API Server 校验 issuer、audience 和有效期，RBAC 根据 subject 与 groups 匹配策略。排障时分别验证这三层，避免把“能登录”误判成“能同步”。", "subs": []}, {"title": "本地账号、管理员账号、Token 与登录限流如何治理", "content": "本地账号只保留应急管理员，日常使用 OIDC。Token 设置过期、用途和轮换周期，禁用不再使用的账号；登录失败限流和审计日志应纳入安全监控。", "subs": []}, {"title": "RBAC 模型、默认策略和资源级动作怎样表达", "content": "RBAC 以 subject、resource、action、object 表达权限，例如只允许某项目的 `get` 和 `sync`。默认策略从 deny 开始，资源动作如 delete、action、exec 单独审批。\n\n对象匹配通常包含 project/name，`*` 会扩大到所有项目；新增资源类型或自定义 action 时要重新审查权限矩阵，并用普通用户 Token 实测允许和拒绝路径。\n\n```yaml\ndata:\n  policy.csv: |\n    p, role:payments, applications, get, payments/*, allow\n    p, role:payments, applications, sync, payments/*, allow\n    g, team-payments, role:payments\n  policy.default: role:readonly\n```", "subs": []}, {"title": "用 Keycloak、Okta、Auth0、OneLogin 或 Zitadel 接入通用 OIDC", "content": "配置 issuer、client ID、client secret、回调地址和 claim 映射。生产使用 HTTPS、明确 audience 和 group claim；先用测试组验证登录、退出、Token 过期和权限回收。", "subs": []}, {"title": "接入 Google、Microsoft Entra ID 与 AWS Identity Center", "content": "云身份提供商通常需要额外配置 tenant、组织域、scope 和组同步。限制允许域或租户，避免个人账号进入平台；验证组改动是否在 Token 刷新后生效。", "subs": []}, {"title": "OpenUnison 等身份代理适合怎样的企业集成场景", "content": "身份代理适合已有统一门户、MFA 或复杂目录映射的企业。代理成为新的信任边界，需保护回调、会话、证书和上游可用性，并保留直连应急路径。", "subs": []}]}, {"title": "第 2 章 · 防护凭据、供应链与运行时入口", "sections": [{"title": "Argo CD 安全模型中的管理员、用户和非管理员风险", "content": "管理员可改变仓库、项目和 RBAC，是最高风险身份；普通用户若能修改 Application source 或 project，也可能间接执行任意集群资源。按职责拆分仓库、项目和同步权限。", "subs": []}, {"title": "TLS、仓库凭据、Secret 与 Webhook Secret 如何分层保护", "content": "入口 TLS、仓库凭据、OIDC Secret、Webhook Secret 分离存储和轮换。使用外部 Secret 管理、KMS 或密封 Secret，限制读取 ServiceAccount；禁止在日志、参数和通知中泄露值。", "subs": []}, {"title": "验证 Argo CD 发布制品和依赖漏洞报告", "content": "部署镜像固定 digest，核对官方签名、SBOM 和 release checksum。Snyk 或其他扫描结果要区分可达运行时依赖与开发依赖，设置修复 SLA 并记录例外。", "subs": []}, {"title": "Web Terminal 和资源动作为什么需要额外授权", "content": "Web Terminal 等能力接近集群 shell，Resource Action 可能执行删除、重启或自定义脚本。默认关闭或只授予专用角色，启用审计、超时和命令白名单。\n\n终端输出可能包含环境变量和 Secret，日志采集要脱敏；动作还要记录操作者、参数、开始时间和结果。", "subs": []}]}, {"title": "第 3 章 · 规划高可用、容量与性能", "sections": [{"title": "哪些组件有状态，哪些组件可以水平扩展", "content": "API Server、Repo Server 和 Controller 可水平扩展；Argo CD 的持久状态保存在 Kubernetes 对象和 etcd 中，Redis 主要是可丢弃缓存，丢失后可重建。扩展前确认瓶颈是 CPU、内存、Git IO、Kubernetes QPS 还是 Redis。", "subs": []}, {"title": "扩展 Repo Server、Application Controller、API Server 和 Redis", "content": "Repo Server 承担渲染，可按仓库和并发扩容；Controller 通过 shard 分担 Application；API Server 主要承载用户和自动化请求。副本数增加后检查 leader election、连接池、PDB 和反亲和。", "subs": []}, {"title": "Monorepo、Manifest 生成并发与缓存如何影响性能", "content": "大 Monorepo 会放大 clone、遍历和 diff 成本；生成并发过高会耗尽 CPU、内存和 API QPS。设置缓存、并发上限、超时和仓库拆分策略，用实际 p95 评估。", "subs": []}, {"title": "Controller Shard 与动态集群分布如何平衡负载", "content": "Shard 将 Application 分配给不同 Controller，动态集群分布可按集群负载重新平衡。迁移期间关注重复调谐、队列积压和短暂 API 压力。", "subs": []}, {"title": "对账频率、超时、抖动和限流参数如何设置", "content": "缩短 reconciliation timeout 可降低漂移延迟但增加 Git 和 API 压力；抖动避免所有实例同时请求。按应用数量、变更频率和错误预算设置，并用压测验证。", "subs": []}]}, {"title": "第 4 章 · 建立指标、仪表盘与 SLO", "sections": [{"title": "四类核心组件分别暴露哪些 Prometheus 指标", "content": "关注 API 请求延迟和错误、Repo Server manifest 生成耗时、Controller reconciliation 队列与操作结果、Redis 连接和缓存命中。指标名称随版本变化，仪表盘应绑定版本并做录制规则。\n\n仪表盘应同时展示平台能否工作和应用是否健康：前者看 API、Git、队列和缓存，后者看 Synced、Health、Sync duration。把两类曲线分开，才能判断是控制面故障还是业务发布失败。", "subs": []}, {"title": "选择低基数 Application、Project、Cluster 标签", "content": "标签用于聚合，不要把 commit、pod UID 或任意用户输入作为高基数 label。Application、project、cluster 维度足以支持大多数 SLO 和排障。", "subs": []}, {"title": "监控 Reconcile、Sync、Manifest 生成和 Git 请求", "content": "分别记录成功率、p50/p95/p99、队列等待、Git fetch 错误、渲染失败和同步持续时间。把控制面健康与业务资源健康分开，避免单一绿灯掩盖渲染故障。", "subs": []}, {"title": "从指标设计可用性、交付时效和错误预算告警", "content": "SLO 可定义 API 可用性、变更从提交到 Synced 的 p95 时延和同步失败率。告警包含影响范围、revision、owner 和 runbook；错误预算耗尽时冻结非必要发布。", "subs": []}, {"title": "指标缓存过期和历史序列如何控制 Prometheus 成本", "content": "缩短不必要的缓存 TTL、限制标签维度、使用 recording rule 和合理 retention。大型环境可按团队或集群分片抓取，并定期删除无消费指标。", "subs": []}]}, {"title": "第 5 章 · 备份、恢复与变更管理", "sections": [{"title": "argocd admin export 能备份什么，不能备份什么", "content": "`argocd admin export` 可导出 Argo CD 配置对象、Application、Project 和 Secret 的声明，但不包含目标集群业务数据、外部 Git、OIDC 提供商和云资源。备份文件必须加密并限制访问。导出前检查是否包含仓库 Token、OIDC client secret 和集群 bearer token；恢复完成后轮换其中的长期凭据。\n\n```bash\nargocd admin export -n argocd > argocd-backup.yaml\nkubectl apply -n argocd -f argocd-backup.yaml\n```", "subs": []}, {"title": "恢复前如何校验版本、命名空间、Secret 和外部依赖", "content": "恢复前固定 Argo CD 版本，确认 CRD 已安装、命名空间存在、Secret 解密能力可用、仓库和 OIDC 可访问。先在隔离集群恢复，再验证登录、仓库拉取、目标连接和 Application 健康。", "subs": []}, {"title": "为配置变更建立验证、审计、回滚和演练流程", "content": "配置进入 Git 后通过 schema、kubeconform、策略检查和预览 diff；生产变更记录审批、操作者和结果。回滚使用 Git revert 或已验证备份，定期演练恢复时间和数据完整性。", "subs": []}]}, {"title": "第 6 章 · 安全完成版本升级与兼容性迁移", "sections": [{"title": "从升级总览建立版本跨度、备份与回滚门禁", "content": "升级前阅读目标版本 breaking changes，确认 CRD、Kubernetes、插件和数据库兼容，完成备份和回滚演练。按 canary、非生产、生产顺序推进，保留旧镜像和清单。", "subs": []}, {"title": "从 v1.x 到 v2.3 识别早期架构与组件合并变化", "content": "早期版本经历 API、Controller、Dex 和仓库组件合并，旧配置字段可能被弃用。迁移时以目标版本 schema 和 release note 为准，不直接复制旧 Deployment 参数。", "subs": []}, {"title": "从 v2.3 到 v2.10 处理 RBAC、CMP、Dex 与工具链变更", "content": "这一阶段重点检查 RBAC 默认策略、CMP sidecar、Dex 配置和 Helm/Kustomize 版本。升级后重新验证登录、渲染、插件和同步权限。", "subs": []}, {"title": "从 v2.10 到 v2.14 核对缓存、身份和健康检查变化", "content": "核对 Redis 缓存行为、OIDC claim、资源 health 脚本和指标标签；关注同一 Application 在升级前后的 diff 是否改变。", "subs": []}, {"title": "从 v2.14 升级到 v3.2 时处理破坏性变化", "content": "v3.x 升级必须逐项阅读迁移说明，重点检查资源跟踪、ApplicationSet、Server-Side Diff、命令参数和默认安全策略。先导出应用清单，再在预生产对比 manifest 与 health。", "subs": []}]}, {"title": "第 7 章 · 用分层证据排查生产故障", "sections": [{"title": "先区分入口、认证、仓库、渲染、对账与集群连接故障", "content": "按链路从外到内排查：DNS/Ingress→TLS/OIDC→API Server→Repo Server→Controller→目标 Kubernetes API。每层只验证一个假设，记录时间、Application、revision 和 request ID。", "subs": []}, {"title": "校验配置、Diff、Health 和 Resource Action 脚本", "content": "使用 `argocd app get`、`app diff`、`app manifests` 和资源详情确认期望状态；检查 ignoreDifferences、health Lua 和 action 脚本是否误判。不要先删除资源来“清理”未知问题。", "subs": []}, {"title": "导出集群凭据并验证目标 Kubernetes API 连通性", "content": "检查 `argocd cluster list`、Secret server 地址、CA 和 ServiceAccount 权限；从 Controller Pod 使用最小命令验证 DNS、TLS 和 API 认证。凭据导出后立即清理临时文件。", "subs": []}, {"title": "排查 CMP 的发现、超时、缓存和 tar stream 问题", "content": "确认插件 discover 匹配路径、sidecar 日志、超时、工作目录和 tar 排除规则。插件输出为空或非法 YAML 时，先在相同镜像中复现 `generate` 命令。", "subs": []}, {"title": "结合组件日志、指标和通知形成统一证据包", "content": "收集组件日志、Prometheus 时间窗、Application YAML、diff、事件和通知投递记录。证据包应脱敏，可让另一名值班人员复盘而无需再次猜测现场。", "subs": []}]}, {"title": "第 8 章 · 理解内部实现、调试和发布边界", "sections": [{"title": "从组件依赖和职责定位源码或运行时故障", "content": "源码定位从 API 类型、Controller reconcile、Repo Server manifest service 和 Redis client 开始。先用组件边界缩小范围，再进入具体函数；不要把业务资源故障归因给 UI。", "subs": []}, {"title": "在本地或远程环境复现和调试 Argo CD 组件", "content": "本地开发需要 Go、Node、Kubectl、Helm、Docker 和 Make；Tilt 可启动组件和依赖。远程调试应通过受控端口转发和临时凭据，结束后撤销访问。\n\n```bash\nmake start-local\nkubectl -n argocd port-forward svc/argocd-server 8080:443\n```", "subs": []}, {"title": "用单元测试、E2E、静态分析和 CI 验证改动", "content": "单元测试覆盖 parser、reconcile 和权限逻辑，E2E 覆盖真实 Kubernetes、仓库和同步路径；静态分析检查 Go、JS、YAML 和安全规则。CI 必须阻断格式、生成代码、镜像和文档校验失败。", "subs": []}, {"title": "管理 GitOps Engine、Notifications Engine 和 UI 依赖", "content": "依赖升级要记录版本、API 兼容和安全公告，锁定 Go module 与前端 lockfile。公共引擎变更应先在独立测试中验证 diff、通知和 UI 行为。", "subs": []}, {"title": "理解贡献、设计评审和 PR 检查如何保护平台质量", "content": "贡献流程要求 issue、设计讨论、测试和文档同步；评审重点关注权限扩大、删除行为、性能和升级兼容。PR 检查不是形式审阅，而是把运行风险提前暴露。", "subs": []}, {"title": "理解发布节奏、安全补丁策略和失败恢复", "content": "发布包含稳定版本、补丁版本和安全修复，维护者应明确支持窗口。生产升级失败时保留旧版本、回滚清单和事件记录，并在恢复后补充根因和预防动作。升级验收顺序建议是组件 Ready、API 登录、仓库渲染、目标连接、只读 diff、非关键 Application 同步、关键 Application 健康，任何一步失败都暂停扩大范围。\n\n#### 生产演练的最小闭环\n\n每季度选择一个非关键 Application 做故障演练：先暂停自动同步，导出配置和凭据引用，制造仓库不可达或目标 API 拒绝，再按入口、认证、仓库、渲染、对账、集群连接的顺序收集证据。恢复后验证登录、仓库渲染、只读 diff、同步和通知，并记录 RTO、RPO、误报和缺失的指标。\n\n升级演练还应保留旧镜像和旧 CRD 清单，明确回滚门槛。若回滚只恢复控制面而没有恢复 OIDC、仓库 CA 或目标集群 RBAC，Application 仍可能全部变成 `Unknown`，这不算恢复成功。\n\n#### 生产运行卡片：安全、可靠性与恢复的可执行细节\n\n##### 1. OIDC issuer 与 JWKS\n本卡片把“OIDC issuer 与 JWKS”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 OIDC issuer 与 JWKS 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n##### 71. OIDC claim 映射\n将 OIDC claim 映射 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 72. RBAC 通配符审计\n将 RBAC 通配符审计 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 73. 管理员应急账号\n将 管理员应急账号 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 74. Secret 外部同步\n将 Secret 外部同步 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 75. Git 提交签名\n将 Git 提交签名 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 76. Webhook 重放防护\n将 Webhook 重放防护 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 77. Ingress 超时\n将 Ingress 超时 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 78. Repo Server 缓存\n将 Repo Server 缓存 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 79. Controller 工作队列\n将 Controller 工作队列 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 80. 动态分片迁移\n将 动态分片迁移 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 81. 大仓库拆分\n将 大仓库拆分 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 82. 资源健康脚本\n将 资源健康脚本 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 83. API 429 限流\n将 API 429 限流 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 84. 指标 recording rule\n将 指标 recording rule 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 85. SLO 窗口选择\n将 SLO 窗口选择 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 86. 告警去重\n将 告警去重 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 87. 备份保留策略\n将 备份保留策略 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 88. RPO 演算\n将 RPO 演算 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 89. 恢复后凭据轮换\n将 恢复后凭据轮换 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 90. 升级前 CRD 备份\n将 升级前 CRD 备份 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 91. v2 到 v3 迁移\n将 v2 到 v3 迁移 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 92. 插件版本锁定\n将 插件版本锁定 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 93. 回滚后漂移\n将 回滚后漂移 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 94. Admission 拒绝\n将 Admission 拒绝 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 95. 目标集群 RBAC\n将 目标集群 RBAC 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 96. CMP tar 排除\n将 CMP tar 排除 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 97. 扩展 API 兼容\n将 扩展 API 兼容 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 98. UI 发布检查\n将 UI 发布检查 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 99. 开发环境隔离\n将 开发环境隔离 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 100. 静态分析规则\n将 静态分析规则 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 101. 镜像 SBOM\n将 镜像 SBOM 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 102. 安全补丁响应\n将 安全补丁响应 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 103. 运行手册评审\n将 运行手册评审 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 104. 值班演练复盘\n将 值班演练复盘 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 105. 节点维护 PDB\n将 节点维护 PDB 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 106. 跨区网络延迟\n将 跨区网络延迟 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 107. OIDC claim 映射\n将 OIDC claim 映射 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 108. RBAC 通配符审计\n将 RBAC 通配符审计 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 109. 管理员应急账号\n将 管理员应急账号 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n##### 110. Secret 外部同步\n将 Secret 外部同步 纳入变更前检查、变更中观测和变更后验收三个阶段。每个阶段都要有明确的停止条件，避免在证据不足时扩大影响范围。\n检查清单：版本与配置已记录；相关 Secret 未暴露；当前没有未完成的高优先级同步；业务 owner 知道本次操作；回滚清单可以在五分钟内执行。\n执行证据：\n```bash\nargocd version --client\nkubectl -n argocd get cm argocd-cm argocd-rbac-cm -o yaml\nkubectl -n argocd get applications.argoproj.io -A -o json\n```\n把命令输出与 Prometheus 同一时间窗对齐，检查错误率、p95 延迟、队列长度、manifest 生成失败、目标 API 429 和 Application 健康变化。指标正常但用户失败时，继续查入口协议和权限；指标异常但用户无感时，确认是否为单一低优先级对象。\n安全要求：使用最小权限的临时身份，操作结束即撤销；禁止通过命令行参数传递长期密钥；备份和日志采用脱敏副本；涉及删除时必须先执行 dry-run 或只读 diff。\n验收：至少验证一个成功路径和一个拒绝路径。成功路径应产生预期状态变化，拒绝路径应保持资源不变并留下审计事件。验证完成后恢复原有 Sync Window、并发和告警静默设置。\n故障处理：若出现新的 `Unknown`、`ComparisonError` 或 `SyncFailed`，先暂停自动同步，保存 operationState 与组件日志，再按入口、身份、仓库、渲染、对账、集群六层定位。\n复盘问题：哪一条证据最先证明根因？哪一个指标没有覆盖影响？runbook 是否能由另一名值班人员独立执行？把答案写入变更记录，而不是只口头交接。\n材料归档：将清单、命令输出、指标查询和回滚结果关联到变更单，设置保留期限，过期后删除含敏感信息的副本。\n\n\n##### 2. RBAC project 边界\n本卡片把“RBAC project 边界”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 RBAC project 边界 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 3. 本地管理员 Token\n本卡片把“本地管理员 Token”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 本地管理员 Token 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 4. Webhook Secret 轮换\n本卡片把“Webhook Secret 轮换”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Webhook Secret 轮换 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 5. 仓库 SSH known_hosts\n本卡片把“仓库 SSH known_hosts”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 仓库 SSH known_hosts 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 6. 目标集群 CA 与 Token\n本卡片把“目标集群 CA 与 Token”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 目标集群 CA 与 Token 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 7. Ingress gRPC 路由\n本卡片把“Ingress gRPC 路由”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Ingress gRPC 路由 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 8. Redis 缓存故障\n本卡片把“Redis 缓存故障”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Redis 缓存故障 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 9. Repo Server 并发\n本卡片把“Repo Server 并发”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Repo Server 并发 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 10. Controller shard\n本卡片把“Controller shard”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Controller shard 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 11. Monorepo 生成\n本卡片把“Monorepo 生成”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Monorepo 生成 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 12. Reconcile 抖动\n本卡片把“Reconcile 抖动”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Reconcile 抖动 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 13. API Server 限流\n本卡片把“API Server 限流”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 API Server 限流 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 14. Prometheus 低基数\n本卡片把“Prometheus 低基数”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Prometheus 低基数 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 15. 交付时效 SLO\n本卡片把“交付时效 SLO”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 交付时效 SLO 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 16. 错误预算冻结\n本卡片把“错误预算冻结”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 错误预算冻结 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 17. 配置导出加密\n本卡片把“配置导出加密”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 配置导出加密 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 18. 隔离集群恢复\n本卡片把“隔离集群恢复”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 隔离集群恢复 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 19. CRD 兼容检查\n本卡片把“CRD 兼容检查”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 CRD 兼容检查 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 20. 升级 canary\n本卡片把“升级 canary”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 升级 canary 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 21. 回滚门槛\n本卡片把“回滚门槛”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 回滚门槛 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 22. ComparisonError\n本卡片把“ComparisonError”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 ComparisonError 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 23. SyncFailed\n本卡片把“SyncFailed”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 SyncFailed 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 24. Unknown 状态\n本卡片把“Unknown 状态”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Unknown 状态 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 25. CMP discover\n本卡片把“CMP discover”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 CMP discover 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 26. CMP generate 超时\n本卡片把“CMP generate 超时”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 CMP generate 超时 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 27. 资源 Action 审计\n本卡片把“资源 Action 审计”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 资源 Action 审计 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 28. Web Terminal\n本卡片把“Web Terminal”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Web Terminal 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 29. 组件单元测试\n本卡片把“组件单元测试”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 组件单元测试 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 30. E2E 测试证据\n本卡片把“E2E 测试证据”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 E2E 测试证据 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 31. 依赖漏洞\n本卡片把“依赖漏洞”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 依赖漏洞 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 32. 发布签名\n本卡片把“发布签名”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 发布签名 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 33. 值班交接\n本卡片把“值班交接”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 值班交接 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 34. 季度故障演练\n本卡片把“季度故障演练”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 季度故障演练 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 35. PDB 与反亲和\n本卡片把“PDB 与反亲和”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 PDB 与反亲和 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 36. Kubernetes API QPS\n本卡片把“Kubernetes API QPS”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Kubernetes API QPS 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 37. OIDC issuer 与 JWKS\n本卡片把“OIDC issuer 与 JWKS”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 OIDC issuer 与 JWKS 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 38. RBAC project 边界\n本卡片把“RBAC project 边界”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 RBAC project 边界 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 39. 本地管理员 Token\n本卡片把“本地管理员 Token”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 本地管理员 Token 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 40. Webhook Secret 轮换\n本卡片把“Webhook Secret 轮换”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Webhook Secret 轮换 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 41. 仓库 SSH known_hosts\n本卡片把“仓库 SSH known_hosts”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 仓库 SSH known_hosts 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 42. 目标集群 CA 与 Token\n本卡片把“目标集群 CA 与 Token”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 目标集群 CA 与 Token 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 43. Ingress gRPC 路由\n本卡片把“Ingress gRPC 路由”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Ingress gRPC 路由 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 44. Redis 缓存故障\n本卡片把“Redis 缓存故障”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Redis 缓存故障 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 45. Repo Server 并发\n本卡片把“Repo Server 并发”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Repo Server 并发 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 46. Controller shard\n本卡片把“Controller shard”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Controller shard 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 47. Monorepo 生成\n本卡片把“Monorepo 生成”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Monorepo 生成 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 48. Reconcile 抖动\n本卡片把“Reconcile 抖动”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Reconcile 抖动 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 49. API Server 限流\n本卡片把“API Server 限流”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 API Server 限流 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 50. Prometheus 低基数\n本卡片把“Prometheus 低基数”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Prometheus 低基数 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 51. 交付时效 SLO\n本卡片把“交付时效 SLO”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 交付时效 SLO 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 52. 错误预算冻结\n本卡片把“错误预算冻结”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 错误预算冻结 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 53. 配置导出加密\n本卡片把“配置导出加密”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 配置导出加密 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 54. 隔离集群恢复\n本卡片把“隔离集群恢复”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 隔离集群恢复 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 55. CRD 兼容检查\n本卡片把“CRD 兼容检查”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 CRD 兼容检查 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 56. 升级 canary\n本卡片把“升级 canary”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 升级 canary 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 57. 回滚门槛\n本卡片把“回滚门槛”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 回滚门槛 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 58. ComparisonError\n本卡片把“ComparisonError”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 ComparisonError 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 59. SyncFailed\n本卡片把“SyncFailed”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 SyncFailed 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 60. Unknown 状态\n本卡片把“Unknown 状态”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Unknown 状态 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 61. CMP discover\n本卡片把“CMP discover”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 CMP discover 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 62. CMP generate 超时\n本卡片把“CMP generate 超时”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 CMP generate 超时 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 63. 资源 Action 审计\n本卡片把“资源 Action 审计”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 资源 Action 审计 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 64. Web Terminal\n本卡片把“Web Terminal”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 Web Terminal 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 65. 组件单元测试\n本卡片把“组件单元测试”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 组件单元测试 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 66. E2E 测试证据\n本卡片把“E2E 测试证据”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 E2E 测试证据 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 67. 依赖漏洞\n本卡片把“依赖漏洞”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 依赖漏洞 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 68. 发布签名\n本卡片把“发布签名”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 发布签名 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 69. 值班交接\n本卡片把“值班交接”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 值班交接 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。\n\n##### 70. 季度故障演练\n本卡片把“季度故障演练”转换为可验证的运行任务。先声明目标，再收集证据，最后执行最小范围变更。任何涉及凭据、删除或升级的操作都需要审批记录。\n目标：确认 季度故障演练 在当前版本、当前集群和当前流量下满足设计约束。成功标准不是命令返回 0，而是控制面、Application 状态和审计记录同时一致。\n准备：记录时间、Argo CD 版本、Application、project、cluster、revision 和操作者；检查是否处于 Sync Window、发布冻结或故障响应状态。\n观察命令：\n```bash\nkubectl -n argocd get pods -o wide\nargocd app list --output wide\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n判读：先看是否存在 Ready、连接、权限或队列错误，再将错误与同一时间窗的指标和日志关联。单个 Application 异常优先查 source、destination 和资源事件；多个 Application 同时异常优先查共享组件。\n变更：只调整一个变量，保留变更前后 YAML 和指标截图。对于 RBAC、Secret、CRD 或同步策略，先在非生产对象上验证，再扩展到生产。\n回退：若错误率、延迟、健康状态或删除数量超过门槛，立即恢复上一份清单或 Secret 版本，并暂停自动同步，等待一个 reconciliation 周期确认稳定。\n风险：缓存可能掩盖真实连接问题，旧 Token 可能让权限测试失真，默认值变化可能造成无意义 diff。任何临时 ignoreDifferences、cluster-admin 或强制 replace 都要设置到期时间。\n证据：保存脱敏后的日志片段、PromQL 查询、Application YAML、diff、事件和审批链接；不要把 Token、client secret、Webhook secret 或完整 JWT 放入工单。\n演练：在隔离命名空间制造一个可控失败，执行本卡片步骤，测量发现、定位、修复和验证耗时；将缺失的指标、权限和文档补回 runbook。", "subs": ["生产演练的最小闭环", "生产运行卡片"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

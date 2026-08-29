@@ -4,9 +4,9 @@
 
 **一份持续整理的个人运维学习笔记与交互式路线图合集。**
 
-![Topics](https://img.shields.io/badge/topics-26-1f2933?style=flat-square)
-![Markdown notes](https://img.shields.io/badge/markdown_notes-79-1f2933?style=flat-square)
-![Roadmaps](https://img.shields.io/badge/roadmaps-81-f4c95d?style=flat-square)
+![Topics](https://img.shields.io/badge/topics-27-1f2933?style=flat-square)
+![Markdown notes](https://img.shields.io/badge/markdown_notes-83-1f2933?style=flat-square)
+![Roadmaps](https://img.shields.io/badge/roadmaps-85-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
 [快速开始](#快速开始) · [内容导航](#内容导航) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
@@ -60,7 +60,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 | 云原生 | [Docker](./topics/cloud-native/docker/) · [Helm](./topics/cloud-native/helm/) · [Kubernetes](./topics/cloud-native/kubernetes/) · [Kubernetes 容器网络](./topics/cloud-native/kubernetes-networking/) · [Consul](./topics/cloud-native/consul/) · [etcd](./topics/cloud-native/etcd/) |
 | 可观测性 | [Prometheus](./topics/observability/prometheus/) · [Kube-Prometheus](./topics/observability/kube-prometheus/) · [VictoriaMetrics](./topics/observability/victoria-metrics/) · [VictoriaMetrics Flags](./topics/observability/victoria-metrics-flags/) · [VictoriaMetrics PromQL](./topics/observability/victoria-metrics-promql/) |
 | 数据系统 | [MySQL](./topics/data-systems/mysql/) · [Kafka](./topics/data-systems/kafka/) · [RabbitMQ](./topics/data-systems/rabbitmq/) |
-| 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) |
+| 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) · [Argo CD](./topics/delivery/argo-cd/) |
 | Web 基础设施 | [Nginx](./topics/web/nginx/) |
 | AI 基础设施 | [GPU AI Infrastructure](./topics/ai-infrastructure/gpu/) |
 | AIOps | [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |

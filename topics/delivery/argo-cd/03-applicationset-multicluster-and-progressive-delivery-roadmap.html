@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Argo CD ApplicationSet、多集群与渐进式交付学习笔记 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Argo CD ApplicationSet、多集群与渐进式交付学习笔记</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Argo CD ApplicationSet、多集群与渐进式交付学习笔记", "intro": "", "parts": [{"title": "第 1 章 · 理解 ApplicationSet 控制器和资源模型", "sections": [{"title": "ApplicationSet 为什么不是普通的 Application 模板复制器", "content": "ApplicationSet 根据生成器结果渲染模板并创建、更新、删除 Application。它管理的是 Application 集合，Application Controller 再负责每个应用的资源调谐，因此形成二级控制循环。模板变更可能一次影响数百个集群。", "subs": []}, {"title": "Generator、Template 与 Application 如何形成二级调谐链路", "content": "Generator 产生参数，Template 生成 Application spec，ApplicationSet Controller 负责集合差异；生成的 Application 交给 Application Controller 处理 Git、diff、sync 和 health。排障时先确定参数是否生成，再看单个 Application。\n\n#### 二级调谐的故障判读\n\nApplicationSet 已更新但 Application 没出现，优先查 generator 输入、模板渲染和 RBAC；Application 已出现但资源未同步，则转到 Application Controller。不要直接删除生成对象，因为下一轮调谐会再次创建，且会掩盖真正的模板问题。\n\n```mermaid\nflowchart LR\n    Input[集群仓库参数] --> Generator[Generator]\n    Generator --> Template[Template 渲染]\n    Template --> Apps[Applications]\n    Apps --> Controller[Application Controller]\n    Controller --> Cluster[目标集群]\n```", "subs": ["二级调谐的故障判读"]}, {"title": "安装、升级和高可用模式需要满足哪些前提", "content": "确认 CRD、RBAC、Webhook、Controller 资源限制和版本兼容；高可用模式需要副本、反亲和和清晰的 leader election。升级前检查生成数量、API QPS、Webhook 和回滚清单。", "subs": []}, {"title": "从规范参考中识别 generators、template、strategy 和 policy", "content": "`generators` 决定输入集合，`template` 定义 Application，`strategy` 控制更新方式，`syncPolicy` 传递给生成的 Application。字段继承和覆盖关系要在样例中验证，尤其是嵌套 metadata 与 syncPolicy。", "subs": []}, {"title": "使用 Go Template、Sprig 函数与缺失键保护", "content": "Go Template 适合条件和字符串组合，Sprig 提供默认值、列表和字典函数。开启 `missingkey=error` 可尽早发现拼写错误；模板中不要拼接未经校验的集群地址或项目名。\n\n模板变量应先经过命名、URL 和版本校验。把 `{{.cluster}}` 直接用于 Application 名称时，要处理大写、长度和非法字符；把文件内容映射到 Helm 参数时，要明确字符串转义规则。", "subs": []}]}, {"title": "第 2 章 · 使用基础生成器批量创建 Application", "sections": [{"title": "List Generator 适合固定清单和动态元素输入", "content": "List Generator 直接维护集群、环境和路径清单，适合小规模稳定集合。元素变更会触发 Application 增删，提交前应检查 diff。\n\n固定清单的优点是可读和可审计，缺点是需要人工维护。适合在仓库中保存少量环境级例外，不适合用来表达几十个动态集群；规模增长后应迁移到 Cluster Generator 或 SCM Provider。", "subs": []}, {"title": "Cluster Generator 如何按标签和 Kubernetes 版本选择集群", "content": "Cluster Generator 读取 Argo CD 已注册集群及其 labels，可按环境、区域、版本筛选。标签是调度契约，命名规则要统一，避免生产集群误匹配开发模板。", "subs": []}, {"title": "Git Directory Generator 如何发现目录并控制排除规则", "content": "它扫描仓库目录并为每个目录生成 Application。使用 exclude 排除 `_base`、文档和测试目录；目录重命名会表现为删除加创建，应提前评估资源归属。", "subs": []}, {"title": "Git File Generator 如何读取配置文件并处理 glob", "content": "Git File Generator 读取 JSON/YAML 文件并把字段作为模板参数。glob 规则要窄，文件 schema 需由 CI 校验，缺字段时让生成失败而不是生成空目标。", "subs": []}, {"title": "Cluster Decision Resource 如何接入外部调度决策", "content": "该 Generator 从自定义资源读取集群决策，适合容量、合规或区域调度服务。外部控制器必须保证决策资源版本化、可审计，并为无决策和过期决策提供安全默认值。", "subs": []}]}, {"title": "第 3 章 · 对接 SCM、Pull Request 与外部生成逻辑", "sections": [{"title": "SCM Provider Generator 如何跨组织发现仓库", "content": "SCM Provider 通过 GitHub、GitLab 等 API 发现组织仓库并套用模板。Token 只授予读元数据和仓库内容的权限，组织过滤与命名约定要防止把实验仓库发布到生产。", "subs": []}, {"title": "Pull Request Generator 如何创建和清理预览环境", "content": "Generator 为每个 PR 生成临时 Application，可把 PR 编号作为命名空间和 URL。关闭或合并 PR 时应自动清理，并为数据库、域名和外部资源设置 TTL 与 orphan 保护。\n\n预览环境的命名空间必须包含 PR 唯一标识，并设置 ResourceQuota、NetworkPolicy 和最大存活时间。清理失败时保留 Application 事件和外部资源 ID，避免只删除 Kubernetes namespace 后留下云资源。", "subs": []}, {"title": "Webhook、轮询周期与 refresh 注解如何控制发现延迟", "content": "Webhook 低延迟但依赖网络和签名配置，轮询是兜底但受 SCM 限流影响；refresh 注解适合单次触发。监控 webhook 失败率、最后成功时间和 API rate limit。", "subs": []}, {"title": "Plugin Generator 如何安全接入外部参数服务", "content": "Plugin Generator 调用外部服务生成参数，服务应返回固定 schema、设置超时和签名校验。不要让插件直接返回任意 Application YAML；使用 allowlist、缓存和熔断，避免外部服务故障拖垮控制器。", "subs": []}]}, {"title": "第 4 章 · 组合生成器并控制参数冲突", "sections": [{"title": "Matrix Generator 如何计算笛卡尔积并传递子生成器参数", "content": "Matrix 将两个生成器结果做笛卡尔积，例如“集群×服务”。组合前估算数量，给参数命名空间，防止同名键覆盖；数量增长应有配额和告警。", "subs": []}, {"title": "Merge Generator 如何覆盖基线参数并处理缺失项", "content": "Merge 以匹配键合并基线与覆盖项，适合全局默认加区域例外。覆盖字段必须显式列出，缺失项采用安全默认，不要静默生成空 destination。", "subs": []}, {"title": "Post Selector 如何在生成后筛选目标集合", "content": "Post Selector 在生成后按标签或字段过滤结果，可作为最后一道准入。过滤条件变更会大规模删除 Application，必须先在 dry-run 或测试项目验证。\n\n变更 Post Selector 前导出当前生成列表，与新列表做集合差异：新增、保留、删除分别审批。删除数量异常时，应通过 Git revert 或暂停 ApplicationSet 恢复，而不是逐个手工重建。", "subs": []}, {"title": "Template Patch 与 Generator Template 如何表达条件化差异", "content": "Generator Template 负责默认模板，Template Patch 针对特定生成结果做条件化修改。复杂条件应回到清晰的输入字段，避免在 patch 中堆叠不可读的 JSONPath。", "subs": []}]}, {"title": "第 5 章 · 保护批量变更、删除与多租户边界", "sections": [{"title": "create-only、create-update 与 sync 策略分别限制什么", "content": "create-only 只允许创建，create-update 允许创建和更新，sync 还允许触发生成 Application 的同步策略。生产批量模板默认从 create-update 开始，验证后再开放删除和自动同步。", "subs": []}, {"title": "忽略 Application 差异时有哪些字段和合并限制", "content": "可忽略生成 Application 的特定 metadata 或 spec 字段，但忽略规则不能掩盖 destination、project 等安全边界。字段合并冲突要通过单元样例和实际 diff 验证。", "subs": []}, {"title": "删除 ApplicationSet、Application 和业务资源时如何避免级联事故", "content": "删除 ApplicationSet 可能删除生成的 Application，进而删除业务资源。先暂停自动同步，设置 orphan 或 preserveResourcesOnDeletion，导出对象并在测试集群演练。", "subs": []}, {"title": "ApplicationSet in any namespace 怎样配置权限和项目模板", "content": "允许任意命名空间后，需要为 ApplicationSet CRD、生成目标和项目访问分别授权。命名空间 allowlist、可信仓库和模板项目必须集中管理。", "subs": []}, {"title": "为什么只有管理员才能控制可信来源和 templated project", "content": "模板可注入 project、destination 和资源权限；普通用户若能修改可信来源，就能间接获得管理员能力。因此仓库 allowlist、项目模板和插件配置应由平台管理员维护。", "subs": []}]}, {"title": "第 6 章 · 从常见用例走向渐进式发布", "sections": [{"title": "用 ApplicationSet 管理集群附加组件、Monorepo 和租户自助", "content": "集群附加组件适合 Cluster Generator，Monorepo 适合目录或文件 Generator，租户自助适合受限模板和项目角色。三者都要定义生命周期、owner 和删除策略。", "subs": []}, {"title": "RollingSync 如何按标签分组和控制批次规模", "content": "RollingSync 根据生成 Application 的标签分组，按步骤和最大更新数推进。批次要覆盖不同故障域，并让每组完成健康检查后再进入下一组。\n\n`maxUpdate` 可以是绝对数量或百分比；百分比在小批次中可能向上取整，因此需要明确最小批量。每组都应配置暂停、失败告警和人工继续条件，避免一个坏版本自动扩散到所有集群。", "subs": []}, {"title": "创建策略与删除策略怎样影响故障暂停和回滚", "content": "创建策略控制新 Application，删除策略控制集合缩小时的清理；失败时应暂停后续批次。回滚以 Git revert 为主，保留上一批次 revision 和生成参数。", "subs": []}, {"title": "为生成数量、SCM 限流和控制器异常建立观测点", "content": "监控生成 Application 数量、每轮耗时、队列深度、错误率、SCM API 剩余配额和控制器重启。为数量突增、生成失败和长时间未更新设置告警。\n\n#### 端到端演练：从一份清单到多集群滚动发布\n\n先用 List Generator 生成两个测试集群，再切换 Cluster Generator 按 `env=staging` 标签筛选。确认生成的 Application 名称、project、destination 和 namespace 都符合预期后，加入 Matrix 把“集群×服务”扩展成组合集合。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  generators:\n    - clusters:\n        selector:\n          matchLabels:\n            env: staging\n  strategy:\n    type: RollingSync\n    rollingSync:\n      steps:\n        - matchExpressions:\n            - key: env\n              operator: In\n              values: [staging]\n          maxUpdate: 1\n```\n\n最后在测试仓库删除一个目录，观察 ApplicationSet 事件、生成 Application 和业务资源的级联关系。只有确认删除策略、暂停方式和回滚 revision 都可用，才把 selector 扩展到生产集群。\n\n#### ApplicationSet 与 Application 的边界\n\nApplicationSet 的职责是“集合管理”，而不是替代 Application Controller。它读取生成器输入，计算期望的 Application 集合，再把每个成员写入 Kubernetes API。Application Controller 随后独立处理 Git manifest、资源比较、同步和健康检查。两个控制器的队列、缓存和权限并不相同。\n\n| 对象 | 所属控制器 | 主要输入 | 主要输出 | 常见故障 |\n| --- | --- | --- | --- | --- |\n| ApplicationSet | ApplicationSet Controller | generators、template、策略 | Application 对象 | 参数为空、模板错误、权限拒绝 |\n| Application | Application Controller | repo、revision、path、destination | Deployment、Service 等资源 | 仓库不可达、渲染失败、同步失败 |\n| 目标资源 | Kubernetes API | Application sync | 工作负载与配置 | admission 拒绝、配额不足、探针失败 |\n\n一个实际的调谐周期可以拆成五步：读取 ApplicationSet；执行生成器；渲染模板；比较现有 Application；提交增删改操作。任一步失败都应在 ApplicationSet status.conditions 中留下线索。值班人员不要只看生成的 Application 是否存在，还要检查 `kubectl describe applicationset` 的事件和 controller 日志。\n\n```bash\nkubectl -n argocd get applicationset payments -o yaml\nkubectl -n argocd describe applicationset payments\nkubectl -n argocd logs deploy/argocd-applicationset-controller --since=10m\nkubectl -n argocd get applications -l applicationset.argoproj.io/instance=payments\n```\n\n#### 调谐链路演练\n\n先提交一个只增加元素的 List Generator，观察 ApplicationSet 的 `observedGeneration` 是否追上 metadata.generation。再修改模板中的 destination namespace，确认所有成员的 spec 发生更新。最后故意把仓库地址改成无效值，验证 ApplicationSet 仍能生成对象，但 Application Controller 将其标记为 `ComparisonError`。\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: ApplicationSet\nmetadata:\n  name: payments\n  namespace: argocd\nspec:\n  generators:\n    - list:\n        elements:\n          - name: dev\n            server: https://dev.example.invalid\n  template:\n    metadata:\n      name: payments-{{name}}\n    spec:\n      project: default\n      source:\n        repoURL: https://git.example.invalid/platform/apps.git\n        targetRevision: main\n        path: payments\n      destination:\n        server: '{{server}}'\n        namespace: payments\n```\n\n期望结果是 ApplicationSet 条件保持健康、Application 对象创建成功，但 Application 的 repository 或 destination 状态明确显示失败原因。该实验能够说明“生成成功”和“交付成功”是两个独立指标。\n\n#### 事件与状态字段判读\n\n`status.conditions` 中的 `ErrorOccurred` 通常表示生成器或模板阶段错误；`ParametersGenerated` 表示生成器已经产生参数，但不代表 Application 已经成功同步；`ResourcesUpToDate` 只说明集合与期望集合一致。升级或重启后，短暂的 `Unknown` 可能来自缓存尚未恢复，应结合 controller ready 和队列指标判断。\n\n```bash\nkubectl -n argocd get applicationset payments \\\n  -o jsonpath='{range .status.conditions[*]}{.type}{\"=\"}{.message}{\"\\n\"}{end}'\n```\n\n将状态写入值班手册时，保留时间戳、observedGeneration 和 controller 版本。只记录“失败”而没有 message 会让后续无法区分网络、RBAC 和 schema 问题。\n\n#### 安装清单审查\n\n安装 ApplicationSet 前至少审查以下资源：CRD 是否与控制器版本匹配；ServiceAccount 是否拥有读取集群 Secret、仓库 Secret 和 Application 的权限；Deployment 是否有资源请求；NetworkPolicy 是否允许访问 Git、Kubernetes API 和 webhook；Webhook Service 是否有稳定端口。\n\n```bash\nkubectl api-resources | rg 'applicationsets|applications'\nkubectl -n argocd get deploy argocd-applicationset-controller -o wide\nkubectl -n argocd auth can-i get applications --as=system:serviceaccount:argocd:argocd-applicationset-controller\nkubectl -n argocd get events --sort-by=.lastTimestamp | tail -20\n```\n\n生产环境应固定镜像版本和 CRD 清单，不直接引用未验证的 `stable` 标签。升级前导出当前 ApplicationSet 与生成 Application 的 YAML，并保存 controller 日志，以便回滚后比较。\n\n#### 高可用与容量估算\n\nApplicationSet Controller 的副本数增加并不等于生成吞吐线性增加。控制器依靠 leader election 避免多个实例同时写入同一集合，非 leader 副本主要承担热备。容量规划应以每轮生成对象数量、Git/SCM API 延迟和 Kubernetes API QPS 为依据。\n\n| 规模 | 建议关注点 | 验收指标 |\n| --- | --- | --- |\n| 少于 50 个 Application | 单副本也可运行 | 调谐延迟小于 30 秒 |\n| 50 到 500 个 | 两副本、资源请求、缓存 | P95 调谐小于 2 分钟 |\n| 超过 500 个 | 分片、仓库拆分、SCM 限流 | 队列不持续增长 |\n\n```yaml\nresources:\n  requests:\n    cpu: 100m\n    memory: 256Mi\n  limits:\n    cpu: 1\n    memory: 1Gi\naffinity:\n  podAntiAffinity:\n    preferredDuringSchedulingIgnoredDuringExecution:\n      - weight: 100\n        podAffinityTerm:\n          topologyKey: topology.kubernetes.io/zone\n          labelSelector:\n            matchLabels:\n              app.kubernetes.io/name: argocd-applicationset-controller\n```\n\n#### 版本升级检查表\n\n升级前检查 ApplicationSet CRD 的 schema 是否增加或删除字段，确认 Go Template 行为和策略字段没有变化。先在测试命名空间应用新版本，再观察一整轮 generator refresh、创建、更新和删除。若使用插件生成器，还需验证插件 API 与超时配置。\n\n```bash\nkubectl get crd applicationsets.argoproj.io -o yaml > /tmp/applicationset-crd.before.yaml\nkubectl -n argocd rollout status deploy/argocd-applicationset-controller --timeout=5m\nkubectl -n argocd get applicationset -A -o json > /tmp/applicationset.after.json\n```\n\n回滚时优先恢复 controller 和 CRD 版本，再恢复仓库中的 ApplicationSet 规范。不要在控制器不兼容时手工编辑生成的 Application，因为下一轮调谐会覆盖手工修改。\n\n#### 规范字段速查\n\n| 字段 | 作用 | 典型值 | 风险 |\n| --- | --- | --- | --- |\n| `spec.generators` | 参数来源列表 | `list`、`clusters`、`git` | 结果数量失控 |\n| `spec.template` | Application 基线 | metadata、spec | 权限边界被模板放大 |\n| `spec.templatePatch` | 条件化补丁 | Go Template 字符串 | patch 不可读、覆盖错误 |\n| `spec.strategy` | Application 更新策略 | `RollingSync` | 扩散速度过快 |\n| `spec.syncPolicy` | 控制 ApplicationSet 自身行为 | `create-update` | 误删生成对象 |\n| `spec.goTemplateOptions` | 模板错误策略 | `missingkey=error` | 输入不完整时生成失败 |\n\n应用规范时先使用 `kubectl apply --server-side --dry-run=server`，让 API Server 校验字段类型；再用 `kubectl diff` 比较现有对象。对于大规模集合，把 generator 参数拆成独立文件并由 CI 做 schema 校验。\n\n#### Go Template 的类型陷阱\n\nGo Template 默认将许多值渲染成字符串。布尔值、数字和列表在嵌套字段中可能被错误地加引号，最终导致 Application schema 校验失败。使用 `toJson` 传递结构化值，使用 `quote` 只处理确实需要字符串的字段。\n\n```yaml\nmetadata:\n  labels:\n    environment: '{{ index .metadata.labels \"environment\" }}'\nspec:\n  source:\n    helm:\n      parameters:\n        - name: replicaCount\n          value: '{{ .replicas }}'\n```\n\n当启用 `missingkey=error` 时，所有元素都必须具备相同字段。若允许少数元素没有可选字段，应使用 `dig` 或预先在 generator 中填充默认值，而不是关闭错误保护。\n\n#### 模板测试方法\n\n把 ApplicationSet 文件放入独立测试目录，使用 `argocd appset` 命令或控制器 dry-run 能力渲染。测试至少覆盖空集合、单元素、多个元素、非法名称、缺失字段和重复名称。\n\n```bash\nargocd appset generate appset.yaml --loglevel debug > generated.yaml\nkubectl apply --dry-run=server -f generated.yaml\n```\n\nCI 中检查生成 Application 的名称集合是否稳定。名称顺序变化本身不应导致资源更新，但名称碰撞会导致后写对象覆盖前写对象，是必须阻断的错误。\n\n#### List Generator 字段设计\n\nList Generator 的每个 element 是一组键值。建议至少包含 `name`、`server`、`namespace`、`revision` 和 `project`，并把环境、区域、故障域作为标签字段。字段命名应与 Cluster Generator 产出的键保持一致，便于后续迁移。\n\n```yaml\ngenerators:\n  - list:\n      elements:\n        - name: cn-shanghai-staging\n          server: https://10.0.0.10\n          namespace: payments\n          revision: main\n          region: cn-shanghai\n          environment: staging\n```\n\n提交前运行脚本检查 name 唯一、server 合法、namespace 符合 DNS-1123，并拒绝 `environment=prod` 却使用非生产仓库 revision 的组合。\n\n#### List Generator 变更演练\n\n新增元素时应先观察 ApplicationSet diff，再允许 Application Controller 同步。删除元素前先确认目标 Application 是否有独立 owner，以及资源是否设置了 `preserveResourcesOnDeletion`。\n\n```bash\nkubectl -n argocd get appset payments -o jsonpath='{.status.resources[*].name}'\ngit diff -- appset/payments.yaml\nkubectl -n argocd annotate applicationset payments argocd.argoproj.io/application-set-refresh=true\n```\n\n演练记录应包含：旧元素集合、新元素集合、将删除的 Application、预计删除的业务资源和回滚提交。\n\n#### Cluster Generator 标签契约\n\nCluster Generator 读取 Argo CD 管理的 cluster Secret。标签既是筛选条件，也是平台团队与应用团队之间的契约。推荐使用 `env`、`region`、`tier`、`compliance` 等有限集合，并在注册集群时由平台自动写入。\n\n```yaml\ngenerators:\n  - clusters:\n      selector:\n        matchLabels:\n          env: prod\n          region: cn-shanghai\n      values:\n        rolloutGroup: primary\n```\n\n不要把任意用户可修改的 label 直接当作生产准入条件。对关键标签使用 admission policy 或集中式注册流程，防止用户把测试集群标记成 prod。\n\n#### Cluster Generator 与版本条件\n\nKubernetes 版本通常以 `kubeVersion` 元数据暴露。版本比较应在 generator 或外部准入层完成，不要依赖字符串字典序。升级窗口内可以用标签 `kube-major`、`kube-minor` 明确表达兼容范围。\n\n```yaml\nselector:\n  matchExpressions:\n    - key: env\n      operator: In\n      values: [staging, prod]\n    - key: kube-minor\n      operator: In\n      values: [28, 29]\n```\n\n当集群标签缺失时，生成结果为空并不一定是控制器故障。值班排查顺序是：确认集群 Secret 存在、标签是否拼写正确、selector 是否包含多个互斥条件。\n\n#### Git Directory Generator 目录约定\n\n目录生成器适合“一个目录一个应用”的仓库布局。推荐将环境覆盖与公共 base 分开，避免 `_base` 被误认为独立应用。目录名变更会产生旧 Application 删除和新 Application 创建，资源跟踪标签无法自动识别这是重命名。\n\n```text\napps/\n  payments/\n    base/\n    overlays/staging/\n    overlays/prod/\n  orders/\n    base/\n```\n\n```yaml\ngenerators:\n  - git:\n      repoURL: https://git.example.com/platform/apps.git\n      revision: main\n      directories:\n        - path: apps/*/overlays/*\n        - path: apps/*/base\n          exclude: true\n```\n\n重命名应采用“先创建新路径、验证资源、再删除旧路径”的两阶段提交，或保留旧路径一段时间并使用资源跟踪迁移方案。\n\n#### Git File Generator 的 schema\n\n文件生成器将匹配文件解析为参数。建议每个文件包含 `app`、`clusterSelector`、`path`、`namespace` 和 `owner`，并在 CI 使用 JSON Schema 校验。glob 应限制在固定目录，避免把 README 或临时文件解析为配置。\n\n```yaml\ngenerators:\n  - git:\n      repoURL: https://git.example.com/platform/config.git\n      revision: main\n      files:\n        - path: clusters/**/apps/*.yaml\n```\n\n文件内容被删除时，生成器会认为对应 Application 不再存在。删除文件前应运行集合差异脚本，并确认是否启用了删除保护。\n\n#### SCM Provider 凭据最小权限\n\nSCM Provider 需要访问组织、仓库和分支元数据。GitHub App 推荐只授予 metadata read、contents read、pull requests read；GitLab Token 仅授予 `read_api` 和 `read_repository`。凭据应放在专用 Secret，禁止复用开发者个人 Token。\n\n```yaml\napiVersion: v1\nkind: Secret\nmetadata:\n  name: scm-provider\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type: repository\nstringData:\n  type: github\n  githubAppID: \"12345\"\n  githubAppInstallationID: \"67890\"\n  githubAppPrivateKey: |-\n    -----BEGIN RSA PRIVATE KEY-----\n    REDACTED\n    -----END RSA PRIVATE KEY-----\n```\n\n轮换时先创建新 Secret，验证 API 调用成功后再删除旧 Secret。观察 controller 日志中的 rate limit 和认证错误，避免在高峰期同时刷新全部组织仓库。\n\n#### Pull Request 预览环境资源账单\n\nPR Generator 方便验证变更，但每个 PR 都可能创建 namespace、负载均衡器、PVC 和云数据库。模板应设置 ResourceQuota、LimitRange 和网络策略，并对外部资源使用 TTL 标签。预览环境的 owner 应来自 SCM 用户或团队映射，便于自动回收。\n\n```yaml\nmetadata:\n  name: preview-{{number}}\n  labels:\n    preview: \"true\"\n    pr: '{{number}}'\n    owner: '{{author}}'\nspec:\n  destination:\n    namespace: preview-{{number}}\n```\n\n关闭 PR 后确认 generator 不再返回该编号，再观察 Application 是否被删除。若删除失败，不要反复重试造成 API 压力，应读取事件并处理 finalizer 或外部资源依赖。\n\n#### Webhook 安全与延迟\n\nWebhook 只负责触发刷新，不应直接携带完整 Application 定义。入口应验证签名、限制来源 IP、设置请求体大小和速率。轮询周期作为兜底，不能设置得过短以免触发 SCM 限流。\n\n```bash\nkubectl -n argocd get secret argocd-secret -o jsonpath='{.data.webhook\\.github\\.secret}'\nkubectl -n argocd annotate applicationset payments argocd.argoproj.io/application-set-refresh=true --overwrite\n```\n\n记录 webhook 接收时间、刷新开始时间、生成完成时间，计算端到端延迟。只看 Git webhook 的 2xx 并不能证明 Application 已更新。\n\n#### Matrix 数量预算\n\nMatrix Generator 的输出数等于子生成器结果的笛卡尔积。集群 20 个、服务 30 个、环境 3 个时将产生 1,800 个 Application，远超许多控制器的默认容量。组合前先计算上界，并按团队、区域或环境拆分 ApplicationSet。\n\n```text\n总数 = |clusters| × |services| × |environments|\n预算 = 控制器可接受的 Application 数 × 安全系数(0.7)\n```\n\n在 CI 中对生成数量设置阈值，超过阈值必须人工审批。运行时监控 `argocd_applicationset_generated_applications` 等指标，发现突增立即暂停相关集合。\n\n#### Merge 覆盖优先级\n\nMerge Generator 需要明确 merge keys。基线元素提供默认仓库、项目和同步策略，覆盖元素只放例外字段。覆盖文件应短小，且通过测试证明缺失字段不会覆盖成空字符串。\n\n```yaml\ngenerators:\n  - merge:\n      mergeKeys: [name]\n      generators:\n        - list:\n            elements:\n              - name: prod\n                revision: stable\n                autoSync: \"false\"\n        - list:\n            elements:\n              - name: prod\n                revision: canary\n```\n\n审查时逐字段列出“基线值、覆盖值、最终值”。若多个覆盖项命中同一 merge key，结果依赖顺序，容易产生隐性变化，应在 CI 禁止重复键。\n\n#### Post Selector 变更保护\n\nPost Selector 在所有 generator 完成后过滤结果。它适合临时排除故障域，但不应成为长期的业务路由配置。修改 selector 前导出旧集合，计算删除集合，并设置变更阈值。\n\n```bash\nkubectl -n argocd get applications -l applicationset.argoproj.io/instance=payments -o name > /tmp/payments.before\nkubectl diff -f appset.yaml\ncomm -23 <(sort /tmp/payments.before) <(sort /tmp/payments.after)\n```\n\n当删除集合超过预期，先暂停 ApplicationSet 调谐，再回滚 selector 提交。不要用 `kubectl delete application` 代替恢复配置。\n\n#### 创建和删除策略矩阵\n\n| 场景 | 创建 | 更新 | 删除 | 推荐 |\n| --- | --- | --- | --- | --- |\n| 试运行 | 允许 | 禁止 | 禁止 | create-only |\n| 日常交付 | 允许 | 允许 | 禁止 | create-update |\n| 完整生命周期 | 允许 | 允许 | 允许 | sync + 明确删除保护 |\n| 灾难恢复 | 手工 | 手工 | 禁止 | 暂停自动策略 |\n\n策略变更本身也应走 Git 审批。生产集合从 create-update 切换到允许删除前，必须有备份、演练记录和回滚负责人。\n\n#### 删除级联实验\n\n在隔离集群创建一个 ApplicationSet，生成带有 PVC 的 Application。分别测试删除 ApplicationSet、删除单个 Application、删除仓库目录三种动作，记录 Kubernetes ownerReferences、finalizers 和业务资源是否保留。\n\n```bash\nkubectl -n argocd get app preview-dev -o jsonpath='{.metadata.ownerReferences}'\nkubectl -n argocd get app preview-dev -o jsonpath='{.metadata.finalizers}'\nkubectl -n preview get pvc\n```\n\n实验结束后确认云资源没有残留。对数据库、负载均衡器等非 Kubernetes 资源，删除保护必须由外部控制器或账单巡检补充。\n\n#### Any Namespace 权限分层\n\n启用 ApplicationSet in any namespace 后，至少存在三层权限：用户能否创建 ApplicationSet；控制器能否读取该命名空间的 ApplicationSet；生成的 Application 是否被允许使用某个 AppProject。任何一层过宽都可能突破租户隔离。\n\n```yaml\nrules:\n  - apiGroups: [argoproj.io]\n    resources: [applicationsets]\n    verbs: [get, list, watch, create, update, patch, delete]\n```\n\n建议按团队命名空间绑定 Role，而不是授予整个集群的 ClusterRole。AppProject 的 sourceRepos、destinations 和 namespaceResourceWhitelist 仍是最终准入边界。\n\n#### Templated Project 风险\n\n如果 ApplicationSet 模板允许用户控制 `spec.project`，用户可能选择拥有集群管理员权限的项目。平台应使用固定 project 或由 generator 映射到 allowlist，并拒绝任意模板表达式。\n\n```yaml\nspec:\n  project: tenant-a\n  destination:\n    server: '{{server}}'\n```\n\n对模板仓库启用 CODEOWNERS 和强制审查；对 project、destination.server、source.repoURL 等字段建立策略检查。安全测试应包含“替换为 platform-admin 项目”“替换为任意集群”“替换为不可信仓库”三类负向用例。\n\n#### RollingSync 批次模型\n\nRollingSync 将 Application 按标签表达式分组，每个 step 完成后才进入下一个 step。批次不是 Kubernetes Deployment 的 pod 分批，而是 Application 级别的同步编排；单个 Application 内的资源顺序仍由 Sync Wave 决定。\n\n```yaml\nstrategy:\n  type: RollingSync\n  rollingSync:\n    steps:\n      - matchExpressions:\n          - key: rollout\n            operator: In\n            values: [canary]\n        maxUpdate: 1\n      - matchExpressions:\n          - key: rollout\n            operator: In\n            values: [stable]\n        maxUpdate: 25%\n```\n\n标签必须在模板中稳定生成。若标签来自可变 SCM 元数据，批次成员可能在一次发布中漂移，导致重复或跳过。\n\n#### RollingSync 失败与恢复\n\n当某一批 Application 健康检查失败时，后续批次应保持未开始状态。值班人员先确认失败是业务探针、仓库渲染还是集群连接，再决定修复、跳过或回滚。跳过批次会改变发布审计记录，必须记录人工批准。\n\n```bash\nkubectl -n argocd get applications -l applicationset.argoproj.io/instance=payments \\\n  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REV:.status.sync.revision\nkubectl -n argocd describe applicationset payments\n```\n\n回滚优先使用 Git revert 恢复上一 revision，再让 RollingSync 按同样批次反向发布。不要直接把生成 Application 的 targetRevision 改成旧值，因为下一次模板调谐可能覆盖该手工操作。\n\n#### 观测指标与告警阈值\n\n至少采集生成数量、调谐错误、调谐耗时、队列深度、工作队列重试、SCM 请求速率、API Server 429、controller 重启次数和 RollingSync 当前步骤。指标名称因版本可能变化，应先通过 `/metrics` 核对实际暴露名称。\n\n```bash\nkubectl -n argocd port-forward svc/argocd-metrics 8082:8082\ncurl -s http://127.0.0.1:8082/metrics | rg 'applicationset|workqueue|scm'\n```\n\n推荐告警：生成数量 10 分钟内增长超过 2 倍；调谐错误持续 5 分钟；SCM 剩余配额低于 20%；队列长度持续增长；RollingSync 处于同一步骤超过发布窗口。告警消息应附 ApplicationSet 名称、当前 revision 和 runbook 链接。\n\n#### 生产发布验收清单\n\n1. 生成器输入来源已审查，仓库和 SCM 凭据为只读最小权限。\n2. 模板使用 `missingkey=error`，名称、项目、集群和命名空间均通过策略校验。\n3. 生成数量小于预算，矩阵和 selector 的集合差异已人工确认。\n4. ApplicationSet 与 Application 的 owner、finalizer、删除策略符合设计。\n5. RollingSync 的 canary、批次大小、暂停条件和回滚 revision 已演练。\n6. 控制器高可用、资源请求、API QPS、SCM 限流和监控告警已验收。\n\n#### 自测题\n\n1. 为什么 ApplicationSet 显示成功而 Application 仍可能 OutOfSync？\n2. Matrix Generator 的结果数量如何估算，何时必须拆分集合？\n3. 删除 Git 目录时，哪些对象可能被级联删除，如何先做集合差异？\n4. 为什么不能让租户任意设置 `spec.project`？\n5. RollingSync 与 Application 内 Sync Wave 的职责有什么区别？\n\n参考答案：ApplicationSet 只负责生成 Application；数量是各子生成器结果的乘积；删除目录会移除对应 Application 并可能触发资源删除；project 决定仓库、集群和资源权限；RollingSync 控制 Application 之间的批次，Sync Wave 控制单个 Application 内资源顺序。\n\n#### 附录 · ApplicationSet 实验手册\n\n#### 实验一：建立最小 List Generator\n\n目标是验证从两个元素生成两个 Application 的完整路径。实验使用独立项目和测试集群，避免默认项目拥有过大的资源范围。\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: ApplicationSet\nmetadata:\n  name: lab-list\n  namespace: argocd\nspec:\n  generators:\n    - list:\n        elements:\n          - app: nginx\n            cluster: dev\n            server: https://kubernetes.default.svc\n          - app: redis\n            cluster: dev\n            server: https://kubernetes.default.svc\n  template:\n    metadata:\n      name: '{{app}}-{{cluster}}'\n      labels:\n        lab: applicationset\n    spec:\n      project: default\n      source:\n        repoURL: https://github.com/example/platform-manifests.git\n        targetRevision: main\n        path: '{{app}}'\n      destination:\n        server: '{{server}}'\n        namespace: '{{app}}'\n```\n\n应用后检查对象数量：\n\n```bash\nkubectl apply -f lab-list.yaml\nkubectl -n argocd get applicationset lab-list\nkubectl -n argocd get applications -l lab=applicationset\n```\n\n预期输出包含 `nginx-dev` 和 `redis-dev`。若只有 ApplicationSet 没有 Application，查看 controller 日志中的模板解析错误。若 Application 数量正确但状态为 Unknown，检查 destination server 是否与 cluster Secret 的 server 完全一致。\n\n删除其中一个 element，先使用 `kubectl diff` 观察集合差异，再确认 `syncPolicy` 是否允许删除。实验结束后使用 Git 回滚，而不是只删除生成对象。\n\n#### 实验二：Cluster Generator 标签选择\n\n目标是验证标签筛选不会把错误环境纳入生产集合。先为三个已注册集群添加明确标签：\n\n```bash\nargocd cluster set https://dev.example.com --label env=dev --label region=cn-east\nargocd cluster set https://staging.example.com --label env=staging --label region=cn-east\nargocd cluster set https://prod.example.com --label env=prod --label region=cn-north\nargocd cluster list\n```\n\nApplicationSet 使用 `matchLabels` 选择 staging：\n\n```yaml\ngenerators:\n  - clusters:\n      selector:\n        matchLabels:\n          env: staging\n          region: cn-east\n```\n\n验证步骤：\n\n```bash\nkubectl -n argocd get applications -l env=staging\nkubectl -n argocd get applicationset lab-clusters -o yaml\n```\n\n故意将 `env` 改为 `production`，观察集合变为空。空集合不是删除保护的替代品；如果策略允许删除，控制器可能删除全部 Application。生产 selector 变更必须经过集合差异审批。\n\n#### 实验三：Git Directory 排除规则\n\n仓库布局如下：\n\n```text\nservices/\n  api/overlays/dev\n  api/overlays/prod\n  web/overlays/dev\n  web/overlays/prod\n  _base\n  README.md\n```\n\n对应配置：\n\n```yaml\ngenerators:\n  - git:\n      repoURL: https://github.com/example/apps.git\n      revision: main\n      directories:\n        - path: services/*/overlays/*\n        - path: services/_base\n          exclude: true\n```\n\n测试清单：\n\n| 操作 | 预期 |\n| --- | --- |\n| 新增 `services/job/overlays/dev` | 新增一个 Application |\n| 修改 `_base` | 不新增 Application，但已存在对象会刷新 |\n| 新增 README | 不产生 Application |\n| 重命名 `web` 为 `frontend` | 旧对象删除、新对象创建 |\n\n目录 generator 的路径是相对仓库根目录的路径。仓库根目录改变、分支改变或 glob 过宽都会造成集合变化。CI 应将生成结果保存为构建产物，供审查者查看。\n\n#### 实验四：Git File 配置校验\n\n文件内容示例：\n\n```yaml\napp: checkout\nowner: commerce\nenvironment: staging\nclusterSelector:\n  env: staging\npath: services/checkout\nnamespace: checkout\n```\n\nApplicationSet 配置：\n\n```yaml\ngenerators:\n  - git:\n      repoURL: https://github.com/example/config.git\n      revision: main\n      files:\n        - path: environments/**/apps/*.yaml\n```\n\n在 CI 中验证必填字段：\n\n```bash\nyq -e '.app and .owner and .environment and .path and .namespace' environments/staging/apps/checkout.yaml\n```\n\n缺字段时应让流水线失败。不要在模板中用空字符串兜底，因为空 namespace 或 path 可能被解释为默认值，导致资源发布到错误位置。\n\n#### 实验五：Matrix 组合与数量保护\n\n准备两个集群元素和三个服务元素，预期生成六个 Application。为每个子 generator 使用不同前缀，避免 `name` 键冲突。\n\n```yaml\ngenerators:\n  - matrix:\n      generators:\n        - clusters:\n            selector:\n              matchLabels:\n                env: staging\n        - list:\n            elements:\n              - service: api\n                path: services/api\n              - service: web\n                path: services/web\n              - service: worker\n                path: services/worker\n```\n\n模板名称：\n\n```yaml\nmetadata:\n  name: '{{name}}-{{service}}'\n```\n\n验证笛卡尔积：\n\n```bash\nkubectl -n argocd get applications -l applicationset.argoproj.io/instance=lab-matrix --no-headers | wc -l\n```\n\n扩展到生产前给数量设置硬阈值。若集群数从 10 增长到 100，服务数从 5 增长到 30，数量会从 50 变成 3,000，控制器内存、API Server 写入和 SCM 读取都会同时放大。\n\n#### 实验六：Merge 基线与例外\n\n基线集合声明所有环境使用稳定 revision：\n\n```yaml\ngenerators:\n  - merge:\n      mergeKeys: [env]\n      generators:\n        - list:\n            elements:\n              - env: dev\n                revision: main\n              - env: staging\n                revision: stable\n              - env: prod\n                revision: stable\n        - list:\n            elements:\n              - env: staging\n                revision: canary\n```\n\n预期 staging 使用 canary，dev 和 prod 仍使用基线值。若 merge key 使用了 `name` 而元素只提供 `env`，覆盖项不会命中，结果仍为 stable。审查时必须检查 key 是否真的存在于两个 generator 输出中。\n\n#### 实验七：Post Selector 故障域隔离\n\n当一个区域出现容量问题时，可以临时过滤该区域：\n\n```yaml\ngenerators:\n  - clusters:\n      selector:\n        matchLabels:\n          env: prod\n  postSelector:\n    matchExpressions:\n      - key: region\n        operator: NotIn\n        values: [cn-east]\n```\n\n该配置会让 cn-east 的 Application 从期望集合中消失。若删除策略开启，可能触发删除。临时隔离更安全的做法是保留对象、暂停同步或把 rollout 标签移出当前批次，并在变更单中记录恢复时间。\n\n#### 实验八：模板补丁的条件化字段\n\n基础模板统一启用自动同步，但生产环境要求人工确认：\n\n```yaml\ntemplate:\n  spec:\n    syncPolicy:\n      automated: {}\ntemplatePatch: |\n  spec:\n    syncPolicy:\n      automated: null\n  {{- if eq .environment \"prod\" }}\n    syncPolicy: {}\n  {{- end }}\n```\n\n实际项目中应尽量使用 generator 字段直接表达差异，只有字段结构无法通过普通模板表达时才使用 patch。Patch 语法错误通常在整个集合层面失败，影响范围大于单个 Application。\n\n#### 实验九：Any Namespace 租户隔离\n\n为租户 `team-a` 创建 namespace 和 Role，只允许操作该 namespace 的 ApplicationSet：\n\n```yaml\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: team-a-applicationsets\n  namespace: team-a\nrules:\n  - apiGroups: [argoproj.io]\n    resources: [applicationsets]\n    verbs: [get, list, watch, create, update, patch, delete]\n```\n\nAppProject 进一步限制来源和目标：\n\n```yaml\nspec:\n  sourceRepos:\n    - https://github.com/example/team-a-*\n  destinations:\n    - namespace: team-a-*\n      server: https://cluster.example.com\n  namespaceResourceWhitelist:\n    - group: apps\n      kind: Deployment\n    - group: \"\"\n      kind: Service\n```\n\n负向测试包括：创建指向 team-b 的 namespace；使用平台管理员 project；引用不在 allowlist 的仓库；创建 ClusterRole。四类操作都应被拒绝或在 Application 状态中保持不可同步。\n\n#### 实验十：删除保护与恢复\n\n在测试环境设置 `preserveResourcesOnDeletion: true`，然后删除 ApplicationSet。验证 Application 是否被删除、业务 Deployment 是否保留。再将策略改为 false，重复实验并记录差异。\n\n```yaml\nspec:\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n恢复流程：\n\n1. 从 Git 恢复 ApplicationSet 提交。\n2. 确认生成器返回原集合。\n3. 检查 Application ownerReferences 是否重新建立。\n4. 对保留的业务资源执行资源跟踪核对。\n5. 仅在确认 revision 后恢复自动同步。\n\n如果对象卡在删除中，先查看 finalizer 和事件，不要直接移除 finalizer。移除 finalizer 可能跳过控制器清理逻辑，留下孤儿资源。\n\n#### 实验十一：Pull Request 生命周期\n\nPR Generator 的最小配置：\n\n```yaml\ngenerators:\n  - pullRequest:\n      github:\n        owner: example\n        repo: checkout\n        labels: [preview]\n      requeueAfterSeconds: 180\ntemplate:\n  metadata:\n    name: checkout-pr-{{number}}\n  spec:\n    source:\n      repoURL: https://github.com/example/checkout.git\n      targetRevision: '{{head_sha}}'\n      path: deploy/preview\n    destination:\n      namespace: checkout-pr-{{number}}\n      server: https://kubernetes.default.svc\n```\n\n测试打开 PR、添加 label、推送新提交、关闭 PR 四个事件。每一步都记录 Application 的 targetRevision、namespace 和健康状态。关闭 PR 后，确认 ApplicationSet 不再返回该 PR，且 namespace、PVC、Ingress 和外部 DNS 均按预期清理。\n\n#### 实验十二：Webhook 与轮询兜底\n\n模拟 webhook 签名错误，确认请求被拒绝且不会触发刷新。随后等待轮询周期，确认控制器仍能发现 Git 或 PR 变化。\n\n```bash\nkubectl -n argocd logs deploy/argocd-applicationset-controller | rg 'webhook|refresh|rate limit'\nkubectl -n argocd annotate applicationset lab-pr \\\n  argocd.argoproj.io/application-set-refresh=true --overwrite\n```\n\n刷新注解适合单次运维动作，不应被脚本高频调用。若需要持续低延迟，优先修复 webhook 网络、签名和服务发现问题，并保留合理的轮询周期。\n\n#### 实验十三：Plugin Generator 超时\n\n插件服务应返回稳定 JSON：\n\n```json\n{\n  \"elements\": [\n    {\"name\": \"dev\", \"server\": \"https://dev.example.com\", \"revision\": \"main\"}\n  ]\n}\n```\n\n服务端设置 5 秒超时、最大响应体 1 MiB 和 schema 校验。模拟服务不可用时，ApplicationSet 应报告生成错误，不能使用上一次结果静默扩大或缩小发布集合。对于临时缓存，应标明时间戳和过期时间。\n\n#### 实验十四：RollingSync Canary 到全量\n\n准备 `rollout=canary` 的一个集群和 `rollout=stable` 的三个集群。第一步只更新 canary，健康后第二步每次更新一个 stable。\n\n```yaml\nstrategy:\n  type: RollingSync\n  rollingSync:\n    steps:\n      - matchExpressions:\n          - key: rollout\n            operator: In\n            values: [canary]\n        maxUpdate: 1\n      - matchExpressions:\n          - key: rollout\n            operator: In\n            values: [stable]\n        maxUpdate: 1\n```\n\n演练中故意让 canary 的 Deployment 探针失败，确认 stable 不会开始。修复后再次触发，确认 canary 使用目标 revision，再继续 stable。记录每批开始和结束时间，形成审计链。\n\n#### 实验十五：容量与限流压测\n\n在测试控制器上逐步增加 List 元素数量，观察调谐耗时、内存和 API Server 429。每次只增加一倍，并在队列恢复后继续。\n\n```bash\nkubectl -n argocd top pod -l app.kubernetes.io/name=argocd-applicationset-controller\nkubectl get --raw /apis/metrics.k8s.io/v1beta1/namespaces/argocd/pods | jq '.items[] | select(.metadata.name|contains(\"applicationset\"))'\n```\n\n压测结果应记录元素数量、生成 Application 数、Git 请求数、平均调谐耗时、P95/P99、峰值内存和错误数。用结果反推生产容量，而不是仅按集群数量估算。\n\n#### 实验十六：回滚演练记录模板\n\n```markdown\nApplicationSet 回滚记录\n- ApplicationSet：\n- 触发时间：\n- 故障现象：\n- 当前 Git revision：\n- 上一个已验证 revision：\n- 受影响 Application 数：\n- 已完成批次：\n- 未开始批次：\n- 业务资源处理：保留/删除/人工确认\n- 回滚提交：\n- 验收人：\n```\n\n回滚后逐项检查生成集合、Application revision、同步状态、健康状态和告警恢复。对于已经成功发布的批次，回滚应遵循同样的 RollingSync 顺序，避免瞬间把所有集群切回旧版本。\n\n#### 实验十七：常见错误与修复路径\n\n| 错误信息 | 优先检查 | 修复动作 |\n| --- | --- | --- |\n| `failed to replace parameters` | 模板变量拼写 | 开启 missingkey=error 并补字段 |\n| `permission denied` | ServiceAccount RBAC | 增加最小资源权限 |\n| `no matching clusters` | Secret 标签 | 修正标签或 selector |\n| `duplicate application name` | Matrix/Merge 键 | 加入集群或服务前缀 |\n| `repository not accessible` | repo Secret、网络 | 验证凭据和 NetworkPolicy |\n| `context deadline exceeded` | SCM/API 延迟 | 增加超时并降低轮询频率 |\n\n每类错误都应保留原始事件、controller 日志和 Git revision。修复后先让单个测试元素恢复，再扩大 selector，避免一次性重放全部集合。\n\n#### 实验十八：平台交接检查\n\n交接给值班团队时，至少提供 ApplicationSet 清单、生成器输入仓库、可信 SCM 凭据 owner、AppProject 权限矩阵、删除和回滚 runbook、指标面板、告警联系人及最近一次演练记录。\n\n```bash\nkubectl get applicationset -A -o yaml > applicationsets-backup.yaml\nkubectl get appproject -n argocd -o yaml > appprojects-backup.yaml\nargocd cluster list > clusters.txt\nargocd repo list > repositories.txt\n```\n\n备份文件含有 endpoint 和 metadata，提交到受控存储前应脱敏 token、证书和私钥。交接验收以另一名工程师能否在测试集群完成一次创建、暂停、回滚和删除演练为准。\n\n#### 运行专题：生成器输入审计\n\n本专题围绕生成器输入审计建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n集群标签治理\n\n本专题围绕集群标签治理建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n目录重命名迁移\n\n本专题围绕目录重命名迁移建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n文件配置校验\n\n本专题围绕文件配置校验建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nSCM 凭据轮换\n\n本专题围绕SCM 凭据轮换建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nPR 预览回收\n\n本专题围绕PR 预览回收建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nWebhook 去重\n\n本专题围绕Webhook 去重建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n插件超时控制\n\n本专题围绕插件超时控制建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nMatrix 数量预算\n\n本专题围绕Matrix 数量预算建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nMerge 冲突检测\n\n本专题围绕Merge 冲突检测建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nSelector 变更审批\n\n本专题围绕Selector 变更审批建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n模板字段校验\n\n本专题围绕模板字段校验建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n删除级联保护\n\n本专题围绕删除级联保护建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nAny Namespace RBAC\n\n本专题围绕Any Namespace RBAC建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nProject Allowlist\n\n本专题围绕Project Allowlist建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nCanary 批次设计\n\n本专题围绕Canary 批次设计建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nRollingSync 失败暂停\n\n本专题围绕RollingSync 失败暂停建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n发布回滚\n\n本专题围绕发布回滚建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n控制器容量压测\n\n本专题围绕控制器容量压测建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nAPI 限流监控\n\n本专题围绕API 限流监控建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n仓库分支策略\n\n本专题围绕仓库分支策略建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\nRevision 固定\n\n本专题围绕Revision 固定建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n资源跟踪核对\n\n本专题围绕资源跟踪核对建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n多集群故障域\n\n本专题围绕多集群故障域建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n租户模板发布\n\n本专题围绕租户模板发布建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n附加组件分层\n\n本专题围绕附加组件分层建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n外部决策资源\n\n本专题围绕外部决策资源建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n状态条件判读\n\n本专题围绕状态条件判读建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n升级兼容验收\n\n本专题围绕升级兼容验收建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```\n\n灾备恢复演练\n\n本专题围绕灾备恢复演练建立可重复的操作流程。变更前先导出 ApplicationSet、Application 和 AppProject，记录当前 Git revision、生成数量与目标集群集合。所有命令在测试命名空间先执行，确认 dry-run 结果后再提交生产变更。\n\n```bash\nkubectl -n argocd get applicationset -o yaml\nkubectl -n argocd get applications -o wide\nkubectl -n argocd describe applicationset <name>\nargocd appset generate <file.yaml> --loglevel debug\n```\n\n验收时同时查看控制器事件和生成 Application 状态。ApplicationSet 成功只代表集合计算成功，Application 还需要能够读取仓库、连接目标集群、渲染 manifest，并通过健康检查。若结果异常，先冻结 selector 或暂停同步，再收集日志，不要直接删除对象。\n\n| 检查项 | 通过标准 | 失败处理 |\n| --- | --- | --- |\n| 输入集合 | 数量与审批单一致 | 回滚输入或 selector |\n| 模板渲染 | 无缺失键和名称碰撞 | 修复 schema 后重试 |\n| 权限边界 | project、repo、cluster 在 allowlist | 拒绝并通知 owner |\n| 删除风险 | 删除集合为空或已确认 | 保留对象并暂停 |\n| 发布状态 | 批次健康且 revision 正确 | 停止后续批次 |\n\n故障复盘至少回答四个问题：哪个控制器首先发现异常；异常影响了多少 Application；是否发生了业务资源删除；怎样通过 Git 提交、策略或权限测试避免再次发生。复盘结论应更新 runbook 和 CI 校验，而不是只留下聊天记录。\n\n```yaml\nspec:\n  goTemplate: true\n  goTemplateOptions: [missingkey=error]\n  syncPolicy:\n    preserveResourcesOnDeletion: true\n```", "subs": ["端到端演练：从一份清单到多集群滚动发布", "ApplicationSet 与 Application 的边界", "调谐链路演练", "事件与状态字段判读", "安装清单审查", "高可用与容量估算", "版本升级检查表", "规范字段速查", "Go Template 的类型陷阱", "模板测试方法", "List Generator 字段设计", "List Generator 变更演练", "Cluster Generator 标签契约", "Cluster Generator 与版本条件", "Git Directory Generator 目录约定", "Git File Generator 的 schema", "SCM Provider 凭据最小权限", "Pull Request 预览环境资源账单", "Webhook 安全与延迟", "Matrix 数量预算", "Merge 覆盖优先级", "Post Selector 变更保护", "创建和删除策略矩阵", "删除级联实验", "Any Namespace 权限分层", "Templated Project 风险", "RollingSync 批次模型", "RollingSync 失败与恢复", "观测指标与告警阈值", "生产发布验收清单", "自测题", "附录 · ApplicationSet 实验手册", "实验一：建立最小 List Generator", "实验二：Cluster Generator 标签选择", "实验三：Git Directory 排除规则", "实验四：Git File 配置校验", "实验五：Matrix 组合与数量保护", "实验六：Merge 基线与例外", "实验七：Post Selector 故障域隔离", "实验八：模板补丁的条件化字段", "实验九：Any Namespace 租户隔离", "实验十：删除保护与恢复", "实验十一：Pull Request 生命周期", "实验十二：Webhook 与轮询兜底", "实验十三：Plugin Generator 超时", "实验十四：RollingSync Canary 到全量", "实验十五：容量与限流压测", "实验十六：回滚演练记录模板", "实验十七：常见错误与修复路径", "实验十八：平台交接检查", "运行专题：生成器输入审计"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
