@@ -51,7 +51,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 79 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 88 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
@@ -60,7 +60,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 | 云原生 | [Docker](./topics/cloud-native/docker/) · [Helm](./topics/cloud-native/helm/) · [Kubernetes](./topics/cloud-native/kubernetes/) · [Kubernetes 容器网络](./topics/cloud-native/kubernetes-networking/) · [Consul](./topics/cloud-native/consul/) · [etcd](./topics/cloud-native/etcd/) |
 | 可观测性 | [Prometheus](./topics/observability/prometheus/) · [Kube-Prometheus](./topics/observability/kube-prometheus/) · [VictoriaMetrics](./topics/observability/victoria-metrics/) · [VictoriaMetrics Flags](./topics/observability/victoria-metrics-flags/) · [VictoriaMetrics PromQL](./topics/observability/victoria-metrics-promql/) |
 | 数据系统 | [MySQL](./topics/data-systems/mysql/) · [Kafka](./topics/data-systems/kafka/) · [RabbitMQ](./topics/data-systems/rabbitmq/) |
-| 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) · [Argo CD](./topics/delivery/argo-cd/) |
+| 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) · [GitOps](./topics/delivery/gitops/) · [Argo CD](./topics/delivery/argo-cd/) |
 | Web 基础设施 | [Nginx](./topics/web/nginx/) |
 | AI 基础设施 | [GPU AI Infrastructure](./topics/ai-infrastructure/gpu/) |
 | AIOps | [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |

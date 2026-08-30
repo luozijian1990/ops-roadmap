@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kubernetes 学习笔记 · 第六册：应用运行就绪实验 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kubernetes 学习笔记 · 第六册：应用运行就绪实验</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Kubernetes 学习笔记 · 第六册：应用运行就绪实验", "intro": "", "parts": [{"title": "第 1 章 · 建立可重复的实验环境与证据基线", "sections": [{"title": "示例应用需要暴露哪些可验证行为", "content": "本册不是用一个只返回 Hello World 的 Pod 演示命令，而是把 Docker 05 产出的同一 `runtime-lab` 镜像反复部署、破坏和恢复。应用必须暴露足够行为，让工作负载、配置、网络、资源、探针和终止实验都有可观察结果。\n\n| 接口/行为 | 正常结果 | 可注入失败 | 证据 |\n|---|---|---|---|\n| `GET /version` | 版本、Commit、架构、Pod UID | 错误 Digest 或旧副本 | 响应 JSON 与 Pod `imageID` |\n| `GET /livez` | 进程可继续工作时 200 | 内部死锁模拟 | 探针、重启次数、日志 |\n| `GET /readyz` | 可接收新流量时 200 | 依赖不可达、配置错误 | EndpointSlice Ready 条件 |\n| `POST /items` | 幂等键写入 | 依赖超时、重复请求 | 请求 ID、状态码、数据结果 |\n| `GET /items` | 返回已写数据 | 数据卷丢失 | 前后值对照 |\n| `/metrics` | 请求、错误、延迟、关闭指标 | 指标缺失 | 抓取时间与样本 |\n| SIGTERM | 摘流、排空、退出 | 忽略信号、超时 | 删除时间线和未完成请求 |\n| stdout/stderr | JSON 日志 | Secret/多行异常 | 脱敏和关联字段 |\n\n统一 `/version` 示例：\n\n```json\n{\n  \"service\": \"runtime-lab\",\n  \"version\": \"1.4.0\",\n  \"commit\": \"0123456789abcdef0123456789abcdef01234567\",\n  \"arch\": \"arm64\",\n  \"podName\": \"runtime-lab-7c8d9f6b5d-abcde\",\n  \"podUid\": \"RECORD_AT_RUNTIME\"\n}\n```\n\nPod 通过 Downward API 获得名称和 UID，不把它们烧进镜像：\n\n```yaml\nenv:\n  - name: POD_NAME\n    valueFrom:\n      fieldRef:\n        fieldPath: metadata.name\n  - name: POD_UID\n    valueFrom:\n      fieldRef:\n        fieldPath: metadata.uid\n  - name: APP_VERSION\n    value: \"1.4.0\"\n```\n\n应用要把健康与依赖拆开。`/livez` 不因短时数据库故障失败；`/readyz` 可以在无法安全处理请求时失败，从 Service 后端摘除；`/metrics` 不作为业务健康端点。接口返回中不暴露 Secret、连接串或内部 Token。\n\n先在容器层验证契约，再进入集群。Kubernetes 实验若失败，才能区分是镜像本身还是集群对象。容器化证据见[Docker 第五册](../docker/05-application-containerization-and-multi-platform-builds.md)。", "subs": []}, {"title": "Kind 集群、入口和指标组件如何固定实验条件", "content": "可重复实验先固定版本、节点、端口、CNI 和附加组件。Kind 默认网络是否执行 NetworkPolicy 不能靠猜测；本册的网络隔离实验必须安装并记录明确支持 Enforcement 的 CNI，再用允许/拒绝请求证明策略真实生效。\n\n```yaml\nkind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nname: runtime-readiness\nnetworking:\n  disableDefaultCNI: true\n  podSubnet: 10.244.0.0/16\n  serviceSubnet: 10.96.0.0/16\nnodes:\n  - role: control-plane\n    extraPortMappings:\n      - containerPort: 30080\n        hostPort: 18080\n        listenAddress: 127.0.0.1\n        protocol: TCP\n  - role: worker\n  - role: worker\n```\n\n实验参数清单：\n\n```yaml\ncluster:\n  kindVersion: RECORD_AT_RUNTIME\n  nodeImage: kindest/node@sha256:RECORD_DIGEST\n  kubernetesVersion: RECORD_AT_RUNTIME\nnetwork:\n  cni: RECORD_CNI_NAME\n  cniVersion: RECORD_CNI_VERSION\n  policyEnforcementVerified: false\nentry:\n  implementation: RECORD_CONTROLLER_OR_GATEWAY\n  version: RECORD_AT_RUNTIME\nmetrics:\n  metricsServerVersion: RECORD_AT_RUNTIME\n  apiAvailable: false\n```\n\n创建后保存环境，不把命令成功当组件 Ready：\n\n```bash\nkind create cluster --config kind.yaml --image kindest/node@sha256:RECORD_DIGEST\nkubectl cluster-info --context kind-runtime-readiness\nkubectl get nodes -o wide\nkubectl get pods -A -o wide\nkubectl api-resources > evidence/api-resources.txt\nkubectl version -o yaml > evidence/kubectl-version.yaml\n```\n\nCNI 安装清单必须固定版本或 Digest，并在应用前等待 DaemonSet/Deployment Ready。NetworkPolicy 基线用三组 Pod：client-allowed、client-denied、server。先证明无策略时两者都能访问；应用默认拒绝后两者都失败；增加 allow 后仅 allowed 成功。\n\n```bash\nkubectl -n runtime-lab exec client-allowed -- curl -fsS http://server:8080/livez\nkubectl -n runtime-lab exec client-denied -- curl -fsS http://server:8080/livez\n# 实际执行时保存两组退出码和时间，不能只保存 NetworkPolicy 对象。\n```\n\nMetrics Server 验收同时看 APIService、Deployment 和真实指标：\n\n```bash\nkubectl get apiservice v1beta1.metrics.k8s.io -o yaml\nkubectl -n kube-system rollout status deployment/metrics-server --timeout=120s\nkubectl top nodes\nkubectl top pods -A\n```\n\n入口实现同样需要 Controller/Gateway 状态与真实 Host/Path 请求。没有安装 Gateway Controller 时，Gateway API YAML 只能做静态验证，不能写成数据面已生效。", "subs": []}, {"title": "如何使用固定 Digest、Namespace 和清理脚本保证重放", "content": "实验必须固定 `repository@sha256:...`，不能使用可移动 Tag。Namespace 同时承载实验 ID、Pod Security 标签、资源配额和清理边界；集群级资源仍需单独登记，删除 Namespace 不会自动清理 CRD、ClusterRole 或 StorageClass。\n\n```yaml\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: runtime-lab\n  labels:\n    app.kubernetes.io/part-of: runtime-readiness-lab\n    lab.example/experiment-id: p1-runtime-001\n    pod-security.kubernetes.io/enforce: restricted\n    pod-security.kubernetes.io/enforce-version: latest\n    pod-security.kubernetes.io/warn: restricted\n    pod-security.kubernetes.io/audit: restricted\n```\n\n```yaml\nimage:\n  repository: registry.example.invalid/platform/runtime-lab\n  digest: sha256:RECORD_FROM_DOCKER_05\nexperiment:\n  id: p1-runtime-001\n  namespace: runtime-lab\n  owner: operator@example.invalid\n  startedAt: RECORD_AT_RUNTIME\n  expiresAt: RECORD_AT_RUNTIME\n```\n\n执行前确认当前上下文，避免把实验清单打到其他集群：\n\n```bash\nexpected_context='kind-runtime-readiness'\ntest \"$(kubectl config current-context)\" = \"$expected_context\"\nkubectl auth can-i create namespace\nkubectl apply --server-side --dry-run=server -f namespace.yaml\nkubectl apply -f namespace.yaml\n```\n\n资源统一带实验标签，清理前先生成快照：\n\n```bash\nkubectl get all,configmap,secret,pvc,networkpolicy,hpa,pdb \\\n  -n runtime-lab \\\n  -l lab.example/experiment-id=p1-runtime-001 \\\n  -o yaml > evidence/pre-cleanup.yaml\n\nkubectl delete namespace runtime-lab --wait=true --timeout=180s\nkubectl get namespace runtime-lab && exit 1 || true\n```\n\n若 Namespace 卡在 Terminating，不直接移除 finalizer。先列出残留 API、对象 finalizer 和不可用 webhook；处理真正的外部清理或 API 问题后再观察。Kind 集群本身只有在全部实验完成、证据导出后才删除。", "subs": []}, {"title": "每个实验应该保存哪些对象、事件、日志、指标和请求", "content": "证据分四层：静态清单说明想要什么，API 响应说明服务器接受什么，控制器状态说明系统做到哪一步，真实请求/进程结果说明用户实际得到什么。任何单层都不能替代其余层。\n\n```mermaid\nflowchart LR\n    Manifest[\"Desired manifest\"] --> Api[\"API accepted object\"]\n    Api --> Controller[\"Controller status\"]\n    Controller --> Runtime[\"Pod and process\"]\n    Runtime --> Request[\"Real request result\"]\n    Request --> Recovery[\"Recovery evidence\"]\n```\n\n统一采集函数：\n\n```bash\ncollect_snapshot() {\n  snapshot_dir=\"$1\"\n  mkdir -p \"$snapshot_dir\"\n  kubectl get deploy,rs,pod,svc,endpointslice,hpa,pdb -n runtime-lab -o yaml \\\n    > \"$snapshot_dir/objects.yaml\"\n  kubectl get events -n runtime-lab --sort-by=.metadata.creationTimestamp \\\n    > \"$snapshot_dir/events.txt\"\n  kubectl logs -n runtime-lab -l app.kubernetes.io/name=runtime-lab \\\n    --all-containers --prefix --timestamps \\\n    > \"$snapshot_dir/logs.txt\" 2>&1 || true\n  kubectl top pod -n runtime-lab \\\n    > \"$snapshot_dir/top.txt\" 2>&1 || true\n}\n```\n\n每个实验目录包含 `before/`、`fault/`、`recovery/`、`cleanup/` 四个快照，以及请求记录：\n\n```json\n{\n  \"experimentId\": \"probe-readiness-001\",\n  \"requestId\": \"req-001\",\n  \"startedAt\": \"RECORD_AT_RUNTIME\",\n  \"target\": \"http://127.0.0.1:18080/version\",\n  \"statusCode\": \"RECORD_AT_RUNTIME\",\n  \"latencyMs\": \"RECORD_AT_RUNTIME\",\n  \"responseDigest\": \"RECORD_AT_RUNTIME\"\n}\n```\n\n事件有保留期且可能合并，日志会轮转，指标是时间序列，所以故障发生后先保存快照再修复。时间源需要统一，至少记录控制端与节点 UTC 时间偏差。证据中包含 Secret 时必须脱敏；Secret 对象只保存 metadata、type 与版本引用，不导出 `data`。\n\n最终结论精确标注证据级别：`static`、`api-accepted`、`controller-observed`、`kind-runtime`、`external-request`。本地 Kind 结果不能推广为生产集群容量或网络证明。", "subs": []}]}, {"title": "第 2 章 · 根据运行语义选择工作负载对象", "sections": [{"title": "Deployment、StatefulSet 和 DaemonSet 如何做场景决策", "content": "对象选择从身份、存储、节点覆盖和更新语义出发。Deployment 适合可替换副本；StatefulSet 适合稳定网络身份和持久卷序号；DaemonSet 适合每个匹配节点一份实例。副本数不是三者的本质区别。\n\n| 问题 | Deployment | StatefulSet | DaemonSet |\n|---|---|---|---|\n| Pod 身份 | 可替换 | 稳定序号 | 绑定节点 |\n| 存储 | 通常共享外部服务 | 常用独立 PVC | 常用 hostPath/节点数据 |\n| 扩缩顺序 | 无身份要求 | 可要求有序 | 随节点变化 |\n| 典型应用 | API、前端 | 数据库、队列成员 | 日志/网络/节点代理 |\n\n`runtime-lab` 主 API 使用 Deployment；数据保留实验用最小 StatefulSet；节点覆盖实验用只读 DaemonSet。观察 Owner 链：\n\n```bash\nkubectl get deploy,rs,pod -n runtime-lab -o wide\nkubectl get pod -n runtime-lab -o json \\\n  | jq '.items[] | {name:.metadata.name,owners:.metadata.ownerReferences}'\n```\n\n故障实验删除一个 Pod，比较三个控制器如何补建；再新增一个 Kind worker，观察只有 DaemonSet 自动覆盖新节点。恢复后检查期望副本、稳定身份和请求，不把 Pod 重新出现等同于数据正确。", "subs": []}, {"title": "PVC Pending、挂载失败和数据保留如何验证", "content": "本节复用[第二册的存储与工作负载原理](02-scheduling-and-workloads.md)，只做应用侧实验。先记录 StorageClass、Provisioner、BindingMode、AccessMode 和 ReclaimPolicy，再创建 PVC。\n\n```yaml\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: runtime-data\n  namespace: runtime-lab\nspec:\n  accessModes:\n    - ReadWriteOnce\n  resources:\n    requests:\n      storage: 1Gi\n  storageClassName: standard\n```\n\n```bash\nkubectl get storageclass -o yaml\nkubectl get pvc,pv -n runtime-lab -o wide\nkubectl describe pvc runtime-data -n runtime-lab\n```\n\n注入三类失败：不存在的 StorageClass 导致 Pending；AccessMode/容量无法匹配；错误 `mountPath` 或权限导致容器启动失败。每类先看 PVC/PV Phase，再看 Pod Events 和 Container Status，避免把存储错误误判为镜像错误。\n\n数据保留测试写入带实验 ID 的记录，删除 StatefulSet Pod 后验证新 Pod 仍可读取；删除 PVC 前明确 ReclaimPolicy。`Delete` 与 `Retain` 只说明 PV/后端回收策略，不等于应用已备份。清理证据要记录 PVC、PV 和后端资源是否真实消失。", "subs": []}, {"title": "Job 和 CronJob 如何处理幂等、并发、重试与历史", "content": "Job 保证任务达到完成条件，不保证业务副作用只发生一次。Pod 重试、节点故障和控制器重建都可能让代码重复执行，因此写操作使用幂等键、唯一约束或事务状态机。\n\n```yaml\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: runtime-migration\n  namespace: runtime-lab\nspec:\n  backoffLimit: 3\n  activeDeadlineSeconds: 300\n  ttlSecondsAfterFinished: 600\n  template:\n    spec:\n      restartPolicy: Never\n      containers:\n        - name: migrate\n          image: registry.example.invalid/platform/runtime-lab@sha256:RECORD_DIGEST\n          args: [\"migrate\", \"--idempotency-key=p1-runtime-001\"]\n```\n\nCronJob 还要决定重叠运行：\n\n```yaml\nspec:\n  schedule: \"*/5 * * * *\"\n  concurrencyPolicy: Forbid\n  startingDeadlineSeconds: 120\n  successfulJobsHistoryLimit: 2\n  failedJobsHistoryLimit: 3\n  jobTemplate:\n    spec:\n      backoffLimit: 2\n      template:\n        spec:\n          restartPolicy: Never\n```\n\n实验让第一次执行在写入后返回非零，观察重试是否产生重复副作用；同时手工触发两次，验证 `concurrencyPolicy` 只约束 CronJob 调度，不约束手工创建的独立 Job。保存 Job Conditions、Pod 退出码、业务记录和历史清理。", "subs": []}, {"title": "Deployment 滚动更新如何受 Surge、Unavailable 和探针影响", "content": "滚动更新同时受副本预算、调度容量、镜像启动和 Readiness 控制。`maxSurge` 决定可额外创建多少，`maxUnavailable` 决定可少多少 Ready 副本；探针失败会阻止新副本计入 Available。\n\n```yaml\nstrategy:\n  type: RollingUpdate\n  rollingUpdate:\n    maxSurge: 1\n    maxUnavailable: 0\nminReadySeconds: 10\nprogressDeadlineSeconds: 180\n```\n\n```bash\nkubectl rollout status deployment/runtime-lab -n runtime-lab --timeout=200s\nkubectl get deploy,rs,pod -n runtime-lab -w\nkubectl get events -n runtime-lab --sort-by=.metadata.creationTimestamp\n```\n\n两组对照：节点有额外容量时正常滚动；资源不足时 Surge Pod Pending，旧副本因 `maxUnavailable: 0` 保留。再让新版本 Readiness 永远失败，预期 Deployment 超过 ProgressDeadline，但旧 Ready 副本仍接流。恢复应修复配置/镜像，不能直接删除旧 ReplicaSet。\n\n请求侧持续发送带时间戳和版本的请求，统计 5xx、连接错误和版本切换。`rollout status` 成功只证明 Deployment 条件，不证明入口真实请求无中断。", "subs": []}, {"title": "OwnerReference、Finalizer 和删除传播如何影响清理", "content": "OwnerReference 让垃圾收集器理解依赖图；Finalizer 让对象在删除前等待清理动作。Foreground 删除先处理 dependents，Background 让 Owner 先从 API 消失，Orphan 则保留 dependents。它们不是“强制删除速度”的选项。\n\n```bash\nkubectl delete deployment runtime-lab -n runtime-lab --cascade=foreground\nkubectl get deployment,replicaset,pod -n runtime-lab -w\n```\n\n```bash\nkubectl get pod runtime-lab-example -n runtime-lab -o json \\\n  | jq '{deletionTimestamp:.metadata.deletionTimestamp,finalizers:.metadata.finalizers,owners:.metadata.ownerReferences}'\n```\n\n实验分别用 Foreground、Background、Orphan 删除副本对象，保存 Owner/Dependent 消失顺序。再创建带测试 Finalizer 的对象，发出删除后观察 Terminating；只有模拟的外部清理完成后才移除 Finalizer。\n\n卡住时按顺序检查 deletionTimestamp、finalizers、Owner UID、相关控制器和 webhook。直接 `--force --grace-period=0` 或清空 finalizers 可能留下外部资源、重复身份或挂载，不能作为常规恢复。清理验收要证明 API 对象、Pod、PVC 与模拟外部记录都达到预期状态。", "subs": []}]}, {"title": "第 3 章 · Namespace、多租户和安全策略如何形成应用边界", "sections": [{"title": "Namespace 能隔离什么，不能隔离什么", "content": "Namespace 提供名称作用域，也是 RBAC、Quota、LimitRange、Pod Security 和 NetworkPolicy 的挂载点；它不隔离节点、内核、集群级对象或网络。两个 Namespace 默认仍可互通，除非 CNI 执行 NetworkPolicy。\n\n| 能直接形成边界 | 需要额外控制 | 不能由 Namespace 解决 |\n|---|---|---|\n| 名称、Role/RoleBinding、配额 | 网络、Pod 安全、Secret 使用 | 内核漏洞、节点管理员 |\n| Namespaced 对象清理 | 调度到专属节点 | CRD、ClusterRole、StorageClass |\n| 团队 Owner 和标签 | 成本/审计归属 | 强多租户虚拟控制面 |\n\n```bash\nkubectl api-resources --namespaced=true\nkubectl api-resources --namespaced=false\nkubectl get namespace runtime-lab --show-labels\n```\n\n实验在两个 Namespace 创建同名 Service，证明 FQDN 不同；再从 client 跨 Namespace 请求，证明未设置策略时可以通信。随后应用网络和身份策略，验证边界变化。不要把对象重名可用误解为安全隔离。", "subs": []}, {"title": "ResourceQuota 和 LimitRange 如何约束团队资源", "content": "LimitRange 可为容器设置默认 Request/Limit 并限制单对象范围；ResourceQuota 限制 Namespace 聚合用量和对象数量。两者主要在 Admission 阶段工作，调度器仍根据最终 Request 判断节点是否有容量。\n\n```yaml\napiVersion: v1\nkind: LimitRange\nmetadata:\n  name: runtime-defaults\n  namespace: runtime-lab\nspec:\n  limits:\n    - type: Container\n      defaultRequest:\n        cpu: 100m\n        memory: 128Mi\n      default:\n        cpu: 500m\n        memory: 512Mi\n---\napiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: runtime-budget\n  namespace: runtime-lab\nspec:\n  hard:\n    requests.cpu: \"2\"\n    requests.memory: 2Gi\n    limits.cpu: \"4\"\n    limits.memory: 4Gi\n    pods: \"20\"\n    persistentvolumeclaims: \"4\"\n```\n\n先创建没有 Resources 的 Pod，读取 API 中被默认化的值；再创建超过单容器上限、超过总配额和 Request 合法但节点放不下三种对象。前两种应被 Admission 拒绝，第三种被接受后 Pending。保存错误原文、Quota Used/Hard 和调度 Events。\n\n恢复分别是修正单对象资源、释放/提高经审批配额、增加容量或降低 Request。不能把配额拒绝通过删除 Requests 修复，因为 HPA 和调度会失去基线。", "subs": []}, {"title": "ServiceAccount 和 RBAC 如何验证最小权限", "content": "应用身份与实验操作者身份分离。默认应用不需要访问 Kubernetes API，因此关闭 Token 自动挂载；确实需要时创建专用 ServiceAccount、Role 和 RoleBinding，只授予资源、名称和动词的最小集合。\n\n```yaml\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: runtime-reader\n  namespace: runtime-lab\nautomountServiceAccountToken: false\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: config-reader\n  namespace: runtime-lab\nrules:\n  - apiGroups: [\"\"]\n    resources: [\"configmaps\"]\n    resourceNames: [\"runtime-config-v1\"]\n    verbs: [\"get\"]\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: runtime-config-reader\n  namespace: runtime-lab\nsubjects:\n  - kind: ServiceAccount\n    name: runtime-reader\n    namespace: runtime-lab\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: config-reader\n```\n\n```bash\nkubectl auth can-i get configmap/runtime-config-v1 \\\n  -n runtime-lab --as=system:serviceaccount:runtime-lab:runtime-reader\nkubectl auth can-i list secrets \\\n  -n runtime-lab --as=system:serviceaccount:runtime-lab:runtime-reader\nkubectl auth can-i delete pods \\\n  -n runtime-lab --as=system:serviceaccount:runtime-lab:runtime-reader\n```\n\n验收必须同时包含允许和拒绝断言。若应用 Pod 声明 `automountServiceAccountToken: false`，检查 `/var/run/secrets/kubernetes.io/serviceaccount/token` 不存在。恢复权限不足时先确认真实 API 调用，再只增加必要 verb；不要绑定 `cluster-admin` 做诊断。", "subs": []}, {"title": "Pod Security Admission 与 NetworkPolicy 如何补足运行隔离", "content": "Pod Security Admission 按 Namespace 标签对 Pod Spec 做 enforce/warn/audit；NetworkPolicy 由支持它的 CNI 执行流量隔离。PSP 已移除，本册不生成 PodSecurityPolicy。\n\nRestricted 工作负载基线：\n\n```yaml\nsecurityContext:\n  runAsNonRoot: true\n  runAsUser: 10001\n  runAsGroup: 10001\n  seccompProfile:\n    type: RuntimeDefault\ncontainers:\n  - name: app\n    securityContext:\n      allowPrivilegeEscalation: false\n      readOnlyRootFilesystem: true\n      capabilities:\n        drop: [\"ALL\"]\n```\n\n默认拒绝并只允许带标签 client 访问 8080：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: runtime-default-deny\n  namespace: runtime-lab\nspec:\n  podSelector: {}\n  policyTypes: [\"Ingress\", \"Egress\"]\n---\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-runtime-client\n  namespace: runtime-lab\nspec:\n  podSelector:\n    matchLabels:\n      app.kubernetes.io/name: runtime-lab\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels:\n              access: runtime-client\n      ports:\n        - protocol: TCP\n          port: 8080\n```\n\n先用违反 Restricted 的 privileged/root Pod 验证 enforce 拒绝并保存错误；再部署合规 Pod。网络实验记录 CNI 名称、版本、Ready 状态，并在策略前后对 allowed/denied 两个 client 各执行请求。NetworkPolicy 对象创建成功但请求仍通，说明 Enforcement 未成立，实验失败，不能宣称隔离完成。", "subs": []}]}, {"title": "第 4 章 · 配置和 Secret 如何安全进入运行中的 Pod", "sections": [{"title": "环境变量和卷挂载为什么具有不同更新语义", "content": "环境变量在容器创建时确定，ConfigMap/Secret 之后变化不会改写进程环境；投射卷通常由 kubelet 周期更新，但应用是否重读取决于自身实现；`subPath` 挂载不会获得同样的原子更新行为。更新对象不等于应用已经使用新值。\n\n```yaml\nenv:\n  - name: FEATURE_MODE\n    valueFrom:\n      configMapKeyRef:\n        name: runtime-config-v1\n        key: featureMode\nvolumeMounts:\n  - name: config\n    mountPath: /etc/runtime-lab\n    readOnly: true\nvolumes:\n  - name: config\n    configMap:\n      name: runtime-config-v1\n```\n\n实验读取进程环境和文件摘要，更新 ConfigMap 后每秒记录两者；预期环境变量不变，卷文件在传播后变化。再验证应用是否显式 reload。恢复环境变量配置需触发新 Pod；卷配置若应用不支持 reload，也应通过 Pod Template 变更滚动发布。", "subs": []}, {"title": "不可变 ConfigMap/Secret 与版本化名称如何控制发布", "content": "`immutable: true` 防止原地修改，版本化名称让 Pod Template 明确引用哪一版配置。发布新配置创建 `runtime-config-v2`，更新 Deployment 引用；回退则恢复旧名称。旧版本保留到回退窗口结束。\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: runtime-config-v2\n  namespace: runtime-lab\nimmutable: true\ndata:\n  runtime.yaml: |\n    featureMode: safe\n    dependencyTimeoutMs: 800\n```\n\n```bash\nkubectl apply -f runtime-config-v2.yaml\nkubectl set env deployment/runtime-lab -n runtime-lab \\\n  --from=configmap/runtime-config-v2\nkubectl rollout status deployment/runtime-lab -n runtime-lab\n```\n\n正式 GitOps 清单不使用上面的命令式修改；实验用它观察 Template 变化。验收读取 Pod Spec 引用、容器内配置版本和 `/version`，再回退到 v1。删除旧 ConfigMap 前用 API 查询所有 Pod/Controller 引用，避免正在运行的重建失败。", "subs": []}, {"title": "Secret 的最小暴露和轮换如何在应用侧验证", "content": "Secret 对象不是天然加密保险箱。本实验只使用测试凭据，比较环境变量、投射卷和外部 Secret provider 的消费语义。优先使用只读文件，避免 Secret 出现在进程环境、Crash Dump 和调试输出。\n\n```yaml\nvolumes:\n  - name: api-credential\n    secret:\n      secretName: runtime-api-v2\n      defaultMode: 0400\ncontainers:\n  - name: app\n    volumeMounts:\n      - name: api-credential\n        mountPath: /run/secrets/runtime\n        readOnly: true\n```\n\n轮换按四阶段执行：创建新值；消费者确认读到新版本；撤销旧值；验证旧值失败且新值成功。日志只记录 `secretVersion=v2`，不记录内容。\n\n```bash\nkubectl exec -n runtime-lab deploy/runtime-lab -- \\\n  /opt/runtime-lab/server --check-secret-version v2\nkubectl logs -n runtime-lab deploy/runtime-lab | grep -F 'TEST_SECRET_VALUE' && exit 1 || true\n```\n\n若应用缓存旧值，明确用 reload、滚动重启或双凭据窗口恢复。Base64 不是加密；Sealed Secrets、External Secrets 与 Vault 的信任和灾备属于 GitOps 02，本册只验证 Pod 消费与轮换结果。", "subs": []}, {"title": "配置缺失、格式错误和依赖不可达如何分别失败", "content": "三类错误应产生不同状态：引用不存在的必需 ConfigMap/Secret 时容器无法创建，常见 `CreateContainerConfigError`；文件存在但格式错误时进程启动后退出，形成 CrashLoopBackOff；依赖暂时不可达时进程可 Live，但 Ready 为 False。\n\n| 故障 | Pod/Container 信号 | 首查 | 恢复 |\n|---|---|---|---|\n| 对象缺失 | Waiting 与 Events | `describe pod` | 创建正确版本或修正引用 |\n| 格式错误 | Terminated exitCode、日志 | `logs --previous` | 修正配置并滚动 |\n| 依赖不可达 | Ready False、Endpoint 摘除 | 探针与依赖请求 | 恢复依赖或降级 |\n| 可选配置缺失 | 应用使用默认值 | `/version` 配置摘要 | 记录默认值来源 |\n\n```bash\npod=\"$(kubectl get pod -n runtime-lab -l app.kubernetes.io/name=runtime-lab -o name | head -1)\"\nkubectl describe -n runtime-lab \"$pod\"\nkubectl logs -n runtime-lab \"$pod\" --previous\nkubectl get endpointslice -n runtime-lab -l kubernetes.io/service-name=runtime-lab -o yaml\n```\n\n故障注入一次只改变引用、内容或依赖地址之一。恢复后同时验证 Pod Ready、EndpointSlice Ready 和真实 Service 请求，避免只看容器重新 Running。", "subs": []}, {"title": "InitContainer 和启动依赖失败如何定位", "content": "Init Container 按顺序完成后主容器才启动，适合生成配置、修正专用卷权限或完成幂等初始化；不适合无限等待外部依赖，也不应执行无法安全重试的迁移副作用。\n\n```yaml\ninitContainers:\n  - name: render-config\n    image: registry.example.invalid/platform/runtime-lab@sha256:RECORD_DIGEST\n    args: [\"render-config\", \"--out=/work/runtime.yaml\"]\n    securityContext:\n      runAsNonRoot: true\n      allowPrivilegeEscalation: false\n      capabilities:\n        drop: [\"ALL\"]\n    volumeMounts:\n      - name: generated\n        mountPath: /work\ncontainers:\n  - name: app\n    volumeMounts:\n      - name: generated\n        mountPath: /etc/runtime-lab\n        readOnly: true\n```\n\n注入错误镜像、错误命令、卷权限、DNS 和超时。按 `.status.initContainerStatuses`、Events、对应 Init 日志排查；主容器日志为空是预期，因为它尚未启动。\n\n```bash\nkubectl get pod -n runtime-lab runtime-init-fault -o json \\\n  | jq '.status.initContainerStatuses'\nkubectl logs -n runtime-lab runtime-init-fault -c render-config\n```\n\n恢复后确认 Init 只产生一次预期输出，主容器读取内容且业务副作用没有重复。若必须执行数据库迁移，更适合独立 Job 和明确幂等/审批，而不是每个 Pod 的 Init Container。", "subs": []}]}, {"title": "第 5 章 · Service、DNS 和入口如何组成请求路径", "sections": [{"title": "Service 和 EndpointSlice 如何把 Selector 变成后端集合", "content": "Service 提供稳定虚拟地址和端口，Selector 控制器把匹配 Pod 转成 EndpointSlice。只有 Ready Endpoint 才通常进入服务后端。ClusterIP 能分配不代表有可用后端，Ping 也不是 HTTP 服务验证。\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  selector:\n    app.kubernetes.io/name: runtime-lab\n  ports:\n    - name: http\n      port: 8080\n      targetPort: http\n```\n\n```bash\nkubectl get service runtime-lab -n runtime-lab -o yaml\nkubectl get endpointslice -n runtime-lab \\\n  -l kubernetes.io/service-name=runtime-lab -o yaml\nkubectl get pod -n runtime-lab --show-labels\n```\n\n依次注入错误 Selector、错误 targetPort、全部 Readiness False 和无 Selector Service。预期分别表现为空 Endpoint、连接失败、Endpoint Ready=False、需要手工 EndpointSlice。恢复后从 client 发真实 `/version` 请求，并比对返回 Pod UID 是否属于 Ready Endpoint。", "subs": []}, {"title": "CoreDNS 和应用 DNS 缓存如何影响服务发现", "content": "Pod 通过集群 DNS 解析 `service.namespace.svc.cluster.local`。短名受 `search` 与 `ndots` 影响，应用、语言运行时和本地缓存又可能延长结果寿命。DNS 成功只得到地址，不证明目标端口或应用健康。\n\n```bash\nkubectl exec -n runtime-lab deploy/client -- cat /etc/resolv.conf\nkubectl exec -n runtime-lab deploy/client -- \\\n  getent hosts runtime-lab.runtime-lab.svc.cluster.local\nkubectl exec -n runtime-lab deploy/client -- \\\n  curl -fsS http://runtime-lab.runtime-lab.svc.cluster.local:8080/version\n```\n\n故障实验：错误 Namespace 短名、CoreDNS Pod 不 Ready、NetworkPolicy 阻断 UDP/TCP 53、应用缓存旧结果。先查询 FQDN，再检查 `/etc/resolv.conf`、CoreDNS Service/Endpoint、日志和网络策略。恢复后同时验证 DNS 查询和 HTTP 请求，记录 TTL 与应用恢复耗时。\n\n应用层还要区分 NXDOMAIN、SERVFAIL、查询超时和解析成功但连接失败。NXDOMAIN 多指向名称或搜索域错误，SERVFAIL 需要检查 CoreDNS 上游和插件链，超时可能是网络策略或数据面丢包；解析得到 IP 后的连接失败已经离开 DNS 层。\n\n用固定频率同时记录 `getent`、`nslookup` 或应用内 resolver 结果，并输出解析耗时。若 Java、Go、Node 的缓存策略不同，应分别记录 TTL 与连接池复用，不能用调试容器一次成功替代业务进程行为。\n\n恢复验收要求新建连接使用当前 Service 地址、旧缓存按可解释窗口失效，且 CoreDNS 恢复后没有持续高错误率。为绕过问题写死 ClusterIP 或 Pod IP 会破坏服务发现契约，不是可接受修复。", "subs": []}, {"title": "Ingress 与 Gateway 如何把外部请求路由到 Service", "content": "Ingress 由 IngressClass/Controller 实现；Gateway API 把基础设施所有者的 Gateway 与应用所有者的 HTTPRoute 分离。对象被 API 接受不表示 Controller 已编程数据面，必须检查 Status Conditions 和真实 Host/Path/TLS 请求。\n\n```yaml\napiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  parentRefs:\n    - name: shared-gateway\n      namespace: gateway-system\n  hostnames:\n    - runtime.localtest.me\n  rules:\n    - matches:\n        - path:\n            type: PathPrefix\n            value: /\n      backendRefs:\n        - name: runtime-lab\n          port: 8080\n```\n\n```bash\nkubectl get gateway -A -o yaml\nkubectl get httproute -n runtime-lab runtime-lab -o yaml\ncurl --fail --resolve runtime.localtest.me:18080:127.0.0.1 \\\n  http://runtime.localtest.me:18080/version\n```\n\n检查 `Accepted`、`ResolvedRefs`、`Programmed` 等实现提供的条件及 `observedGeneration`。错误 Class、未授权跨 Namespace 引用、错误 backend port 和 TLS Secret 会产生不同状态。没有真实 Gateway Controller 时仅标静态清单验证。", "subs": []}, {"title": "如何按 Client、Gateway、Service、Endpoint 和 Pod 顺序定位断点", "content": "请求链按外向内定位，避免一遇到 503 就重启 Pod。\n\n```mermaid\nflowchart LR\n    Client[\"Client DNS TLS\"] --> Gateway[\"Gateway route\"]\n    Gateway --> Service[\"Service port\"]\n    Service --> Endpoint[\"EndpointSlice Ready\"]\n    Endpoint --> Pod[\"Pod listener probe\"]\n    Pod --> Dependency[\"Application dependency\"]\n```\n\n| 现象 | 首查 | 常见断点 |\n|---|---|---|\n| DNS 失败 | Client resolver | Host/FQDN、CoreDNS |\n| 连接拒绝 | Listener/端口 | Gateway 未监听、NodePort 错 |\n| 404 | Host/Path/Route | 未匹配规则 |\n| 502/503 | Route backend 与 Endpoint | 空后端、错误端口、上游拒绝 |\n| 超时 | NetworkPolicy/应用依赖 | 丢包、连接池、后端阻塞 |\n| TLS 错误 | SNI、证书链、Secret | Host 不匹配、证书过期 |\n\n每层使用一个首个查询并保存输出：客户端 `curl -v`，Gateway Status，Service Spec，EndpointSlice，Pod `ss`/应用自检。恢复后从原客户端重放原 Host/Path，而不是只在 Pod 内 curl localhost。", "subs": []}]}, {"title": "第 6 章 · Requests、Limits、QoS 和 HPA 如何共同决定容量", "sections": [{"title": "Requests 如何参与调度，Limits 如何影响运行时", "content": "Scheduler 根据 Request 与节点 Allocatable 判断能否放置；CPU Limit 常表现为节流，Memory Limit 超出可导致 OOMKill。实际用量低不意味着 Request 无意义，它还是容量预留、HPA 利用率分母和 QoS 输入。\n\n```yaml\nresources:\n  requests:\n    cpu: 200m\n    memory: 128Mi\n    ephemeral-storage: 64Mi\n  limits:\n    cpu: \"1\"\n    memory: 384Mi\n    ephemeral-storage: 256Mi\n```\n\n```bash\nkubectl top pod -n runtime-lab --containers\nkubectl describe pod -n runtime-lab runtime-lab-example\nkubectl get node -o custom-columns=NAME:.metadata.name,ALLOCATABLE_CPU:.status.allocatable.cpu\n```\n\n三组压力：CPU 超 Limit 观察延迟和 throttling 指标；内存超过 Limit 观察 `OOMKilled`、退出码 137 和重启；Request 超节点可用量观察 Pending/FailedScheduling。恢复分别是优化/调整 Limit、修复内存峰值、改变 Request 或容量。不能把所有失败都归因于“资源不足”。", "subs": []}, {"title": "QoS、驱逐和临时存储如何改变故障顺序", "content": "Guaranteed、Burstable、BestEffort 由 Pod 中各容器 CPU/Memory Request/Limit 关系决定；节点压力驱逐还考虑优先级、用量是否超过 Request 等因素。QoS 不是绝对免死牌。\n\n```bash\nkubectl get pod -n runtime-lab \\\n  -o custom-columns=NAME:.metadata.name,QOS:.status.qosClass\nkubectl describe node runtime-readiness-worker\nkubectl get events -A --field-selector reason=Evicted\n```\n\n实验创建三类 QoS Pod，使用受控方式制造 MemoryPressure 或 DiskPressure；Kind 中若无法安全复现，只保留配置和静态判断，不伪造驱逐结果。临时存储实验向 emptyDir/容器可写层写入，观察 Pod ephemeral-storage 使用、Evicted 与清理。\n\n故障证据包括 Node Conditions、taint、Pod Reason、容器用量和业务请求。恢复后清除压力源、让控制器补副本并验证数据；删除 Evicted Pod 只是清理显示，不是根因修复。\n\n临时存储要同时观察容器可写层、日志和 `emptyDir`。只给内存设置 Limit 并不能防止日志或临时文件占满节点磁盘；声明 `ephemeral-storage` Request/Limit 后，还要验证应用在容量不足时能返回明确错误并停止继续写入。\n\n驱逐顺序不是仅按 QoS 排名。节点压力种类、Priority、Pod 用量是否超过 Request 和 kubelet 阈值都会参与判断，因此实验报告必须保存当时 Node Condition 与每个候选 Pod 的资源声明/实际用量。\n\n恢复完成的标准是节点压力解除、替代 Pod Ready、临时数据按契约清理、真实请求恢复。若业务数据曾写进临时卷，还要记录丢失范围，不能用新 Pod Running 掩盖数据错误。", "subs": []}, {"title": "Metrics Server 和 HPA v2 如何计算期望副本", "content": "HPA 控制器周期读取指标，按“当前值/目标值”计算期望副本，多个指标取最大的建议值。CPU utilization 需要容器 CPU Request；缺失 Request 会让相关利用率无法定义。未就绪与缺失指标 Pod 还会影响保守计算。\n\n```text\ndesiredReplicas = ceil(currentReplicas * currentMetricValue / desiredMetricValue)\n```\n\n```yaml\napiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: runtime-lab\n  minReplicas: 2\n  maxReplicas: 10\n  metrics:\n    - type: Resource\n      resource:\n        name: cpu\n        target:\n          type: Utilization\n          averageUtilization: 60\n```\n\n```bash\nkubectl get hpa runtime-lab -n runtime-lab -w\nkubectl describe hpa runtime-lab -n runtime-lab\nkubectl get --raw /apis/metrics.k8s.io/v1beta1/namespaces/runtime-lab/pods | jq .\n```\n\n负向实验删除 CPU Request，预期 HPA Condition/Events 显示不能计算；停止 Metrics Server，预期指标未知且不应盲目缩容；添加第二指标，验证期望副本取更高建议。恢复后等指标窗口稳定，再确认副本和请求延迟。", "subs": []}, {"title": "Stabilization Window 和 Scaling Policy 如何抑制抖动", "content": "`behavior` 分别控制扩容、缩容的稳定窗口和速率。扩容通常快，缩容需要观察窗口避免短暂低谷导致容量骤降；Policy 还限制每周期可增加/减少的 Pod 或百分比。\n\n```yaml\nbehavior:\n  scaleUp:\n    stabilizationWindowSeconds: 0\n    selectPolicy: Max\n    policies:\n      - type: Percent\n        value: 100\n        periodSeconds: 60\n      - type: Pods\n        value: 4\n        periodSeconds: 60\n  scaleDown:\n    stabilizationWindowSeconds: 300\n    selectPolicy: Max\n    policies:\n      - type: Percent\n        value: 25\n        periodSeconds: 60\n```\n\n实验使用尖峰、持续高负载、低流量和指标中断四条曲线。每 15 秒保存 HPA current/desired、Deployment replicas、Pod Ready 与请求延迟。达到 `maxReplicas` 且延迟继续上升应报警，而不是认为 HPA 工作正常。\n\n抖动恢复不是无限增加窗口。先判断指标噪声、Request 错配、启动慢、负载不均还是容量上限，再调整目标、Policy 或应用。实验结束停止负载，等待受控缩容并验证最小副本仍能服务。", "subs": []}]}, {"title": "第 7 章 · 探针、终止和中断预算如何保护可用性", "sections": [{"title": "Startup、Readiness 和 Liveness 分别回答什么问题", "content": "Startup 回答“慢启动是否已经完成”，成功前抑制其他探针；Readiness 回答“现在能否接新流量”；Liveness 回答“进程是否已无法自行恢复”。把外部依赖放进 Liveness 会在依赖故障时重启所有副本。\n\n```yaml\nstartupProbe:\n  httpGet:\n    path: /livez\n    port: http\n  periodSeconds: 2\n  failureThreshold: 30\nreadinessProbe:\n  httpGet:\n    path: /readyz\n    port: http\n  periodSeconds: 5\n  timeoutSeconds: 1\n  failureThreshold: 2\nlivenessProbe:\n  httpGet:\n    path: /livez\n    port: http\n  periodSeconds: 10\n  timeoutSeconds: 1\n  failureThreshold: 3\n```\n\nHTTP 适合应用语义，TCP 只证明端口接受连接，exec 会产生进程开销，gRPC 适合标准健康协议。实验先让应用慢启动，证明 Startup 避免过早 Liveness；再让依赖失败，仅 Readiness 失败；最后模拟内部死锁，Liveness 触发重启。保存探针 Events、RestartCount 和请求结果。", "subs": []}, {"title": "Readiness 与 EndpointSlice 如何控制新旧请求", "content": "Pod Ready 条件变化会传播到 EndpointSlice，代理和客户端再感知后端集合变化。传播不是瞬时的，已有 keep-alive/长连接也可能继续使用旧实例，所以不能只看 Ready=False 就认为所有请求已经摘除。\n\n```bash\nkubectl get pod -n runtime-lab -w\nkubectl get endpointslice -n runtime-lab \\\n  -l kubernetes.io/service-name=runtime-lab -w\n```\n\n持续请求记录 Pod UID，注入某一副本 Readiness 失败，比较 Pod Condition 时间、EndpointSlice 更新时间和最后一次命中该 Pod 的请求时间。恢复依赖后观察重新入池。若全部 Readiness 失败，Service 无 Ready 后端，Liveness 不应因此重启进程。\n\n连接复用实验分别使用短连接和长连接，说明控制面摘除与数据面连接排空的差别。恢复验收要求新连接不再命中故障副本、旧连接按契约结束、恢复副本重新接受请求。\n\n传播时间线至少包含五个时间点：应用开始拒绝 Readiness、kubelet 更新 Pod Condition、EndpointSlice Controller 更新 Endpoint、代理观察新后端集合、客户端最后一次命中故障 Pod。它们来自不同组件，时间必须统一到 UTC。\n\n若 EndpointSlice 已标 Ready=False 但新连接仍命中该 Pod，继续检查节点代理、Gateway/Ingress upstream 和服务网格数据面是否已消费更新；不要反复修改探针。若只有长连接继续存在，则由应用终止契约和连接最大寿命决定是否正常。\n\n恢复后先小流量观察，再让 Pod 重新 Ready。应用如果在依赖刚恢复时立刻开放全部流量，可能触发缓存预热或连接风暴；可以由 readiness 内部的稳定窗口处理，但不能用 Liveness 重启代替预热。", "subs": []}, {"title": "SIGTERM、preStop 和 Grace Period 如何实现优雅终止", "content": "删除 Pod 后进入终止流程，kubelet 执行 `preStop`（若有）并向主进程发送终止信号，Grace Period 到期后强制结束。`preStop` 的时间也计入总宽限期，固定 sleep 只是猜传播延迟，不能替代应用主动摘流和连接排空。\n\n```yaml\nterminationGracePeriodSeconds: 30\ncontainers:\n  - name: app\n    lifecycle:\n      preStop:\n        httpGet:\n          path: /prepare-shutdown\n          port: http\n```\n\n```bash\nkubectl delete pod -n runtime-lab runtime-lab-example --wait=false\nkubectl get pod -n runtime-lab runtime-lab-example -w\nkubectl logs -n runtime-lab runtime-lab-example --timestamps\n```\n\n时间线记录 deletionTimestamp、Readiness=False、EndpointSlice 摘除、SIGTERM 日志、最后新请求、存量请求完成、容器退出。注入忽略 SIGTERM 和超长请求，预期 Grace 到期后出现强制终止；恢复为正确 handler，并让超时预算覆盖最长允许请求而非无限等待。", "subs": []}, {"title": "多副本、Topology Spread 和 PDB 如何应对计划中断", "content": "多副本只有分散到不同故障域才真正提高可用性。Topology Spread 影响调度分布，PDB 限制 API 发起的自愿中断，二者都不能阻止节点突然掉电，也不能弥补副本本身不 Ready。\n\n```yaml\ntopologySpreadConstraints:\n  - maxSkew: 1\n    topologyKey: kubernetes.io/hostname\n    whenUnsatisfiable: DoNotSchedule\n    labelSelector:\n      matchLabels:\n        app.kubernetes.io/name: runtime-lab\n---\napiVersion: policy/v1\nkind: PodDisruptionBudget\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  minAvailable: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: runtime-lab\n```\n\n三副本分布到两个 worker，执行 `kubectl drain` 一个 worker，观察 Eviction 是否受 PDB、剩余容量和调度约束影响。再把副本降为 2，证明过严 PDB 可能阻塞维护。保存 Pod 分布、PDB disruptionsAllowed、Drain 输出与持续请求。\n\n恢复按优先级：恢复 Ready 容量、解除不可满足的调度约束、经审批调整 PDB，再继续 Drain。不能直接 `--disable-eviction` 绕过 PDB 后宣称可用性通过。实验完成后 uncordon 节点并验证副本重新平衡。", "subs": []}]}, {"title": "第 8 章 · 用故障注入验收应用运行基线", "sections": [{"title": "镜像、调度、配置和权限失败如何从 Pod 状态定位", "content": "Pod `Pending`、`Waiting`、`Running` 只是入口，真正原因在 Conditions、Container State、Events 和日志。按生命周期顺序排查：Admission、Scheduling、Image Pull、Container Create、Process Start、Readiness。\n\n| 故障 | 典型信号 | 首个查询 | 禁止的猜测式动作 |\n|---|---|---|---|\n| 无效 Digest/凭据 | ImagePullBackOff | Events、image 字段 | 重启 Pod |\n| Request 无法满足 | Pending/FailedScheduling | Pod Events、Node Allocatable | 降为零 Request |\n| ConfigMap 缺失 | CreateContainerConfigError | describe Pod | 改成可选引用 |\n| PSA/RBAC 拒绝 | API Forbidden | apply 错误、auth can-i | 使用 cluster-admin |\n| 入口/格式错误 | CrashLoopBackOff | State、logs --previous | 无限增加重启 |\n\n```bash\nkubectl get pod -n runtime-lab -o wide\nkubectl get pod -n runtime-lab runtime-fault -o json \\\n  | jq '{conditions:.status.conditions,containers:.status.containerStatuses}'\nkubectl describe pod -n runtime-lab runtime-fault\nkubectl logs -n runtime-lab runtime-fault --previous\n```\n\n每个故障保存失败快照，执行单一修复，再保存恢复快照。最终不仅 Pod Ready，还要 `/version` 返回预期 Digest/Commit，Service Endpoint Ready，真实请求成功。", "subs": []}, {"title": "Service、DNS、Ingress 和 Gateway 故障如何分层验证", "content": "网络故障按请求路径注入：Selector 为空、targetPort 错、DNS 被策略阻断、Ingress Host/Path 错、Gateway Reference 未接受、TLS Secret 错。每次只改变一层。\n\n```bash\ncurl --verbose --resolve runtime.localtest.me:18080:127.0.0.1 \\\n  http://runtime.localtest.me:18080/version\nkubectl get httproute -n runtime-lab runtime-lab -o yaml\nkubectl get service,endpointslice -n runtime-lab -o yaml\nkubectl exec -n runtime-lab deploy/client -- \\\n  curl -v http://runtime-lab:8080/version\n```\n\n诊断记录客户端错误、Gateway/Ingress Status、Service Port、EndpointSlice Ready 和 Pod 监听。若 Pod 内 localhost 成功而 Service 失败，问题在应用外层；若 Endpoint 正确而 Gateway 503，检查路由控制器到后端的网络与端口。\n\n恢复后必须从原始外部客户端重放相同 Host/Path/TLS；Pod 内请求只能作为分层证据。没有真实 Controller 时，Gateway 实验状态为 `not-executed`。", "subs": []}, {"title": "探针、资源和 HPA 故障如何避免自动化扩大影响", "content": "自动化会放大错误配置：错误 Liveness 造成重启风暴；全部 Readiness 失败清空 Service 后端；低 Memory Limit 反复 OOM；缺指标让 HPA 失效；错误 Request 让利用率偏离真实容量。\n\n```bash\nkubectl get pod,hpa,endpointslice -n runtime-lab -w\nkubectl get events -n runtime-lab --sort-by=.metadata.creationTimestamp\nkubectl top pod -n runtime-lab --containers\n```\n\n止损顺序：冻结继续发布；保存状态；若错误 Liveness 仍重启，修正探针或回退 Pod Template；若 Readiness 全失败，恢复最后已知可服务配置；若 OOM，降低负载/恢复旧 Limit 并定位内存；HPA 达上限时限流而非无限提高副本。\n\n实验统计重启次数、Ready Endpoint 数、OOM 次数、HPA Desired/Max、请求错误和恢复时间。只看到副本增多不表示容量恢复；必须看真实请求和资源饱和。\n\n为了避免边修边丢证据，先暂停新的配置发布和自动镜像更新，但不要立即删除 HPA 或 PDB。保存当前 Generation、Conditions 和时间序列后，选择最小止损动作；否则删除控制器可能引入第二个变量。\n\n错误 Liveness 的恢复通常通过回退 Pod Template 或修正探针，并观察 RestartCount 停止增长；错误 Readiness 则要保留至少一个已知可服务版本。内存 OOM 需要区分泄漏、峰值和 Limit 过低，HPA 无法修复单 Pod OOM。\n\n自动化恢复完成要同时满足：控制器不再产生错误动作、Ready Endpoint 数恢复、请求错误回到基线、资源趋势稳定、临时止损已撤销。只把 `maxReplicas` 调大或探针关闭，会扩大成本或隐藏故障，不是闭环。", "subs": []}, {"title": "如何用成功、失败、恢复和清理证据完成最终验收", "content": "最终验收由另一名操作者按 Runbook 重放，分四条路径：成功路径建立基线；失败路径证明信号可发现；恢复路径证明服务与状态回到预期；清理路径证明实验没有遗留对象和外部副作用。\n\n```yaml\napiVersion: evidence.platform.example/v1\nkind: KubernetesRuntimeAcceptance\nmetadata:\n  experimentId: p1-runtime-001\nspec:\n  cluster:\n    context: kind-runtime-readiness\n    kubernetesVersion: RECORD_AT_RUNTIME\n    cni:\n      name: RECORD_AT_RUNTIME\n      version: RECORD_AT_RUNTIME\n      enforcementVerified: false\n  image:\n    reference: registry.example.invalid/platform/runtime-lab@sha256:RECORD_DIGEST\n    dockerEvidence: ../docker-p1-1.4.0/result.yaml\n  paths:\n    success: evidence/success/result.yaml\n    failure: evidence/failures/index.yaml\n    recovery: evidence/recovery/result.yaml\n    cleanup: evidence/cleanup/result.yaml\nstatus:\n  result: pending\n  evidenceLevel: static\n  limitations: []\n```\n\n通过条件：固定 Digest；所有 34 个节点对应实验；至少一条真实请求；NetworkPolicy 有允许/拒绝对照；配置、资源、探针和终止有恢复证据；清理后 Namespace 与登记的集群级资源均不存在。若未运行 Kind，只能报告 Markdown/YAML/Shell 静态校验。\n\n#### 基础实验清单\n\n下面清单把本册的共同基线集中在一起。`RECORD_DIGEST` 必须在执行前替换为 Docker 05 已验收的 64 位摘要；示例不会自动使用 Tag 回退。\n\n```yaml\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: runtime-lab\n  labels:\n    app.kubernetes.io/part-of: runtime-readiness-lab\n    lab.example/experiment-id: p1-runtime-001\n    pod-security.kubernetes.io/enforce: restricted\n    pod-security.kubernetes.io/enforce-version: latest\n    pod-security.kubernetes.io/warn: restricted\n    pod-security.kubernetes.io/audit: restricted\n---\napiVersion: v1\nkind: LimitRange\nmetadata:\n  name: runtime-defaults\n  namespace: runtime-lab\nspec:\n  limits:\n    - type: Container\n      defaultRequest:\n        cpu: 100m\n        memory: 128Mi\n      default:\n        cpu: 500m\n        memory: 384Mi\n---\napiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: runtime-budget\n  namespace: runtime-lab\nspec:\n  hard:\n    requests.cpu: \"2\"\n    requests.memory: 2Gi\n    limits.cpu: \"4\"\n    limits.memory: 4Gi\n    pods: \"20\"\n    services: \"10\"\n    persistentvolumeclaims: \"4\"\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nautomountServiceAccountToken: false\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: runtime-config-v1\n  namespace: runtime-lab\n  labels:\n    lab.example/experiment-id: p1-runtime-001\nimmutable: true\ndata:\n  runtime.yaml: |\n    featureMode: safe\n    dependencyUrl: http://dependency.runtime-lab.svc.cluster.local:8080\n    dependencyTimeoutMs: 800\n    shutdownTimeoutMs: 20000\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\n  labels:\n    app.kubernetes.io/name: runtime-lab\n    app.kubernetes.io/part-of: runtime-readiness-lab\n    app.kubernetes.io/version: \"1.4.0\"\n    lab.example/experiment-id: p1-runtime-001\nspec:\n  replicas: 3\n  minReadySeconds: 10\n  progressDeadlineSeconds: 180\n  revisionHistoryLimit: 3\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 1\n      maxUnavailable: 0\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: runtime-lab\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: runtime-lab\n        app.kubernetes.io/part-of: runtime-readiness-lab\n        app.kubernetes.io/version: \"1.4.0\"\n        lab.example/experiment-id: p1-runtime-001\n      annotations:\n        lab.example/config-version: runtime-config-v1\n    spec:\n      serviceAccountName: runtime-lab\n      automountServiceAccountToken: false\n      terminationGracePeriodSeconds: 30\n      securityContext:\n        runAsNonRoot: true\n        runAsUser: 10001\n        runAsGroup: 10001\n        fsGroup: 10001\n        seccompProfile:\n          type: RuntimeDefault\n      topologySpreadConstraints:\n        - maxSkew: 1\n          topologyKey: kubernetes.io/hostname\n          whenUnsatisfiable: DoNotSchedule\n          labelSelector:\n            matchLabels:\n              app.kubernetes.io/name: runtime-lab\n      containers:\n        - name: app\n          image: registry.example.invalid/platform/runtime-lab@sha256:RECORD_DIGEST\n          imagePullPolicy: IfNotPresent\n          args:\n            - serve\n            - --config=/etc/runtime-lab/runtime.yaml\n          ports:\n            - name: http\n              containerPort: 8080\n              protocol: TCP\n          env:\n            - name: APP_VERSION\n              value: \"1.4.0\"\n            - name: SOURCE_COMMIT\n              value: 0123456789abcdef0123456789abcdef01234567\n            - name: POD_NAME\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.name\n            - name: POD_UID\n              valueFrom:\n                fieldRef:\n                  fieldPath: metadata.uid\n            - name: NODE_NAME\n              valueFrom:\n                fieldRef:\n                  fieldPath: spec.nodeName\n          resources:\n            requests:\n              cpu: 200m\n              memory: 128Mi\n              ephemeral-storage: 64Mi\n            limits:\n              cpu: \"1\"\n              memory: 384Mi\n              ephemeral-storage: 256Mi\n          securityContext:\n            allowPrivilegeEscalation: false\n            readOnlyRootFilesystem: true\n            capabilities:\n              drop:\n                - ALL\n          startupProbe:\n            httpGet:\n              path: /livez\n              port: http\n            periodSeconds: 2\n            timeoutSeconds: 1\n            failureThreshold: 30\n          readinessProbe:\n            httpGet:\n              path: /readyz\n              port: http\n            periodSeconds: 5\n            timeoutSeconds: 1\n            failureThreshold: 2\n            successThreshold: 1\n          livenessProbe:\n            httpGet:\n              path: /livez\n              port: http\n            periodSeconds: 10\n            timeoutSeconds: 1\n            failureThreshold: 3\n          lifecycle:\n            preStop:\n              httpGet:\n                path: /prepare-shutdown\n                port: http\n          volumeMounts:\n            - name: config\n              mountPath: /etc/runtime-lab\n              readOnly: true\n            - name: tmp\n              mountPath: /tmp\n      volumes:\n        - name: config\n          configMap:\n            name: runtime-config-v1\n        - name: tmp\n          emptyDir:\n            sizeLimit: 64Mi\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\n  labels:\n    app.kubernetes.io/name: runtime-lab\n    lab.example/experiment-id: p1-runtime-001\nspec:\n  selector:\n    app.kubernetes.io/name: runtime-lab\n  ports:\n    - name: http\n      protocol: TCP\n      port: 8080\n      targetPort: http\n---\napiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\n  labels:\n    lab.example/experiment-id: p1-runtime-001\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: runtime-lab\n  minReplicas: 3\n  maxReplicas: 10\n  metrics:\n    - type: Resource\n      resource:\n        name: cpu\n        target:\n          type: Utilization\n          averageUtilization: 60\n  behavior:\n    scaleUp:\n      stabilizationWindowSeconds: 0\n      selectPolicy: Max\n      policies:\n        - type: Percent\n          value: 100\n          periodSeconds: 60\n        - type: Pods\n          value: 4\n          periodSeconds: 60\n    scaleDown:\n      stabilizationWindowSeconds: 300\n      selectPolicy: Max\n      policies:\n        - type: Percent\n          value: 25\n          periodSeconds: 60\n---\napiVersion: policy/v1\nkind: PodDisruptionBudget\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\n  labels:\n    lab.example/experiment-id: p1-runtime-001\nspec:\n  minAvailable: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: runtime-lab\n```\n\n应用清单前先做客户端和服务端 Dry Run：\n\n```bash\nkubectl apply --dry-run=client -f base.yaml\nkubectl apply --server-side --dry-run=server -f base.yaml\n```\n\n`RECORD_DIGEST` 未替换时，静态 YAML 仍可解析，但运行必然失败。执行器要在 apply 前显式拒绝占位符，不能依赖 ImagePullBackOff 才发现。\n\n#### 故障清单如何保持单变量\n\n每个故障使用独立文件或 Kustomize Overlay，只覆盖一个字段。下面给出最小对象片段；实际应用前先记录 Base Digest，恢复时重新应用 Base 并等待状态收敛。\n\n镜像 Digest 错误：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          image: registry.example.invalid/platform/runtime-lab@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\n```\n\n调度 Request 超出 Kind 节点：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          resources:\n            requests:\n              cpu: \"1000\"\n              memory: 128Mi\n            limits:\n              cpu: \"1000\"\n              memory: 384Mi\n```\n\n缺失 ConfigMap 引用：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  template:\n    spec:\n      volumes:\n        - name: config\n          configMap:\n            name: runtime-config-does-not-exist\n```\n\n错误 Service Selector：\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  selector:\n    app.kubernetes.io/name: runtime-lab-does-not-exist\n```\n\n错误 targetPort：\n\n```yaml\napiVersion: v1\nkind: Service\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  ports:\n    - name: http\n      protocol: TCP\n      port: 8080\n      targetPort: 18081\n```\n\nReadiness 失败：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          readinessProbe:\n            httpGet:\n              path: /does-not-exist\n              port: http\n            periodSeconds: 2\n            timeoutSeconds: 1\n            failureThreshold: 1\n```\n\nLiveness 重启风暴：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          startupProbe: null\n          livenessProbe:\n            httpGet:\n              path: /does-not-exist\n              port: http\n            initialDelaySeconds: 0\n            periodSeconds: 2\n            timeoutSeconds: 1\n            failureThreshold: 1\n```\n\n过低内存 Limit：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          resources:\n            requests:\n              cpu: 200m\n              memory: 16Mi\n            limits:\n              cpu: \"1\"\n              memory: 16Mi\n```\n\nHPA 缺少 CPU Request：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          resources:\n            requests:\n              memory: 128Mi\n            limits:\n              cpu: \"1\"\n              memory: 384Mi\n```\n\n违反 Restricted Pod Security：\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: runtime-privileged-fault\n  namespace: runtime-lab\nspec:\n  containers:\n    - name: app\n      image: registry.example.invalid/platform/runtime-lab@sha256:RECORD_DIGEST\n      securityContext:\n        privileged: true\n```\n\nNetworkPolicy 默认拒绝：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny\n  namespace: runtime-lab\nspec:\n  podSelector: {}\n  policyTypes:\n    - Ingress\n    - Egress\n```\n\n允许 DNS 和带标签客户端：\n\n```yaml\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-dns\n  namespace: runtime-lab\nspec:\n  podSelector: {}\n  policyTypes:\n    - Egress\n  egress:\n    - to:\n        - namespaceSelector:\n            matchLabels:\n              kubernetes.io/metadata.name: kube-system\n      ports:\n        - protocol: UDP\n          port: 53\n        - protocol: TCP\n          port: 53\n---\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-runtime-client\n  namespace: runtime-lab\nspec:\n  podSelector:\n    matchLabels:\n      app.kubernetes.io/name: runtime-lab\n  policyTypes:\n    - Ingress\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels:\n              access: runtime-client\n      ports:\n        - protocol: TCP\n          port: 8080\n```\n\n错误 HTTPRoute backend：\n\n```yaml\napiVersion: gateway.networking.k8s.io/v1\nkind: HTTPRoute\nmetadata:\n  name: runtime-lab\n  namespace: runtime-lab\nspec:\n  parentRefs:\n    - name: shared-gateway\n      namespace: gateway-system\n  hostnames:\n    - runtime.localtest.me\n  rules:\n    - backendRefs:\n        - name: runtime-does-not-exist\n          port: 8080\n```\n\n卡住的测试 Finalizer：\n\n```yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: finalizer-fault\n  namespace: runtime-lab\n  finalizers:\n    - lab.example/cleanup\ndata:\n  externalResourceId: fake-resource-p1-runtime-001\n```\n\n每个片段必须通过 server-side dry-run（PSA 拒绝实验预期失败除外）。应用后只等待该故障的预期信号，超时就采集证据并退出，不能让脚本无限等待。恢复统一重新应用 Base 清单，检查新的 Pod Template、Rollout、Endpoint 和请求。\n\n#### 成功、故障、恢复和清理的执行骨架\n\n脚本要求显式上下文、Digest 和证据目录。它不会安装 CNI、Gateway 或 Metrics Server，这些集群级前置条件必须由环境清单记录并单独验收。\n\n```bash\n#!/usr/bin/env bash\nset -Eeuo pipefail\n\n: \"${KUBE_CONTEXT:?set KUBE_CONTEXT}\"\n: \"${IMAGE_DIGEST:?set IMAGE_DIGEST}\"\n: \"${BASE_MANIFEST:?set BASE_MANIFEST}\"\n: \"${EVIDENCE_ROOT:?set EVIDENCE_ROOT}\"\n\nnamespace='runtime-lab'\nexperiment_id='p1-runtime-001'\nexpected_context='kind-runtime-readiness'\n\nif [ \"$KUBE_CONTEXT\" != \"$expected_context\" ]; then\n  echo \"refusing context $KUBE_CONTEXT\" >&2\n  exit 64\nfi\n\nif [ \"$(kubectl config current-context)\" != \"$KUBE_CONTEXT\" ]; then\n  echo 'current kubectl context does not match' >&2\n  exit 64\nfi\n\nif ! printf '%s' \"$IMAGE_DIGEST\" \\\n  | grep -Eq '^sha256:[0-9a-f]{64}$'; then\n  echo 'IMAGE_DIGEST must be a complete sha256 digest' >&2\n  exit 64\nfi\n\nrun_dir=\"$EVIDENCE_ROOT/$experiment_id\"\nmkdir -p \\\n  \"$run_dir/environment\" \\\n  \"$run_dir/success\" \\\n  \"$run_dir/failures\" \\\n  \"$run_dir/recovery\" \\\n  \"$run_dir/cleanup\"\n\ncollect_namespace() {\n  phase=\"$1\"\n  phase_dir=\"$run_dir/$phase\"\n  mkdir -p \"$phase_dir\"\n\n  kubectl get \\\n    deployment,replicaset,pod,service,endpointslice,hpa,pdb,configmap,pvc,networkpolicy \\\n    -n \"$namespace\" \\\n    -o yaml \\\n    > \"$phase_dir/objects.yaml\" 2>&1 || true\n\n  kubectl get events \\\n    -n \"$namespace\" \\\n    --sort-by=.metadata.creationTimestamp \\\n    > \"$phase_dir/events.txt\" 2>&1 || true\n\n  kubectl logs \\\n    -n \"$namespace\" \\\n    -l app.kubernetes.io/name=runtime-lab \\\n    --all-containers \\\n    --prefix \\\n    --timestamps \\\n    > \"$phase_dir/logs.txt\" 2>&1 || true\n\n  kubectl top pod \\\n    -n \"$namespace\" \\\n    --containers \\\n    > \"$phase_dir/top.txt\" 2>&1 || true\n}\n\nwait_for_ready_endpoints() {\n  timeout_seconds=\"$1\"\n  deadline=\"$(( $(date +%s) + timeout_seconds ))\"\n\n  while [ \"$(date +%s)\" -lt \"$deadline\" ]; do\n    ready_count=\"$(kubectl get endpointslice \\\n      -n \"$namespace\" \\\n      -l kubernetes.io/service-name=runtime-lab \\\n      -o json \\\n      | jq '[.items[].endpoints[]? | select(.conditions.ready == true)] | length')\"\n    if [ \"$ready_count\" -ge 2 ]; then\n      return 0\n    fi\n    sleep 2\n  done\n\n  return 1\n}\n\nrecord_request() {\n  output_file=\"$1\"\n  url=\"$2\"\n  started_ms=\"$(($(date +%s) * 1000))\"\n  body_file=\"$(mktemp)\"\n  headers_file=\"$(mktemp)\"\n\n  status_code=\"$(curl \\\n    --silent \\\n    --show-error \\\n    --output \"$body_file\" \\\n    --dump-header \"$headers_file\" \\\n    --write-out '%{http_code}' \\\n    \"$url\")\"\n\n  finished_ms=\"$(($(date +%s) * 1000))\"\n  response_digest=\"$(shasum -a 256 \"$body_file\" | awk '{print $1}')\"\n\n  jq -n \\\n    --arg url \"$url\" \\\n    --arg statusCode \"$status_code\" \\\n    --arg responseDigest \"$response_digest\" \\\n    --argjson latencyMs \"$((finished_ms - started_ms))\" \\\n    '{\n      url: $url,\n      statusCode: $statusCode,\n      latencyMs: $latencyMs,\n      responseDigest: $responseDigest\n    }' > \"$output_file\"\n\n  rm -f \"$body_file\" \"$headers_file\"\n  test \"$status_code\" = '200'\n}\n\nkubectl version -o yaml \\\n  > \"$run_dir/environment/kubernetes-version.yaml\"\nkubectl get nodes -o wide \\\n  > \"$run_dir/environment/nodes.txt\"\nkubectl get pods -A -o wide \\\n  > \"$run_dir/environment/system-pods.txt\"\nkubectl get apiservice v1beta1.metrics.k8s.io -o yaml \\\n  > \"$run_dir/environment/metrics-api.yaml\" 2>&1 || true\n\nif grep -R -Fq 'RECORD_DIGEST' \"$BASE_MANIFEST\"; then\n  echo 'base manifest still contains RECORD_DIGEST' >&2\n  exit 64\nfi\n\nkubectl apply \\\n  --server-side \\\n  --dry-run=server \\\n  -f \"$BASE_MANIFEST\" \\\n  > \"$run_dir/environment/server-dry-run.txt\"\n\nkubectl apply \\\n  --server-side \\\n  -f \"$BASE_MANIFEST\" \\\n  > \"$run_dir/success/apply.txt\"\n\nkubectl rollout status \\\n  deployment/runtime-lab \\\n  -n \"$namespace\" \\\n  --timeout=240s \\\n  > \"$run_dir/success/rollout.txt\"\n\nif ! wait_for_ready_endpoints 120; then\n  collect_namespace success\n  echo 'ready endpoint threshold not reached' >&2\n  exit 1\nfi\n\nkubectl port-forward \\\n  -n \"$namespace\" \\\n  service/runtime-lab \\\n  18081:8080 \\\n  > \"$run_dir/success/port-forward.log\" 2>&1 &\nport_forward_pid=\"$!\"\n\nfinish_port_forward() {\n  kill \"$port_forward_pid\" >/dev/null 2>&1 || true\n  wait \"$port_forward_pid\" >/dev/null 2>&1 || true\n}\ntrap finish_port_forward EXIT INT TERM\n\nport_ready=0\nfor attempt in $(seq 1 30); do\n  if curl --fail --silent \\\n      http://127.0.0.1:18081/livez \\\n      > \"$run_dir/success/livez.txt\"; then\n    port_ready=1\n    break\n  fi\n  sleep 1\ndone\n\nif [ \"$port_ready\" -ne 1 ]; then\n  collect_namespace success\n  exit 1\nfi\n\nrecord_request \\\n  \"$run_dir/success/version-request.json\" \\\n  http://127.0.0.1:18081/version\n\nkubectl get endpointslice \\\n  -n \"$namespace\" \\\n  -l kubernetes.io/service-name=runtime-lab \\\n  -o json \\\n  > \"$run_dir/success/endpointslices.json\"\n\nkubectl auth can-i list secrets \\\n  -n \"$namespace\" \\\n  --as=system:serviceaccount:runtime-lab:runtime-lab \\\n  > \"$run_dir/success/rbac-deny.txt\"\n\nif [ \"$(cat \"$run_dir/success/rbac-deny.txt\")\" != 'no' ]; then\n  echo 'runtime service account can list secrets' >&2\n  exit 1\nfi\n\ncollect_namespace success\n\nfaults='image-pull service-selector readiness liveness memory hpa-request'\n\nfor fault in $faults; do\n  fault_manifest=\"faults/$fault.yaml\"\n  fault_dir=\"$run_dir/failures/$fault\"\n  mkdir -p \"$fault_dir\"\n\n  kubectl apply -f \"$fault_manifest\" \\\n    > \"$fault_dir/apply.txt\" 2>&1 || true\n\n  sleep 10\n\n  kubectl get pod,service,endpointslice,hpa \\\n    -n \"$namespace\" \\\n    -o yaml \\\n    > \"$fault_dir/objects.yaml\" 2>&1 || true\n\n  kubectl get events \\\n    -n \"$namespace\" \\\n    --sort-by=.metadata.creationTimestamp \\\n    > \"$fault_dir/events.txt\" 2>&1 || true\n\n  kubectl logs \\\n    -n \"$namespace\" \\\n    -l app.kubernetes.io/name=runtime-lab \\\n    --all-containers \\\n    --prefix \\\n    --timestamps \\\n    > \"$fault_dir/logs.txt\" 2>&1 || true\n\n  kubectl apply --server-side -f \"$BASE_MANIFEST\" \\\n    > \"$fault_dir/recover-apply.txt\"\n\n  kubectl rollout status \\\n    deployment/runtime-lab \\\n    -n \"$namespace\" \\\n    --timeout=240s \\\n    > \"$fault_dir/recover-rollout.txt\"\n\n  wait_for_ready_endpoints 120\n\n  record_request \\\n    \"$fault_dir/recovery-request.json\" \\\n    http://127.0.0.1:18081/version\ndone\n\ncollect_namespace recovery\n\nfinish_port_forward\ntrap - EXIT INT TERM\n\nkubectl get all,configmap,pvc,networkpolicy,hpa,pdb \\\n  -n \"$namespace\" \\\n  -o yaml \\\n  > \"$run_dir/cleanup/before.yaml\"\n\nkubectl delete namespace \"$namespace\" \\\n  --wait=true \\\n  --timeout=180s \\\n  > \"$run_dir/cleanup/delete.txt\"\n\nif kubectl get namespace \"$namespace\" \\\n  > \"$run_dir/cleanup/after.txt\" 2>&1; then\n  echo 'namespace still exists' >&2\n  exit 1\nfi\n\njq -n \\\n  --arg experimentId \"$experiment_id\" \\\n  --arg imageDigest \"$IMAGE_DIGEST\" \\\n  '{\n    experimentId: $experimentId,\n    imageDigest: $imageDigest,\n    successPath: \"completed\",\n    failurePath: \"completed\",\n    recoveryPath: \"completed\",\n    cleanupPath: \"completed\",\n    evidenceLevel: \"kind-runtime\",\n    gatewayExecuted: false,\n    networkPolicyExecuted: false\n  }' > \"$run_dir/result.json\"\n```\n\n这个骨架故意把 Gateway 和 NetworkPolicy 标为 false：只有环境已经安装真实 Controller、支持 Enforcement 的 CNI，并额外执行外部请求与 allowed/denied 两组断言后，操作者才能更新结果。固定等待 10 秒只用于采集窗口，正式实验应针对具体 Condition 等待并设置上限。\n\n#### 最终证据报告模板\n\n报告使用 `pending` 和 `not-executed` 区分尚未执行与执行失败。验证器不能把缺字段默认成通过。\n\n```yaml\napiVersion: evidence.platform.example/v1\nkind: KubernetesRuntimeAcceptance\nmetadata:\n  experimentId: p1-runtime-001\n  startedAt: RECORD_AT_RUNTIME\n  finishedAt: RECORD_AT_RUNTIME\n  operator: RECORD_AT_RUNTIME\n  reviewer: RECORD_AT_RUNTIME\nspec:\n  scope:\n    environment: local-kind\n    productionClaim: false\n    roadmapGenerated: false\n  cluster:\n    context: kind-runtime-readiness\n    kindVersion: RECORD_AT_RUNTIME\n    nodeImageDigest: sha256:RECORD_AT_RUNTIME\n    kubernetesVersion: RECORD_AT_RUNTIME\n    nodes:\n      controlPlane: 1\n      workers: 2\n    cni:\n      name: RECORD_AT_RUNTIME\n      version: RECORD_AT_RUNTIME\n      readyEvidence: environment/system-pods.txt\n      enforcement:\n        result: pending\n        allowedRequest: network/allowed.json\n        deniedRequest: network/denied.json\n    metrics:\n      apiServiceAvailable: false\n      topNodesEvidence: resources/top-nodes.txt\n      topPodsEvidence: resources/top-pods.txt\n    gateway:\n      implementation: RECORD_AT_RUNTIME\n      version: RECORD_AT_RUNTIME\n      controllerReady: false\n      programmedCondition: false\n      externalRequest: network/external-request.json\n  image:\n    repository: registry.example.invalid/platform/runtime-lab\n    indexDigest: sha256:RECORD_FROM_DOCKER_05\n    sourceCommit: 0123456789abcdef0123456789abcdef01234567\n    dockerAcceptance: ../docker-p1-1.4.0/result.yaml\n    podImageIds:\n      - RECORD_AT_RUNTIME\n  baseline:\n    namespace: runtime-lab\n    namespaceLabels: success/namespace.yaml\n    deployment: success/deployment.yaml\n    replicaSets: success/replicasets.yaml\n    pods: success/pods.yaml\n    service: success/service.yaml\n    endpointSlices: success/endpointslices.json\n    hpa: success/hpa.yaml\n    pdb: success/pdb.yaml\n    request:\n      version: success/version-request.json\n      liveness: success/livez.txt\n      readiness: success/readyz.txt\n  workloads:\n    decision:\n      result: pending\n      deploymentEvidence: workloads/deployment.yaml\n      statefulSetEvidence: workloads/statefulset.yaml\n      daemonSetEvidence: workloads/daemonset.yaml\n    storage:\n      result: pending\n      pvcPending: storage/pvc-pending.yaml\n      mountFailure: storage/mount-failure.yaml\n      retention: storage/retention.yaml\n    jobs:\n      result: pending\n      idempotency: workloads/job-idempotency.yaml\n      concurrency: workloads/cronjob-concurrency.yaml\n    rollout:\n      result: pending\n      capacity: workloads/rollout-capacity.yaml\n      probeFailure: workloads/rollout-probe.yaml\n    deletion:\n      result: pending\n      ownerChain: workloads/owner-chain.yaml\n      finalizer: workloads/finalizer.yaml\n  tenancy:\n    namespaceBoundary:\n      result: pending\n      crossNamespaceRequest: tenancy/cross-namespace.json\n    quota:\n      result: pending\n      admissionRejection: tenancy/quota-rejection.txt\n      pendingScheduling: tenancy/scheduling-pending.yaml\n    rbac:\n      result: pending\n      allowed: tenancy/rbac-allowed.txt\n      denied: tenancy/rbac-denied.txt\n      tokenMountAbsent: tenancy/token-mount.txt\n    podSecurity:\n      result: pending\n      restrictedRejection: tenancy/psa-rejection.txt\n      compliantPod: tenancy/restricted-pod.yaml\n  configuration:\n    projection:\n      result: pending\n      environment: config/environment.txt\n      volumeTimeline: config/volume-timeline.json\n    immutableVersion:\n      result: pending\n      forward: config/forward.yaml\n      rollback: config/rollback.yaml\n    secretRotation:\n      result: pending\n      newValueAccepted: config/secret-new.txt\n      oldValueRevoked: config/secret-old.txt\n      logScan: config/secret-log-scan.txt\n    failureModes:\n      result: pending\n      missing: config/missing.yaml\n      malformed: config/malformed.yaml\n      dependency: config/dependency.yaml\n    initContainer:\n      result: pending\n      statuses: config/init-statuses.json\n      idempotency: config/init-idempotency.yaml\n  networking:\n    service:\n      result: pending\n      selectorFault: network/selector-fault.yaml\n      targetPortFault: network/target-port-fault.yaml\n    dns:\n      result: pending\n      fqdn: network/fqdn.txt\n      cacheTimeline: network/dns-cache.json\n    entry:\n      result: not-executed\n      routeStatus: network/route-status.yaml\n      hostPathRequest: network/external-request.json\n    layeredDiagnosis:\n      result: pending\n      client: network/client.txt\n      gateway: network/gateway.yaml\n      service: network/service.yaml\n      endpoint: network/endpoints.yaml\n      pod: network/pod.txt\n  capacity:\n    requestsLimits:\n      result: pending\n      cpu: resources/cpu.yaml\n      memory: resources/memory.yaml\n      scheduling: resources/scheduling.yaml\n    qosEviction:\n      result: not-executed\n      qosClasses: resources/qos.txt\n      eviction: resources/eviction.yaml\n    hpaCalculation:\n      result: pending\n      metrics: resources/metrics.json\n      conditions: resources/hpa-conditions.yaml\n    hpaBehavior:\n      result: pending\n      timeline: resources/hpa-timeline.json\n      maxReplicaAlert: resources/hpa-max.txt\n  availability:\n    probes:\n      result: pending\n      startup: availability/startup.yaml\n      readiness: availability/readiness.yaml\n      liveness: availability/liveness.yaml\n    endpointPropagation:\n      result: pending\n      timeline: availability/endpoint-timeline.json\n      longConnection: availability/long-connection.json\n    termination:\n      result: pending\n      timeline: availability/termination-timeline.json\n      forcedKill: availability/forced-kill.yaml\n    disruption:\n      result: pending\n      topology: availability/topology.yaml\n      drain: availability/drain.txt\n      pdb: availability/pdb.yaml\n  faultAcceptance:\n    podLifecycle:\n      result: pending\n      evidence: failures/pod-lifecycle/index.yaml\n    requestPath:\n      result: pending\n      evidence: failures/request-path/index.yaml\n    automation:\n      result: pending\n      evidence: failures/automation/index.yaml\n  cleanup:\n    namespaceDeleted: false\n    namespacedResourcesAbsent: false\n    clusterScopedInventoryReviewed: false\n    externalSideEffectsAbsent: false\n    evidence: cleanup/result.yaml\nstatus:\n  result: pending\n  evidenceLevel: static\n  blockingFindings: []\n  acceptedLimitations:\n    - local Kind results are not production capacity evidence\n  nextHandoff:\n    gitopsRuntimeEvidence: pending\n```\n\n最终审查顺序是：先拒绝占位符和可变 Tag；再验证 H3 对应的证据文件存在；然后检查成功、失败、恢复、清理四条路径；最后由另一名操作者抽样重放。只有真实执行过的条目才能从 `pending` 改为 `passed`，未安装 Gateway/CNI Enforcement 等前置条件的条目必须保留 `not-executed` 或阻塞结论。\n\n#### 重放者的最终检查表\n\n重放者不沿用作者的口头说明，只依赖仓库清单与证据目录。以下任一项不成立，本地实验就不能标记完成：\n\n1. 当前上下文精确等于 `kind-runtime-readiness`。\n2. Node Image、Kubernetes、CNI、Metrics Server 和入口实现版本均已记录。\n3. 镜像使用完整 Index Digest，Pod `imageID` 可反查平台 Manifest。\n4. Namespace 带实验 ID、Pod Security 与到期信息。\n5. Deployment、Service、EndpointSlice、HPA 和 PDB 的 Generation 已被控制器观察。\n6. `/version` 返回 Source Commit、架构和 Pod UID，且与对象证据一致。\n7. `/livez` 与 `/readyz` 在依赖失败时呈现不同语义。\n8. 环境变量、投射卷和版本化配置的更新差异有时间线。\n9. Secret 轮换完成新值启用、旧值撤销和日志脱敏三项验证。\n10. PVC Pending、挂载失败、数据保留和回收边界各有结果。\n11. Job 重试没有产生未解释的重复副作用。\n12. RBAC 同时包含允许和拒绝断言，应用默认不挂载 API Token。\n13. PSA Restricted 拒绝实验和合规 Pod 运行实验都完成。\n14. NetworkPolicy 记录支持 Enforcement 的 CNI，并有允许/拒绝请求。\n15. Service Selector、targetPort、DNS 与入口故障能按层定位。\n16. CPU、Memory、临时存储和 Pending 调度信号没有混淆。\n17. HPA 缺失指标、多个指标和达到上限的行为均可解释。\n18. Startup、Readiness、Liveness 的故障不会互相代替。\n19. SIGTERM 时间线包含摘流、排空、退出和强制终止对照。\n20. Topology Spread、PDB 与 Drain 的边界没有被夸大。\n21. 每项故障只改变一个变量，恢复后重新应用 Base。\n22. 真实外部请求从原客户端重放，而不是只 curl Pod localhost。\n23. 事件、日志和指标在修复前采集，时间窗口可对齐。\n24. 所有 Secret 值和 Token 都未进入证据文件。\n25. Namespace、测试 Finalizer、PVC 和登记的集群级对象均已清理。\n26. `static`、`kind-runtime`、`external-request` 等证据级别标注准确。\n27. 未执行项保留 `pending` 或 `not-executed`，没有伪造输出。\n28. 另一名操作者至少重放一个资源、一个网络和一个终止故障。\n\n报告关闭前，重放者还应做一次跨章节一致性检查：镜像身份、对象版本、请求时间窗和故障编号必须能互相连接。尤其要确认以下边界没有被摘要结论掩盖：\n\n1. 本地 Kind 中的成功结果只证明所记录版本组合下的行为，不外推生产容量与可用性。\n2. 未安装的 Gateway、云负载均衡或 NetworkPolicy Enforcement 不以模拟输出冒充真实运行结果。\n3. HPA、PDB、探针和优雅终止分别约束不同阶段，任何单项通过都不代表整体发布安全。\n4. 修复后的成功记录必须引用对应失败编号，不能只留下最终绿色状态。\n5. 外部请求、Pod 内请求与控制器状态分别标注采集位置，避免把局部连通误判为端到端可达。\n6. 所有结论都能追溯到清单快照、事件、日志或指标之一，并注明证据级别与限制。\n7. 清理完成后仍需保留不含敏感值的索引和摘要，使接收方能够确认实验范围与退出状态。\n8. 交给 GitOps 阶段的是同一不可变候选及其运行证据，不允许在晋级途中替换镜像内容。\n\n这份检查表负责关闭实验，不替代前文机制与 Runbook。通过后交出的仍是本地 Kind 证据包；生产发布、真实 Gateway/云负载均衡、生产 CNI 和容量结果需要在对应环境重新验证。", "subs": ["基础实验清单", "故障清单如何保持单变量", "成功、故障、恢复和清理的执行骨架", "最终证据报告模板", "重放者的最终检查表"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

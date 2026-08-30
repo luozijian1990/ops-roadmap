@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Argo CD 镜像自动化与渐进式交付学习笔记 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Argo CD 镜像自动化与渐进式交付学习笔记</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Argo CD 镜像自动化与渐进式交付学习笔记", "intro": "", "parts": [{"title": "第 1 章 · Image Updater 如何形成独立调谐链", "sections": [{"title": "Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么", "content": "Argo CD 负责把 Git 中的期望状态调谐到集群，Argo CD Image Updater 负责发现符合策略的新镜像版本，并改变 Application 使用的镜像参数。它不是镜像构建器，也不验证业务功能；它连接的是“已存在的候选镜像”和“环境期望版本”。\n\n```mermaid\nflowchart LR\n    CI[CI pipeline] -->|Push immutable image| Registry[OCI registry]\n    Updater[Image Updater] -->|List tags and manifests| Registry\n    Updater -->|Select candidate| Policy[Update policy]\n    Policy -->|Write change| Git[Configuration repository]\n    Git --> Argo[Argo CD]\n    Argo --> Cluster[Target cluster]\n```\n\n它的控制边界包括：\n\n- 哪些 Application 可以被匹配。\n- 每个 Application 管理哪些镜像。\n- 如何从 Registry 候选中选择版本。\n- 用 Argo CD API 还是 Git 传播更新。\n- 使用哪个 Registry 和 Git 凭据。\n\n镜像扫描成功不等于可以发布。漏洞、签名、兼容性和审批等门禁应在候选进入生产配置前完成。若 Image Updater 只按时间选择“最新”而没有验证状态，它会把 Registry 的每次写入自动放大为环境变更。\n\n#### 明确 Image Updater 的输入和输出契约\n\n输入至少包括当前配置引用、Registry 候选集合、Tag 过滤规则、更新策略、凭据和目标 Application。输出应是一笔可审查的配置变更或明确的“无需更新”状态。\n\n| 边界 | Image Updater 应负责 | 不应隐式负责 |\n|---|---|---|\n| 候选发现 | 查询允许的 Repository 和 Tag | 判断源码测试是否正确 |\n| 候选过滤 | 应用 SemVer、Regex、平台等规则 | 绕过签名和漏洞策略 |\n| 变更表达 | 更新拥有的镜像字段 | 修改无关 Values 或运行对象 |\n| 写回 | 提交 Git 或更新受支持目标 | 失败时直接 Patch 生产集群 |\n| 状态 | 报告扫描、选择和回写结果 | 把 Argo CD Sync 当作自身成功 |\n\n为每个 Application 记录字段 Owner。CI 产生制品，Image Updater 提出镜像变更，审批者接受环境风险，Argo CD 调谐配置，Rollouts 控制流量；任何两个组件不应同时写同一字段。\n\n验收时制造一个合规候选、一个不合规候选和 Registry 不可达。期望分别是提出变更、明确拒绝、保持当前版本并报告故障。\n\n如果状态只能显示“Error”，还要补充 Registry、镜像别名、策略和最近成功扫描时间，值班人员才能安全决定重试还是暂停。\n\nImage Updater 1.x 从 Application annotations 迁移到独立 `ImageUpdater` CRD。顶层可以定义公共更新和回写策略，`applicationRefs` 匹配 Application，再为每个镜像定义别名、名称和覆盖规则。\n\n```yaml\napiVersion: argocd-image-updater.argoproj.io/v1alpha1\nkind: ImageUpdater\nmetadata:\n  name: checkout-production\n  namespace: argocd\nspec:\n  commonUpdateSettings:\n    updateStrategy: semver\n    allowTags: 'regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$'\n    ignoreTags:\n      - latest\n      - dev\n  writeBackConfig:\n    method: git\n    gitConfig:\n      branch: main\n  applicationRefs:\n    - namePattern: checkout-production\n      images:\n        - alias: checkout\n          imageName: harbor.example.com/payments/checkout-api:2.8.4\n```\n\n示例仅说明对象关系，最终字段必须由集群已安装 CRD 验证。`spec.namespace` 已被移除，控制器使用 ImageUpdater 对象所在的 `metadata.namespace` 查找 Application。升级时若照搬旧文档，CRD 校验会直接拒绝。\n\n旧 annotations 可以作为迁移输入，但不要把一套镜像策略同时写在 CRD 和 annotations 中而不理解优先级。迁移应先列出旧 Application、镜像别名、更新策略、凭据和回写方式，再逐应用切换并观察状态。\n\n#### 逐应用迁移旧 Annotation 配置\n\n迁移清单至少包含旧键、等价 CRD 字段、默认值差异和验证结果：\n\n1. 导出 Application 上所有 Image Updater annotations。\n2. 按镜像别名整理 Repository、策略、允许/忽略 Tag 和凭据。\n3. 创建只匹配一个测试 Application 的 `ImageUpdater` 对象。\n4. 暂停旧配置写入，避免两套配置同时管理字段。\n5. 对比两套方式计算出的候选，不立即启用生产回写。\n6. 启用测试回写并观察至少两个扫描周期。\n7. 删除旧 annotations，再确认候选和状态不变。\n\n迁移要特别检查默认更新策略、Namespace 发现范围、分支和回写文件。字段名字相似不代表默认行为相同。\n\n如果新 CRD 无法表达某个历史行为，不应保留隐藏 Annotation 兜底。应明确选择调整流程、等待能力补齐或把该 Application 暂留旧模式，并记录退出条件。\n\n批量迁移一次只扩大一个维度，例如同团队或同环境。用命中 Application 数量预算防止 `namePattern` 意外覆盖生产全集。\n\n#### Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的机制边界\n\n建立输入、候选、变更、写回和状态契约，明确不负责构建验证、生产审批和直接流量控制。\n\n- **Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\nTag 用于导航，Digest 才承担不可变身份；Index 与平台 Manifest 的关系必须在生产架构上展开验证。\n证明、签名、扫描和制品应绑定同一内容身份，验证服务不可用要记为未知而不是自动放行。\n\n#### Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的静态检查模板\n\n下面命令为“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么\nevidence_file=\"./evidence/check-fe1d0c4180.txt\"\nkubectl get imageupdater -A -o yaml | tee -a \"${evidence_file}\"\ngit log --oneline --decorate -n 5 | tee -a \"${evidence_file}\"\nkubectl get applications.argoproj.io -A | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么的故障实验与恢复\n\n“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”的可逆故障场景是：分别阻断 DNS、TLS、认证、Manifest 和 Blob，区分已运行 Pod 与新建 Pod 的影响，再以同一 Digest 恢复。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”执行恢复策略：暂停发布和非必要重调度，从区域副本恢复同一 Digest，复验 Manifest、Blob、证明与拉取身份后再释放队列。\n4. 重新采集“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Image Updater 在 CI、Registry、Git 和 Argo CD 之间负责什么”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["明确 Image Updater 的输入和输出契约", "逐应用迁移旧 Annotation 配置", "Image Updater 在 CI、Registry、Git 和 Argo CD"]}, {"title": "Registry 查询、Application 匹配和镜像别名如何关联", "content": "解释 ImageUpdater Namespace、ApplicationRefs、NamePattern、镜像别名和最终 Manifest 中镜像字段的匹配过程。\n\n#### Registry 查询、Application 匹配和镜像别名如何关联的机制边界\n\n\n- **Registry 查询、Application 匹配和镜像别名如何关联的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Registry 查询、Application 匹配和镜像别名如何关联的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Registry 查询、Application 匹配和镜像别名如何关联的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Registry 查询、Application 匹配和镜像别名如何关联的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\nTag 用于导航，Digest 才承担不可变身份；Index 与平台 Manifest 的关系必须在生产架构上展开验证。\n证明、签名、扫描和制品应绑定同一内容身份，验证服务不可用要记为未知而不是自动放行。\n\n#### Registry 查询、Application 匹配和镜像别名如何关联的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Registry 查询、Application 匹配和镜像别名如何关联` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Registry 查询、Application 匹配和镜像别名如何关联` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Registry 查询、Application 匹配和镜像别名如何关联` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Registry 查询、Application 匹配和镜像别名如何关联` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Registry 查询、Application 匹配和镜像别名如何关联”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Registry 查询、Application 匹配和镜像别名如何关联的静态检查模板\n\n下面命令为“Registry 查询、Application 匹配和镜像别名如何关联”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Registry 查询、Application 匹配和镜像别名如何关联\nevidence_file=\"./evidence/check-0e6e0de901.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Registry 查询、Application 匹配和镜像别名如何关联”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Registry 查询、Application 匹配和镜像别名如何关联的故障实验与恢复\n\n“Registry 查询、Application 匹配和镜像别名如何关联”的可逆故障场景是：分别阻断 DNS、TLS、认证、Manifest 和 Blob，区分已运行 Pod 与新建 Pod 的影响，再以同一 Digest 恢复。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Registry 查询、Application 匹配和镜像别名如何关联”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Registry 查询、Application 匹配和镜像别名如何关联”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Registry 查询、Application 匹配和镜像别名如何关联”执行恢复策略：暂停发布和非必要重调度，从区域副本恢复同一 Digest，复验 Manifest、Blob、证明与拉取身份后再释放队列。\n4. 重新采集“Registry 查询、Application 匹配和镜像别名如何关联”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Registry 查询、Application 匹配和镜像别名如何关联”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["Registry 查询、Application 匹配和镜像别名如何关联的机制边界", "Registry 查询、Application 匹配和镜像别名如何关联的决策与证据", "Registry 查询、Application 匹配和镜像别名如何关联的静态检查模板", "Registry 查询、Application 匹配和镜像别名如何关联的故障实验与恢"]}, {"title": "控制器状态如何区分扫描、选择、写回和后续同步", "content": "为无候选、Registry 错误、Git 错误、Commit 已推送、Argo CD 未检测建立状态和查询矩阵。\n\n#### 控制器状态如何区分扫描、选择、写回和后续同步的机制边界\n\n\n- **控制器状态如何区分扫描、选择、写回和后续同步的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **控制器状态如何区分扫描、选择、写回和后续同步的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **控制器状态如何区分扫描、选择、写回和后续同步的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **控制器状态如何区分扫描、选择、写回和后续同步的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“控制器状态如何区分扫描、选择、写回和后续同步”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“控制器状态如何区分扫描、选择、写回和后续同步”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 控制器状态如何区分扫描、选择、写回和后续同步的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `控制器状态如何区分扫描、选择、写回和后续同步` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `控制器状态如何区分扫描、选择、写回和后续同步` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `控制器状态如何区分扫描、选择、写回和后续同步` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `控制器状态如何区分扫描、选择、写回和后续同步` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“控制器状态如何区分扫描、选择、写回和后续同步”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 控制器状态如何区分扫描、选择、写回和后续同步的静态检查模板\n\n下面命令为“控制器状态如何区分扫描、选择、写回和后续同步”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 控制器状态如何区分扫描、选择、写回和后续同步\nevidence_file=\"./evidence/check-907607ddd7.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“控制器状态如何区分扫描、选择、写回和后续同步”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 控制器状态如何区分扫描、选择、写回和后续同步的故障实验与恢复\n\n“控制器状态如何区分扫描、选择、写回和后续同步”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“控制器状态如何区分扫描、选择、写回和后续同步”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“控制器状态如何区分扫描、选择、写回和后续同步”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“控制器状态如何区分扫描、选择、写回和后续同步”执行恢复策略：冻结后续变更并保留当前稳定状态，恢复版本化输入后等待控制器重新收敛，再用业务证据关闭事件。\n4. 重新采集“控制器状态如何区分扫描、选择、写回和后续同步”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“控制器状态如何区分扫描、选择、写回和后续同步”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["控制器状态如何区分扫描、选择、写回和后续同步的机制边界", "控制器状态如何区分扫描、选择、写回和后续同步的决策与证据", "控制器状态如何区分扫描、选择、写回和后续同步的静态检查模板", "控制器状态如何区分扫描、选择、写回和后续同步的故障实验与恢复"]}, {"title": "如何从旧 Application Annotations 迁移到 1.x CRD", "content": "导出旧配置、映射字段、双算候选、单应用切换、删除旧写入入口并观察两个扫描周期。\n\n#### 如何从旧 Application Annotations 迁移到 1.x CRD的机制边界\n\n\n- **如何从旧 Application Annotations 迁移到 1.x CRD的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **如何从旧 Application Annotations 迁移到 1.x CRD的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **如何从旧 Application Annotations 迁移到 1.x CRD的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **如何从旧 Application Annotations 迁移到 1.x CRD的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“如何从旧 Application Annotations 迁移到 1.x CRD”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“如何从旧 Application Annotations 迁移到 1.x CRD”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 如何从旧 Application Annotations 迁移到 1.x CRD的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `如何从旧 Application Annotations 迁移到 1.x CRD` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `如何从旧 Application Annotations 迁移到 1.x CRD` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `如何从旧 Application Annotations 迁移到 1.x CRD` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `如何从旧 Application Annotations 迁移到 1.x CRD` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“如何从旧 Application Annotations 迁移到 1.x CRD”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 如何从旧 Application Annotations 迁移到 1.x CRD的静态检查模板\n\n下面命令为“如何从旧 Application Annotations 迁移到 1.x CRD”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 如何从旧 Application Annotations 迁移到 1.x CRD\nevidence_file=\"./evidence/check-ad9ffd4759.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“如何从旧 Application Annotations 迁移到 1.x CRD”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 如何从旧 Application Annotations 迁移到 1.x CRD的故障实验与恢复\n\n“如何从旧 Application Annotations 迁移到 1.x CRD”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“如何从旧 Application Annotations 迁移到 1.x CRD”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“如何从旧 Application Annotations 迁移到 1.x CRD”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“如何从旧 Application Annotations 迁移到 1.x CRD”执行恢复策略：冻结后续变更并保留当前稳定状态，恢复版本化输入后等待控制器重新收敛，再用业务证据关闭事件。\n4. 重新采集“如何从旧 Application Annotations 迁移到 1.x CRD”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“如何从旧 Application Annotations 迁移到 1.x CRD”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["如何从旧 Application Annotations 迁移到 1"]}]}, {"title": "第 2 章 · 更新策略和 Git Write-back 如何保持 Git 为事实来源", "sections": [{"title": "SemVer、Newest Build、Digest 和 Alphabetical 如何选择", "content": "用固定候选仓库验证版本顺序、预发布、旧版本晚构建、可变 Tag 和空候选。\n\n#### SemVer、Newest Build、Digest 和 Alphabetical 如何选择的机制边界\n\n\n- **SemVer、Newest Build、Digest 和 Alphabetical 如何选择的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **SemVer、Newest Build、Digest 和 Alphabetical 如何选择的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **SemVer、Newest Build、Digest 和 Alphabetical 如何选择的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **SemVer、Newest Build、Digest 和 Alphabetical 如何选择的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\nTag 用于导航，Digest 才承担不可变身份；Index 与平台 Manifest 的关系必须在生产架构上展开验证。\n证明、签名、扫描和制品应绑定同一内容身份，验证服务不可用要记为未知而不是自动放行。\n\n#### SemVer、Newest Build、Digest 和 Alphabetical 如何选择的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `SemVer、Newest Build、Digest 和 Alphabetical 如何选择` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `SemVer、Newest Build、Digest 和 Alphabetical 如何选择` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `SemVer、Newest Build、Digest 和 Alphabetical 如何选择` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `SemVer、Newest Build、Digest 和 Alphabetical 如何选择` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### SemVer、Newest Build、Digest 和 Alphabetical 如何选择的静态检查模板\n\n下面命令为“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: SemVer、Newest Build、Digest 和 Alphabetical 如何选择\nevidence_file=\"./evidence/check-7e7876269d.txt\"\nkubectl get imageupdater -A -o yaml | tee -a \"${evidence_file}\"\ngit log --oneline --decorate -n 5 | tee -a \"${evidence_file}\"\nkubectl get applications.argoproj.io -A | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### SemVer、Newest Build、Digest 和 Alphabetical 如何选择的故障实验与恢复\n\n“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”执行恢复策略：暂停镜像扫描或写回，恢复上一个配置 Commit，修正规则后用固定候选集双算，确认不会再次选择错误版本。\n4. 重新采集“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“SemVer、Newest Build、Digest 和 Alphabetical 如何选择”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["SemVer、Newest Build、Digest 和 Alphabetical"]}, {"title": "AllowTags、IgnoreTags 和平台约束如何缩小候选集合", "content": "策略回答“从可见镜像中选哪一个”，不是“这个镜像是否安全”。常见维度包括 SemVer、构建时间、字母排序、Digest、允许/忽略 Tag 和目标平台。\n\n| 场景 | 推荐做法 | 主要风险 |\n|---|---|---|\n| 稳定发布 | SemVer + 明确范围 + 排除预发布 | 版本约束过宽跨大版本 |\n| Commit SHA Tag | 由外部流程提交明确 Digest | 字符串排序没有时间语义 |\n| 固定渠道 Tag | Digest 策略观察内容变化 | Git 难以直观看出业务版本 |\n| 多架构镜像 | 验证 Image Index 和目标平台 | 只发布一个架构导致部分节点失败 |\n\n不要把 `latest` 当生产候选选择。即使 Digest 策略能发现 `latest` 内容变化，这种变化仍缺少版本语义和审核上下文。更好的做法是构建生成不可变候选，再让配置变更明确记录旧、新 Digest。\n\n#### 为更新策略建立候选测试集\n\n准备稳定版、预发布版、主版本升级、旧 Tag 重推、缺失平台和签名失败六类样本。每次策略变更都输出完整候选集合和最终选择。\n\n| 策略 | 必测风险 | 期望保护 |\n|---|---|---|\n| SemVer | 是否跨主版本、是否含预发布 | 只在声明范围内升级 |\n| Newest Build | 旧版本晚构建 | 不把构建时间误当版本顺序 |\n| Digest | 可变 Tag 内容变化 | 发现变化但仍经过审核 |\n| Alphabetical | 命名不统一 | 只用于有固定排序语义的 Tag |\n\n候选为空时保持当前配置；候选多于预期时报告策略过宽；当前版本不符合新规则时进入人工迁移。三种异常都不能自动选择“看起来最近”的镜像。\n\nRegex 要测试拒绝集合，SemVer 要测试边界版本，Digest 模式要测试 Tag 重推审计。测试数据固定在专用 Repository，避免生产 Registry 的新推送让结果不确定。\n\n生产启用前把旧、新 Digest、策略版本和候选列表写进变更记录，便于解释为什么这个版本被选中。\n\n#### AllowTags、IgnoreTags 和平台约束如何缩小候选集合的机制边界\n\n测试 Regex 接受/拒绝、平台 Manifest 完整性、当前版本不合规和策略变更迁移。\n\n- **AllowTags、IgnoreTags 和平台约束如何缩小候选集合的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **AllowTags、IgnoreTags 和平台约束如何缩小候选集合的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **AllowTags、IgnoreTags 和平台约束如何缩小候选集合的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **AllowTags、IgnoreTags 和平台约束如何缩小候选集合的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### AllowTags、IgnoreTags 和平台约束如何缩小候选集合的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `AllowTags、IgnoreTags 和平台约束如何缩小候选集合` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `AllowTags、IgnoreTags 和平台约束如何缩小候选集合` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `AllowTags、IgnoreTags 和平台约束如何缩小候选集合` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `AllowTags、IgnoreTags 和平台约束如何缩小候选集合` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### AllowTags、IgnoreTags 和平台约束如何缩小候选集合的静态检查模板\n\n下面命令为“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: AllowTags、IgnoreTags 和平台约束如何缩小候选集合\nevidence_file=\"./evidence/check-359da4f758.txt\"\nkubectl get imageupdater -A -o yaml | tee -a \"${evidence_file}\"\ngit log --oneline --decorate -n 5 | tee -a \"${evidence_file}\"\nkubectl get applications.argoproj.io -A | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### AllowTags、IgnoreTags 和平台约束如何缩小候选集合的故障实验与恢复\n\n“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”执行恢复策略：暂停镜像扫描或写回，恢复上一个配置 Commit，修正规则后用固定候选集双算，确认不会再次选择错误版本。\n4. 重新采集“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“AllowTags、IgnoreTags 和平台约束如何缩小候选集合”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["为更新策略建立候选测试集", "AllowTags、IgnoreTags 和平台约束如何缩小候选集合的机制边界", "AllowTags、IgnoreTags 和平台约束如何缩小候选集合的决策与证据", "AllowTags、IgnoreTags 和平台约束如何缩小候选集合的静态检查模板", "AllowTags、IgnoreTags 和平台约束如何缩小候选集合的故障实验与恢复"]}, {"title": "Git Write-back 如何处理分支、路径、PR 和受保护仓库", "content": "Image Updater 支持直接修改 Application 参数和 Git Write-back。前者适合临时或命令式管理的 Application，后者更符合版本化事实来源。若 Application 自身由 Git 管理，直接修改集群对象可能被下一次同步覆盖。\n\nGit Write-back 的关键步骤是：读取 Repository 和 Target Revision、检出分支、更新目标文件、创建 Commit、推送，再由 Argo CD 观察新 Revision。生产环境通常还需要 Pull Request 和审批，而不是让控制器直接写受保护分支。\n\n凭据应独立于人工账号，并限制到目标仓库。回写 Commit 建议包含：Application、镜像别名、旧/新 Digest、选择策略和 ImageUpdater 对象。发生冲突时应停止并告警，不能强制覆盖其他发布变更。\n\n回写文件也要有明确 Owner。若 Helm Values、Kustomize Image 和 `.argocd-source-<app>.yaml` 同时覆盖镜像，最终值取决于渲染优先级，Git Diff 很难说明实际部署内容。应只保留一个正式入口，并在 CI 中渲染最终 Manifest 验证目标 Digest。\n\n受保护分支环境可以让 Image Updater 创建 Pull Request。PR 检查应展示旧/新 Digest、版本差异、签名和扫描状态，并限制机器人自行批准。紧急撤销候选时，关闭未合并 PR、暂停匹配的 ImageUpdater，并撤销 Registry Tag 或策略资格。\n\n验证回写链路时不要使用生产 Repository。先在测试 Application 中制造一个新候选，确认状态记录、Commit 作者、分支、目标文件、Argo CD 检测延迟和最终渲染；再逐环境启用。\n\n#### 验证回写没有制造双重事实来源\n\n回写成功后依次检查：\n\n1. 机器人 Commit 位于预期分支，作者和签名符合策略。\n2. 只修改目标镜像字段，没有重排或覆盖人工配置。\n3. 提交信息含旧、新 Digest、Application 和策略。\n4. Argo CD 实际读取该分支与路径，并渲染出新 Digest。\n5. 运行态只由 Argo CD 改变，不存在 Image Updater 直接 Patch。\n6. 重扫时识别当前版本，不重复创建等价 Commit。\n\n保护分支要求 PR 时，Image Updater 的成功状态应是“提案已创建”，而不是“生产已更新”。审批、合并、Sync 和业务接受分别由后续系统记录。\n\n制造 Git 冲突验证机器人只重读并更新拥有字段。若无法安全合并，就保持当前版本并请求人工处理，不能强推覆盖。\n\n撤销回写用新的 Revert 或替代 Commit 保留历史。删除机器人 Commit 或手工修改运行对象都会破坏审计链。\n\n#### Git Write-back 如何处理分支、路径、PR 和受保护仓库的机制边界\n\n给出直接 Commit 与 PR 两种完整流程、机器人最小权限、Commit Schema 和最终渲染验证。\n\n- **Git Write-back 如何处理分支、路径、PR 和受保护仓库的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Git Write-back 如何处理分支、路径、PR 和受保护仓库的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Git Write-back 如何处理分支、路径、PR 和受保护仓库的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Git Write-back 如何处理分支、路径、PR 和受保护仓库的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n写入者必须声明字段所有权、目标分支和冲突策略，远端 HEAD 变化后重新计算而不是覆盖。\nCommit 已产生但本地状态丢失时先按变更 ID 查重，避免同一候选生成重复提交或 PR。\n\n#### Git Write-back 如何处理分支、路径、PR 和受保护仓库的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Git Write-back 如何处理分支、路径、PR 和受保护仓库` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Git Write-back 如何处理分支、路径、PR 和受保护仓库` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Git Write-back 如何处理分支、路径、PR 和受保护仓库` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Git Write-back 如何处理分支、路径、PR 和受保护仓库` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Git Write-back 如何处理分支、路径、PR 和受保护仓库”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Git Write-back 如何处理分支、路径、PR 和受保护仓库的静态检查模板\n\n下面命令为“Git Write-back 如何处理分支、路径、PR 和受保护仓库”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Git Write-back 如何处理分支、路径、PR 和受保护仓库\nevidence_file=\"./evidence/check-59820a14ef.txt\"\nkubectl get imageupdater -A -o yaml | tee -a \"${evidence_file}\"\ngit log --oneline --decorate -n 5 | tee -a \"${evidence_file}\"\nkubectl get applications.argoproj.io -A | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Git Write-back 如何处理分支、路径、PR 和受保护仓库”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Git Write-back 如何处理分支、路径、PR 和受保护仓库的故障实验与恢复\n\n“Git Write-back 如何处理分支、路径、PR 和受保护仓库”的可逆故障场景是：制造远端 HEAD 前移与重复变更 ID，验证机器人重新读取、重算并去重；禁止强制覆盖受保护分支。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Git Write-back 如何处理分支、路径、PR 和受保护仓库”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Git Write-back 如何处理分支、路径、PR 和受保护仓库”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Git Write-back 如何处理分支、路径、PR 和受保护仓库”执行恢复策略：冻结新的写回，按变更 ID 查找已存在的 Commit 或 PR，重新读取远端 HEAD 后重算；错误提交使用显式 Revert。\n4. 重新采集“Git Write-back 如何处理分支、路径、PR 和受保护仓库”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Git Write-back 如何处理分支、路径、PR 和受保护仓库”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["验证回写没有制造双重事实来源", "Git Write"]}, {"title": "并发冲突、状态丢失和错误候选如何恢复", "content": "用变更 ID 去重，处理远端 HEAD 变化、Commit 已存在但状态丢失、Revert 后候选被再次选择。\n\n#### 并发冲突、状态丢失和错误候选如何恢复的机制边界\n\n\n- **并发冲突、状态丢失和错误候选如何恢复的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **并发冲突、状态丢失和错误候选如何恢复的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **并发冲突、状态丢失和错误候选如何恢复的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **并发冲突、状态丢失和错误候选如何恢复的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n写入者必须声明字段所有权、目标分支和冲突策略，远端 HEAD 变化后重新计算而不是覆盖。\nCommit 已产生但本地状态丢失时先按变更 ID 查重，避免同一候选生成重复提交或 PR。\n\n#### 并发冲突、状态丢失和错误候选如何恢复的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `并发冲突、状态丢失和错误候选如何恢复` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `并发冲突、状态丢失和错误候选如何恢复` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `并发冲突、状态丢失和错误候选如何恢复` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `并发冲突、状态丢失和错误候选如何恢复` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“并发冲突、状态丢失和错误候选如何恢复”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 并发冲突、状态丢失和错误候选如何恢复的静态检查模板\n\n下面命令为“并发冲突、状态丢失和错误候选如何恢复”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 并发冲突、状态丢失和错误候选如何恢复\nevidence_file=\"./evidence/check-ed8d4873bb.txt\"\nkubectl get imageupdater -A -o yaml | tee -a \"${evidence_file}\"\ngit log --oneline --decorate -n 5 | tee -a \"${evidence_file}\"\nkubectl get applications.argoproj.io -A | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“并发冲突、状态丢失和错误候选如何恢复”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 并发冲突、状态丢失和错误候选如何恢复的故障实验与恢复\n\n“并发冲突、状态丢失和错误候选如何恢复”的可逆故障场景是：制造远端 HEAD 前移与重复变更 ID，验证机器人重新读取、重算并去重；禁止强制覆盖受保护分支。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“并发冲突、状态丢失和错误候选如何恢复”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“并发冲突、状态丢失和错误候选如何恢复”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“并发冲突、状态丢失和错误候选如何恢复”执行恢复策略：冻结新的写回，按变更 ID 查找已存在的 Commit 或 PR，重新读取远端 HEAD 后重算；错误提交使用显式 Revert。\n4. 重新采集“并发冲突、状态丢失和错误候选如何恢复”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“并发冲突、状态丢失和错误候选如何恢复”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["并发冲突、状态丢失和错误候选如何恢复的机制边界", "并发冲突、状态丢失和错误候选如何恢复的决策与证据", "并发冲突、状态丢失和错误候选如何恢复的静态检查模板", "并发冲突、状态丢失和错误候选如何恢复的故障实验与恢复"]}]}, {"title": "第 3 章 · Argo Rollouts 如何接管工作负载与版本生命周期", "sections": [{"title": "Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联", "content": "Application、AppProject 和基础同步模型参见 [Argo CD 基础、架构与 Application](01-foundations-architecture-and-applications.md)；本册从 Rollout 接管工作负载之后的版本和流量关系开始。\n\nArgo Rollouts 的 BlueGreen 策略同时维护旧稳定 ReplicaSet 和新预览 ReplicaSet。Active Service 选择稳定版本并承载生产流量，Preview Service 选择新版本供验证。晋级时控制器改变 Active Service Selector，使生产流量切到新 ReplicaSet。\n\n```mermaid\nflowchart TB\n    Client[Production clients] --> Active[Active Service]\n    Tester[Preview checks] --> Preview[Preview Service]\n    Active --> Stable[Stable ReplicaSet]\n    Preview --> New[Preview ReplicaSet]\n    Controller[Rollouts controller] -->|Manage selectors| Active\n    Controller -->|Manage selectors| Preview\n```\n\nService Selector 切换很快，但现有连接、Ingress 缓存、数据平面传播和外部负载均衡可能延迟。因此旧 ReplicaSet 不能在切换瞬间立即删除，`scaleDownDelaySeconds` 为传播和快速回退保留窗口。\n\n#### 从选择器验证真实流量路径\n\n蓝绿排障从 Service Selector 开始，而不是先重启 Pod：\n\n1. 读取 Rollout 的 StableRS、CurrentPodHash 和 Phase。\n2. 对比 Active 与 Preview Service 的 Selector。\n3. 查询 EndpointSlice，确认地址来自对应 ReplicaSet 且 Ready。\n4. 检查 Ingress、Gateway 或负载均衡器实际引用哪个 Service。\n5. 分别向生产入口和 Preview 入口发送带版本回显的请求。\n6. 在切换后持续观察旧版本连接与新建连接。\n\n若 Service Selector 已更新而真实请求仍到旧版本，问题位于数据面传播、连接复用或上游缓存。继续 Promote 或重建 ReplicaSet 不会解决这类问题。\n\n版本回显可以来自响应 Header、日志字段或 Trace Resource，不能只看 Pod 数量推测流量。测试结束要确认调试 Header 不泄漏内部敏感信息。\n\n记录选择器切换、EndpointSlice 更新和最后一条旧版本请求的时间差，用实测结果设置 `scaleDownDelaySeconds`，而不是照搬示例值。\n\n#### Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的机制边界\n\n画出 OwnerReference、Pod Template Hash、StableRS、CurrentPodHash 和数据面资源关系。\n\n- **Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”，查询值必须连同时间窗口、样本数和 Provider 状态解释，空值不能自动当作零。\n对于“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”，业务失败、观测故障和数据不足要进入不同状态，且每种状态只能对应一个默认动作。\n\n#### Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的静态检查模板\n\n下面命令为“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联\nevidence_file=\"./evidence/check-d0c0ddc940.txt\"\nkubectl get analysisrun -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl describe analysisrun -n demo | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联的故障实验与恢复\n\n“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”的可逆故障场景是：依次返回空 Vector、多 Series、NaN 和超时，确认业务失败、数据不足与 Provider 错误不会被混为一类。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”执行恢复策略：暂停自动晋级并保持稳定版本，修复查询或观测链后重放同一时间窗口；缺失数据不得补写为零。\n4. 重新采集“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Rollout、ReplicaSet、Service、AnalysisRun 和路由对象如何关联”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["从选择器验证真实流量路径", "Rollout、ReplicaSet、Service、AnalysisRun 和路由"]}, {"title": "从 Deployment 迁移到 Rollout 需要检查哪些不变量", "content": "覆盖 Selector、Service、HPA、PDB、探针、历史版本、暂停窗口和回退入口。\n\n#### 从 Deployment 迁移到 Rollout 需要检查哪些不变量的机制边界\n\n\n- **从 Deployment 迁移到 Rollout 需要检查哪些不变量的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **从 Deployment 迁移到 Rollout 需要检查哪些不变量的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **从 Deployment 迁移到 Rollout 需要检查哪些不变量的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **从 Deployment 迁移到 Rollout 需要检查哪些不变量的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“从 Deployment 迁移到 Rollout 需要检查哪些不变量”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“从 Deployment 迁移到 Rollout 需要检查哪些不变量”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 从 Deployment 迁移到 Rollout 需要检查哪些不变量的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `从 Deployment 迁移到 Rollout 需要检查哪些不变量` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `从 Deployment 迁移到 Rollout 需要检查哪些不变量` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `从 Deployment 迁移到 Rollout 需要检查哪些不变量` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `从 Deployment 迁移到 Rollout 需要检查哪些不变量` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“从 Deployment 迁移到 Rollout 需要检查哪些不变量”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 从 Deployment 迁移到 Rollout 需要检查哪些不变量的静态检查模板\n\n下面命令为“从 Deployment 迁移到 Rollout 需要检查哪些不变量”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 从 Deployment 迁移到 Rollout 需要检查哪些不变量\nevidence_file=\"./evidence/check-75035ff7cd.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“从 Deployment 迁移到 Rollout 需要检查哪些不变量”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 从 Deployment 迁移到 Rollout 需要检查哪些不变量的故障实验与恢复\n\n“从 Deployment 迁移到 Rollout 需要检查哪些不变量”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“从 Deployment 迁移到 Rollout 需要检查哪些不变量”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“从 Deployment 迁移到 Rollout 需要检查哪些不变量”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“从 Deployment 迁移到 Rollout 需要检查哪些不变量”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“从 Deployment 迁移到 Rollout 需要检查哪些不变量”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“从 Deployment 迁移到 Rollout 需要检查哪些不变量”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["从 Deployment 迁移到 Rollout 需要检查哪些不变量的机制边界", "从 Deployment 迁移到 Rollout 需要检查哪些不变量的决策与证据", "从 Deployment 迁移到 Rollout 需要检查哪些不变量的静态检查模板", "从 Deployment 迁移到 Rollout 需要检查哪些不变量的故障实验与恢复"]}, {"title": "控制器、CLI、Dashboard 和通知分别提供什么证据", "content": "区分 API 接受、控制器推进、可视化和通知，不把 CLI 命令成功当成数据面完成。\n\n#### 控制器、CLI、Dashboard 和通知分别提供什么证据的机制边界\n\n\n- **控制器、CLI、Dashboard 和通知分别提供什么证据的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **控制器、CLI、Dashboard 和通知分别提供什么证据的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **控制器、CLI、Dashboard 和通知分别提供什么证据的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **控制器、CLI、Dashboard 和通知分别提供什么证据的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“控制器、CLI、Dashboard 和通知分别提供什么证据”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“控制器、CLI、Dashboard 和通知分别提供什么证据”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 控制器、CLI、Dashboard 和通知分别提供什么证据的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `控制器、CLI、Dashboard 和通知分别提供什么证据` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `控制器、CLI、Dashboard 和通知分别提供什么证据` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `控制器、CLI、Dashboard 和通知分别提供什么证据` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `控制器、CLI、Dashboard 和通知分别提供什么证据` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“控制器、CLI、Dashboard 和通知分别提供什么证据”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 控制器、CLI、Dashboard 和通知分别提供什么证据的静态检查模板\n\n下面命令为“控制器、CLI、Dashboard 和通知分别提供什么证据”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 控制器、CLI、Dashboard 和通知分别提供什么证据\nevidence_file=\"./evidence/check-aad3f1f484.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“控制器、CLI、Dashboard 和通知分别提供什么证据”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 控制器、CLI、Dashboard 和通知分别提供什么证据的故障实验与恢复\n\n“控制器、CLI、Dashboard 和通知分别提供什么证据”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“控制器、CLI、Dashboard 和通知分别提供什么证据”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“控制器、CLI、Dashboard 和通知分别提供什么证据”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“控制器、CLI、Dashboard 和通知分别提供什么证据”执行恢复策略：冻结后续变更并保留当前稳定状态，恢复版本化输入后等待控制器重新收敛，再用业务证据关闭事件。\n4. 重新采集“控制器、CLI、Dashboard 和通知分别提供什么证据”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“控制器、CLI、Dashboard 和通知分别提供什么证据”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["控制器、CLI、Dashboard 和通知分别提供什么证据的机制边界", "控制器、CLI、Dashboard 和通知分别提供什么证据的决策与证据", "控制器、CLI、Dashboard 和通知分别提供什么证据的静态检查模板", "控制器、CLI、Dashboard 和通知分别提供什么证据的故障实验与恢复"]}, {"title": "Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复", "content": "解释旧 ReplicaSet 保留、快速回退窗口、镜像可取得性和超出窗口后的重新扩容成本。\n\n#### Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的机制边界\n\n\n- **Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的静态检查模板\n\n下面命令为“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复\nevidence_file=\"./evidence/check-21bf95bd2a.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复的故障实验与恢复\n\n“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Rollout 历史、Revision 和 Rollback Window 如何支持快速恢复”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["Rollout 历史、Revision 和 Rollback Window 如何支持"]}]}, {"title": "第 4 章 · 蓝绿发布如何验证预览并完成流量切换", "sections": [{"title": "Active Service、Preview Service 和两个 ReplicaSet 如何协作", "content": "提供两个 Service、完整 Rollout 和标签/Selector 清单，验证 EndpointSlice 与真实版本回显。\n\n#### Active Service、Preview Service 和两个 ReplicaSet 如何协作的机制边界\n\n\n- **Active Service、Preview Service 和两个 ReplicaSet 如何协作的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Active Service、Preview Service 和两个 ReplicaSet 如何协作的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Active Service、Preview Service 和两个 ReplicaSet 如何协作的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Active Service、Preview Service 和两个 ReplicaSet 如何协作的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Active Service、Preview Service 和两个 ReplicaSet 如何协作”，控制器中的目标权重只是意图，必须继续检查 Service、Endpoint、代理配置和真实请求分布。\n对于“Active Service、Preview Service 和两个 ReplicaSet 如何协作”，旧连接、会话粘性、异步消费者和缓存可能在切换后继续产生副作用，不能只看 Rollout Phase。\n\n#### Active Service、Preview Service 和两个 ReplicaSet 如何协作的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Active Service、Preview Service 和两个 ReplicaSet 如何协作` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Active Service、Preview Service 和两个 ReplicaSet 如何协作` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Active Service、Preview Service 和两个 ReplicaSet 如何协作` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Active Service、Preview Service 和两个 ReplicaSet 如何协作` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Active Service、Preview Service 和两个 ReplicaSet 如何协作”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Active Service、Preview Service 和两个 ReplicaSet 如何协作的静态检查模板\n\n下面命令为“Active Service、Preview Service 和两个 ReplicaSet 如何协作”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Active Service、Preview Service 和两个 ReplicaSet 如何协作\nevidence_file=\"./evidence/check-f9203471ab.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Active Service、Preview Service 和两个 ReplicaSet 如何协作”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Active Service、Preview Service 和两个 ReplicaSet 如何协作的故障实验与恢复\n\n“Active Service、Preview Service 和两个 ReplicaSet 如何协作”的可逆故障场景是：延迟或阻断路由控制器更新，持续采样真实版本回显；只有数据面恢复稳定后才允许关闭事件。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Active Service、Preview Service 和两个 ReplicaSet 如何协作”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Active Service、Preview Service 和两个 ReplicaSet 如何协作”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Active Service、Preview Service 和两个 ReplicaSet 如何协作”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“Active Service、Preview Service 和两个 ReplicaSet 如何协作”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Active Service、Preview Service 和两个 ReplicaSet 如何协作”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["Active Service、Preview Service 和两个 Replica"]}, {"title": "Preview 容量、预热和依赖隔离如何设计", "content": "计算 CPU、内存、连接池、缓存、许可证和后台消费者的双版本预算。\n\n#### Preview 容量、预热和依赖隔离如何设计的机制边界\n\n\n- **Preview 容量、预热和依赖隔离如何设计的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Preview 容量、预热和依赖隔离如何设计的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Preview 容量、预热和依赖隔离如何设计的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Preview 容量、预热和依赖隔离如何设计的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“Preview 容量、预热和依赖隔离如何设计”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“Preview 容量、预热和依赖隔离如何设计”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### Preview 容量、预热和依赖隔离如何设计的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Preview 容量、预热和依赖隔离如何设计` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Preview 容量、预热和依赖隔离如何设计` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Preview 容量、预热和依赖隔离如何设计` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Preview 容量、预热和依赖隔离如何设计` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Preview 容量、预热和依赖隔离如何设计”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Preview 容量、预热和依赖隔离如何设计的静态检查模板\n\n下面命令为“Preview 容量、预热和依赖隔离如何设计”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Preview 容量、预热和依赖隔离如何设计\nevidence_file=\"./evidence/check-0d95a3860f.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Preview 容量、预热和依赖隔离如何设计”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Preview 容量、预热和依赖隔离如何设计的故障实验与恢复\n\n“Preview 容量、预热和依赖隔离如何设计”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Preview 容量、预热和依赖隔离如何设计”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Preview 容量、预热和依赖隔离如何设计”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Preview 容量、预热和依赖隔离如何设计”执行恢复策略：停止后续环境和集群批次，保持已验证区域不变，回退当前批次并完成临时资源、DNS 与权限清理。\n4. 重新采集“Preview 容量、预热和依赖隔离如何设计”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Preview 容量、预热和依赖隔离如何设计”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["Preview 容量、预热和依赖隔离如何设计的机制边界", "Preview 容量、预热和依赖隔离如何设计的决策与证据", "Preview 容量、预热和依赖隔离如何设计的静态检查模板", "Preview 容量、预热和依赖隔离如何设计的故障实验与恢复"]}, {"title": "PrePromotion 和 PostPromotion 应分别验证什么", "content": "PrePromotion Analysis 在生产流量切换前运行，适合验证预览端点、Schema 兼容、依赖连接和合成交易。PostPromotion Analysis 在切换后观察真实流量，适合验证错误率、延迟和业务 KPI。\n\n| 阶段 | 可观察对象 | 失败动作 |\n|---|---|---|\n| PrePromotion | Preview Service、新 Pod、只读依赖 | 不切生产流量，Abort 新版本 |\n| Promotion | Active Service Selector 和数据平面 | 验证传播，保留旧 ReplicaSet |\n| PostPromotion | 真实请求、业务和依赖指标 | 切回旧稳定版本并停止新流量 |\n\n预览成功不能证明生产成功，因为预览流量规模、身份和缓存与生产不同。PostPromotion 也不是无限观察；应定义窗口，过长会占用双倍容量，过短则看不到慢性问题。\n\nPrePromotion 测试必须避免产生不可撤销副作用。支付、消息发送和外部写入应使用沙箱账户、幂等键或只读探测。若预览版本与稳定版本共享数据库，测试数据还要能被识别和清理。\n\nPostPromotion 失败后控制器可以切回旧 ReplicaSet，但已经产生的业务副作用不会自动撤销。运行手册应列出需要人工补偿的数据和外部系统。\n\n#### 为两阶段分析准备不同测试账户\n\nPrePromotion 使用隔离身份和可清理数据，重点证明新版本能够启动、连接依赖并完成关键协议。PostPromotion 使用真实流量指标，重点判断用户影响和共享系统行为。\n\n| 检查 | PrePromotion | PostPromotion |\n|---|---|---|\n| 请求入口 | Preview Service 或专用路由 | Active 生产入口 |\n| 数据 | 沙箱、只读或带测试标记 | 真实业务数据 |\n| 容量结论 | 受 Preview 副本限制 | 接近真实流量行为 |\n| 失败止损 | 不切流并删除新版本 | 切回旧版本并检查副作用 |\n| 证据 | 合成请求与依赖检查 | SLI、日志、Trace 和业务 KPI |\n\n测试账户必须具有与真实用户足够接近的授权路径，同时不能触发不可逆交易。过度简化的 `/healthz` 只能证明进程响应，不能代替完整业务路径。\n\nPostPromotion 查询要带版本或路由维度，避免 Stable 的大量成功请求稀释新版本错误。切回后继续观察一段时间，确认积压和异步副作用没有延迟出现。\n\n每个 Step 都应有目的，而不是机械使用 10%、30%、60%。\n\n| 阶段 | 目的 | 典型证据 |\n|---|---|---|\n| 0% | 启动、预热、内部测试 | Pod、探针、依赖、合成请求 |\n| 1%-5% | 发现明显兼容和启动问题 | 错误率、日志、资源异常 |\n| 10%-30% | 比较稳定版和新版本 | 延迟、业务 KPI、依赖差异 |\n| 50% | 验证接近真实容量 | HPA、饱和度、缓存和队列 |\n| 100% | 完成替换前观察 | 全量 SLO、旧版本回退窗口 |\n\n低流量业务可能长时间收集不到足够样本，固定等待 10 分钟没有统计意义。可以延长窗口、使用合成流量或设置最低请求量门禁，但不能为了自动化伪造成功结论。\n\n#### 为每个 Step 写退出契约\n\n一个 Step 至少包含进入条件、目标流量、容量、最短与最长时间、必要成功、硬失败和超时动作。\n\n示例：10% 步骤要求 Canary 两个 Ready Pod，至少 1000 个请求，连续三个窗口成功率不低于 99.5%，P95 相对 Stable 退化不超过 10%；任一数据一致性错误立即 Abort；20 分钟样本仍不足则转人工判断。\n\n进入下一步前保存：\n\n- 实际 Stable/Canary 请求量和流量比例。\n- 当前 ReplicaSet、Pod 与镜像 Digest。\n- 每个 Measurement 的值、Phase 和时间。\n- 人工 Promote 或例外的身份与理由。\n- 下一步容量是否已经准备好。\n\n步骤数量不是越多越安全。每一步都增加双版本时间和操作复杂度；没有新增风险信息的相邻权重可以合并。\n\n根据历史故障调整步骤：启动类故障在低权重暴露，容量类故障需要较高权重，慢性内存泄漏可能需要延长全量后的观察。策略应反映真实风险模型。\n\n#### PrePromotion 和 PostPromotion 应分别验证什么的机制边界\n\n区分 Preview 合成测试与真实流量指标，设计测试账户、幂等键、数据清理和失败动作。\n\n- **PrePromotion 和 PostPromotion 应分别验证什么的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **PrePromotion 和 PostPromotion 应分别验证什么的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **PrePromotion 和 PostPromotion 应分别验证什么的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **PrePromotion 和 PostPromotion 应分别验证什么的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“PrePromotion 和 PostPromotion 应分别验证什么”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“PrePromotion 和 PostPromotion 应分别验证什么”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### PrePromotion 和 PostPromotion 应分别验证什么的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `PrePromotion 和 PostPromotion 应分别验证什么` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `PrePromotion 和 PostPromotion 应分别验证什么` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `PrePromotion 和 PostPromotion 应分别验证什么` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `PrePromotion 和 PostPromotion 应分别验证什么` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“PrePromotion 和 PostPromotion 应分别验证什么”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### PrePromotion 和 PostPromotion 应分别验证什么的静态检查模板\n\n下面命令为“PrePromotion 和 PostPromotion 应分别验证什么”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: PrePromotion 和 PostPromotion 应分别验证什么\nevidence_file=\"./evidence/check-53fc273200.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“PrePromotion 和 PostPromotion 应分别验证什么”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### PrePromotion 和 PostPromotion 应分别验证什么的故障实验与恢复\n\n“PrePromotion 和 PostPromotion 应分别验证什么”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“PrePromotion 和 PostPromotion 应分别验证什么”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“PrePromotion 和 PostPromotion 应分别验证什么”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“PrePromotion 和 PostPromotion 应分别验证什么”执行恢复策略：冻结后续变更并保留当前稳定状态，恢复版本化输入后等待控制器重新收敛，再用业务证据关闭事件。\n4. 重新采集“PrePromotion 和 PostPromotion 应分别验证什么”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“PrePromotion 和 PostPromotion 应分别验证什么”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["为两阶段分析准备不同测试账户", "为每个 Step 写退出契约", "PrePromotion 和 PostPromotion 应分别验证什么的机制边界", "PrePromotion 和 PostPromotion 应分别验证什么的决策与证据", "PrePromotion 和 PostPromotion 应分别验证什么的静态检查模", "PrePromotion 和 PostPromotion 应分别验证什么的故障实验与"]}, {"title": "Promote、Abort 和切回旧版本如何验证数据面生效", "content": "保存 Selector、EndpointSlice、旧连接、真实请求和业务指标前后快照，以实测传播时间设置缩容延迟。\n\n#### Promote、Abort 和切回旧版本如何验证数据面生效的机制边界\n\n\n- **Promote、Abort 和切回旧版本如何验证数据面生效的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Promote、Abort 和切回旧版本如何验证数据面生效的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Promote、Abort 和切回旧版本如何验证数据面生效的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Promote、Abort 和切回旧版本如何验证数据面生效的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Promote、Abort 和切回旧版本如何验证数据面生效”，控制器中的目标权重只是意图，必须继续检查 Service、Endpoint、代理配置和真实请求分布。\n对于“Promote、Abort 和切回旧版本如何验证数据面生效”，旧连接、会话粘性、异步消费者和缓存可能在切换后继续产生副作用，不能只看 Rollout Phase。\n\n#### Promote、Abort 和切回旧版本如何验证数据面生效的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Promote、Abort 和切回旧版本如何验证数据面生效` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Promote、Abort 和切回旧版本如何验证数据面生效` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Promote、Abort 和切回旧版本如何验证数据面生效` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Promote、Abort 和切回旧版本如何验证数据面生效` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Promote、Abort 和切回旧版本如何验证数据面生效”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Promote、Abort 和切回旧版本如何验证数据面生效的静态检查模板\n\n下面命令为“Promote、Abort 和切回旧版本如何验证数据面生效”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Promote、Abort 和切回旧版本如何验证数据面生效\nevidence_file=\"./evidence/check-5a7552319a.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Promote、Abort 和切回旧版本如何验证数据面生效”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Promote、Abort 和切回旧版本如何验证数据面生效的故障实验与恢复\n\n“Promote、Abort 和切回旧版本如何验证数据面生效”的可逆故障场景是：延迟或阻断路由控制器更新，持续采样真实版本回显；只有数据面恢复稳定后才允许关闭事件。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Promote、Abort 和切回旧版本如何验证数据面生效”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Promote、Abort 和切回旧版本如何验证数据面生效”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Promote、Abort 和切回旧版本如何验证数据面生效”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“Promote、Abort 和切回旧版本如何验证数据面生效”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Promote、Abort 和切回旧版本如何验证数据面生效”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["Promote、Abort 和切回旧版本如何验证数据面生效的机制边界", "Promote、Abort 和切回旧版本如何验证数据面生效的决策与证据", "Promote、Abort 和切回旧版本如何验证数据面生效的静态检查模板", "Promote、Abort 和切回旧版本如何验证数据面生效的故障实验与恢复"]}]}, {"title": "第 5 章 · 金丝雀发布如何逐步增加风险暴露", "sections": [{"title": "无 Traffic Manager 时副本比例为何不等于请求比例", "content": "没有 Traffic Manager 时，Rollouts 通过新旧 ReplicaSet 副本数量近似 `setWeight`。10 个总副本下 10% 可以对应 1 个 Canary Pod；3 个副本下 10% 无法精确表示，控制器只能选择误差较小的整数。\n\n这种模式假设 Kubernetes Service 在 Pod 间近似均匀分配新连接，但长连接、客户端连接池、请求耗时和会话粘性都会让真实请求比例偏离副本比例。\n\n```yaml\nstrategy:\n  canary:\n    maxSurge: 25%\n    maxUnavailable: 0\n    steps:\n      - setWeight: 10\n      - pause:\n          duration: 10m\n      - setWeight: 30\n      - pause: {}\n      - setWeight: 60\n      - pause:\n          duration: 20m\n```\n\n无 `duration` 的 Pause 会一直等待，直到人工 Promote 或其他自动步骤解除。它适合需要人工判读的阶段，但必须设置通知和超时升级，否则发布可能长期占用双版本容量。\n\n#### 用实际请求校准副本权重\n\n在每个权重步骤同时记录 Stable/Canary 副本、Ready Endpoint、新建连接、请求数和每 Pod QPS。对比声明权重、理论副本比例和真实请求比例。\n\n| 偏差现象 | 可能原因 | 验证方式 |\n|---|---|---|\n| Canary 请求远低于副本比例 | 长连接或会话粘性 | 强制新连接并查客户端池 |\n| Canary 单 Pod QPS 更高 | 副本取整或 Ready 数不足 | 对比 Endpoint 与实际权重 |\n| 权重变化后长时间不稳定 | HPA 与 Rollout 同时缩放 | 查期望/实际副本时间线 |\n| 只有部分路径进入 Canary | 多入口或路由规则差异 | 按 Route、Host 分组请求 |\n\n低副本数应用要预先计算可表示权重。例如 3 个副本无法稳定表达 10%，此时把步骤写成 10% 只是意图，不是数据面事实。\n\n若真实比例偏差足以影响统计结论，应接入 Traffic Manager、增加副本或改用合成请求。不能继续用错误分母判断 Canary 质量。\n\n观察窗口结束时保存实际样本量和偏差，作为下一次步骤时长与容量的输入。\n\n接入 NGINX、Istio、Traefik 或 Gateway API 插件后，Rollouts 可以把流量权重写入数据平面，而不是只靠副本数量。这样少量 Canary Pod 也可以承载明确比例，还可按 Header、Cookie 或用户组路由。\n\n```mermaid\nflowchart LR\n    Client[Client traffic] --> Router[Ingress mesh or gateway]\n    Router -->|Stable weight| StableSvc[Stable Service]\n    Router -->|Canary weight| CanarySvc[Canary Service]\n    StableSvc --> StableRS[Stable ReplicaSet]\n    CanarySvc --> CanaryRS[Canary ReplicaSet]\n    Controller[Rollouts controller] -->|Update routing objects| Router\n```\n\n引入 Traffic Manager 会增加故障面。需要验证控制器是否成功写入路由对象、数据平面是否应用、新旧 Service 是否有 Endpoint，以及真实流量比例是否接近目标。CRD 更新成功不等于代理已经生效。\n\n#### 验收控制器到数据平面的传播\n\n为一次 10% 到 30% 的权重变化记录四个时间点：Rollout Step 更新、路由对象更新、代理配置生效、真实请求比例稳定。\n\n验证内容包括：\n\n1. Rollouts Controller 对路由对象拥有预期字段，没有与其他控制器冲突。\n2. Stable 和 Canary Service 的 Selector 与 EndpointSlice 正确。\n3. 代理配置状态已接受新权重，不只有 Kubernetes 对象变化。\n4. 从多个入口和客户端发送新连接，观察真实版本分布。\n5. 路由控制器不可用时，现有权重保持而不是重置为默认。\n6. Abort 能把权重恢复，并清理 Header 或实验路由。\n\n路由传播时间要进入 Pause 与旧版本保留窗口。如果指标窗口在数据面生效前开始，会混入上一阶段流量并产生错误判断。\n\n升级 Traffic Manager、Gateway CRD 或代理版本后重跑验收。控制器字段兼容不等于数据面语义完全一致。\n\n#### 无 Traffic Manager 时副本比例为何不等于请求比例的机制边界\n\n解释副本取整、长连接、会话粘性和 Ready Endpoint，记录声明权重与实际请求偏差。\n\n- **无 Traffic Manager 时副本比例为何不等于请求比例的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **无 Traffic Manager 时副本比例为何不等于请求比例的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **无 Traffic Manager 时副本比例为何不等于请求比例的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **无 Traffic Manager 时副本比例为何不等于请求比例的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“无 Traffic Manager 时副本比例为何不等于请求比例”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“无 Traffic Manager 时副本比例为何不等于请求比例”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 无 Traffic Manager 时副本比例为何不等于请求比例的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `无 Traffic Manager 时副本比例为何不等于请求比例` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `无 Traffic Manager 时副本比例为何不等于请求比例` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `无 Traffic Manager 时副本比例为何不等于请求比例` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `无 Traffic Manager 时副本比例为何不等于请求比例` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“无 Traffic Manager 时副本比例为何不等于请求比例”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 无 Traffic Manager 时副本比例为何不等于请求比例的静态检查模板\n\n下面命令为“无 Traffic Manager 时副本比例为何不等于请求比例”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 无 Traffic Manager 时副本比例为何不等于请求比例\nevidence_file=\"./evidence/check-9ede8026ec.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“无 Traffic Manager 时副本比例为何不等于请求比例”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 无 Traffic Manager 时副本比例为何不等于请求比例的故障实验与恢复\n\n“无 Traffic Manager 时副本比例为何不等于请求比例”的可逆故障场景是：延迟或阻断路由控制器更新，持续采样真实版本回显；只有数据面恢复稳定后才允许关闭事件。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“无 Traffic Manager 时副本比例为何不等于请求比例”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“无 Traffic Manager 时副本比例为何不等于请求比例”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“无 Traffic Manager 时副本比例为何不等于请求比例”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“无 Traffic Manager 时副本比例为何不等于请求比例”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“无 Traffic Manager 时副本比例为何不等于请求比例”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["用实际请求校准副本权重", "验收控制器到数据平面的传播", "无 Traffic Manager 时副本比例为何不等于请求比例的机制边界", "无 Traffic Manager 时副本比例为何不等于请求比例的决策与证据", "无 Traffic Manager 时副本比例为何不等于请求比例的静态检查模板", "无 Traffic Manager 时副本比例为何不等于请求比例的故障实验与恢复"]}, {"title": "setWeight、Pause 和每一步退出契约如何设计", "content": "每步定义进入条件、目标权重、最小样本、最短/最长时间、硬失败、必要成功和超时动作。\n\n#### setWeight、Pause 和每一步退出契约如何设计的机制边界\n\n\n- **setWeight、Pause 和每一步退出契约如何设计的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **setWeight、Pause 和每一步退出契约如何设计的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **setWeight、Pause 和每一步退出契约如何设计的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **setWeight、Pause 和每一步退出契约如何设计的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“setWeight、Pause 和每一步退出契约如何设计”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“setWeight、Pause 和每一步退出契约如何设计”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### setWeight、Pause 和每一步退出契约如何设计的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `setWeight、Pause 和每一步退出契约如何设计` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `setWeight、Pause 和每一步退出契约如何设计` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `setWeight、Pause 和每一步退出契约如何设计` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `setWeight、Pause 和每一步退出契约如何设计` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“setWeight、Pause 和每一步退出契约如何设计”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### setWeight、Pause 和每一步退出契约如何设计的静态检查模板\n\n下面命令为“setWeight、Pause 和每一步退出契约如何设计”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: setWeight、Pause 和每一步退出契约如何设计\nevidence_file=\"./evidence/check-5be6c33a5d.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“setWeight、Pause 和每一步退出契约如何设计”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### setWeight、Pause 和每一步退出契约如何设计的故障实验与恢复\n\n“setWeight、Pause 和每一步退出契约如何设计”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“setWeight、Pause 和每一步退出契约如何设计”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“setWeight、Pause 和每一步退出契约如何设计”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“setWeight、Pause 和每一步退出契约如何设计”执行恢复策略：冻结后续变更并保留当前稳定状态，恢复版本化输入后等待控制器重新收敛，再用业务证据关闭事件。\n4. 重新采集“setWeight、Pause 和每一步退出契约如何设计”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“setWeight、Pause 和每一步退出契约如何设计”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["setWeight、Pause 和每一步退出契约如何设计的机制边界", "setWeight、Pause 和每一步退出契约如何设计的决策与证据", "setWeight、Pause 和每一步退出契约如何设计的静态检查模板", "setWeight、Pause 和每一步退出契约如何设计的故障实验与恢复"]}, {"title": "setCanaryScale、dynamicStableScale 和 HPA 如何协作", "content": "计算 Canary 安全 QPS、Ready 容量和 Abort 时 Stable 恢复时间，防止整体平均指标掩盖过载。\n\n#### setCanaryScale、dynamicStableScale 和 HPA 如何协作的机制边界\n\n\n- **setCanaryScale、dynamicStableScale 和 HPA 如何协作的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **setCanaryScale、dynamicStableScale 和 HPA 如何协作的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **setCanaryScale、dynamicStableScale 和 HPA 如何协作的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **setCanaryScale、dynamicStableScale 和 HPA 如何协作的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“setCanaryScale、dynamicStableScale 和 HPA 如何协作”，控制器中的目标权重只是意图，必须继续检查 Service、Endpoint、代理配置和真实请求分布。\n对于“setCanaryScale、dynamicStableScale 和 HPA 如何协作”，旧连接、会话粘性、异步消费者和缓存可能在切换后继续产生副作用，不能只看 Rollout Phase。\n\n#### setCanaryScale、dynamicStableScale 和 HPA 如何协作的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `setCanaryScale、dynamicStableScale 和 HPA 如何协作` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `setCanaryScale、dynamicStableScale 和 HPA 如何协作` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `setCanaryScale、dynamicStableScale 和 HPA 如何协作` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `setCanaryScale、dynamicStableScale 和 HPA 如何协作` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“setCanaryScale、dynamicStableScale 和 HPA 如何协作”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### setCanaryScale、dynamicStableScale 和 HPA 如何协作的静态检查模板\n\n下面命令为“setCanaryScale、dynamicStableScale 和 HPA 如何协作”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: setCanaryScale、dynamicStableScale 和 HPA 如何协作\nevidence_file=\"./evidence/check-e2dccf1bb7.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“setCanaryScale、dynamicStableScale 和 HPA 如何协作”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### setCanaryScale、dynamicStableScale 和 HPA 如何协作的故障实验与恢复\n\n“setCanaryScale、dynamicStableScale 和 HPA 如何协作”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“setCanaryScale、dynamicStableScale 和 HPA 如何协作”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“setCanaryScale、dynamicStableScale 和 HPA 如何协作”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“setCanaryScale、dynamicStableScale 和 HPA 如何协作”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“setCanaryScale、dynamicStableScale 和 HPA 如何协作”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“setCanaryScale、dynamicStableScale 和 HPA 如何协作”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["setCanaryScale、dynamicStableScale 和 HPA 如何"]}, {"title": "Abort 后为什么仍要检查路由、连接和异步副作用", "content": "```bash\nkubectl argo rollouts get rollout checkout-api -n production --watch\nkubectl argo rollouts promote checkout-api -n production\nkubectl argo rollouts abort checkout-api -n production\n```\n\n命令只是控制入口，生产操作还要记录变更编号、操作者和证据。Abort 后验证 Active Service Selector、EndpointSlice、旧 ReplicaSet 副本和真实请求，不能只看到命令成功。\n\n如果旧 ReplicaSet 已过 `scaleDownDelaySeconds` 被缩容，快速回退会需要重新扩容和拉取镜像，恢复时间上升。回退窗口应结合故障发现时间、镜像保留和容量成本设置。\n\n操作前保存 `kubectl argo rollouts get rollout`、Service Selector、EndpointSlice 和 AnalysisRun；操作后用同样查询形成前后对照。这样才能区分“控制命令已接受”和“数据面已经恢复”。\n\n人工 Promote 不应成为绕过失败 Analysis 的快捷按钮。若确需强制继续，应使用 Break Glass 权限、记录风险接受人，并在发布后补做完整验证。\n\n#### 演练 Promote、Abort 和回退的可观测结果\n\n每个动作都保存控制面和数据面前后状态：\n\n| 动作 | 控制面预期 | 数据面预期 | 完成证据 |\n|---|---|---|---|\n| Promote | Rollout 进入切换 | Active Selector 指向新 Hash | 新请求稳定命中新版本 |\n| Abort | 新版本停止晋级 | Active 保持或返回旧 Hash | 错误率回落、旧容量恢复 |\n| Retry | 产生新的分析或步骤尝试 | 流量保持在当前安全权重 | 新 Measurement 与原因可见 |\n| Git Revert | Argo CD 读取安全 Revision | Rollout 创建或恢复安全 ReplicaSet | 配置与运行身份一致 |\n\n命令退出码只说明 API 接受请求。动作完成要等待 Selector、EndpointSlice、真实请求和业务指标共同达到预期。\n\n在旧 ReplicaSet 缩容前后各做一次 Abort，比较恢复时间。这个差值决定延迟窗口是否覆盖组织的典型故障发现时间。\n\n强制 Promote 演练仅在隔离环境进行，并验证审计和告警能够区分正常晋级与风险例外。\n\n\nAbort 会让控制器把目标状态转回稳定版本，但路由传播、连接复用和异步任务需要时间。操作后检查：\n\n- Rollout Phase 和 Conditions。\n- Stable/Canary Service Selector 与 EndpointSlice。\n- Ingress、Mesh 或 Gateway 的当前权重。\n- 新旧 ReplicaSet 副本和 Pod Ready。\n- 真实请求中的版本标识。\n- 错误率是否恢复，队列和数据库是否留下副作用。\n\n如果业务仍未恢复，问题可能已经超出流量层，例如数据库不兼容、缓存污染或下游写入。此时继续反复 Abort/Promote 只会增加扰动，应进入事件响应。\n\n#### 用版本回显确认 Abort 真正生效\n\nAbort 前后持续发送带唯一 Request ID 的新连接，并记录响应版本。完成标准不是 Canary Pod 变为零，而是：\n\n1. 路由对象权重回到 Stable。\n2. Stable Service 有足够 Ready Endpoint。\n3. 新连接不再进入 Canary。\n4. 旧长连接按预算结束或被 Drain。\n5. Stable 错误率和延迟回到基线。\n6. 队列、缓存和数据库没有继续产生新版本副作用。\n\n若控制面已恢复而请求仍命中新版本，冻结进一步操作，检查入口缓存、Sidecar 配置、客户端连接池和多集群路由。\n\nCanary Pod 保留用于取证时，要从生产 Service 摘除，并限制后台消费者和定时任务。没有入口流量不代表它不会继续处理消息或写数据库。\n\n事件关闭前决定失败 Revision 的处置：保留到何时、如何阻止 Image Updater 再次选择、修复后是否产生新 Digest。不要复用已失败的可变 Tag。\n\n#### Abort 后为什么仍要检查路由、连接和异步副作用的机制边界\n\n覆盖入口权重、长连接、队列、定时任务、缓存和数据库写入，定义冻结变更和事件升级条件。\n\n- **Abort 后为什么仍要检查路由、连接和异步副作用的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Abort 后为什么仍要检查路由、连接和异步副作用的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Abort 后为什么仍要检查路由、连接和异步副作用的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Abort 后为什么仍要检查路由、连接和异步副作用的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Abort 后为什么仍要检查路由、连接和异步副作用”，控制器中的目标权重只是意图，必须继续检查 Service、Endpoint、代理配置和真实请求分布。\n对于“Abort 后为什么仍要检查路由、连接和异步副作用”，旧连接、会话粘性、异步消费者和缓存可能在切换后继续产生副作用，不能只看 Rollout Phase。\n\n#### Abort 后为什么仍要检查路由、连接和异步副作用的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Abort 后为什么仍要检查路由、连接和异步副作用` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Abort 后为什么仍要检查路由、连接和异步副作用` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Abort 后为什么仍要检查路由、连接和异步副作用` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Abort 后为什么仍要检查路由、连接和异步副作用` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Abort 后为什么仍要检查路由、连接和异步副作用”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Abort 后为什么仍要检查路由、连接和异步副作用的静态检查模板\n\n下面命令为“Abort 后为什么仍要检查路由、连接和异步副作用”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Abort 后为什么仍要检查路由、连接和异步副作用\nevidence_file=\"./evidence/check-40248f4acc.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Abort 后为什么仍要检查路由、连接和异步副作用”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Abort 后为什么仍要检查路由、连接和异步副作用的故障实验与恢复\n\n“Abort 后为什么仍要检查路由、连接和异步副作用”的可逆故障场景是：延迟或阻断路由控制器更新，持续采样真实版本回显；只有数据面恢复稳定后才允许关闭事件。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Abort 后为什么仍要检查路由、连接和异步副作用”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Abort 后为什么仍要检查路由、连接和异步副作用”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Abort 后为什么仍要检查路由、连接和异步副作用”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“Abort 后为什么仍要检查路由、连接和异步副作用”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Abort 后为什么仍要检查路由、连接和异步副作用”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["演练 Promote、Abort 和回退的可观测结果", "用版本回显确认 Abort 真正生效", "Abort 后为什么仍要检查路由、连接和异步副作用的机制边界", "Abort 后为什么仍要检查路由、连接和异步副作用的决策与证据", "Abort 后为什么仍要检查路由、连接和异步副作用的静态检查模板", "Abort 后为什么仍要检查路由、连接和异步副作用的故障实验与恢复"]}]}, {"title": "第 6 章 · Traffic Manager 如何把控制器意图传递到数据面", "sections": [{"title": "NGINX、Istio 和 Gateway API 集成如何选择", "content": "比较对象模型、权重精度、Header 路由、依赖组件、状态反馈和回退复杂度。\n\n#### NGINX、Istio 和 Gateway API 集成如何选择的机制边界\n\n\n- **NGINX、Istio 和 Gateway API 集成如何选择的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **NGINX、Istio 和 Gateway API 集成如何选择的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **NGINX、Istio 和 Gateway API 集成如何选择的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **NGINX、Istio 和 Gateway API 集成如何选择的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“NGINX、Istio 和 Gateway API 集成如何选择”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“NGINX、Istio 和 Gateway API 集成如何选择”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### NGINX、Istio 和 Gateway API 集成如何选择的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `NGINX、Istio 和 Gateway API 集成如何选择` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `NGINX、Istio 和 Gateway API 集成如何选择` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `NGINX、Istio 和 Gateway API 集成如何选择` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `NGINX、Istio 和 Gateway API 集成如何选择` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“NGINX、Istio 和 Gateway API 集成如何选择”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### NGINX、Istio 和 Gateway API 集成如何选择的静态检查模板\n\n下面命令为“NGINX、Istio 和 Gateway API 集成如何选择”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: NGINX、Istio 和 Gateway API 集成如何选择\nevidence_file=\"./evidence/check-12e1128983.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“NGINX、Istio 和 Gateway API 集成如何选择”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### NGINX、Istio 和 Gateway API 集成如何选择的故障实验与恢复\n\n“NGINX、Istio 和 Gateway API 集成如何选择”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“NGINX、Istio 和 Gateway API 集成如何选择”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“NGINX、Istio 和 Gateway API 集成如何选择”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“NGINX、Istio 和 Gateway API 集成如何选择”执行恢复策略：冻结后续变更并保留当前稳定状态，恢复版本化输入后等待控制器重新收敛，再用业务证据关闭事件。\n4. 重新采集“NGINX、Istio 和 Gateway API 集成如何选择”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“NGINX、Istio 和 Gateway API 集成如何选择”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["NGINX、Istio 和 Gateway API 集成如何选择的机制边界", "NGINX、Istio 和 Gateway API 集成如何选择的决策与证据", "NGINX、Istio 和 Gateway API 集成如何选择的静态检查模板", "NGINX、Istio 和 Gateway API 集成如何选择的故障实验与恢复"]}, {"title": "Stable/Canary Service 与路由对象如何完整声明", "content": "```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Rollout\nmetadata:\n  name: checkout-api\n  namespace: production\nspec:\n  replicas: 6\n  selector:\n    matchLabels:\n      app: checkout-api\n  template:\n    metadata:\n      labels:\n        app: checkout-api\n    spec:\n      containers:\n        - name: checkout-api\n          image: harbor.example.com/payments/checkout-api@sha256:0123456789abcdef\n          readinessProbe:\n            httpGet:\n              path: /ready\n              port: 8080\n  strategy:\n    blueGreen:\n      activeService: checkout-api\n      previewService: checkout-api-preview\n      autoPromotionEnabled: false\n      previewReplicaCount: 2\n      scaleDownDelaySeconds: 300\n```\n\n`autoPromotionEnabled: false` 让新版本在 Ready 后停在预览阶段，等待分析或人工晋级。`previewReplicaCount` 可以降低预览成本，但若测试需要完整容量或缓存预热，就不能只启少量副本。\n\n#### 对蓝绿策略做静态和运行时双重审查\n\n静态审查确认 Active/Preview Service 存在、Selector 仅包含稳定应用标签、Pod Template 有唯一版本 Hash、探针与资源预算完整。\n\n运行时审查确认：\n\n- Preview Service 只指向新 ReplicaSet。\n- Active Service 在晋级前保持旧 ReplicaSet。\n- 预览副本达到测试所需容量和依赖连接数。\n- AnalysisRun 能访问 Preview 地址且不会误打生产入口。\n- 切换后旧 ReplicaSet 在延迟窗口内保留。\n- Abort 能让 Active Selector 返回旧 Hash。\n\n`previewReplicaCount` 小于生产容量时，要标记哪些验证结论不成立。例如少量副本可以证明基本功能，却不能证明连接池、缓存预热和峰值吞吐。\n\n策略字段变更也需要演练。缩短延迟、启用自动晋级或修改 Analysis 引用都可能改变恢复边界，不能作为普通 YAML 重构直接合并。\n\n使用 Traffic Routing 时，可以用 `setCanaryScale` 独立控制 Canary 副本数。例如先启动 3 个副本做无生产流量测试，再把少量 Header 流量导入；或为流量镜像准备足够容量。\n\n必须避免“少量 Pod 承担大量流量”。如果 Canary 只有总容量的 10%，却把 90% 流量导入，它可能因自身过载产生错误，看起来像版本缺陷。放量门禁应同时检查权重、Ready 副本、单 Pod 负载和 HPA 行为。\n\n`dynamicStableScale` 可以随 Canary 权重增加而缩小稳定副本，节省资源，但 Abort 时稳定容量需要恢复。高风险业务通常保留稳定版本完整容量以换取快速切回。\n\nHPA 目标通常绑定 Rollout，因此会根据整体负载调整总副本。使用 Traffic Manager 解耦流量和副本后，要验证 HPA 指标是否能反映 Canary 的单独压力；只看整体平均值可能掩盖少量 Canary Pod 过载。\n\n每次改变 `setCanaryScale` 后都应观察实际副本、Traffic Weight、每 Pod QPS 和 Ready 状态。恢复 `matchTrafficWeight: true` 时确认后续步骤不会突然缩容或扩容。\n\n#### 用容量算例检查权重是否安全\n\n假设稳定版 10 个 Pod、单 Pod 安全上限 100 QPS，总流量 800 QPS。若 Canary 只有 2 个 Pod，安全承载上限是 200 QPS，对应最大 25% 流量；把权重直接设为 50% 会让 Canary 过载。\n\n计算时还要扣除探针、预热和抖动余量，并按 Ready Pod 而非期望副本计算。任一 Canary Pod NotReady 时，允许权重应随有效容量下降。\n\n把容量公式和数据源写入 Step 门禁，避免控制器权重与 HPA 扩容速度互相追赶。\n\nAbort 预算还要包含 Stable 从缩容状态恢复到安全容量的时间。\n\n#### Stable/Canary Service 与路由对象如何完整声明的机制边界\n\n给出至少一套完整 NGINX 或 Gateway API 示例，其余提供字段映射和适用差异。\n\n- **Stable/Canary Service 与路由对象如何完整声明的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Stable/Canary Service 与路由对象如何完整声明的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Stable/Canary Service 与路由对象如何完整声明的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Stable/Canary Service 与路由对象如何完整声明的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Stable/Canary Service 与路由对象如何完整声明”，控制器中的目标权重只是意图，必须继续检查 Service、Endpoint、代理配置和真实请求分布。\n对于“Stable/Canary Service 与路由对象如何完整声明”，旧连接、会话粘性、异步消费者和缓存可能在切换后继续产生副作用，不能只看 Rollout Phase。\n\n#### Stable/Canary Service 与路由对象如何完整声明的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Stable/Canary Service 与路由对象如何完整声明` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Stable/Canary Service 与路由对象如何完整声明` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Stable/Canary Service 与路由对象如何完整声明` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Stable/Canary Service 与路由对象如何完整声明` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Stable/Canary Service 与路由对象如何完整声明”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Stable/Canary Service 与路由对象如何完整声明的静态检查模板\n\n下面命令为“Stable/Canary Service 与路由对象如何完整声明”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Stable/Canary Service 与路由对象如何完整声明\nevidence_file=\"./evidence/check-43a512c32b.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Stable/Canary Service 与路由对象如何完整声明”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Stable/Canary Service 与路由对象如何完整声明的故障实验与恢复\n\n“Stable/Canary Service 与路由对象如何完整声明”的可逆故障场景是：延迟或阻断路由控制器更新，持续采样真实版本回显；只有数据面恢复稳定后才允许关闭事件。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Stable/Canary Service 与路由对象如何完整声明”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Stable/Canary Service 与路由对象如何完整声明”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Stable/Canary Service 与路由对象如何完整声明”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“Stable/Canary Service 与路由对象如何完整声明”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Stable/Canary Service 与路由对象如何完整声明”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["对蓝绿策略做静态和运行时双重审查", "用容量算例检查权重是否安全", "Stable/Canary Service 与路由对象如何完整声明的机制边界", "Stable/Canary Service 与路由对象如何完整声明的决策与证据", "Stable/Canary Service 与路由对象如何完整声明的静态检查模板", "Stable/Canary Service 与路由对象如何完整声明的故障实验与恢复"]}, {"title": "如何验证路由对象更新已经被代理真实应用", "content": "记录 Rollout Step、路由对象、代理配置和真实请求比例四个时间点，检查多个入口与新连接。\n\n#### 如何验证路由对象更新已经被代理真实应用的机制边界\n\n\n- **如何验证路由对象更新已经被代理真实应用的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **如何验证路由对象更新已经被代理真实应用的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **如何验证路由对象更新已经被代理真实应用的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **如何验证路由对象更新已经被代理真实应用的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“如何验证路由对象更新已经被代理真实应用”，控制器中的目标权重只是意图，必须继续检查 Service、Endpoint、代理配置和真实请求分布。\n对于“如何验证路由对象更新已经被代理真实应用”，旧连接、会话粘性、异步消费者和缓存可能在切换后继续产生副作用，不能只看 Rollout Phase。\n\n#### 如何验证路由对象更新已经被代理真实应用的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `如何验证路由对象更新已经被代理真实应用` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `如何验证路由对象更新已经被代理真实应用` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `如何验证路由对象更新已经被代理真实应用` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `如何验证路由对象更新已经被代理真实应用` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“如何验证路由对象更新已经被代理真实应用”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 如何验证路由对象更新已经被代理真实应用的静态检查模板\n\n下面命令为“如何验证路由对象更新已经被代理真实应用”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 如何验证路由对象更新已经被代理真实应用\nevidence_file=\"./evidence/check-1581b4bb3d.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“如何验证路由对象更新已经被代理真实应用”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 如何验证路由对象更新已经被代理真实应用的故障实验与恢复\n\n“如何验证路由对象更新已经被代理真实应用”的可逆故障场景是：延迟或阻断路由控制器更新，持续采样真实版本回显；只有数据面恢复稳定后才允许关闭事件。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“如何验证路由对象更新已经被代理真实应用”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“如何验证路由对象更新已经被代理真实应用”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“如何验证路由对象更新已经被代理真实应用”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“如何验证路由对象更新已经被代理真实应用”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“如何验证路由对象更新已经被代理真实应用”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["如何验证路由对象更新已经被代理真实应用的机制边界", "如何验证路由对象更新已经被代理真实应用的决策与证据", "如何验证路由对象更新已经被代理真实应用的静态检查模板", "如何验证路由对象更新已经被代理真实应用的故障实验与恢复"]}, {"title": "路由控制器故障和传播延迟如何影响发布门禁", "content": "按链路分层排查：\n\n1. **Registry**：DNS、TLS、限流、认证、Manifest 和平台信息。\n2. **候选策略**：Tag 是否匹配、版本约束是否允许、当前版本是否可解析。\n3. **Application 匹配**：名称、标签、命名空间和来源类型是否满足。\n4. **Git 回写**：仓库凭据、分支、保护规则、文件冲突和签名要求。\n5. **Argo CD**：是否观察新 Commit、渲染参数是否真正改变镜像。\n6. **运行环境**：节点能否拉取、准入策略是否接受、工作负载是否健康。\n\n错误镜像已进入 Git 时，优先创建显式 Revert 或安全版本变更。暂停 ImageUpdater，防止它再次选择同一候选；修复 AllowTags、IgnoreTags 或版本范围后，在非生产环境验证再恢复自动化。\n\n#### 用故障矩阵演练自动化恢复\n\n| 注入故障 | 预期安全状态 | 恢复前证据 | 恢复动作 |\n|---|---|---|---|\n| Registry 认证失效 | 当前 Digest 不变 | 最近成功扫描、401 日志 | 轮换凭据后重扫 |\n| 候选规则错误 | 无变更或明确拒绝 | 候选集合与策略版本 | 修正规则并重新评审 |\n| Git Push 被拒绝 | 运行态不变 | 远端 HEAD、机器人身份 | 修复权限或冲突 |\n| Commit 已推但状态丢失 | 仓库已有唯一变更 | Commit 与变更 ID | 采用既有结果 |\n| Argo CD 仓库不可达 | 旧版本继续运行 | Application Revision、连接错误 | 恢复读取并 Refresh |\n| 新版本门禁失败 | Rollout 停在安全流量 | AnalysisRun 与 SLI | Abort、回退或修复 |\n\n每个故障都要证明“保持什么不变”。自动化不可用时最重要的是不悄悄选择新候选、不绕过 Git、不删除当前工作负载。\n\n恢复后观察两个完整扫描周期和一次 Argo CD 调谐，确认没有积压变更、重复 Commit 或旧错误状态。只看到控制器 Pod Ready 不能关闭事件。\n\n\n蓝绿发布适合能并行运行两个版本、需要整体切换或预览验证的服务。主要成本和风险包括：\n\n- 新旧副本并存，峰值容量接近双倍。\n- 数据库变更必须同时兼容两个版本。\n- Session、缓存和长连接可能仍绑定旧版本。\n- 消费队列的 Worker 不经过 Service，流量切换无法控制它们。\n- 外部任务、定时作业和副作用可能被两个版本重复执行。\n\n对队列消费者、单写者或共享锁服务，应单独设计主从、Drain、消费组或 Leader 迁移。Rollout 控制的是 Kubernetes 工作负载和已集成的数据平面，不理解业务协议的副作用。\n\n数据库变更应采用 Expand/Contract：先添加兼容字段并让新旧版本都能工作，完成应用切换和观察后再删除旧结构。若发布必须执行不可逆迁移，蓝绿带来的快速流量回切并不等于应用可回退。\n\n容量规划不只看 Pod Requests，还要看连接数、数据库连接池、缓存预热和许可证限制。预览环境副本增加可能让共享依赖先耗尽，导致稳定版本也受影响。\n\n#### 计算双版本并存预算\n\n对每项稀缺资源计算稳定版本、新版本和系统余量：\n\n| 资源 | 计算方式 | 常见遗漏 |\n|---|---|---|\n| CPU/内存 | Stable Requests + Preview Requests + Surge | 节点碎片和 DaemonSet 开销 |\n| 数据库连接 | 两套副本上限乘单 Pod 池大小 | 启动探测也会建连接 |\n| 消息消费者 | 两版本并发实例与分区数 | 重复消费和 Rebalance |\n| 缓存 | 双版本 Key、预热和淘汰 | 新 Schema 污染旧缓存 |\n| 许可证 | 同时在线实例或连接 | 预览副本也计费 |\n\n在容量接近上限时，降低 Preview 副本只解决计算资源，不一定解决每实例固定连接或后台任务。必要时为 Preview 禁用消费者、使用只读依赖或安排容量窗口。\n\n故障演练要在 Stable 已接近高负载时启动 Preview，观察共享依赖是否先饱和。只在空闲测试环境验证，无法证明生产并存安全。\n\n预算不足时应选择 Canary、小规模影子验证或维护窗口，而不是依赖调度器碰运气放置双倍副本。\n\n#### 路由控制器故障和传播延迟如何影响发布门禁的机制边界\n\n验证现有权重是否保持、指标窗口何时开始、Abort 如何清理实验路由和何时升级事件。\n\n- **路由控制器故障和传播延迟如何影响发布门禁的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **路由控制器故障和传播延迟如何影响发布门禁的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **路由控制器故障和传播延迟如何影响发布门禁的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **路由控制器故障和传播延迟如何影响发布门禁的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“路由控制器故障和传播延迟如何影响发布门禁”，控制器中的目标权重只是意图，必须继续检查 Service、Endpoint、代理配置和真实请求分布。\n对于“路由控制器故障和传播延迟如何影响发布门禁”，旧连接、会话粘性、异步消费者和缓存可能在切换后继续产生副作用，不能只看 Rollout Phase。\n\n#### 路由控制器故障和传播延迟如何影响发布门禁的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `路由控制器故障和传播延迟如何影响发布门禁` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `路由控制器故障和传播延迟如何影响发布门禁` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `路由控制器故障和传播延迟如何影响发布门禁` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `路由控制器故障和传播延迟如何影响发布门禁` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“路由控制器故障和传播延迟如何影响发布门禁”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 路由控制器故障和传播延迟如何影响发布门禁的静态检查模板\n\n下面命令为“路由控制器故障和传播延迟如何影响发布门禁”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 路由控制器故障和传播延迟如何影响发布门禁\nevidence_file=\"./evidence/check-d72e1ff51f.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“路由控制器故障和传播延迟如何影响发布门禁”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 路由控制器故障和传播延迟如何影响发布门禁的故障实验与恢复\n\n“路由控制器故障和传播延迟如何影响发布门禁”的可逆故障场景是：延迟或阻断路由控制器更新，持续采样真实版本回显；只有数据面恢复稳定后才允许关闭事件。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“路由控制器故障和传播延迟如何影响发布门禁”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“路由控制器故障和传播延迟如何影响发布门禁”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“路由控制器故障和传播延迟如何影响发布门禁”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“路由控制器故障和传播延迟如何影响发布门禁”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“路由控制器故障和传播延迟如何影响发布门禁”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["用故障矩阵演练自动化恢复", "计算双版本并存预算", "路由控制器故障和传播延迟如何影响发布门禁的机制边界", "路由控制器故障和传播延迟如何影响发布门禁的决策与证据", "路由控制器故障和传播延迟如何影响发布门禁的静态检查模板", "路由控制器故障和传播延迟如何影响发布门禁的故障实验与恢复"]}]}, {"title": "第 7 章 · AnalysisTemplate 如何把指标变成可解释门禁", "sections": [{"title": "AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化", "content": "AnalysisTemplate 定义可复用的指标和判断条件，Rollout 在特定阶段创建 AnalysisRun，AnalysisRun 记录每次 Measurement 及最终 Phase。参数可以来自 Rollout 字段、固定值或模板引用。\n\n```mermaid\nflowchart LR\n    Rollout[Rollout step] -->|Create| Run[AnalysisRun]\n    Template[AnalysisTemplate] -->|Define metrics| Run\n    Args[Rollout args] --> Run\n    Run --> Provider[Metric provider]\n    Provider --> Measurement[Measurements]\n    Measurement --> Decision[Successful Failed Inconclusive Error]\n    Decision --> Rollout\n```\n\n模板应该版本化并由指标 Owner 审查。随意修改共享 ClusterAnalysisTemplate 可能同时改变多个团队的发布门禁，影响面比单个应用配置大。\n\n#### AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的机制边界\n\n解释参数来源、共享模板影响面、Run 身份、Measurement 生命周期和 Template Owner。\n\n- **AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”，查询值必须连同时间窗口、样本数和 Provider 状态解释，空值不能自动当作零。\n对于“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”，业务失败、观测故障和数据不足要进入不同状态，且每种状态只能对应一个默认动作。\n\n#### AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的静态检查模板\n\n下面命令为“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化\nevidence_file=\"./evidence/check-bd8b607885.txt\"\nkubectl get analysisrun -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl describe analysisrun -n demo | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化的故障实验与恢复\n\n“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”的可逆故障场景是：依次返回空 Vector、多 Series、NaN 和超时，确认业务失败、数据不足与 Provider 错误不会被混为一类。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”执行恢复策略：暂停自动晋级并保持稳定版本，修复查询或观测链后重放同一时间窗口；缺失数据不得补写为零。\n4. 重新采集“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“AnalysisTemplate、ClusterAnalysisTemplate 和 AnalysisRun 如何版本化”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["AnalysisTemplate、ClusterAnalysisTemplate 和"]}, {"title": "Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择", "content": "比较启动时机、终止条件、数据窗口、失败影响和适用风险。\n\n#### Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的机制边界\n\n\n- **Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”，查询值必须连同时间窗口、样本数和 Provider 状态解释，空值不能自动当作零。\n对于“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”，业务失败、观测故障和数据不足要进入不同状态，且每种状态只能对应一个默认动作。\n\n#### Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的静态检查模板\n\n下面命令为“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择\nevidence_file=\"./evidence/check-8409ee41d6.txt\"\nkubectl get analysisrun -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl describe analysisrun -n demo | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择的故障实验与恢复\n\n“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”的可逆故障场景是：依次返回空 Vector、多 Series、NaN 和超时，确认业务失败、数据不足与 Provider 错误不会被混为一类。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”执行恢复策略：暂停自动晋级并保持稳定版本，修复查询或观测链后重放同一时间窗口；缺失数据不得补写为零。\n4. 重新采集“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Inline、Background、PrePromotion 和 PostPromotion Analysis 如何选择”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["Inline、Background、PrePromotion 和 PostPromo"]}, {"title": "Prometheus 空值、多值、NaN、延迟和低流量如何处理", "content": "Prometheus Instant Query 常返回 Vector，示例里的 `result[0]` 假设恰好有一个值。若查询返回空 Vector、多个 Series 或 NaN，条件可能报错或产生错误判断。应先通过聚合确保结果形状稳定，并对无数据语义做明确决策。\n\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: AnalysisTemplate\nmetadata:\n  name: checkout-success-rate\nspec:\n  args:\n    - name: service\n  metrics:\n    - name: success-rate\n      interval: 1m\n      count: 10\n      failureLimit: 2\n      consecutiveSuccessLimit: 3\n      successCondition: len(result) == 1 && result[0] >= 0.995\n      failureCondition: len(result) != 1 || result[0] < 0.990\n      provider:\n        prometheus:\n          address: http://prometheus.monitoring.svc:9090\n          query: |\n            sum(rate(http_requests_total{service=\"{{args.service}}\",code!~\"5..\"}[5m]))\n            /\n            sum(rate(http_requests_total{service=\"{{args.service}}\"}[5m]))\n```\n\n真实使用还要防止分母为零，并按版本或 Stable/Canary 路由标签比较。Range Query 返回多个时间点时，应使用 `all`、`any` 等逻辑检查整个窗口，而非只取第一个值。\n\n#### 用已知数据测试 Prometheus 条件\n\n为每条查询准备六种结果：正常单值、失败单值、空 Vector、多 Series、NaN/Inf 和 Provider 超时。记录 successCondition、failureCondition 与最终 Phase。\n\n测试时确认：\n\n- 分母为零不会产生被误判为成功的 NaN。\n- 空结果表示无流量还是抓取故障，有明确策略。\n- 多 Series 通过聚合或 `all`/`any` 显式处理。\n- Stable 与 Canary Label 不会互相混入。\n- Query Window 只覆盖当前流量步骤。\n- Provider 超时进入 Error，而不是复用旧值。\n\n在 Prometheus UI 得到一个正确数字，不等于 Analysis Provider 会以相同结构返回。要检查 AnalysisRun 中保存的 Measurement Value 和 Message。\n\n查询变更应回放历史发布窗口，估算误报和漏报。只用当前正常数据调阈值，容易得到永远通过的门禁。\n\n指标从请求发生到查询可见包含采集间隔、远程写入、规则计算和查询缓存延迟。Rollout 刚切流就立即查询，可能读到旧窗口；低流量又会让比例剧烈波动。\n\n设计时明确：\n\n- Initial Delay 是否覆盖路由传播和应用预热。\n- Query Window 是否只包含当前步骤流量。\n- 最低请求量是否足以判断比例。\n- 记录规则更新周期是否小于分析间隔。\n- 时钟和 Label 是否能区分新旧版本。\n\n对于金额、库存等低频高价值业务，可以结合合成交易、事件计数和人工审批。自动化目标是减少已知风险，不是制造统计确定性。\n\n#### 画出一次分析窗口的时间线\n\n依次标记路由生效、应用预热、指标抓取、远程写入、记录规则和 Analysis 查询时间。查询窗口起点应晚于路由生效与预热，终点要覆盖最新可见样本。\n\n若最低样本量未达到，状态应是数据不足而非成功。可以延长窗口或补充受控合成请求，但合成数据要与真实流量分开标记。\n\n为高价值低频事件设置绝对硬失败，例如出现一次数据一致性错误立即 Abort，而不是等待比例稳定。\n\n#### Prometheus 空值、多值、NaN、延迟和低流量如何处理的机制边界\n\n为正常单值、失败、空 Vector、多 Series、NaN/Inf 和 Provider 超时建立查询测试集。\n\n- **Prometheus 空值、多值、NaN、延迟和低流量如何处理的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Prometheus 空值、多值、NaN、延迟和低流量如何处理的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Prometheus 空值、多值、NaN、延迟和低流量如何处理的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Prometheus 空值、多值、NaN、延迟和低流量如何处理的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Prometheus 空值、多值、NaN、延迟和低流量如何处理”，查询值必须连同时间窗口、样本数和 Provider 状态解释，空值不能自动当作零。\n对于“Prometheus 空值、多值、NaN、延迟和低流量如何处理”，业务失败、观测故障和数据不足要进入不同状态，且每种状态只能对应一个默认动作。\n\n#### Prometheus 空值、多值、NaN、延迟和低流量如何处理的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Prometheus 空值、多值、NaN、延迟和低流量如何处理` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Prometheus 空值、多值、NaN、延迟和低流量如何处理` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Prometheus 空值、多值、NaN、延迟和低流量如何处理` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Prometheus 空值、多值、NaN、延迟和低流量如何处理` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Prometheus 空值、多值、NaN、延迟和低流量如何处理”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Prometheus 空值、多值、NaN、延迟和低流量如何处理的静态检查模板\n\n下面命令为“Prometheus 空值、多值、NaN、延迟和低流量如何处理”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Prometheus 空值、多值、NaN、延迟和低流量如何处理\nevidence_file=\"./evidence/check-445629199e.txt\"\nkubectl get analysisrun -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl describe analysisrun -n demo | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Prometheus 空值、多值、NaN、延迟和低流量如何处理”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Prometheus 空值、多值、NaN、延迟和低流量如何处理的故障实验与恢复\n\n“Prometheus 空值、多值、NaN、延迟和低流量如何处理”的可逆故障场景是：依次返回空 Vector、多 Series、NaN 和超时，确认业务失败、数据不足与 Provider 错误不会被混为一类。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Prometheus 空值、多值、NaN、延迟和低流量如何处理”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Prometheus 空值、多值、NaN、延迟和低流量如何处理”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Prometheus 空值、多值、NaN、延迟和低流量如何处理”执行恢复策略：暂停自动晋级并保持稳定版本，修复查询或观测链后重放同一时间窗口；缺失数据不得补写为零。\n4. 重新采集“Prometheus 空值、多值、NaN、延迟和低流量如何处理”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Prometheus 空值、多值、NaN、延迟和低流量如何处理”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["用已知数据测试 Prometheus 条件", "画出一次分析窗口的时间线", "Prometheus 空值、多值、NaN、延迟和低流量如何处理的机制边界", "Prometheus 空值、多值、NaN、延迟和低流量如何处理的决策与证据", "Prometheus 空值、多值、NaN、延迟和低流量如何处理的静态检查模板", "Prometheus 空值、多值、NaN、延迟和低流量如何处理的故障实验与恢复"]}, {"title": "多指标如何区分硬失败、必要成功和辅助观察", "content": "平均分模型可能让严重错误被其他健康指标抵消。例如 CPU 很低不能抵消支付失败率上升。门禁应分为硬失败、必要成功和辅助观察：\n\n| 类型 | 示例 | 决策 |\n|---|---|---|\n| 硬失败 | 数据错误、5xx 激增、关键交易失败 | 立即 Abort |\n| 必要成功 | 成功率、延迟、最小样本量 | 全部满足才晋级 |\n| 辅助观察 | CPU、缓存命中、非关键日志 | 提供人工上下文 |\n\nAnalysisTemplate 可以组合多个 Metric，但跨系统事务、人工批准和复杂依赖可能更适合 Analysis Provider 插件或外部评估服务。所有扩展都要定义超时、认证、重试和幂等。\n\n建议把硬失败指标拆成独立 Metric，使状态能清楚指出是错误率、延迟还是业务结果失败。把所有条件塞入一个复杂表达式虽然简短，却降低排障和阈值审查能力。\n\n辅助观察指标不参与自动成功判断时，也应写入发布证据包。人工可以据此发现“门禁通过但资源成本显著上升”等需要后续处理的问题。\n\n#### 多指标如何区分硬失败、必要成功和辅助观察的机制边界\n\n禁止用平均分让严重错误被健康指标抵消；定义每类指标的 Success/Failure 条件、最小样本、失败次数、权重是否参与决策，以及 Provider 故障时的唯一动作，并验证多模板合并时的指标重名和参数冲突。\n\n- **多指标如何区分硬失败、必要成功和辅助观察的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **多指标如何区分硬失败、必要成功和辅助观察的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **多指标如何区分硬失败、必要成功和辅助观察的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **多指标如何区分硬失败、必要成功和辅助观察的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“多指标如何区分硬失败、必要成功和辅助观察”，查询值必须连同时间窗口、样本数和 Provider 状态解释，空值不能自动当作零。\n对于“多指标如何区分硬失败、必要成功和辅助观察”，业务失败、观测故障和数据不足要进入不同状态，且每种状态只能对应一个默认动作。\n\n#### 多指标如何区分硬失败、必要成功和辅助观察的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `多指标如何区分硬失败、必要成功和辅助观察` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `多指标如何区分硬失败、必要成功和辅助观察` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `多指标如何区分硬失败、必要成功和辅助观察` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `多指标如何区分硬失败、必要成功和辅助观察` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“多指标如何区分硬失败、必要成功和辅助观察”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 多指标如何区分硬失败、必要成功和辅助观察的静态检查模板\n\n下面命令为“多指标如何区分硬失败、必要成功和辅助观察”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 多指标如何区分硬失败、必要成功和辅助观察\nevidence_file=\"./evidence/check-b1a57054d3.txt\"\nkubectl get analysisrun -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl describe analysisrun -n demo | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“多指标如何区分硬失败、必要成功和辅助观察”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 多指标如何区分硬失败、必要成功和辅助观察的故障实验与恢复\n\n“多指标如何区分硬失败、必要成功和辅助观察”的可逆故障场景是：依次返回空 Vector、多 Series、NaN 和超时，确认业务失败、数据不足与 Provider 错误不会被混为一类。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“多指标如何区分硬失败、必要成功和辅助观察”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“多指标如何区分硬失败、必要成功和辅助观察”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“多指标如何区分硬失败、必要成功和辅助观察”执行恢复策略：暂停自动晋级并保持稳定版本，修复查询或观测链后重放同一时间窗口；缺失数据不得补写为零。\n4. 重新采集“多指标如何区分硬失败、必要成功和辅助观察”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“多指标如何区分硬失败、必要成功和辅助观察”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["多指标如何区分硬失败、必要成功和辅助观察的机制边界", "多指标如何区分硬失败、必要成功和辅助观察的决策与证据", "多指标如何区分硬失败、必要成功和辅助观察的静态检查模板", "多指标如何区分硬失败、必要成功和辅助观察的故障实验与恢复"]}, {"title": "Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作", "content": "- **Successful**：成功条件达到，允许继续。\n- **Failed**：业务测量违反失败门限，通常 Abort。\n- **Error**：Provider 调用、表达式或认证失败，说明观测链路有问题。\n- **Inconclusive**：既未满足成功也未达到失败，适合转人工判断。\n\n不要把 Error 当 Success。指标系统不可用时继续放量会使门禁失去意义；默认更安全的策略是暂停，并由值班人员判断是修复观测、延长窗口还是回退。\n\n`failureLimit` 控制可容忍失败次数，`consecutiveSuccessLimit` 要求连续成功。短暂噪声环境可允许少量失败，但连续成功能防止单次偶然好值提前晋级。阈值应通过历史数据和回放验证，不凭直觉设定。\n\n状态转换需要配套动作：Failed 通常自动 Abort，Error 通常暂停并修复 Provider，Inconclusive 进入限时人工判断。每一种状态都要有最大等待时间；无限等待会让 Rollout 和双版本资源长期悬挂。\n\n分析被提前终止时还要理解控制器的最终状态语义，不能仅凭“Run 结束”判断通过。复盘应查看每个 Measurement 的 Value、Phase、时间和 Message。\n\n#### 为四种结果定义唯一处置路径\n\n| 结果 | 默认动作 | 允许人工覆盖 | 必须保留 |\n|---|---|---|---|\n| Successful | 进入下一步 | 可选择继续观察 | Measurement 与查询版本 |\n| Failed | Abort 或回退 | 仅 Break Glass 继续 | 失败值、阈值和用户影响 |\n| Error | 暂停并修复观测 | 风险审批后有限继续 | Provider 错误和重试记录 |\n| Inconclusive | 限时人工判断 | Promote、回退或延长 | 样本量和判断理由 |\n\n同一种结果在不同 Metric 上不能含义相反。数据一致性检查失败属于硬失败，观测 Provider 无法访问属于 Error；把两者都编码成 `false` 会丢失安全语义。\n\n人工覆盖后创建独立事件，不能改写原 AnalysisRun。后续复盘要能区分系统结论和风险接受人的决定。\n\n等待超时必须升级到指定角色，并有默认安全状态。无限 Pause 会占用容量、阻塞新发布，也可能让值班交接丢失上下文。\n\n#### Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的机制边界\n\n区分业务失败、观测故障和数据不足；定义 Abort、暂停、限时人工判断、Break Glass 和证据保留。\n\n- **Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n对于“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”，查询值必须连同时间窗口、样本数和 Provider 状态解释，空值不能自动当作零。\n对于“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”，业务失败、观测故障和数据不足要进入不同状态，且每种状态只能对应一个默认动作。\n\n#### Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的静态检查模板\n\n下面命令为“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作\nevidence_file=\"./evidence/check-704b0468a0.txt\"\nkubectl get analysisrun -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl describe analysisrun -n demo | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作的故障实验与恢复\n\n“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”的可逆故障场景是：依次返回空 Vector、多 Series、NaN 和超时，确认业务失败、数据不足与 Provider 错误不会被混为一类。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”执行恢复策略：暂停自动晋级并保持稳定版本，修复查询或观测链后重放同一时间窗口；缺失数据不得补写为零。\n4. 重新采集“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Successful、Failed、Error 和 Inconclusive 如何驱动唯一动作”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["为四种结果定义唯一处置路径", "Successful、Failed、Error 和 Inconclusive 如何驱"]}]}, {"title": "第 8 章 · Argo CD 与 Rollouts 如何协同排障和验收", "sections": [{"title": "Argo CD Sync/Health 与 Rollout Phase 分别说明什么", "content": "Argo CD 的资源健康、同步窗口和运维边界可结合 [安全、可靠性与运维](04-security-reliability-and-operations.md)阅读；这里专门处理它们与 Rollout Phase、Analysis 和数据面状态的组合判读。\n\nArgo CD Sync 表示 Git 声明与 Kubernetes 对象是否一致；Rollout Phase 表示 Rollouts 控制器推进到了哪个状态。Argo CD 可以已经 Synced，而 Rollout 正在 Paused、Progressing 或 Degraded。这不是矛盾：声明已应用，但运行过程尚未结束。\n\n排障先回答两个问题：\n\n1. Rollout Spec 是否正是目标 Git Revision 渲染的结果？\n2. Rollouts Controller 是否根据该 Spec 正常推进 ReplicaSet、Service、路由和 AnalysisRun？\n\n若 Argo CD OutOfSync，先处理渲染、Diff 和同步；若 Synced 但 Rollout 异常，转向 Rollout Conditions、Events 和关联资源。不要在两个控制器之间来回点 Sync 和 Promote 掩盖原因。\n\nArgo CD Health 依赖 CRD 提供的 Status 和资源健康规则。升级 Rollouts 或自定义健康脚本后，要用 Paused、Healthy、Degraded、Abort 等测试对象验证映射；错误健康规则可能把等待人工晋级显示为故障，或把失败状态显示为健康。\n\n还要区分 Argo CD Application 的整体 Health 和单个 Rollout 的 Health。Application 中其他 Job、Ingress、Certificate 或 Hook 失败，也会使整体状态异常，不能只盯 Rollout。\n\n#### 用状态组合定位责任控制器\n\n| Argo CD | Rollout | 首要排查 |\n|---|---|---|\n| OutOfSync | 未变化 | 仓库、渲染、Diff 和同步策略 |\n| Synced | Progressing | ReplicaSet、Pod、Service 和步骤等待 |\n| Synced | Paused | Analysis、人工门禁和暂停超时 |\n| Synced | Degraded | Rollout Conditions 与运行资源 |\n| Healthy | 业务异常 | 请求路径、依赖和业务 SLI |\n\n每次只让对应控制器执行一次明确动作，随后重新取证。连续点击 Sync、Retry 和 Promote 会混淆状态时间线。\n\n#### Argo CD Sync/Health 与 Rollout Phase 分别说明什么的机制边界\n\n建立状态组合矩阵，区分配置未应用、Rollout 正常推进、人工暂停、资源失败和业务异常。\n\n- **Argo CD Sync/Health 与 Rollout Phase 分别说明什么的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **Argo CD Sync/Health 与 Rollout Phase 分别说明什么的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **Argo CD Sync/Health 与 Rollout Phase 分别说明什么的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **Argo CD Sync/Health 与 Rollout Phase 分别说明什么的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### Argo CD Sync/Health 与 Rollout Phase 分别说明什么的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `Argo CD Sync/Health 与 Rollout Phase 分别说明什么` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `Argo CD Sync/Health 与 Rollout Phase 分别说明什么` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `Argo CD Sync/Health 与 Rollout Phase 分别说明什么` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `Argo CD Sync/Health 与 Rollout Phase 分别说明什么` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### Argo CD Sync/Health 与 Rollout Phase 分别说明什么的静态检查模板\n\n下面命令为“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: Argo CD Sync/Health 与 Rollout Phase 分别说明什么\nevidence_file=\"./evidence/check-bc3d8c2e16.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### Argo CD Sync/Health 与 Rollout Phase 分别说明什么的故障实验与恢复\n\n“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“Argo CD Sync/Health 与 Rollout Phase 分别说明什么”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["用状态组合定位责任控制器", "Argo CD Sync/Health 与 Rollout Phase 分别说明什么"]}, {"title": "如何按 Rollout 到数据面的关系顺序收集故障快照", "content": "```bash\nkubectl argo rollouts get rollout checkout-api -n production\nkubectl describe rollout checkout-api -n production\nkubectl get rs,pod,svc,endpointslice -n production \\\n  -l app=checkout-api -o wide\nkubectl get analysisrun -n production \\\n  -l rollouts-pod-template-hash --sort-by=.metadata.creationTimestamp\nkubectl get events -n production \\\n  --sort-by=.lastTimestamp\n```\n\n证据顺序是 Rollout → ReplicaSet → Pod → Service/EndpointSlice → Traffic Router → AnalysisRun → 指标 Provider。对象存在不代表关系正确，重点检查 Selector、Hash、Owner Reference、权重、Ready Endpoint 和状态时间戳。\n\n#### 保存可比较的故障快照\n\n故障快照应同时包含期望、控制器状态和数据面事实：\n\n- Argo CD 目标与实际 Revision、Diff 和最近 Sync 结果。\n- Rollout Spec、Status、Conditions、当前 Step 和 StableRS。\n- ReplicaSet OwnerReference、Pod Template Hash 与镜像 ID。\n- Service Selector、EndpointSlice Ready 地址和路由权重。\n- AnalysisRun 每个 Measurement、Provider 错误和查询窗口。\n- 同窗口真实请求版本分布、错误率、延迟和关键日志。\n\n所有命令使用同一 Namespace、应用和时间基线，并把输出放进带事件 ID 的受控目录。不要复制 Secret Data、完整 Token 或用户请求体。\n\n恢复后执行相同查询形成对照。只有前后快照才能判断哪个关系恢复、哪个残留仍需处理；单张故障截图无法证明最终状态。\n\n对于短生命周期 Pod 和 AnalysisRun，证据采集要在自动清理前完成，或把关键 Status 持久化到外部发布记录。\n\n#### 如何按 Rollout 到数据面的关系顺序收集故障快照的机制边界\n\n固定 Rollout、ReplicaSet、Pod、Service、EndpointSlice、Router、AnalysisRun 和 Provider 查询顺序。\n\n- **如何按 Rollout 到数据面的关系顺序收集故障快照的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **如何按 Rollout 到数据面的关系顺序收集故障快照的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **如何按 Rollout 到数据面的关系顺序收集故障快照的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **如何按 Rollout 到数据面的关系顺序收集故障快照的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“如何按 Rollout 到数据面的关系顺序收集故障快照”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“如何按 Rollout 到数据面的关系顺序收集故障快照”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 如何按 Rollout 到数据面的关系顺序收集故障快照的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `如何按 Rollout 到数据面的关系顺序收集故障快照` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `如何按 Rollout 到数据面的关系顺序收集故障快照` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `如何按 Rollout 到数据面的关系顺序收集故障快照` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `如何按 Rollout 到数据面的关系顺序收集故障快照` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“如何按 Rollout 到数据面的关系顺序收集故障快照”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 如何按 Rollout 到数据面的关系顺序收集故障快照的静态检查模板\n\n下面命令为“如何按 Rollout 到数据面的关系顺序收集故障快照”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 如何按 Rollout 到数据面的关系顺序收集故障快照\nevidence_file=\"./evidence/check-5e1ca846f3.txt\"\nkubectl get rollout,svc,endpointslice -n demo -o wide | tee -a \"${evidence_file}\"\nkubectl get httproute,ingress,virtualservice -n demo 2>/dev/null | tee -a \"${evidence_file}\"\nfor i in {1..50}; do curl -fsS https://demo.example/version; done | sort | uniq -c | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“如何按 Rollout 到数据面的关系顺序收集故障快照”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 如何按 Rollout 到数据面的关系顺序收集故障快照的故障实验与恢复\n\n“如何按 Rollout 到数据面的关系顺序收集故障快照”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“如何按 Rollout 到数据面的关系顺序收集故障快照”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“如何按 Rollout 到数据面的关系顺序收集故障快照”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“如何按 Rollout 到数据面的关系顺序收集故障快照”执行恢复策略：暂停步骤并确保稳定版本容量，执行 Abort 或切回后持续检查 Endpoint、代理配置、版本回显与异步副作用。\n4. 重新采集“如何按 Rollout 到数据面的关系顺序收集故障快照”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“如何按 Rollout 到数据面的关系顺序收集故障快照”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["保存可比较的故障快照", "如何按 Rollout 到数据面的关系顺序收集故障快照的机制边界", "如何按 Rollout 到数据面的关系顺序收集故障快照的决策与证据", "如何按 Rollout 到数据面的关系顺序收集故障快照的静态检查模板", "如何按 Rollout 到数据面的关系顺序收集故障快照的故障实验与恢复"]}, {"title": "回滚显示成功但业务未恢复时如何处理副作用", "content": "先确认“回滚成功”指的是哪一层：Git 已 Revert、Argo CD 已 Synced、Rollout 已切回，还是业务请求已恢复。常见残留问题包括：\n\n- Service 或路由仍有部分流量指向新版本。\n- 连接池和客户端缓存尚未刷新。\n- 数据库 Schema 或数据已被新版本改变。\n- 消息队列存在新格式消息或重复副作用。\n- 缓存污染、Feature Flag 或外部配置未回退。\n- 指标窗口仍包含故障期数据，看起来尚未恢复。\n\n每一项都需要独立验证和恢复动作。此时不要继续自动重试发布，应冻结变更并进入事件处置。\n\n#### 按副作用范围升级恢复\n\n先确认新版本是否仍接收请求或后台任务；若仍在运行，立即从入口、消费者和定时任务三处止损。\n\n然后按数据库、队列、缓存、外部 API 和客户端连接逐项指定 Owner、查询和恢复动作。没有明确 Owner 的共享状态优先升级事件负责人。\n\n恢复验证使用新的 Request ID 和业务数据，避免旧指标窗口或缓存结果造成假阳性。\n\n所有副作用处理完成后再解除变更冻结，并创建新的安全 Revision；不要重用已经失败且身份不清的候选。\n\n#### 回滚显示成功但业务未恢复时如何处理副作用的机制边界\n\n按路由、连接、数据库、队列、缓存、Feature Flag 和指标旧窗口逐项指定 Owner 与恢复动作。\n\n- **回滚显示成功但业务未恢复时如何处理副作用的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **回滚显示成功但业务未恢复时如何处理副作用的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **回滚显示成功但业务未恢复时如何处理副作用的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **回滚显示成功但业务未恢复时如何处理副作用的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“回滚显示成功但业务未恢复时如何处理副作用”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“回滚显示成功但业务未恢复时如何处理副作用”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 回滚显示成功但业务未恢复时如何处理副作用的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `回滚显示成功但业务未恢复时如何处理副作用` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `回滚显示成功但业务未恢复时如何处理副作用` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `回滚显示成功但业务未恢复时如何处理副作用` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `回滚显示成功但业务未恢复时如何处理副作用` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“回滚显示成功但业务未恢复时如何处理副作用”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 回滚显示成功但业务未恢复时如何处理副作用的静态检查模板\n\n下面命令为“回滚显示成功但业务未恢复时如何处理副作用”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 回滚显示成功但业务未恢复时如何处理副作用\nevidence_file=\"./evidence/check-6acabe91be.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“回滚显示成功但业务未恢复时如何处理副作用”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 回滚显示成功但业务未恢复时如何处理副作用的故障实验与恢复\n\n“回滚显示成功但业务未恢复时如何处理副作用”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“回滚显示成功但业务未恢复时如何处理副作用”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“回滚显示成功但业务未恢复时如何处理副作用”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“回滚显示成功但业务未恢复时如何处理副作用”执行恢复策略：按副作用范围选择 Git Revert、应用回退、向前修复或数据恢复，并分别验证配置、流量与持久化状态。\n4. 重新采集“回滚显示成功但业务未恢复时如何处理副作用”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“回滚显示成功但业务未恢复时如何处理副作用”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["按副作用范围升级恢复", "回滚显示成功但业务未恢复时如何处理副作用的机制边界", "回滚显示成功但业务未恢复时如何处理副作用的决策与证据", "回滚显示成功但业务未恢复时如何处理副作用的静态检查模板", "回滚显示成功但业务未恢复时如何处理副作用的故障实验与恢复"]}, {"title": "如何用完整渐进式交付实验完成上线验收", "content": "运行手册至少包含：\n\n1. 发布对象、策略、预期步骤和时间预算。\n2. Stable 与 Canary/Preview 的识别方法。\n3. 每步指标、阈值、最低样本量和 Dashboard。\n4. Promote、Pause、Abort 权限和审计方式。\n5. Registry、Git、Argo CD、Rollouts、Router、Prometheus 的排障入口。\n6. 数据库、队列、缓存和外部依赖的兼容性说明。\n7. 回滚窗口、旧镜像保留和最坏情况下的恢复方法。\n8. 事件升级、责任人和证据包位置。\n\n手册需要通过故障演练验证。静态 YAML、控制器 Ready 和一次成功 Demo 不能证明生产回退路径有效。\n\n#### 用角色交接演练运行手册\n\n由未参与模板编写的值班人员执行四个场景：错误镜像、Preview 探针失败、Prometheus 不可用和路由权重未生效。\n\n每个场景测量：\n\n1. 从告警到定位目标 Revision 的时间。\n2. 从 Rollout 到数据面证据的查询是否完整。\n3. 值班人员是否有读取、Pause、Abort 和升级权限。\n4. 止损动作是否保持 Git 与运行态可解释。\n5. 恢复后是否完成证据包和临时资源清理。\n\n如果演练人员需要询问模板作者命令参数、指标含义或安全版本，手册仍有隐含知识。把问题补成决策表或可复制查询，再由另一人重跑。\n\n每次控制器、路由组件、指标系统或策略升级后重跑相关场景。手册的有效期由系统变化决定，不能只按日历复审。\n\n#### 上线前如何做完整验收\n\n- [ ] ImageUpdater 只能匹配授权 Application 和镜像。\n- [ ] 候选策略排除临时 Tag，并验证目标平台。\n- [ ] Git Write-back 使用受限身份，冲突和失败可见。\n- [ ] Rollout、Service、AnalysisTemplate 和路由对象通过 Server-side Dry Run。\n- [ ] BlueGreen 或 Canary 的容量预算满足峰值。\n- [ ] 指标查询处理空值、多值、低流量和延迟。\n- [ ] Provider 不可用时默认暂停，不默认成功。\n- [ ] Promote、Abort 和 Break Glass 均有最小权限与审计。\n- [ ] 已演练错误镜像、探针失败、指标失败、路由失败和回滚。\n- [ ] 最终成功由真实请求、业务指标和交付证据共同确认。\n\n渐进式交付的价值不在于“发布步骤更多”，而在于用较小流量和明确证据，把未知风险暴露在可停止、可恢复的窗口内。\n\n验收不能只勾选清单，还要为每项附上可复查证据：\n\n| 验收域 | 最小证据 |\n|---|---|\n| 镜像自动化 | 候选集合、策略版本、机器人 Commit、最终 Digest |\n| 配置调谐 | Argo CD Revision、Diff、Sync 和 Health 时间线 |\n| 发布控制 | Rollout Step、ReplicaSet、Service 与路由前后快照 |\n| 指标门禁 | AnalysisRun、Measurement、查询版本和样本量 |\n| 真实流量 | Request ID、版本回显、Stable/Canary 请求分布 |\n| 故障恢复 | Abort 或回退耗时、数据面恢复和副作用检查 |\n| 权限审计 | Promote、Abort、Break Glass 操作者与理由 |\n\n由没有参与实现的审核者随机选择一个成功发布和一个失败发布，沿证据链从业务请求反查到配置与源码。任何一步只能依赖口述，都视为未通过。\n\n验收结果要写明剩余风险和适用边界。例如仅验证无状态 HTTP 服务，不代表队列消费者、定时任务和数据库破坏性迁移可以直接复用同一策略。\n\n正式启用后设置首批发布的更严格观察窗口和人工值守。连续多次达到成功、失败和回退标准后，再扩大自动晋级范围。\n\n每次扩大范围都重新确认容量、指标区分度和旧版本保留窗口仍然成立。\n\n#### 如何用完整渐进式交付实验完成上线验收的机制边界\n\n从新镜像候选、Git Write-back、Argo CD Sync、流量步骤、Analysis、失败 Abort 到证据包执行一条成功和一条失败路径。\n\n- **如何用完整渐进式交付实验完成上线验收的声明输入**：ImageUpdater、Rollout 与 Analysis 声明必须拥有稳定身份、明确 Owner 和可比较的前后版本。\n- **如何用完整渐进式交付实验完成上线验收的控制过程**：Image Updater、Argo CD、Rollouts 与路由控制器分别保存观察结果、决策原因和最后成功时间，避免把多个阶段压成一个“成功”。\n- **如何用完整渐进式交付实验完成上线验收的运行结果**：ReplicaSet、Endpoint、代理配置与真实请求必须能回指同一变更 ID，无法回指时发布状态只能是未知。\n- **如何用完整渐进式交付实验完成上线验收的恢复入口**：在执行前确定 Revert、Abort、凭据撤销或人工接管的触发条件和负责人。\n\n围绕“如何用完整渐进式交付实验完成上线验收”先固定输入和 Owner，再观察控制器是否接受、推进并报告结果。\n“如何用完整渐进式交付实验完成上线验收”出现绿色状态时仍只回答当前层次的问题，不能替代下一层的数据面或业务验收。\n\n#### 如何用完整渐进式交付实验完成上线验收的决策与证据\n\n| 判定层 | 本节点要核对的事实 | 合格证据 | 拒绝或暂停条件 |\n|---|---|---|---|\n| 输入 | `如何用完整渐进式交付实验完成上线验收` 使用的版本、参数与审批是否唯一 | Commit、Digest、对象 generation 或工单 ID | 使用浮动引用或来源不明 |\n| 控制 | `如何用完整渐进式交付实验完成上线验收` 的各控制器是否观察到同一输入并完成自己的动作 | Status、Condition、事件与控制器日志 | 永久错误、超时或状态互相矛盾 |\n| 数据面 | `如何用完整渐进式交付实验完成上线验收` 的最终对象、路由或制品是否与声明一致 | 对象快照、Manifest、Endpoint 或真实请求 | 只有 API 接受记录，没有运行结果 |\n| 恢复 | `如何用完整渐进式交付实验完成上线验收` 的回退入口与清理动作能否重复执行 | Revert 记录、恢复耗时与残留检查 | 回退依赖临时口令或个人记忆 |\n\n为“如何用完整渐进式交付实验完成上线验收”预先定义成功、暂未完成、失败、未知四种结果。暂未完成必须有最大等待时间；未知表示证据链不可用，默认不得自动晋级。\n\n#### 如何用完整渐进式交付实验完成上线验收的静态检查模板\n\n下面命令为“如何用完整渐进式交付实验完成上线验收”建立最小证据快照。资源名、命名空间、仓库和地址需按环境替换；未接入真实系统时不能写成运行验证结论。\n\n```bash\n# check: 如何用完整渐进式交付实验完成上线验收\nevidence_file=\"./evidence/check-251f5447e8.txt\"\nkubectl argo rollouts get rollout checkout -n demo --watch | tee -a \"${evidence_file}\"\nkubectl get rs,pod,svc,endpointslice -n demo -l app=checkout -o wide | tee -a \"${evidence_file}\"\nkubectl get events -n demo --sort-by=.lastTimestamp | tee -a \"${evidence_file}\"\ndate -u +%FT%TZ | tee -a \"${evidence_file}\"\n```\n“如何用完整渐进式交付实验完成上线验收”的命令返回零只说明查询完成。验收记录还要保存对象版本、查询时间和关键输出；若权限不足而缺失一层证据，应修复取证权限或把结果标为未知。\n\n#### 如何用完整渐进式交付实验完成上线验收的故障实验与恢复\n\n“如何用完整渐进式交付实验完成上线验收”的可逆故障场景是：暂停当前步骤并保持稳定版本容量，保存路由和分析快照后再决定 Abort 或继续。实验前保存基线并设置停止条件，故障中不得顺手修改第二个变量。\n\n1. 保存“如何用完整渐进式交付实验完成上线验收”的输入 Revision、对象 `resourceVersion`、运行身份、最近事件和当前业务基线。\n2. 注入与“如何用完整渐进式交付实验完成上线验收”直接相关的单一故障，记录第一个异常信号、告警延迟和是否越过门禁。\n3. 为“如何用完整渐进式交付实验完成上线验收”执行恢复策略：冻结后续变更并保留当前稳定状态，恢复版本化输入后等待控制器重新收敛，再用业务证据关闭事件。\n4. 重新采集“如何用完整渐进式交付实验完成上线验收”的同一组证据，确认控制器不再重试旧变更，数据面回到稳定版本，临时权限与对象已经清理。\n\n恢复完成的判据不是页面重新变绿，而是“如何用完整渐进式交付实验完成上线验收”的输入、控制状态、运行结果和清理记录再次对齐。若仍有旧连接、旧凭据、悬挂任务或无法解释的指标窗口，事件不能关闭。", "subs": ["用角色交接演练运行手册", "上线前如何做完整验收", "如何用完整渐进式交付实验完成上线验收的机制边界", "如何用完整渐进式交付实验完成上线验收的决策与证据", "如何用完整渐进式交付实验完成上线验收的静态检查模板", "如何用完整渐进式交付实验完成上线验收的故障实验与恢复"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
