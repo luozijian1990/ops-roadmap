@@ -7,8 +7,6 @@
 ## 第一章 · 认识 Helm 的定位、架构与核心对象
 
 ### Helm 为什么是 Kubernetes 的包管理器
-<!-- src: 340051e0e422d4f0/Helm-Architecture.md -->
-
 Helm 把一组 Kubernetes 资源清单、默认配置和说明文件封装成可版本化的 **Chart**，再把 Chart 与环境配置合并，形成一个可追踪的 **Release**。它解决的不是容器运行时问题，而是应用资源如何打包、复用、发布和演进的问题。
 
 | 能力 | Helm 负责什么 | 不应误解为什么 |
@@ -60,8 +58,6 @@ Helm 不会持续监控并纠正业务资源漂移。安装之后，如果人工
 | 回滚 | 重新应用旧 YAML | `helm rollback` 创建新修订 |
 
 ### Chart、Config、Release 与 Repository 如何协作
-<!-- src: d6e98726a5cdc436/Using-Helm.md -->
-
 Helm 的核心词汇必须区分清楚：
 
 | 对象 | 含义 | 典型例子 |
@@ -121,8 +117,6 @@ Chart values.yaml
 | `uninstall` | 否 | 否 | 不创建可运行修订 |
 
 ### Helm 客户端如何完成渲染、发布与状态管理
-<!-- src: 340051e0e422d4f0/Helm-Architecture.md -->
-
 Helm 4 的主要实现仍可从两层理解：
 
 - **Helm Client**：接受命令，负责本地 Chart 开发、仓库管理和 Release 操作。
@@ -181,8 +175,6 @@ Helm 使用 Kubernetes 客户端库通过 REST API 与集群通信。Release 信
 ## 第二章 · 安装 Helm 并完成第一次发布
 
 ### 根据操作系统和维护策略选择安装方式
-<!-- src: d6e98726a5cdc436/Installing-Helm.md -->
-
 开始之前先确定版本策略。生产团队通常应固定经过验证的 Helm 版本，并明确升级窗口；个人实验环境可以使用包管理器跟随稳定版本。Canary 构建来自开发分支，不应直接进入生产流水线。
 
 | 安装方式 | 优点 | 注意事项 |
@@ -251,8 +243,6 @@ sha256sum -c helm-v4.0.0-linux-amd64.tar.gz.sha256sum
 ```
 
 ### 准备 Kubernetes 集群并验证 Helm 环境
-<!-- src: d6e98726a5cdc436/Quickstart-Guide.md -->
-
 成功使用 Helm 需要三个前提：可访问的 Kubernetes 集群、正确配置的 Kubernetes 身份与安全策略、可工作的 Helm CLI。先验证 `kubectl`，再验证 Helm，能更快地区分集群连接问题和 Helm 问题。
 
 ```bash
@@ -305,8 +295,6 @@ kubectl auth can-i create clusterroles.rbac.authorization.k8s.io
 本地文件示例中的重定向用于操作者执行；笔记构建过程本身不会写这些文件。
 
 ### 从查找 Chart 到卸载 Release 走完最小闭环
-<!-- src: d6e98726a5cdc436/Quickstart-Guide.md -->
-
 第一次练习应覆盖仓库、Chart 和 Release 三种对象，而不是只执行一次 `install`。
 
 ```bash
@@ -371,8 +359,6 @@ kubectl get events -n helm-lab --sort-by=.metadata.creationTimestamp
 ## 第三章 · 管理 Release 的日常生命周期
 
 ### 查找、检查并选择待安装的 Chart
-<!-- src: d6e98726a5cdc436/Using-Helm.md -->
-
 `helm search hub` 面向 Artifact Hub 搜索公开 Chart，`helm search repo` 只搜索已经添加到本机的传统仓库索引。找到候选后，不应直接安装，应先检查元数据、默认值、README、CRD 和签名信息。
 
 ```bash
@@ -412,8 +398,6 @@ rg 'kind: (ClusterRole|CustomResourceDefinition)' ./web
 Artifact Hub 是跨仓库目录，返回包页面和仓库信息；`search repo` 只查本机已缓存的 `index.yaml`。因此 Hub 能搜到但本机不能安装，通常是还没有添加实际仓库，或者该项目已经迁移到 OCI。
 
 ### 安装 Release 并通过 Values 定制配置
-<!-- src: d6e98726a5cdc436/Using-Helm.md -->
-
 Helm 可以从仓库引用、本地目录、`.tgz` 包或完整 URL 安装 Chart。生产环境应固定 Chart 版本，并在执行前保存 Values 与渲染结果。
 
 ```yaml
@@ -489,8 +473,6 @@ helm install web oci://registry.example.com/charts/web --version 2.4.1
 无论来源如何，生产审计都应保存最终 Chart digest、版本、Values 和渲染结果，而不只保存一条命令。
 
 ### 升级、回滚和卸载时如何控制变更风险
-<!-- src: d6e98726a5cdc436/Using-Helm.md -->
-
 升级会基于新 Chart 和新配置生成下一次修订。最重要的控制点是固定输入、先检查差异、设置等待条件，并提前知道回滚目标。
 
 ```bash
@@ -559,8 +541,6 @@ Chart 可以用资源保留策略避免某些对象随卸载删除，但这会�
 回滚可以恢复 Kubernetes 清单和 Helm 配置，却无法自动撤销数据库 Schema、外部 DNS、对象存储数据、消息格式或 Hook 调用的外部 API。发布设计应为这些动作提供向前修复、兼容窗口或独立回退脚本。
 
 ### 观察 Release 历史、状态和实际生效内容
-<!-- src: d6e98726a5cdc436/Using-Helm.md -->
-
 Helm 的观测命令回答四个不同问题：
 
 | 问题 | 命令 |

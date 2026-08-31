@@ -7,8 +7,6 @@
 ## 第四章 · 编写具备控制逻辑的 Playbook
 
 ### 从 Play 和 Task 理解 Playbook 的执行模型
-<!-- src: f308346b55708758/Playbooks-介绍.md -->
-
 Playbook 是 YAML 编写的自动化执行说明。一个 Playbook 包含一个或多个 Play；每个 Play 把一组主机映射到一组有序 Task；Task 调用模块描述目标状态；Handler 只在收到变更通知时执行。
 
 ```mermaid
@@ -144,8 +142,6 @@ ansible-pull -U https://git.example/infra/node-config.git \
 官方入口见 [Playbook 指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/index.html)。
 
 ### 用变量适配不同主机与运行环境
-<!-- src: f308346b55708758/Variables.md -->
-
 变量让同一套自动化适配环境、区域、角色和主机差异。变量应描述数据，不应变成隐藏控制流；同一个变量尽量只在一个清晰位置定义。
 
 #### 使用可读的数据结构
@@ -334,8 +330,6 @@ Filter 改变数据，不应隐藏复杂业务决策。表达式需要连续套�
 不要对整个 `hostvars` 做无差别 debug。输出结构化变量前先确认其中没有密码、Token、证书私钥或个人信息。
 
 ### 用条件判断控制任务是否执行
-<!-- src: f308346b55708758/条件选择.md -->
-
 `when` 在每台主机上独立求值，不需要 Jinja 双花括号。条件应使用明确的布尔值、类型转换和 `is defined` 检查。
 
 ```yaml
@@ -408,8 +402,6 @@ graph TD
 平台差异优先放在数据中，避免复制两份几乎相同的 Task。条件语法见 [官方 Conditionals 指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_conditionals.html)。
 
 ### 用循环消除重复任务并等待目标状态
-<!-- src: f308346b55708758/循环.md -->
-
 现代 Playbook 优先使用统一的 `loop`。旧材料中的大量 `with_items`、`with_dict`、`with_nested` 仍有兼容场景，但新代码通常可由 `loop` 配合 filter 或 lookup 表达。
 
 ```yaml
@@ -585,8 +577,6 @@ lookup 在控制节点上执行，不是在当前受管主机上。它可能读�
 ## 第五章 · 组织可复用且易维护的自动化代码
 
 ### 使用 Roles 和 Include 拆分复杂 Playbook
-<!-- src: f308346b55708758/Playbook-角色(Roles)-和-Include-语句.md -->
-
 Role 用约定目录封装 tasks、handlers、defaults、vars、templates、files 和 metadata。它适合表达“配置 Web 服务”这样的能力，而顶层 Playbook 负责选择环境、主机和角色组合。
 
 ```text
@@ -701,8 +691,6 @@ ansible-galaxy collection list
 生产项目应固定已经测试的版本或提交，不用浮动默认分支。第三方内容需要审查维护状态、许可证、输入输出、提权和下载行为；内部共享的新能力优先封装成带版本的 Collection，而不是复制 Role 目录到多个仓库。
 
 ### 按最佳实践设计目录 变量与部署拓扑
-<!-- src: f308346b55708758/最佳实践.md -->
-
 ```text
 ansible-project/
 ├── ansible.cfg
@@ -777,8 +765,6 @@ ansible-playbook -i inventories/staging playbooks/site.yml --check --diff
 静态检查、check mode 和真实测试各有边界，不能相互替代。涉及服务重启、外部 API 或数据库迁移时，应在隔离环境做真实集成测试。
 
 ### 使用标签选择性执行 Play 和 Task
-<!-- src: 3b674c8d93eb5e29/标签.md -->
-
 ```yaml
 - name: 写入监控配置
   ansible.builtin.template:
@@ -799,8 +785,6 @@ ansible-playbook site.yml --skip-tags disruptive
 标签是执行选择器，不是依赖管理器。只运行中间标签可能跳过前置条件，所以标签设计要按可独立执行的能力分组。`always` 通常用于安全检查，`never` 适合必须显式启用的诊断或破坏性任务。动态 include 的标签继承与静态 import 不同，发布前应用 `--list-tasks --tags ...` 检查实际任务集。
 
 ### 从指定任务启动并逐步调试 Playbook
-<!-- src: 3b674c8d93eb5e29/从指定任务开始运行palybook以及分步运行playbook.md -->
-
 ```bash
 ansible-playbook site.yml --list-tasks
 ansible-playbook site.yml --start-at-task '写入应用配置'
@@ -810,8 +794,6 @@ ansible-playbook site.yml --step
 `--start-at-task` 依赖精确 Task 名称，并会跳过此前的前置条件；动态 include 中尚未展开的 Task 也可能无法作为可靠起点。它适合故障恢复和调试，不应成为正常部署方式。`--step` 会逐个询问是否执行，适合实验环境人工观察，不适合无人值守流水线。
 
 ### 使用 Check Mode 预演配置变更
-<!-- src: 3b674c8d93eb5e29/Check-Mode-(“Dry-Run”).md -->
-
 ```bash
 ansible-playbook -i inventories/staging site.yml --check --diff
 ```
@@ -834,8 +816,6 @@ Check mode 不是事务、回滚或完整测试：依赖前一 Task 新建文件
 ## 第六章 · 控制复杂任务的执行 安全与故障行为
 
 ### 用异步执行和轮询处理长时间任务
-<!-- src: 3b674c8d93eb5e29/异步操作和轮询.md -->
-
 ```yaml
 - name: 启动长时间升级并定期轮询
   ansible.builtin.command: /opt/app/bin/upgrade
@@ -864,8 +844,6 @@ Check mode 不是事务、回滚或完整测试：依赖前一 Task 新建文件
 不要异步执行有全局锁竞争的包管理任务，也不要启动后永远不收集结果。详情见 [官方异步执行指南](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_async.html)。
 
 ### 定义任务失败 变更与恢复行为
-<!-- src: 3b674c8d93eb5e29/Playbooks-中的错误处理.md -->
-
 ```yaml
 - name: 执行健康检查
   ansible.builtin.command: /opt/app/bin/healthcheck
@@ -914,8 +892,6 @@ Check mode 不是事务、回滚或完整测试：依赖前一 Task 新建文件
 `block` 的 `rescue` 只在 block 内任务返回失败后运行，不会捕获 YAML 解析错误或所有不可达情况；`always` 无论 block 成功或被 rescue 都会运行，适合恢复临时监控静默、释放锁和写审计信息。不要在 `always` 中无条件把健康检查失败的节点重新加回负载均衡器。
 
 ### 用委托 本地动作和批次控制实现滚动操作
-<!-- src: 3b674c8d93eb5e29/委托,滚动更新,本地动作.md -->
-
 ```yaml
 - name: 滚动更新 Web 集群
   hosts: webservers
@@ -1002,8 +978,6 @@ Check mode 不是事务、回滚或完整测试：依赖前一 Task 新建文件
 本地执行使用控制节点的 Python、文件系统和权限。不要把不可信变量传给本地 shell，也不要假设 CI 容器与开发机安装了相同工具。
 
 ### 为任务和代理环境传递环境变量
-<!-- src: 3b674c8d93eb5e29/配置环境-(在代理环境中).md -->
-
 ```yaml
 - name: 通过代理安装软件包
   ansible.builtin.package:
@@ -1018,8 +992,6 @@ Check mode 不是事务、回滚或完整测试：依赖前一 Task 新建文件
 `environment` 设置的是模块在远端执行时的环境，不是控制节点全局环境，也不会自动成为 Fact。代理凭据属于秘密；环境变量还可能被进程列表、调试输出或子进程继承，应尽量使用短期凭据并配合 `no_log`。
 
 ### 使用 Vault 保护 Playbook 中的敏感数据
-<!-- src: 3b674c8d93eb5e29/Vault.md -->
-
 ```bash
 ansible-vault create group_vars/production/vault.yml
 ansible-vault edit group_vars/production/vault.yml
@@ -1065,8 +1037,6 @@ ansible-playbook site.yml \
 Vault 只保护静态存储中的密文。解密后秘密仍可能进入日志、模板、远端文件或进程参数；因此还要限制文件权限、设置 `no_log`、控制 CI 凭据和轮换 Vault 密钥。多环境使用 Vault ID，密码来源优先接入秘密管理器脚本或自动化控制器 Credential。参考 [官方 Vault 指南](https://docs.ansible.com/projects/ansible/latest/vault_guide/vault.html)。
 
 ### 理解 Accelerated Mode 的历史作用与淘汰背景
-<!-- src: 3b674c8d93eb5e29/Accelerated-Mode.md -->
-
 Accelerated Mode 是 Ansible 1.x 为减少旧 SSH 连接开销设计的远端临时守护机制，涉及 `accelerate: true`、5099 端口和 `accelerate_*` 配置。它已从现代 Ansible 移除，新项目不得照搬。
 
 当前性能优化顺序通常是：复用 OpenSSH ControlPersist、评估 pipelining、合理设置 forks、减少不必要 Facts、合并模块调用、优化慢查询，并用执行数据定位瓶颈。不要为了速度关闭主机密钥检查或扩大无边界并发。
@@ -1074,8 +1044,6 @@ Accelerated Mode 是 Ansible 1.x 为减少旧 SSH 连接开销设计的远端临
 ## 第七章 · 将 Ansible 应用于开发和持续交付
 
 ### 使用 Vagrant 搭建可重复的 Ansible 实验环境
-<!-- src: 07a2c664dbb799d4/使用Vagrant和Ansible.md -->
-
 Vagrant 可创建可丢弃虚拟机并调用 Ansible provisioner，适合验证 Linux 系统配置、Role 幂等性和多节点流程。
 
 ```ruby
@@ -1134,8 +1102,6 @@ ansible-playbook -i inventories/vagrant/hosts.yml playbooks/site.yml
 旧教程的 Ubuntu Precise box、`ansible.sudo` 和 `ansible_ssh_*` 已过时。实验环境仍应固定 box 版本、限制私有网络、避免真实生产凭据，并验证第二次 provision 是否保持幂等。
 
 ### 编排多层应用的持续交付与滚动升级
-<!-- src: 07a2c664dbb799d4/持续交付与滚动升级.md -->
-
 滚动发布不是单个 `serial` 参数，而是一条可观测状态机：验证前置条件、摘除流量、部署、健康检查、恢复流量、观察，再进入下一批。
 
 ```mermaid
@@ -1366,3 +1332,34 @@ Playbook 应校验版本和摘要，不应在运行时把 `latest`、可变分�
 5. 用异步、block、委托和批次处理复杂故障行为；
 6. 用 Vault 和外部秘密系统保护敏感数据；
 7. 在隔离环境验证后，以可观察、可停止、可回滚的方式滚动交付。
+
+## 第八章 · 环境即代码与交付前置
+
+### 测试环境如何自动创建、隔离、观察和回收
+测试环境的数量应由并行测试需求、隔离风险、数据准备成本和回收速度共同决定。环境即代码的目标不是把所有配置复制成更长的 YAML，而是让创建输入、版本、依赖和销毁动作可重复、可审计。
+
+#### 将环境描述拆成四类输入
+
+| 输入 | 示例 | 验收方式 |
+| --- | --- | --- |
+| 版本 | 应用 Commit、镜像 Digest、Chart 版本 | 与发布记录一致 |
+| 拓扑 | 主机组、命名空间、依赖服务 | Inventory 和资源清单可重建 |
+| 配置 | 非敏感参数、功能开关、资源配额 | Schema 校验和差异审查 |
+| 秘密 | 数据库、Registry、外部 API 凭据 | Vault/Secret 注入，不落日志 |
+
+Playbook 应先执行预检查和 `--check`，再分批创建资源；失败时保留证据并执行明确的清理或恢复动作。环境回收必须是显式任务，不能依赖操作者记忆，否则临时环境会持续占用配额并污染测试结果。
+
+#### 用环境自描述降低排障成本
+
+环境创建完成后输出一份版本化摘要，包括应用版本、依赖版本、Inventory、关键配置摘要、资源地址、创建人和过期时间。摘要不应包含秘密值，但要包含秘密引用的名称和版本。排障时先比较两个环境摘要，再决定是代码、配置、拓扑还是外部依赖造成差异。
+
+#### 用最小实验验证可重复性
+
+```bash
+ansible-playbook -i inventories/test hosts.yml --check --diff
+ansible-playbook -i inventories/test hosts.yml --limit app --serial 1
+ansible-playbook -i inventories/test hosts.yml --tags verify
+ansible-playbook -i inventories/test hosts.yml --tags cleanup
+```
+
+这些命令只表示执行路径，不代表任何特定环境已经验证成功。真正的验收还要保存每次运行的 Commit、Inventory、变更摘要、失败主机和清理结果，并确认第二次执行不会产生非预期变化。

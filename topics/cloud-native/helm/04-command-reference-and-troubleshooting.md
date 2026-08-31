@@ -6,8 +6,6 @@
 ## 第十二章 · 按 Chart 与仓库任务选择命令
 
 ### 创建、检查、打包和验证 Chart
-<!-- src: e8ddd95ed0cc1bbe/helm-create.md; e8ddd95ed0cc1bbe/helm-lint.md; e8ddd95ed0cc1bbe/helm-package.md; e8ddd95ed0cc1bbe/helm-verify.md -->
-
 | 命令 | 输入 | 主要输出 | 使用时机 |
 | --- | --- | --- | --- |
 | `helm create NAME` | 名称或路径 | Chart 脚手架 | 开始新 Chart |
@@ -125,8 +123,6 @@ flowchart LR
 每一步都应消费上一步的固定产物。若在验证后重新打包，即使源码没变，新的归档也需要重新计算摘要并签名。
 
 ### 构建、更新和检查 Chart 依赖
-<!-- src: e8ddd95ed0cc1bbe/helm-dependency.md; e8ddd95ed0cc1bbe/helm-dependency-build.md; e8ddd95ed0cc1bbe/helm-dependency-list.md; e8ddd95ed0cc1bbe/helm-dependency-update.md -->
-
 ```bash
 helm dependency list ./web
 helm dependency update ./web
@@ -206,8 +202,6 @@ helm dependency build ./web --skip-refresh
 | 本地成功 CI 失败 | 缓存、凭据或 CA 未带入 | 用干净容器重现并比较 `helm env` |
 
 ### 搜索、检查和拉取 Chart
-<!-- src: e8ddd95ed0cc1bbe/helm-search.md; e8ddd95ed0cc1bbe/helm-search-hub.md; e8ddd95ed0cc1bbe/helm-search-repo.md; e8ddd95ed0cc1bbe/helm-show.md; e8ddd95ed0cc1bbe/helm-show-all.md; e8ddd95ed0cc1bbe/helm-show-chart.md; e8ddd95ed0cc1bbe/helm-show-crds.md; e8ddd95ed0cc1bbe/helm-show-readme.md; e8ddd95ed0cc1bbe/helm-show-values.md; e8ddd95ed0cc1bbe/helm-pull.md -->
-
 | 目标 | 命令 |
 | --- | --- |
 | 在 Artifact Hub 找候选 | `helm search hub KEYWORD` |
@@ -302,8 +296,6 @@ flowchart TD
 生产环境应从内部批准仓库消费，而不是每次安装都重新搜索公共目录。
 
 ### 添加、索引、查看、更新和移除传统仓库
-<!-- src: e8ddd95ed0cc1bbe/helm-repo.md; e8ddd95ed0cc1bbe/helm-repo-add.md; e8ddd95ed0cc1bbe/helm-repo-index.md; e8ddd95ed0cc1bbe/helm-repo-list.md; e8ddd95ed0cc1bbe/helm-repo-remove.md; e8ddd95ed0cc1bbe/helm-repo-update.md -->
-
 ```bash
 helm repo add vendor https://charts.example.com
 helm repo list
@@ -400,8 +392,6 @@ helm repo index ./public \
 用这一顺序排查可以避免在 TLS 尚未建立时反复修改 Chart 版本。
 
 ### 登录 OCI Registry 并推送 Chart
-<!-- src: e8ddd95ed0cc1bbe/helm-registry.md; e8ddd95ed0cc1bbe/helm-registry-login.md; e8ddd95ed0cc1bbe/helm-registry-logout.md; e8ddd95ed0cc1bbe/helm-push.md -->
-
 ```bash
 printf '%s' "$REGISTRY_PASSWORD" | \
   helm registry login registry.example.com \
@@ -470,8 +460,6 @@ Logout 删除 Helm Registry 配置中的对应凭据，不会撤销服务端 tok
 不要用 `latest` 代替 Chart Version。即使 Registry 允许覆盖同名 tag，发布策略也应禁止重写已发布版本。
 
 ### 在本地渲染模板并定位配置问题
-<!-- src: e8ddd95ed0cc1bbe/helm-template.md -->
-
 ```bash
 helm template web ./chart \
   -n production \
@@ -584,8 +572,6 @@ graph TD
 ## 第十三章 · 按 Release 生命周期选择命令
 
 ### 安装、升级、回滚和卸载 Release
-<!-- src: e8ddd95ed0cc1bbe/helm-install.md; e8ddd95ed0cc1bbe/helm-upgrade.md; e8ddd95ed0cc1bbe/helm-rollback.md; e8ddd95ed0cc1bbe/helm-uninstall.md -->
-
 ```bash
 helm install web vendor/web --version 1.4.0 \
   -n production --create-namespace -f values-prod.yaml \
@@ -797,8 +783,6 @@ CRD 通常不会随应用 Release 自动删除，因为它可能服务多个实�
 | 仅预览 | dry-run/template | 不证明运行时就绪 |
 
 ### 查看 Release 列表、状态和修订历史
-<!-- src: e8ddd95ed0cc1bbe/helm-list.md; e8ddd95ed0cc1bbe/helm-status.md; e8ddd95ed0cc1bbe/helm-history.md -->
-
 ```bash
 helm list -A --all --output table
 helm status web -n production --output yaml
@@ -877,8 +861,6 @@ helm history RELEASE [flags]
 不要未经确认直接删除 Release Secret 来“解锁”，这会破坏状态历史。
 
 ### 获取 Release 的 Values、Manifest、Hook、Notes 与元数据
-<!-- src: e8ddd95ed0cc1bbe/helm-get.md; e8ddd95ed0cc1bbe/helm-get-all.md; e8ddd95ed0cc1bbe/helm-get-hooks.md; e8ddd95ed0cc1bbe/helm-get-manifest.md; e8ddd95ed0cc1bbe/helm-get-metadata.md; e8ddd95ed0cc1bbe/helm-get-notes.md; e8ddd95ed0cc1bbe/helm-get-values.md -->
-
 | 命令 | 回答的问题 |
 | --- | --- |
 | `helm get values` | 用户提供了哪些值，或加 `--all` 看计算值 |
@@ -960,8 +942,6 @@ diff -u r3.yaml r4.yaml
 结构化 YAML 的键顺序可能产生噪声；严谨比较可先解析并规范化，但要保留原始文件供审计。
 
 ### 执行 Release 测试并判断失败位置
-<!-- src: e8ddd95ed0cc1bbe/helm-test.md -->
-
 ```bash
 helm test web -n production --logs --timeout 10m
 helm test web -n production --filter name=smoke --logs
@@ -1021,8 +1001,6 @@ Helm 超时       -> Job 未结束、删除阻塞、timeout 太短
 ## 第十四章 · 配置 CLI、自动补全与插件命令
 
 ### 查询 Helm 根命令、版本、环境与常用速查操作
-<!-- src: e8ddd95ed0cc1bbe/helm.md; e8ddd95ed0cc1bbe/helm-version.md; e8ddd95ed0cc1bbe/helm-env.md; d6e98726a5cdc436/Cheat-Sheet.md -->
-
 ```bash
 helm help
 helm version --short
@@ -1190,8 +1168,6 @@ flowchart TD
 每次只跨过一个证据门，避免把“Pod 不就绪”误诊为 Chart 下载问题。
 
 ### 为 Bash、Zsh、Fish 和 PowerShell 配置自动补全
-<!-- src: e8ddd95ed0cc1bbe/helm-completion.md; e8ddd95ed0cc1bbe/helm-completion-bash.md; e8ddd95ed0cc1bbe/helm-completion-zsh.md; e8ddd95ed0cc1bbe/helm-completion-fish.md; e8ddd95ed0cc1bbe/helm-completion-powershell.md -->
-
 ```bash
 # Bash current session
 source <(helm completion bash)
@@ -1280,8 +1256,6 @@ helm completion powershell | Out-String | Invoke-Expression
 补全只是效率工具，不是命令校验。执行前仍要读完整命令，尤其是 namespace、Release 名和删除参数。
 
 ### 安装、列出、打包、更新、校验和卸载插件
-<!-- src: e8ddd95ed0cc1bbe/helm-plugin.md; e8ddd95ed0cc1bbe/helm-plugin-install.md; e8ddd95ed0cc1bbe/helm-plugin-list.md; e8ddd95ed0cc1bbe/helm-plugin-package.md; e8ddd95ed0cc1bbe/helm-plugin-update.md; e8ddd95ed0cc1bbe/helm-plugin-verify.md; e8ddd95ed0cc1bbe/helm-plugin-uninstall.md -->
-
 ```bash
 helm plugin install https://example.com/acme-plugin --version 1.2.0
 helm plugin list

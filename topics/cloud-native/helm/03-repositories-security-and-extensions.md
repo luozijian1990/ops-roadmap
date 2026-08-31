@@ -6,8 +6,6 @@
 ## 第八章 · 发布和分发 Chart
 
 ### 理解传统 Chart Repository 的结构与索引
-<!-- src: 340051e0e422d4f0/The-Chart-Repository-Guide.md -->
-
 传统 Chart Repository 本质上是能通过 HTTP 提供 `index.yaml` 和 `.tgz` 文件的静态站点。`index.yaml` 汇总 Chart 元数据、版本、下载 URL 和摘要；包不必与索引同域，但同域部署最简单。
 
 ```text
@@ -75,8 +73,6 @@ helm search repo vendor/web --versions
 已有消费者依赖 `helm search repo` 时，迁移到 OCI 需要额外提供发现入口或文档。
 
 ### 创建、托管、同步和更新 Chart Repository
-<!-- src: 340051e0e422d4f0/The-Chart-Repository-Guide.md; 0b443dd78fd28297/Syncing-Your-Chart-Repository.md -->
-
 ```bash
 helm package ./charts/web
 helm repo index ./public --url https://charts.example.com
@@ -129,8 +125,6 @@ helm pull verify/web --version 1.3.0 --verify
 材料以对象存储目录为例。同步命令需要避免先删除远端旧包，生产仓库还应配置版本控制或回收站，以便索引发布错误时恢复。公开仓库可以匿名读取，但写权限只给发布流水线。
 
 ### 用 GitHub Actions 自动发布 Chart
-<!-- src: 0b443dd78fd28297/Chart-Releaser-Action-to-Automate-GitHub-Page-Charts.md -->
-
 Chart Releaser Action 可以把 Git 仓库中的 Chart 打包为 GitHub Release，并维护 GitHub Pages 上的索引。典型触发点是默认分支的 Chart 目录发生变更。
 
 ```yaml
@@ -175,8 +169,6 @@ jobs:
 真正安装测试通常需要 KIND 或专用测试集群。测试通过后再允许 Releaser 创建不可变版本，失败时不能生成半成品索引。
 
 ### 用 OCI Registry 存储、签名和迁移 Chart
-<!-- src: 340051e0e422d4f0/Use-OCI-based-registries.md -->
-
 OCI Registry 可以在现有容器镜像基础设施中存放 Chart，统一认证、权限、复制和保留策略。上传引用不包含 Chart 名和标签，它们分别从 `Chart.yaml` 的 `name` 与 `version` 推导。
 
 ```bash
@@ -233,8 +225,6 @@ dependencies:
 - 非 TLS 本地 Registry 只用于测试，生产不要依赖 `plain-http`。
 
 ### 用 Provenance 验证 Chart 的来源与完整性
-<!-- src: 340051e0e422d4f0/Helm-Provenance-and-Integrity.md -->
-
 Provenance 文件把 Chart 摘要与发布者签名绑定。验证成功表示包与签名时内容一致，并且签名能追溯到给定密钥；它不自动证明 Chart 安全、维护者可信或镜像无漏洞。
 
 ```bash
@@ -273,8 +263,6 @@ Provenance 文件包含 Chart 元数据和包摘要的签名表达。包被修�
 ## 第九章 · 处理兼容性、安全与存储治理
 
 ### 管理 Helm 与 Kubernetes 的版本偏差和发布节奏
-<!-- src: 340051e0e422d4f0/Helm-Version-Support-Policy.md; 340051e0e422d4f0/Release-schedule-policy.md -->
-
 Helm 与 Kubernetes 的支持范围会随版本变化，不能把材料中的某个版本号永久写成事实。升级前应核对当前 Helm 支持策略、目标 Kubernetes 版本以及 Chart 的 `kubeVersion`。
 
 ```bash
@@ -312,8 +300,6 @@ Helm 的支持策略定义客户端版本可配合哪些 Kubernetes 版本，不
 - 比较 Manifest 并观察弃用警告。
 
 ### 在不同 Kubernetes 发行版中使用 Helm
-<!-- src: 340051e0e422d4f0/Kubernetes-Distribution-Guide.md -->
-
 Helm 面向符合 Kubernetes API 的集群，可用于托管云、KIND、Minikube、OpenShift 等环境。真正差异通常来自认证插件、默认 StorageClass、Ingress 实现、安全策略、LoadBalancer 能力和可用 API。
 
 部署前用能力而不是发行版名称做检查：
@@ -344,8 +330,6 @@ KIND、Minikube、MicroK8s 等适合 Chart 安装测试，但默认可能没有 
 优先根据 `.Capabilities.APIVersions.Has` 和公开 Values 决定是否生成可选资源。直接判断集群供应商会把模板绑定到品牌名称，也容易漏掉同能力的其他发行版。
 
 ### 识别并迁移已经废弃的 Kubernetes API
-<!-- src: 340051e0e422d4f0/Deprecated-Kubernetes-APIs.md -->
-
 Kubernetes 删除旧 API 后，包含旧 `apiVersion` 的 Chart 可能无法安装，旧 Release 的历史 Manifest 也可能阻碍升级。Chart 维护者应更新模板和 `kubeVersion`，使用者应在集群升级前扫描已部署 Release。
 
 迁移顺序：盘点目标版本删除项、渲染所有 Values 组合、升级 Chart、验证对象转换和行为、再升级集群。不能只搜索源码，因为条件模板和历史修订可能隐藏旧 API。
@@ -369,8 +353,6 @@ kubectl api-resources
 CRD 的 served/storage 版本、转换 Webhook 和现有对象存储版本不由普通 Helm 升级自动解决。先完成 CRD 与对象迁移，再升级依赖新版本的应用 Chart。
 
 ### 用 Kubernetes RBAC 限制 Helm 操作者权限
-<!-- src: 340051e0e422d4f0/Role-based-Access-Control.md -->
-
 Helm 使用 kubeconfig 中的身份，没有独立授权层。给日常发布账号分配命名空间级 Role/RoleBinding；只有确实需要 CRD、ClusterRole 等资源时才授予集群级权限。
 
 ```bash
@@ -411,8 +393,6 @@ kubectl auth can-i --list \
 预检结果还要结合准入策略。RBAC 允许不代表 Pod Security、OPA 或其他 Webhook 会接受对象。
 
 ### 为 SQL Release 存储后端分配最小权限
-<!-- src: 340051e0e422d4f0/Permissions-management-for-SQL-storage-backend.md -->
-
 SQL 后端适用于有特定集中存储需求的环境，但会引入数据库可用性、凭据和权限治理。初始化账号可建表和授权，运行账号只获得所需表操作权限；不要让 Helm 运行身份长期持有数据库管理员权限。
 
 选择存储驱动时先回答：是否真的不能使用集群内 Secret、备份和恢复如何做、网络故障时发布如何失败、多个集群如何隔离数据。
@@ -436,8 +416,6 @@ TO helm_runtime;
 ## 第十章 · 使用和开发 Helm 插件
 
 ### 理解插件类型、API 版本、运行时和目录结构
-<!-- src: dea9de507a10787d/Overview.md; 340051e0e422d4f0/The-Helm-Plugins-Guide.md -->
-
 插件扩展 Helm CLI，但不要求修改 Helm 核心。Helm 4 材料把插件区分为 CLI、Getter 和 PostRenderer 等类型，并支持 subprocess 与 Wasm 等运行时。插件根目录包含 `plugin.yaml`、可执行代码和可选平台配置。
 
 ```yaml
@@ -502,8 +480,6 @@ Helm 调用插件时会暴露一组 Helm 相关环境变量，例如插件目录
 CLI 插件应提供稳定的 `--help`，并让错误消息同时包含“发生了什么”和“下一步怎么做”。若插件 API 支持补全协议，可按当前位置返回候选项，但补全过程不能执行有副作用的操作，也不应因为网络不可达拖慢 shell。
 
 ### 安全地查找、安装、查看和卸载插件
-<!-- src: dea9de507a10787d/Using-Plugins.md -->
-
 插件以当前用户权限执行，可能读取 kubeconfig、环境变量和文件系统，应像安装本地程序一样审查来源、版本和安装 Hook。
 
 ```bash
@@ -548,8 +524,6 @@ Helm 能否发现插件
 退出码非零时保留标准错误，但要先脱敏。插件在终端成功、在 CI 失败，常见原因是工作目录、HOME、PATH、代理、证书或 kubeconfig 不同。
 
 ### 开发 CLI、Getter 与 PostRenderer 插件
-<!-- src: dea9de507a10787d/Developing-Plugins.md; fa02247a9e4fa3f3/Build-a-CLI-Plugin.md; fa02247a9e4fa3f3/Build-a-Getter-Plugin.md; fa02247a9e4fa3f3/Build-a-Postrenderer-Plugin.md -->
-
 - CLI 插件增加新的 `helm NAME` 命令。
 - Getter 插件支持新的 Chart 获取协议。
 - PostRenderer 插件接收渲染后的 Manifest 并输出修改结果。
@@ -639,8 +613,6 @@ kubectl apply --dry-run=server -f rendered.yaml
 ## 第十一章 · 通过高级接口扩展 Helm
 
 ### 用 PostRenderer 改写最终清单
-<!-- src: 340051e0e422d4f0/Advanced-Helm-Techniques.md -->
-
 PostRenderer 位于模板渲染与提交 API Server 之间，可统一注入标签、安全上下文或策略变换。
 
 ```mermaid
@@ -678,8 +650,6 @@ PostRenderer 失败时 Helm 应停止提交；脚本不能吞掉解析错误后�
 适合统一注入组织级标签、Pod 安全字段、镜像拉取 Secret 或服务网格注解；不适合修补 Chart 的核心业务逻辑、隐藏不兼容 API，或产生需要独立生命周期管理的大量资源。能够在上游 Chart 解决的问题，优先回到模板和 Values。
 
 ### 选择 ConfigMap、Secret、Memory 或 SQL 存储后端
-<!-- src: 340051e0e422d4f0/Advanced-Helm-Techniques.md -->
-
 Release 存储决定历史保留位置。Secret 是常见默认选择；ConfigMap 可读性更强但不适合敏感内容；Memory 只适合测试；SQL 引入独立数据库。选择时比较机密性、容量、RBAC、备份、灾难恢复和运维成本。
 
 | 驱动 | 持久性 | 访问控制 | 适用场景 | 主要风险 |
@@ -696,8 +666,6 @@ Release 存储决定历史保留位置。Secret 是常见默认选择；ConfigMa
 Release 记录保存 Helm 所需状态，不包含数据库数据、PVC 内容和所有外部系统副作用。灾难恢复演练必须同时覆盖 Kubernetes 资源、Helm 历史、持久数据和外部依赖；恢复后再验证 `helm list`、`helm history` 与集群实际对象一致。
 
 ### 通过 Go SDK 调用 Helm 核心能力
-<!-- src: 97fd329e1effbc74/Introduction.md; 340051e0e422d4f0/Advanced-Helm-Techniques.md -->
-
 Go SDK 让控制器或平台服务复用 Helm 的 action、chart、cli 和 release 包。最小流程是创建环境设置、初始化 `action.Configuration`、构造具体 Action 并运行。
 
 ```go
@@ -783,8 +751,6 @@ SDK 不会替你定义团队的 Values 优先级。可以复用 Helm 的 values 
 平台请求被取消时，Kubernetes 和 Registry 操作也应尽快停止。优先使用支持 context 的 Action 接口，并为下载、等待资源和 Hook 分别设置合理超时。HTTP 请求的 30 秒超时不等于 Helm 等待工作负载就绪的 10 分钟超时，二者要分别设计。
 
 ### 用 Action 和 Driver 构建自定义 Helm 工具
-<!-- src: 97fd329e1effbc74/Examples.md -->
-
 材料覆盖 Pull、Install、Upgrade、Uninstall、List 等 Action 以及负责串联它们的 Driver。工程实现应把配置初始化、Registry Client、Chart 定位、依赖下载和错误包装抽成稳定边界。
 
 ```mermaid

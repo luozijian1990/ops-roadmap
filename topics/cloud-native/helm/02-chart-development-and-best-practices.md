@@ -7,8 +7,6 @@
 ## 第四章 · 理解并创建一个规范的 Chart
 
 ### 从目录结构认识 Chart 的组成
-<!-- src: 340051e0e422d4f0/Charts.md; 7c8a04233466d18e/Getting-Started.md -->
-
 Chart 是遵循约定目录结构的一组文件。`helm create mychart` 可生成起点，但生产 Chart 应删除无关样例并按应用实际资源重建。
 
 ```text
@@ -93,8 +91,6 @@ metadata:
 `crds/` 中的 CRD 是普通 YAML，不能使用模板动作。安装时 Helm 先提交 CRD，等待 API 可发现，再渲染和提交其余资源。CRD 实例放在 `templates/` 中，才能使用 Values。已有 CRD 不会在普通升级中自动更新，这一边界需要独立治理。
 
 ### 正确维护 Chart.yaml、版本和类型
-<!-- src: 340051e0e422d4f0/Charts.md; ff38f0b4059545ea/General-Conventions.md -->
-
 ```yaml
 apiVersion: v2
 name: web-platform
@@ -149,8 +145,6 @@ dependencies:
 废弃不是直接删除旧包。先在新版本中设置 `deprecated: true` 并递增版本，再发布该版本，最后停止维护源码。仓库中最新版本被标为 deprecated 时，客户端才能识别整个 Chart 已废弃。已安装 Release 的迁移方案要另行说明。
 
 ### 用 README、LICENSE、NOTES 和忽略规则完善交付物
-<!-- src: 340051e0e422d4f0/Charts.md; 7c8a04233466d18e/Creating-a-NOTES.txt-File.md; 7c8a04233466d18e/The-.helmignore-file.md -->
-
 README 应说明用途、前提、Values、升级约束和示例；LICENSE 描述 Chart 模板代码的许可；`templates/NOTES.txt` 在安装、升级和 `helm status` 后输出简短的下一步操作。
 
 ```text
@@ -215,8 +209,6 @@ tar -tzf ./dist/web-1.0.0.tgz | sort
 ## 第五章 · 掌握 Go 模板语言与渲染上下文
 
 ### 从第一个模板理解渲染过程
-<!-- src: 7c8a04233466d18e/Getting-Started.md -->
-
 模板动作放在 `{{` 与 `}}` 中。Helm 加载 Chart 和 Values，执行 `templates/` 下模板，将多个结果组成 Manifest，再提交给 Kubernetes。`helm get manifest` 可查看已发布版本，`helm template` 可查看本地渲染结果。
 
 ```mermaid
@@ -229,8 +221,6 @@ graph LR
 ```
 
 ### 使用内置对象读取 Release、Chart、Values 与集群信息
-<!-- src: 7c8a04233466d18e/Built-in-Objects.md -->
-
 | 对象 | 常用成员 | 用途 |
 | --- | --- | --- |
 | `.Release` | `Name`、`Namespace`、`Revision`、`IsInstall` | 感知发布上下文 |
@@ -275,8 +265,6 @@ apiVersion: policy/v1
 `.Template.Name` 给出当前模板的命名空间路径，`.Template.BasePath` 给出当前 Chart 的模板目录，可用于计算其他模板内容摘要。`.Subcharts` 允许父 Chart 查看子 Chart 的完整作用域，但这会增强耦合；稳定共享值优先使用 `global` 或明确导入契约。
 
 ### 用函数、管道和操作符转换模板数据
-<!-- src: 7c8a04233466d18e/Template-Functions-and-Pipelines.md; 7c8a04233466d18e/Template-Function-List.md -->
-
 管道把前一结果作为后一函数的最后一个参数：
 
 ```yaml
@@ -492,8 +480,6 @@ featureMode: legacy
 查询列表时遍历返回值的 `.items`。对象不存在通常返回空值，权限或 API 错误则让模板失败。使用 `lookup` 复用 Secret 时，必须定义首次安装、升级、卸载后重装和 dry-run 各自的行为。
 
 ### 用 if、with、range 和变量组织控制逻辑
-<!-- src: 7c8a04233466d18e/Flow-Control.md; 7c8a04233466d18e/Variables.md -->
-
 ```yaml
 {{- $root := . -}}
 {{- if .Values.ingress.enabled }}
@@ -586,8 +572,6 @@ mug: "true"
 调整裁剪符后必须查看实际输出。模板源码排版漂亮不代表渲染 YAML 正确，反过来也不应为了减少空行牺牲可读性。
 
 ### 用命名模板、include 和作用域实现复用
-<!-- src: 7c8a04233466d18e/Named-Templates.md -->
-
 命名模板是全局的，应以 Chart 名称作为前缀避免父子 Chart 冲突。以下 helper 返回稳定标签：
 
 ```gotemplate
@@ -672,8 +656,6 @@ Input: root Helm context
 模板注释不会进入渲染结果，YAML 注释会保留到 Manifest；API 对象通常不会保存客户端注释，因此需要长期存在的元数据应使用 annotation。
 
 ### 在模板中读取、匹配和编码文件
-<!-- src: 7c8a04233466d18e/Accessing-Files-Inside-Templates.md -->
-
 `.Files` 不能读取 `templates/`、被 `.helmignore` 排除的文件或父 Chart 文件。常见用法：
 
 ```yaml
@@ -745,8 +727,6 @@ allowlist: |-
 文件内容进入 YAML 前要考虑缩进、尾随换行、字符编码和大小。配置过大时应改用镜像、对象存储或独立配置发布流程。
 
 ### 处理 YAML 类型、缩进、多行文本和锚点
-<!-- src: 7c8a04233466d18e/Appendix:-YAML-Techniques.md; 7c8a04233466d18e/Appendix:-Go-Data-Types-and-Templates.md -->
-
 YAML 类型会影响 Kubernetes 校验：端口通常是整数，环境变量值必须是字符串。多行文本用 `|` 保留换行、用 `>` 折叠换行；模板生成嵌套块时优先用 `nindent`。
 
 ```yaml
@@ -809,8 +789,6 @@ worker:
 YAML 第一次解析后会把别名展开，重新编码时锚点消失。需要跨资源稳定复用时，应使用命名模板、Values 或 Library Chart，而不是依赖锚点保留。
 
 ### 调试模板并规划后续进阶路径
-<!-- src: 7c8a04233466d18e/Debugging-Templates.md; 7c8a04233466d18e/Next-Steps.md -->
-
 ```bash
 helm lint ./mychart
 helm template demo ./mychart -f values-test.yaml --debug
@@ -857,8 +835,6 @@ helm template demo ./web \
 ## 第六章 · 设计 Values、依赖与可复用 Chart
 
 ### 设计可覆盖、可理解且类型稳定的 Values
-<!-- src: 7c8a04233466d18e/Values-Files.md; ff38f0b4059545ea/Values.md -->
-
 Values 可来自 `values.yaml`、父 Chart、多个 `-f` 文件和 `--set`。后提供的值优先。公开 Values 应使用 lowerCamelCase，键名不应重复内置对象名称。
 
 ```yaml
@@ -941,8 +917,6 @@ Schema 应覆盖公开接口的关键约束，但不要把所有 Kubernetes Open
 用户可以把某些映射键设为 `null`，使它从合并结果中删除。这在覆盖 Chart 默认探针或安全上下文时有用，但 Chart 应明确哪些键允许删除，避免模板假设它永远存在。
 
 ### 声明依赖并理解版本、仓库、条件和标签
-<!-- src: 340051e0e422d4f0/Charts.md; ff38f0b4059545ea/Dependencies.md -->
-
 ```yaml
 dependencies:
   - name: postgresql
@@ -1003,8 +977,6 @@ metrics:
 Helm 也能使用直接放在 `charts/` 的目录或包，即使它没有在 `Chart.yaml` 声明。这种方式难以让工具判断来源和版本，更新命令也不会随意删除未声明包。生产 Chart 应优先声明依赖并使用锁文件。
 
 ### 用父子 Chart 和全局 Values 组合应用
-<!-- src: 7c8a04233466d18e/Subcharts-and-Global-Values.md -->
-
 子 Chart 应当可以独立运行，不能依赖父 Chart 的私有 Values。父 Chart 通过与子 Chart 同名的键覆盖其配置，`global` 值对父子双方可见。复杂系统可以用 umbrella Chart 组合多个组件，但要控制耦合和升级半径。
 
 ```yaml
@@ -1050,8 +1022,6 @@ database:
 父子 Chart 可以使用彼此全局可见的命名模板，但无法像面向对象继承那样可靠覆盖 `block`。推荐把共享模板放进 Library Chart，使用版本化名称和明确参数。
 
 ### 用 Library Chart 沉淀跨 Chart 的公共能力
-<!-- src: 340051e0e422d4f0/Library-Charts.md -->
-
 Library Chart 在 `Chart.yaml` 中声明 `type: library`，自身不能安装，也不渲染普通资源，适合集中维护标签、容器、Service 等模板原语。应用 Chart 把它声明为依赖，再用 `include` 调用。
 
 ```yaml
@@ -1111,8 +1081,6 @@ dependencies:
 ## 第七章 · 把 Chart 提升到可维护的生产质量
 
 ### 遵循模板目录、命名、空白和注释约定
-<!-- src: ff38f0b4059545ea/Templates.md -->
-
 每个资源通常单独成文件，文件名使用连字符；helper 放 `_helpers.tpl`。模板名称带 Chart 前缀，YAML 使用两个空格。YAML 注释会进入最终清单，模板注释 `{{/* ... */}}` 只留在源码。
 
 #### 模板目录的可维护布局
@@ -1145,8 +1113,6 @@ templates/
 JSON 是合法 YAML，某些复杂动态映射用 JSON 可以规避缩进问题，但普通 Kubernetes Manifest 仍建议采用 YAML 风格。模板输出必须是 YAML 或 JSON 对象文档，不能夹杂调试文本。
 
 ### 规范 Labels、Annotations、PodTemplate 和镜像策略
-<!-- src: ff38f0b4059545ea/Labels-and-Annotations.md; ff38f0b4059545ea/Pods-and-PodTemplates.md -->
-
 推荐使用 Kubernetes 通用标签：
 
 ```yaml
@@ -1289,8 +1255,6 @@ Chart 应根据 replicaCount 校验或文档化 PDB 约束，并允许平台接�
 | 私有镜像 | imagePullSecrets 与 ServiceAccount 正确 |
 
 ### 安全地创建 RBAC 与 CRD 资源
-<!-- src: ff38f0b4059545ea/Role-Based-Access-Control.md; ff38f0b4059545ea/Custom-Resource-Definitions.md -->
-
 RBAC 默认遵循最小权限，并允许使用者关闭 ServiceAccount/RBAC 创建以接入现有身份。CRD 放在 `crds/`，先于模板安装且不参与模板渲染；Helm 不负责常规升级或删除 CRD，因此 CRD 演进应建立独立流程。
 
 #### 可切换的 ServiceAccount 与 RBAC
@@ -1404,8 +1368,6 @@ CRD schema 可能新增字段、收紧校验、改变 served/storage version 或
 使用者跳过 CRD 安装时，Chart 应尽早用 capabilities 或明确校验提示缺失 API。README 需要写明所需 CRD 名称、最小版本和安装来源，而不是让应用对象在 API Server 处才报“no matches for kind”。
 
 ### 用 Hook 介入 Release 生命周期
-<!-- src: 340051e0e422d4f0/Chart-Hooks.md -->
-
 Hook 可在 `pre-install`、`post-install`、`pre-upgrade`、`post-upgrade`、`pre-delete`、`post-delete`、`pre-rollback`、`post-rollback` 和 `test` 等阶段执行。
 
 ```yaml
@@ -1487,8 +1449,6 @@ kubectl get events -n production --sort-by=.lastTimestamp
 第三方 Chart 的 Hook 可以在安装、升级、删除和回滚阶段执行，并可能拥有高权限 ServiceAccount。采用 Chart 前应把 Hook 当可执行供应链内容审查：镜像来源、命令、网络访问、Secret、RBAC 与清理策略都要检查。
 
 ### 用 Chart Test 和静态检查建立质量门
-<!-- src: 340051e0e422d4f0/Chart-Tests.md -->
-
 Chart Test 是带 `helm.sh/hook: test` 注解的 Pod 或 Job，进程退出码 0 表示成功。它适合验证服务连通、配置生效和基本认证。
 
 ```bash
@@ -1583,8 +1543,6 @@ helm test 与业务冒烟
 只用默认 Values 测试会漏掉条件分支。至少覆盖最小配置、生产推荐配置和可选组件开启配置。
 
 ### 应用模板函数、校验、复用与幂等技巧
-<!-- src: 0b443dd78fd28297/Chart-Development-Tips-and-Tricks.md -->
-
 - 用 `required` 为关键 Values 给出可理解的失败信息。
 - 字符串加引号，数字保持数值类型；环境变量值即使像数字也应是字符串。
 - 用 `include` 复用并接入管道，用 `tpl` 谨慎渲染用户提供的模板字符串。

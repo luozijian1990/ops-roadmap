@@ -7,8 +7,6 @@
 ## 第一章 · 建立 Ansible 的基础运行环境
 
 ### 认识 Ansible 的安装方式与运行前提
-<!-- src: 756783d3c3959286/Installation.md -->
-
 Ansible 是一种无代理自动化工具。它安装在控制节点上，通过 SSH、PowerShell Remoting 或其他连接插件管理远端设备，不要求每台受管主机长期运行 Ansible 守护进程，也不依赖中央数据库。
 
 ```mermaid
@@ -132,8 +130,6 @@ graph LR
 当前安装与版本选择可继续查阅 [Ansible 官方安装指南](https://docs.ansible.com/projects/ansible/latest/installation_guide/intro_installation.html)。
 
 ### 从 SSH 连接到第一条 Ansible 命令
-<!-- src: 756783d3c3959286/新手上路.md -->
-
 完成安装后，应先建立一个最小实验项目。把 Inventory、配置和后续 Playbook 放在同一目录，便于版本控制和复现。
 
 ```bash
@@ -247,8 +243,6 @@ ssh-keyscan -H 192.0.2.10 >> ~/.ssh/known_hosts
 如果出现主机重装导致的密钥变化，应先核实主机身份，再删除旧记录，而不是直接关闭检查。
 
 ### 理解配置文件的查找顺序与常用选项
-<!-- src: 756783d3c3959286/Ansible的配置文件.md -->
-
 Ansible 可以从配置文件、环境变量、命令行选项、Playbook 关键字和变量中获得行为设置。排障时必须同时回答两个问题：加载了哪一个配置文件，以及最终值被哪一层覆盖。
 
 #### `ansible.cfg` 只使用找到的第一份
@@ -378,8 +372,6 @@ ansible-doc -t callback -l
 旧材料中的 `hostfile`、`sudo_*`、`accelerate_*`、`module_name` 等配置属于旧版本。现代项目应先用 `ansible-config list` 确认选项是否存在；Accelerated Mode 已退出当前架构，SSH ControlPersist 与 pipelining 承担了原先大量性能优化诉求。
 
 ### 管理 Windows 主机需要哪些额外准备
-<!-- src: 756783d3c3959286/Windows-Support.md -->
-
 Windows 不是“把 Linux 模块换个目标地址”那么简单。它有独立的连接方式、模块命名空间、Shell 语义、路径格式和认证模型。
 
 ```mermaid
@@ -495,8 +487,6 @@ Windows Facts 同样进入 `ansible_facts`，但字段取决于平台和模块�
 ## 第二章 · 用 Inventory 和 Patterns 组织受管主机
 
 ### 使用静态 Inventory 描述主机与分组
-<!-- src: 756783d3c3959286/Inventory文件.md -->
-
 Inventory 是 Ansible 对受管对象的视图。它不仅列出地址，还定义主机的稳定标识、业务分组、环境分组、连接参数和变量来源。Patterns 再从这个视图中选出本次执行的目标集合。
 
 ```mermaid
@@ -646,8 +636,6 @@ ansible-inventory -i inventory/hosts.yml --host web01
 把 Inventory 和变量文件纳入版本控制，但将 Vault 密文或外部秘密引用与普通变量分开管理。官方的完整组织方式见 [Inventory 构建指南](https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html)。
 
 ### 从外部系统动态生成 Inventory
-<!-- src: 756783d3c3959286/动态-Inventory.md -->
-
 静态 Inventory 适合变化较慢的环境。当主机由云平台、自动伸缩组、CMDB、LDAP 或容器平台动态维护时，手工清单会产生漂移：已经销毁的主机仍被执行，新建主机却没有进入自动化范围。
 
 ```mermaid
@@ -798,8 +786,6 @@ cache_timeout: 300
 官方说明见 [动态 Inventory 指南](https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_dynamic_inventory.html)。
 
 ### 使用 Patterns 精确选择目标主机
-<!-- src: 756783d3c3959286/Patterns.md -->
-
 Patterns 是集合表达式。它只能选择 Inventory 已知的主机，不会因为写入了一个新 IP 就自动绕过 Inventory。
 
 | 目标 | Pattern |
@@ -893,8 +879,6 @@ Patterns 的完整语法与处理顺序见 [官方 Patterns 指南](https://docs
 ## 第三章 · 使用 Ad-Hoc 命令与模块完成一次性任务
 
 ### 用 Ad-Hoc 命令执行批量运维操作
-<!-- src: 756783d3c3959286/Introduction-To-Ad-Hoc-Commands.md -->
-
 Ad-Hoc 命令是在命令行中直接调用一个模块，适合一次性检查、紧急操作和小范围变更。需要反复执行、需要评审或包含多个步骤的工作，应写成 Playbook 并纳入版本控制。
 
 ```text
@@ -1067,8 +1051,6 @@ Facts 可能包含网络、硬件和系统细节。不要在公开日志中无�
 7. 可复用的命令立即沉淀为 Playbook。
 
 ### 理解模块如何承载 Ansible 的实际操作
-<!-- src: aeac5bc3ee43e0c9/简介.md -->
-
 模块是 Ansible 的工作单元。Ad-Hoc 命令调用一个模块；Playbook 中的每个 Task 通常也调用一个模块。连接插件负责“怎么到达目标”，模块负责“到达后做什么”。
 
 ```mermaid
@@ -1134,8 +1116,6 @@ ansible-doc -t inventory amazon.aws.aws_ec2
 `ansible.builtin.service` 是 FQCN，格式为 `<namespace>.<collection>.<content>`。它能避免同名模块冲突，并让读者直接知道依赖来自核心还是外部 Collection。
 
 ### 辨析核心模块与额外模块的历史分类
-<!-- src: aeac5bc3ee43e0c9/核心模块.md; aeac5bc3ee43e0c9/额外模块.md -->
-
 旧版 Ansible 把模块分成 `ansible-modules-core` 和 `ansible-modules-extras` 两个仓库。这个分类已经被 Collections 架构替代，不应继续用“核心模块比额外模块更受支持”判断现代依赖。
 
 | 历史模型 | 当前模型 |
@@ -1169,8 +1149,6 @@ ansible-galaxy collection list
 - 团队是否固定版本并在隔离环境验证。
 
 ### 读取模块的通用返回值与 Facts
-<!-- src: aeac5bc3ee43e0c9/共同的返回值.md -->
-
 模块返回结构化数据。Ad-Hoc 命令会直接显示它；Playbook 可以使用 `register` 保存结果，再用于判断、输出和后续任务。
 
 ```yaml

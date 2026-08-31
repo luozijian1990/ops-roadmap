@@ -3,8 +3,6 @@
 ## 第一册 · 网络模型、地址与子网
 
 ### 从数据交换理解计算机网络
-<!-- src: temp/network/1.txt (Ch. 2 Networking Overview) -->
-
 计算机网络要解决的核心问题，是让两台或多台设备交换任意字节。围绕这个目标，网络必须回答四个问题：通信双方是谁、数据如何到达、途中是否损坏、接收方如何理解这些字节。本册从这些问题出发，逐步建立分层、寻址、封装和局域网通信的基础模型。
 
 > **材料说明**：知识覆盖参考 Brian “Beej Jorgensen” Hall 的 *Beej's Guide to Network Concepts* v1.0.40。本文按运维与 SRE 学习路径进行原创重组，不是原书的逐章翻译；原作及其许可信息以 [官方页面](https://beej.us/guide/bgnet0/) 为准。
@@ -63,8 +61,6 @@ flowchart LR
 3. 带宽翻倍但 RTT 不变时，单次请求延迟一定减半吗？
 
 ### 客户端、服务端、协议与网络操作系统
-<!-- src: temp/network/1.txt (Ch. 2.3-2.7 Client Server, OS, Protocols, Wired versus Wireless) -->
-
 客户端和服务端描述的是一次通信中的角色，不一定对应固定的设备类型。客户端主动发起请求，服务端在已知地址和端口上等待请求。同一个程序既可以是服务端，也可以在调用其他服务时充当客户端。
 
 协议是通信双方共同遵守的规则，至少要约定消息格式、字段含义、交互顺序和异常处理。例如 HTTP 约定请求行、Header 和 Body 的组织方式，TCP 则约定如何建立可靠连接。没有协议，即使字节已经到达，接收方也无法可靠解释。
@@ -107,8 +103,6 @@ iw dev 2>/dev/null
 这些命令分别观察接口计数、Ethernet 链路属性和无线接口，但不同平台与驱动暴露的信息并不相同。
 
 ### 分层为什么是理解网络的第一把钥匙
-<!-- src: temp/network/1.txt (Ch. 4 The Layered Network Model) -->
-
 分层把复杂通信拆成职责明确的模块。每一层只依赖下层提供的服务，并向上层暴露稳定接口。应用无需知道信号如何在网线中传播，路由器也不需要理解 HTTP 页面内容。
 
 发送端从上向下逐层添加控制信息，这个过程叫封装；接收端从下向上逐层移除并解释控制信息，这个过程叫解封装。
@@ -156,8 +150,6 @@ sudo tcpdump -ni any -e -vv 'icmp or tcp port 443'
 - HTTP 200 不证明返回的业务数据一定正确。
 
 ### TCP/IP 模型与 OSI 模型如何对应
-<!-- src: temp/network/1.txt (Ch. 4.2-4.4 Protocol Layering, Internet Model, OSI Model) -->
-
 OSI 七层模型适合描述和讨论网络职责，TCP/IP 模型更贴近互联网协议的实际组织。两者不是互斥标准，而是观察同一通信系统的两种粒度。
 
 | OSI 层 | TCP/IP 层 | 典型协议或对象 | 主要职责 |
@@ -197,8 +189,6 @@ L7  请求格式  响应码  依赖和日志是否正常
 一次只用证据排除一层，比同时修改 DNS、防火墙和应用配置更容易保留根因。
 
 ### 二进制、十六进制与字节如何表达网络数据
-<!-- src: temp/network/1.txt (Ch. 10.1 Integer Representations; Ch. 40 Bitwise Operations) -->
-
 网络上传输的最终都是比特。8 个比特组成一个字节，能表示 `0` 到 `255`。二进制适合观察位，十六进制每一位正好对应 4 个比特，因此更适合展示报文、地址和掩码。
 
 ```text
@@ -225,8 +215,6 @@ print(network.to_bytes(4, "big"))  # b'\xc0\xa8\n\x00'
 ```
 
 ### 位运算如何服务于掩码和协议字段
-<!-- src: temp/network/1.txt (Ch. 40.3-40.7 AND, OR, NOT, Shift, Bit Masks) -->
-
 位运算直接作用于整数的二进制位。网络程序用它们计算网段、构造标志字段、提取报文中的子字段，也用它们把多个布尔状态压缩进一个字节。
 
 #### 四类基本位运算
@@ -272,8 +260,6 @@ print(mask.to_bytes(4, "big"))
 位运算前必须明确整数宽度。Python 整数没有固定宽度，`~value` 会得到数学意义上的负数；若要模拟 8 位或 32 位翻转，需要再与 `0xff` 或 `0xffffffff` 做 AND。
 
 ### 大端序、小端序与网络字节序
-<!-- src: temp/network/1.txt (Ch. 10.2-10.3 Endianness and Python) -->
-
 多字节整数必须约定高位字节和低位字节的排列顺序。大端序把最高有效字节放在前面，小端序相反。互联网协议约定网络字节序为大端序，主机内部顺序则取决于 CPU 架构。
 
 以十六进制整数 `0x12345678` 为例：
@@ -323,8 +309,6 @@ hexdump -C packet.bin
 直接把 C 结构体内存发送到网络也不安全，其中可能包含对齐填充、主机字节序和平台相关宽度。
 
 ### TCP 字节流为什么需要应用层消息边界
-<!-- src: temp/network/1.txt (Ch. 11 Parsing Packets) -->
-
 TCP 提供连续字节流，不保留应用执行 `send` 时的边界。发送方一次写入 100 字节，接收方可能分两次读到，也可能一次读到它和后一条消息的全部内容。这不是“粘包故障”，而是字节流接口的正常语义。
 
 应用协议必须自行定义消息边界，常见办法有：
@@ -391,8 +375,6 @@ while True:
 随机把同一字节串切成不同块喂给解析器，是发现边界依赖的有效测试方法。
 
 ### IP 协议负责什么又不负责什么
-<!-- src: temp/network/1.txt (Ch. 6 The Internet Protocol) -->
-
 IP 为跨网络传输提供统一地址和尽力而为的数据包交付。它负责在包头中携带源地址、目的地址等信息，并让路由器逐跳转发。IP 不保证到达、不保证顺序，也不自动重传。
 
 ```mermaid
@@ -433,8 +415,6 @@ ICMP Destination Unreachable 能报告无路由、端口不可达等问题；Pac
 IPv4 允许中间路由器分片，IPv6 中间路由器不分片。任何一个分片丢失都可能使整个原始包无法重组，应优先控制报文大小与有效 MTU。
 
 ### IPv4 地址、私有网络与动态分配
-<!-- src: temp/network/1.txt (Ch. 6.5-6.6 Private Networks, Static and Dynamic Addresses; Ch. 7.1 IPv4 Addresses) -->
-
 IPv4 地址是 32 位整数，通常写成四个十进制字节，例如 `192.0.2.10`。地址必须结合前缀长度解释；脱离掩码，仅凭 IP 不能确定设备认为哪些地址在本地网段。
 
 常见特殊范围如下：
@@ -463,8 +443,6 @@ networkctl status 2>/dev/null
 查看地址时要同时记录前缀长度、接口和作用域。只抄下 `192.168.10.20` 而遗漏 `/24`，无法完整解释主机的本地网络判断。
 
 ### IPv4 的历史分类、特殊地址与特殊网段
-<!-- src: temp/network/1.txt (Ch. 7.2-7.6 Subnets, Historic Subnets, Special Addresses and Subnets) -->
-
 早期 IPv4 使用 A、B、C 类地址，分别隐含 `/8`、`/16`、`/24` 网络边界。这种分类分配浪费严重，已经被 CIDR 取代，但旧文档中的“C 类网段”等说法仍然常见。
 
 | 历史类别 | 首位特征 | 默认前缀 | 过去的用途 |
@@ -486,8 +464,6 @@ networkctl status 2>/dev/null
 `/31` 和 `/32` 是需要单独理解的例外。`/31` 可用于点到点链路，两个地址都能作为端点；`/32` 表示单个主机路由，常见于 Loopback、VIP 和精确路由。
 
 ### IPv6 地址表示、作用域、DNS 与 URL
-<!-- src: temp/network/1.txt (Ch. 8 IPv6 Representation, Link Local, Special Addresses, DNS and URLs) -->
-
 IPv6 地址为 128 位，写成八组十六进制数。连续的零可以用一次 `::` 压缩，每组开头的零可以省略。例如：
 
 ```text
@@ -528,8 +504,6 @@ ping -6 -c 2 2001:db8::42
 URL 需要用方括号消除地址中的冒号与端口分隔符之间的歧义：`https://[2001:db8::42]:8443/`。日志、代理配置和允许列表也必须能正确解析这一写法。
 
 ### CIDR、子网掩码与网络边界
-<!-- src: temp/network/1.txt (Ch. 17.1-17.6 Address Representation and Subnet Masks) -->
-
 CIDR 使用斜杠后的数字表示网络前缀长度。`192.168.10.42/24` 表示前 24 位是网络位，后 8 位是主机位，对应掩码 `255.255.255.0`。
 
 ```text
@@ -579,8 +553,6 @@ print(list(ipaddress.collapse_addresses(nets)))
 ```
 
 ### 从 IP 地址计算网段、主机范围与广播地址
-<!-- src: temp/network/1.txt (Ch. 17.7 Finding the Subnet; Ch. 18.6 Broadcast Address; Ch. 19 Computing and Finding Subnets) -->
-
 计算 `192.168.10.70/26`：每个 `/26` 块有 64 个地址，边界依次是 0、64、128、192，因此 70 落在 64 到 127。
 
 ```text
@@ -633,8 +605,6 @@ assert a.overlaps(b)
 在连接 VPC、VPN、Kubernetes Pod CIDR 和办公网络前做重叠审计，成本远低于上线后迁移地址。
 
 ### 链路层、帧与数据包有什么区别
-<!-- src: temp/network/1.txt (Ch. 20.1-20.2 Octets, Frames versus Packets) -->
-
 “帧”和“包”有时被泛称为 packet，但精确讨论时应区分层次：Ethernet 帧属于链路层，承载 IP 数据包；IP 数据包又承载 TCP 段或 UDP 数据报。
 
 ```mermaid
@@ -649,8 +619,6 @@ Ethernet 帧通常包含目的 MAC、源 MAC、EtherType、载荷和帧校验序
 MTU 是链路一次能承载的最大网络层载荷。Ethernet 常见 MTU 为 1500 字节，但隧道封装会消耗额外空间。MTU 不匹配可能造成分片、丢包或“能 ping 小包但大请求卡住”的现象。
 
 ### Ethernet 帧由哪些字段组成
-<!-- src: temp/network/1.txt (Ch. 20.6 Ethernet Frame, EtherType, CRC and Sublayers) -->
-
 一个常见 Ethernet II 帧由前导码、帧起始定界符、目的 MAC、源 MAC、EtherType、载荷和帧校验序列组成。抓包软件通常从目的 MAC 开始展示，因为网卡硬件可能已经去掉前导码和 FCS。
 
 | 字段 | 常见长度 | 作用 |
@@ -673,8 +641,6 @@ MTU 是链路一次能承载的最大网络层载荷。Ethernet 常见 MTU 为 1
 CRC 能发现链路传输错误，但通常由网卡硬件生成和验证。校验失败的帧经常在进入操作系统抓包点之前就被丢弃，因此普通 tcpdump 未必看得到坏帧。
 
 ### MAC 地址、介质访问与交换机学习
-<!-- src: temp/network/1.txt (Ch. 20.3-20.6 MAC Addresses, Shared Medium, Multiple Access, Ethernet) -->
-
 MAC 地址通常是 48 位链路层地址，例如 `02:42:ac:11:00:02`。交换机学习每个源 MAC 来自哪个端口，并根据目的 MAC 转发帧。未知单播和广播会在广播域内泛洪。
 
 ```mermaid
@@ -704,8 +670,6 @@ VLAN 20  02:00:00:00:00:0c  Gi0/3
 MAC 表震荡通常意味着同一个源 MAC 在多个端口间快速移动，可能由二层环路、错误聚合或虚拟机迁移引起。
 
 ### ARP 如何把 IPv4 地址解析成 MAC 地址
-<!-- src: temp/network/1.txt (Ch. 21 ARP) -->
-
 ARP 用于在同一链路内把 IPv4 地址解析为 MAC 地址。发送方不知道目标 MAC 时广播 ARP Request，拥有目标 IP 的设备单播回复 ARP Reply，结果随后进入邻居缓存。
 
 ```mermaid
@@ -729,8 +693,6 @@ ip neigh get 192.168.10.1
 邻居条目会经历 `REACHABLE`、`STALE`、`DELAY`、`PROBE`、`FAILED` 等状态。ARP 缓存不是永久可信数据；地址迁移、虚拟 IP 漂移和重复地址都可能使缓存短暂过期或错误。
 
 ### ARP 报文、通告与地址冲突检测
-<!-- src: temp/network/1.txt (Ch. 21.4-21.6 ARP Structure, Request Response, Announcements and Probes) -->
-
 ARP 报文不是 IP 数据包，而是直接装在 Ethernet 帧中，EtherType 为 `0x0806`。它同时携带链路层地址和协议层地址。
 
 | 字段 | 含义 | Ethernet 与 IPv4 常见值 |
@@ -761,8 +723,6 @@ arping -U -I eth0 192.168.10.50
 ARP 没有认证，攻击者可能发送伪造绑定实施中间人攻击。静态邻居、交换机动态 ARP 检查和网络分段能降低风险，但需要结合环境权衡维护成本。
 
 ### IPv6 邻居发现如何替代 ARP
-<!-- src: temp/network/1.txt (Ch. 21.7 IPv6 and ARP) -->
-
 IPv6 不使用 ARP，而是在 ICMPv6 上实现邻居发现协议 NDP。NDP 不仅解析链路层地址，还承担路由器发现、前缀发现、邻居可达性检测和重复地址检测。
 
 | IPv4 机制 | IPv6 对应机制 |
@@ -775,8 +735,6 @@ IPv6 不使用 ARP，而是在 ICMPv6 上实现邻居发现协议 NDP。NDP 不�
 NDP 使用组播而不是广播。排查 IPv6 邻居问题时，除了 `ip -6 neigh`，还必须确认防火墙没有错误阻断必要的 ICMPv6；完全封禁 ICMPv6 会破坏 IPv6 的基本运行。
 
 ### 网卡、交换机与路由器分别工作在哪一层
-<!-- src: temp/network/1.txt (Ch. 24 Network Hardware) -->
-
 | 组件 | 主要层次 | 决策依据 | 作用域 |
 | --- | --- | --- | --- |
 | 网卡 | L1/L2 | 帧与接口配置 | 单台主机 |
@@ -789,8 +747,6 @@ NDP 使用组播而不是广播。排查 IPv6 邻居问题时，除了 `ip -6 ne
 真实设备常同时承担多个角色，例如家用路由器通常集成交换机、无线 AP、DHCP、DNS 转发、NAT 和防火墙。排障时应按实际数据路径拆开这些逻辑角色，而不是只看设备名称。
 
 ### 用 Packet Tracer 直连两台主机
-<!-- src: temp/network/1.txt (Ch. 25 Connect Two Computers; Ch. 41 Installing Packet Tracer) -->
-
 第一个实验只连接两台主机，用最小拓扑验证同网段通信。为 PC-A 配置 `192.168.10.10/24`，为 PC-B 配置 `192.168.10.20/24`，暂时不配置默认网关。
 
 ```mermaid
@@ -810,8 +766,6 @@ flowchart LR
 如果接口 Up 但 ping 失败，优先核对地址、掩码和两端是否处在同一网段。如果第一次 ping 丢一个包、之后成功，通常是等待 ARP 解析，不应直接判定链路不稳定。
 
 ### 用交换机和单台路由器连接局域网
-<!-- src: temp/network/1.txt (Ch. 26 Using a Switch; Ch. 27 Using a Router) -->
-
 先把三台 PC 接入交换机并配置同一 `/24`，验证交换机如何学习源 MAC。随后再增加第二个 LAN 和一台路由器，让两个广播域通过三层转发通信。
 
 ```text
@@ -856,8 +810,6 @@ PC-B  192.168.20.10/24  gateway 192.168.20.1
 这个实验最重要的不是得到 ping 成功，而是解释每一跳：主机怎样判断目标不在本地、如何解析网关 MAC、路由器怎样更换帧头并继续转发。
 
 ### 用多台路由器、默认网关和静态路由连接网段
-<!-- src: temp/network/1.txt (Ch. 28 Multiple Routers) -->
-
 增加路由器后，每台路由器只自动知道自己的直连网段。若要访问更远网段，必须配置静态路由、默认路由或动态路由协议。
 
 ```mermaid

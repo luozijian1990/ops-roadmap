@@ -3,8 +3,6 @@
 ## 第二册 · 传输、路由与网络服务
 
 ### TCP 如何用端口和连接提供可靠字节流
-<!-- src: temp/network/1.txt (Ch. 14.1-14.4 TCP Goals, Stack Location, Ports and Overview) -->
-
 IP 只负责尽力把数据包送向目标主机，TCP 则在两个进程之间建立面向连接的可靠字节流。它用端口区分主机上的不同进程，用序列号描述字节位置，并通过确认、重传和窗口控制处理丢包、乱序及接收能力差异。
 
 > **材料说明**：知识覆盖参考 Brian “Beej Jorgensen” Hall 的 *Beej's Guide to Network Concepts* v1.0.40。本文按运维与 SRE 学习路径进行原创重组，不是原书的逐章翻译；原作及其许可信息以 [官方页面](https://beej.us/guide/bgnet0/) 为准。
@@ -54,8 +52,6 @@ ss -nt state established
 这些能力必须由应用协议和状态管理补充。
 
 ### 序列号、确认与重传如何恢复顺序和完整性
-<!-- src: temp/network/1.txt (Ch. 14.4-14.5 Transmission, Packet Ordering and Error Detection) -->
-
 TCP 把字节编号。接收方通过 ACK 告诉发送方下一个期望字节，发送方在超时或收到重复 ACK 等信号后重传缺失数据。校验和用于发现传输错误，序列号用于恢复顺序和排除重复段。
 
 #### 用字节编号而不是用包编号
@@ -84,8 +80,6 @@ sequenceDiagram
 抓包分析时关注 `tcp.analysis.retransmission` 只是起点。还要判断抓包点是否漏包、重传前是否有重复 ACK、RTT 是否突然上升，以及丢包发生在哪个方向。
 
 ### 流量控制和拥塞控制解决了什么不同问题
-<!-- src: temp/network/1.txt (Ch. 14.6-14.7 Flow Control, Slow Start and Congestion Avoidance) -->
-
 流量控制与拥塞控制解决不同问题：
 
 | 机制 | 保护对象 | 主要信号 |
@@ -131,8 +125,6 @@ ss -tin dst 203.0.113.20
 Linux 的详细 Socket 信息可显示 RTT、拥塞窗口和重传等指标，但字段随内核版本和算法变化。
 
 ### 三次握手、数据传输与四次关闭
-<!-- src: temp/network/1.txt (Ch. 14.4.1-14.4.3 Connection, Transmission and Closing) -->
-
 三次握手让双方确认彼此可达并同步初始序列号。简化过程如下：
 
 ```mermaid
@@ -176,8 +168,6 @@ sequenceDiagram
 TIME_WAIT 通常由主动关闭方承担，持续约两个最大报文生存期。它防止旧报文污染后续同四元组连接，也保证最后 ACK 丢失时能再次响应 FIN。
 
 ### UDP 为什么选择简单而不保证可靠
-<!-- src: temp/network/1.txt (Ch. 15 User Datagram Protocol) -->
-
 UDP 是无连接的数据报协议。每个数据报保留消息边界，头部只包含源端口、目的端口、长度和校验和。它不负责握手、排序、重传、流量控制或拥塞控制。
 
 ```mermaid
@@ -193,8 +183,6 @@ flowchart LR
 常见用途包括 DNS 查询、语音视频、在线游戏、遥测，以及把可靠传输实现在用户态的 QUIC。
 
 ### TCP 与 UDP、MTU 和分片应该如何权衡
-<!-- src: temp/network/1.txt (Ch. 15.6-15.8 Maximum Payload, Uses and Datagram Sockets; Ch. 14 TCP) -->
-
 | 需求 | 更常见选择 | 原因 |
 | --- | --- | --- |
 | 文件、网页、数据库连接 | TCP | 需要可靠有序字节流 |
@@ -229,8 +217,6 @@ ping -M do -s 1472 -c 1 203.0.113.20
 若业务消息超过单个数据报，可在应用层增加消息 ID、分片编号、总分片数和超时。必须限制同时重组的消息数量与总内存，否则攻击者可以用不完整分片耗尽资源。
 
 ### Internet 校验和如何发现传输错误
-<!-- src: temp/network/1.txt (Ch. 16.3 Checksum in General) -->
-
 Internet 校验和把数据按 16 位字分组，使用反码加法累加，再对结果逐位取反。接收方重复计算并比较，用于发现传输中的常见位错误。
 
 TCP 校验不仅覆盖 TCP 头和数据，还包含由 IP 地址、协议号和 TCP 长度构成的伪首部。伪首部不会在线路上作为 TCP 数据发送，它把关键 IP 信息纳入校验，降低误投递未被发现的概率。
@@ -261,8 +247,6 @@ def add16(total: int, word: int) -> int:
 奇数字节载荷在计算时补一个零字节，但补位不属于实际数据。验证报文时，包含已填写校验和的全部字应得到全 1 结果。
 
 ### 用伪首部逐步验证 TCP 校验和
-<!-- src: temp/network/1.txt (Ch. 16.1-16.11 Validating a TCP Packet) -->
-
 TCP 伪首部把源 IPv4、目的 IPv4、零字节、协议号和 TCP 长度纳入校验。它不在线路上作为 TCP 头发送，只为校验计算临时拼接。
 
 ```text
@@ -299,8 +283,6 @@ def pseudo_header(src: str, dst: str, tcp_length: int) -> bytes:
 抓包中看到“checksum incorrect”不一定真是线上坏包。发送校验和卸载时，抓包点可能位于网卡填写校验和之前；接收卸载也可能改变观察方式。应结合抓包方向和网卡 offload 配置判断。
 
 ### 路由器如何根据路由表逐跳转发数据包
-<!-- src: temp/network/1.txt (Ch. 18.2-18.4 Routing Tables, Algorithm, Example) -->
-
 主机和路由器都通过路由表决定下一步。转发时通常执行以下流程：读取目的 IP、查找最佳匹配路由、确定出接口和下一跳、递减 TTL、重新构造链路层帧并发送。
 
 ```mermaid
@@ -347,8 +329,6 @@ ip neigh show
 普通主机默认可能关闭三层转发；路由器或容器宿主机需要明确启用并配合防火墙策略。
 
 ### 默认路由、最长前缀匹配与下一跳
-<!-- src: temp/network/1.txt (Ch. 18 IP Routing; Ch. 28.5-28.7 Default Gateways and Routing Tables) -->
-
 当多条路由都能匹配目的地址时，路由器选择前缀最长、也就是范围最具体的那一条。默认路由 `0.0.0.0/0` 能匹配所有 IPv4 地址，但只在没有更具体路由时使用。
 
 ```text
@@ -378,8 +358,6 @@ Linux 策略路由可以依据源地址、标记等条件选择不同路由表�
 一条路由可能只给出下一跳 IP，系统还需再次查表确定如何到达该下一跳。若递归结果指向错误接口或形成循环，目标前缀即使存在也不可用。
 
 ### IGP 与 BGP 如何在网络之间传播路径
-<!-- src: temp/network/1.txt (Ch. 18.1 Interior and Exterior Gateway Protocols) -->
-
 静态路由适合规模小、拓扑稳定的环境。网络扩大后，动态路由协议让路由器交换可达前缀，并在链路变化时重新计算路径。
 
 | 范围 | 类型 | 常见协议 | 关注点 |
@@ -406,8 +384,6 @@ BGP 选择依据包含本地策略、AS Path、下一跳等属性。企业可以
 | 数据面 | 流量是否真正按其转发 |
 
 ### TTL、广播地址与路由环路如何影响转发
-<!-- src: temp/network/1.txt (Ch. 18.5-18.6 Routing Loops, Time To Live and Broadcast Address) -->
-
 IPv4 的 TTL 和 IPv6 的 Hop Limit 都会在每经过一个路由器时减一。归零后路由器丢弃数据包，并通常发送 ICMP Time Exceeded。这样即使路由配置形成环路，包也不会永久循环。
 
 `traceroute` 正是利用逐步增加 TTL 来发现路径上的路由节点：
@@ -430,8 +406,6 @@ tracepath example.com
 广播只属于 IPv4 子网语义；IPv6 使用不同作用域的组播。把广播、组播和泛洪混为一谈会导致错误的容量与安全判断。
 
 ### 用 Dijkstra 算法理解最短路径路由
-<!-- src: temp/network/1.txt (Ch. 22 Routing with Dijkstra) -->
-
 Dijkstra 算法在边权非负的图中，从一个起点计算到其他节点的最短路径。链路状态路由协议可以把路由器看作节点、链路成本看作边权，然后构建最短路径树。
 
 ```mermaid
@@ -448,8 +422,6 @@ graph LR
 路由中的“成本”不一定等于跳数，可以依据带宽、管理员配置或其他度量。最短路径算法解释的是计算机制，实际协议还要处理邻居建立、数据库同步、收敛和等价多路径。
 
 ### 用 Python 实现最短路径计算实验
-<!-- src: temp/network/1.txt (Ch. 22.4-22.7 Dijkstra Implementation, Graph Representation and Examples) -->
-
 邻接表适合表示稀疏网络。每个节点映射到邻居和成本，优先队列用于快速取得当前距离最小的候选节点。
 
 ```python
@@ -490,8 +462,6 @@ assert distance["D"] == 4
 要恢复路径，从目标沿 `previous` 反向回溯到起点，再将结果翻转。实际链路状态协议还要处理拓扑数据库版本、老化和并发变化。
 
 ### DNS 如何把域名递归解析为地址
-<!-- src: temp/network/1.txt (Ch. 31.1-31.5 DNS Usage, Domains, Name Servers, Resolution Example) -->
-
 DNS 是分层、分布式命名系统。应用通常把查询交给递归解析器，解析器负责查询缓存，或沿根、顶级域和权威服务器逐级寻找答案。
 
 ```mermaid
@@ -514,8 +484,6 @@ sequenceDiagram
 客户端配置的 DNS 服务器通常是递归解析器，而不是所有域名的权威来源。把“DNS 服务器”笼统当作一个角色，会混淆递归、转发和权威托管问题。
 
 ### DNS 层级、Zone、Resolver、缓存与 TTL 如何协作
-<!-- src: temp/network/1.txt (Ch. 31.3-31.8 Name Servers, Root Servers, Zones, Caching) -->
-
 域名从右向左体现层级，例如 `api.prod.example.com` 的父域依次是 `prod.example.com`、`example.com` 和 `com`。区域是由某组权威服务器管理的一部分命名空间，不必等同于整个域。
 
 TTL 指示解析结果可以缓存多久。较长 TTL 降低查询压力并提高缓存命中，但变更传播更慢；较短 TTL 便于切换，却增加权威服务器和递归解析器负载。
@@ -547,8 +515,6 @@ dig +norecurse @203.0.113.53 example.com A
 SOA 中的序列号帮助辅助服务器判断区域是否更新。修改记录却忘记推进序列号，会让区域传送和缓存行为难以预测。
 
 ### DNS 记录、动态更新与反向解析分别解决什么问题
-<!-- src: temp/network/1.txt (Ch. 31.9-31.11 Record Types, Dynamic DNS, Reverse DNS) -->
-
 | 类型 | 用途 | 示例含义 |
 | --- | --- | --- |
 | `A` | 名称到 IPv4 | `api` 指向 IPv4 地址 |
@@ -578,8 +544,6 @@ dig _service._tcp.example.com SRV
 ```
 
 ### 用 dig 从递归查询追踪到权威服务器
-<!-- src: temp/network/1.txt (Ch. 34 Digging DNS Info) -->
-
 ```bash
 dig example.com A
 dig example.com AAAA
@@ -669,8 +633,6 @@ dig +noall +answer www.example.com A
 修改记录前先降低 TTL 只能影响尚未缓存或刷新后的记录；已经进入缓存的旧 TTL 不会被远程立即缩短。
 
 ### DHCP DORA 如何自动分配网络配置
-<!-- src: temp/network/1.txt (Ch. 6.6 Static versus Dynamic Addresses; Ch. 33.1 DHCP Operation) -->
-
 DHCP 可以下发 IP 地址、掩码、默认网关、DNS 服务器和租约时间等配置。典型 IPv4 交互称为 DORA：Discover、Offer、Request、Acknowledge。
 
 ```mermaid
@@ -705,8 +667,6 @@ sudo tcpdump -ni eth0 -vv 'udp port 67 or udp port 68'
 抓包时记录事务 ID、客户端 MAC、Requested IP、Server Identifier、租期、网关和 DNS 选项，才能确认响应是否属于同一次申请。
 
 ### DHCP 租约、续租与跨网段 Relay 如何工作
-<!-- src: temp/network/1.txt (Ch. 33 DHCP Operation and Reflection) -->
-
 租约不是永久配置。客户端通常在 T1 时尝试向原服务器单播续租，在 T2 时扩大为广播重绑定；租期结束仍未成功就必须停止使用地址。
 
 ```mermaid
@@ -732,8 +692,6 @@ DHCP 广播默认不能跨路由器。Relay 在客户端网段接收广播，转
 地址池利用率、租约冲突、错误 Option 和 Rogue DHCP 都应纳入监控。
 
 ### NAT 状态表如何转换地址与端口
-<!-- src: temp/network/1.txt (Ch. 32.1-32.5 NAT Motivation, Private Networks, Operation and IPv6) -->
-
 NAT 在网络边界修改 IP 地址，常见的源 NAT 会让多个私有地址共享一个公网地址。配合端口转换时，设备通过公网端口与内部四元组之间的状态映射区分连接。
 
 ```mermaid
@@ -768,8 +726,6 @@ nft list ruleset
 某些协议把 IP 或端口写进应用载荷，需要 ALG 或协议自身的 NAT 穿越机制。复杂 ALG 容易造成兼容和安全问题，现代协议更倾向显式代理或端到端加密。
 
 ### 端口转发和回程路径为什么必须成对检查
-<!-- src: temp/network/1.txt (Ch. 32.6 Port Forwarding) -->
-
 端口转发通常是目的 NAT：网关收到发往某个公网地址和端口的流量后，把目的地址改成内部服务地址。返回流量再依据连接状态做反向转换。
 
 ```text
@@ -815,8 +771,6 @@ flowchart LR
 5. 在 WAN 确认逆转换后的响应。
 
 ### 从浏览器输入域名到收到响应发生了什么
-<!-- src: temp/network/1.txt (Ch. 3 Client Connection Process; Ch. 14 TCP; Ch. 31 DNS; Ch. 32 NAT) -->
-
 一次网页访问把本册的知识串在一起：
 
 1. 浏览器和操作系统检查 DNS 缓存，并向递归解析器查询地址。

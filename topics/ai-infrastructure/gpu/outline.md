@@ -99,7 +99,7 @@
 ## 编辑和发布约束
 
 - 每篇只保留一个 H1；H2 是章节，H3 是 Roadmap 学习节点，H4 是节点内部知识点。
-- 每个 H3 后紧跟独占一行的 `<!-- src: ... -->`，并保留实际存在的本地来源映射。
+- 每个 H3 后保留必要的来源说明，但不要把内部来源路径暴露到最终笔记。
 - H2 与第一个 H3 之间不放正文，避免 Roadmap Parser 丢失内容。
 - 每篇控制在 5,000 行以内；后续修订优先消除同篇重复，而不是再次拆分分册。
 - Slurm、Storage、Inference、Virtualization、RAS、Benchmark、SRE 和 Distributed Runtime 不再恢复为独立文档。

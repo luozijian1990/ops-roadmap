@@ -3,8 +3,6 @@
 ## 第三册 · Socket、安全与排障实战
 
 ### Socket API 如何连接应用程序与协议栈
-<!-- src: temp/network/1.txt (Ch. 2.4 OS, Network Programming, Sockets; Ch. 3 Introducing The Sockets API) -->
-
 Socket 是应用访问操作系统网络协议栈的编程接口。应用通过文件描述符执行创建、绑定、监听、连接、收发和关闭等操作；操作系统负责 TCP 状态、IP 路由、邻居解析以及网卡队列。
 
 > **材料说明**：知识覆盖参考 Brian “Beej Jorgensen” Hall 的 *Beej's Guide to Network Concepts* v1.0.40。本文按运维与 SRE 学习路径进行原创重组，不是原书的逐章翻译；原作及其许可信息以 [官方页面](https://beej.us/guide/bgnet0/) 为准。
@@ -62,8 +60,6 @@ sock.setblocking(False)
 后一次调用会覆盖前面的阻塞模式。生产代码应在接口层统一约定，避免某个辅助函数悄悄改变共享 Socket 状态。
 
 ### TCP 客户端如何解析地址、建立连接并收发数据
-<!-- src: temp/network/1.txt (Ch. 3.1 Client Connection Process; Ch. 5.4 HTTP Client) -->
-
 客户端通常先解析服务名，再依次尝试返回的地址。`socket.create_connection` 会替我们完成常见的解析和连接步骤：
 
 ```python
@@ -121,8 +117,6 @@ def connect_any(host: str, port: int, timeout: float = 5):
 连接超时可以在有限次数内退避重试；连接拒绝通常表示目标明确拒绝，盲目高频重试只会放大负载。非幂等业务在收到响应前断线时，客户端无法仅凭 TCP 判断服务器是否已执行操作。
 
 ### TCP 服务端如何绑定、监听并接受连接
-<!-- src: temp/network/1.txt (Ch. 3.2 Server Listening Process) -->
-
 TCP 服务端的基本流程是 `socket`、`bind`、`listen`、`accept`。监听 Socket 只负责接受连接，`accept` 返回的新 Socket 才负责与特定客户端通信。
 
 ```python
@@ -165,8 +159,6 @@ lsof -nP -iTCP:9000 -sTCP:LISTEN
 ```
 
 ### UDP Socket 如何收发独立数据报
-<!-- src: temp/network/1.txt (Ch. 15.8 UDP Datagram Sockets) -->
-
 UDP 服务端使用 `recvfrom` 同时获得数据和来源地址，回复时用 `sendto` 指定目标。每次读取对应一个数据报；接收缓冲区太小时，超出部分会被截断，而不是留给下次读取。
 
 ```python
@@ -200,8 +192,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
 无响应可能是服务未回复、请求或响应丢失、防火墙丢弃，也可能是目标不存在。ICMP Port Unreachable 有时会被传回 Socket，但中间设备不保证发送或转发它。
 
 ### select 如何管理可读、可写、监听与超时事件
-<!-- src: temp/network/1.txt (Ch. 29 Select) -->
-
 阻塞式 `recv` 会让线程等待一个连接。`select` 可以同时观察多个文件描述符是否可读、可写或异常，从而用一个事件循环管理多个连接。
 
 ```python
@@ -251,8 +241,6 @@ if not events:
 超时可以驱动心跳、空闲连接清理和指标上报，但不要用大量线性扫描拖慢每次循环。连接多时应使用按到期时间组织的数据结构。
 
 ### 用 select 构建多客户端事件循环
-<!-- src: temp/network/1.txt (Ch. 30 Project Using Select) -->
-
 每个连接需要独立状态，至少包含输入缓冲、输出缓冲、最后活动时间和协议解析阶段。
 
 ```python
@@ -288,8 +276,6 @@ stateDiagram-v2
 公平性很重要。单个连接一次产生大量事件时，应限制每轮处理量，让其他连接也有机会运行。
 
 ### 线程的启动、共享状态与执行顺序有什么风险
-<!-- src: temp/network/1.txt (Ch. 42.1-42.2 Thread Concepts and Python Multithreading) -->
-
 线程模型直观：主线程接受连接，再由工作线程处理客户端。但并发会引入共享状态竞争、线程泄漏、锁顺序、阻塞调用和无界资源消耗等问题。
 
 ```mermaid
@@ -330,8 +316,6 @@ for thread in threads:
 输出顺序不确定，代码不能依赖“线程按创建顺序运行”。共享可变对象需要锁、队列或所有权约束；只读数据更容易安全共享。
 
 ### daemon、join 与线程练习如何管理生命周期
-<!-- src: temp/network/1.txt (Ch. 42.3-42.5 Daemon Threads, CTRL C and Threading Project) -->
-
 进程退出时不会等待 daemon 线程完成，它们可能在清理、刷新文件或发送消息中途被终止。daemon 适合“主流程结束后无需保证完成”的辅助任务，不适合承载必须持久化的关键工作。
 
 ```python
@@ -378,8 +362,6 @@ def range_sum(index, start, end, result):
 - 记录未完成任务并释放资源。
 
 ### Python 字符串、字符编码与网络字节如何转换
-<!-- src: temp/network/1.txt (Ch. 5.2 Python Character Encoding) -->
-
 Socket 只发送 `bytes`，Python 文本使用 `str`。编码把字符转换成字节，解码把字节按约定还原为字符；双方编码不一致会产生乱码或解码错误。
 
 ```python
@@ -407,8 +389,6 @@ assert len(body) == 6
 不要先按字符截断再假设字节长度不变。流式解码还要处理一个多字节字符被拆到两次 `recv` 的情况，可以使用增量解码器或等完整消息到齐再解码。
 
 ### 用原生 Socket 编写最小 HTTP 客户端和服务端
-<!-- src: temp/network/1.txt (Ch. 5.1-5.5 HTTP Client and Server Project) -->
-
 HTTP/1.1 消息由起始行、Header、空行和可选 Body 组成，行结束符是 `\r\n`。下面的服务端只用于观察协议，不适合公网部署：
 
 ```python
@@ -461,8 +441,6 @@ python webclient.py example.com 8080
 浏览器发起第二个连接不一定是程序错误，可能是请求 `/favicon.ico`。服务端日志应打印对端地址、方法和路径帮助判断。
 
 ### 如何解释 HTTP 重定向、客户端错误和服务端错误
-<!-- src: temp/network/1.txt (Ch. 5.6 HTTP 301, 302, 400, 404 and 500 Responses) -->
-
 状态码分组表达处理结果：2xx 成功，3xx 需要进一步动作，4xx 表示请求侧问题，5xx 表示服务端处理失败。
 
 | 状态 | 含义 | 客户端下一步 |
@@ -497,8 +475,6 @@ curl -v -L --max-redirs 5 http://example.com/
 ```
 
 ### 静态文件服务端如何解析请求、MIME 和 Content Length
-<!-- src: temp/network/1.txt (Ch. 9.1-9.7 Better Web Server Project) -->
-
 静态文件服务大致经历：读取完整 Header、解析请求行、验证方法、规范化路径、确定 MIME 类型、读取文件、生成 `Content-Length` 并发送响应。
 
 ```mermaid
@@ -548,8 +524,6 @@ content_length = len(body)
 文件必须以二进制读取，否则换行转换和字符编码可能让实际发送字节数与 Content-Length 不一致。
 
 ### 如何限制文件路径、返回 404 并安全扩展服务端
-<!-- src: temp/network/1.txt (Ch. 9.5 Path Stripping; Ch. 9.7-9.8 Not Found and Extensions) -->
-
 简单实验可以只取路径最后一段，但更真实的实现需要允许根目录内的子路径，同时拒绝逃逸。
 
 ```python
@@ -593,8 +567,6 @@ Connection: close
 每一步先写非法路径、缺失文件和半包测试，再增加能力。
 
 ### 如何正确处理偏移量、半包与多个消息
-<!-- src: temp/network/1.txt (Ch. 5.6.2 Receiving Partial Data; Ch. 11 Parsing Packets; Ch. 13 The Word Server) -->
-
 接收循环应把新字节追加到缓冲区，再反复解析其中所有完整消息，最后保留不完整尾部。解析函数最好返回“消息”和“剩余缓冲区”，避免把读取和协议解析耦合。
 
 ```python
@@ -618,8 +590,6 @@ def extract_frames(buffer: bytearray):
 测试至少覆盖：只有部分长度头、长度头完整但 Body 不完整、一次收到多帧、消息刚好到上限、长度超过上限、对端在半帧时关闭。
 
 ### 用 Atomic Time 实验解码固定长度二进制协议
-<!-- src: temp/network/1.txt (Ch. 12 Project Atomic Time) -->
-
 固定长度协议适合用来练习“精确读取 N 字节”和网络字节序。读取函数必须循环，因为一次 `recv(n)` 仍可能少于 n：
 
 ```python
@@ -664,8 +634,6 @@ print("local ", int(time.time()))
 不同时间协议可能从 1900、1970 或其他日期计数。32 位秒数还会回绕，长期运行系统必须明确时代编号或升级字段宽度。
 
 ### 用 Word Server 实验实现长度前缀和流式拆包
-<!-- src: temp/network/1.txt (Ch. 13 Project The Word Server) -->
-
 Word Server 把每个单词封装为消息，训练从 TCP 字节流中连续提取包。可以设计两字节大端长度，后接 UTF-8 单词字节。
 
 ```text
@@ -696,8 +664,6 @@ def extract_word(buffer: bytearray):
 测试时把同一字节流按每 1 字节、随机长度和一次全部三种方式喂给解析器，结果必须一致。还要测试空单词、非法 UTF-8、超长声明和半包 EOF。
 
 ### JSON 与 Python 对象如何编码、解码和验证
-<!-- src: temp/network/1.txt (Ch. 43 JSON; Ch. 39.5 JSON Payloads) -->
-
 JSON 解决消息内容的结构表达，不解决 TCP 消息边界。常见做法是在 JSON 前加长度，或规定每行一个 JSON 对象。
 
 ```python
@@ -750,8 +716,6 @@ if decoded.get("type") not in {"hello", "chat", "join", "leave"}:
 Pretty Print 适合日志和调试，线上帧可使用紧凑分隔符。日志仍应限制长度并脱敏，不能把令牌和私人消息完整打印。
 
 ### 多用户聊天室的客户端和服务端如何协作
-<!-- src: temp/network/1.txt (Ch. 39.1-39.3 Chat Architecture, Client IO and TUI) -->
-
 聊天室是综合练习：服务端管理多个连接，客户端同时处理终端输入与服务器消息，协议区分加入、聊天、离开和错误事件。
 
 ```mermaid
@@ -787,8 +751,6 @@ buffers = {}
 特殊命令 `/q` 应在本地触发退出，不发送普通聊天消息。退出流程要关闭 Socket，使接收线程从阻塞读取中醒来。
 
 ### Hello、Chat、Join 与 Leave 消息如何设计
-<!-- src: temp/network/1.txt (Ch. 39.4-39.5 Packet Structure and JSON Payload Types) -->
-
 原文协议使用两字节大端长度和 UTF-8 JSON 载荷。长度只覆盖 JSON 字节，不包含两字节头。
 
 ```text
@@ -831,8 +793,6 @@ stateDiagram-v2
 字段验证包括昵称和消息长度、字符范围、必填键、未知键策略及版本。广播前仍要进行服务端授权和速率限制。
 
 ### 每连接缓冲区、并发接收与断线清理如何实现
-<!-- src: temp/network/1.txt (Ch. 39.6-39.7 Chat Extensions and Recommendations; Ch. 42 Multithreading) -->
-
 TCP 接收缓冲必须按连接隔离。把所有客户端字节追加到同一个全局缓冲会混合不同会话，造成数据泄漏和协议损坏。
 
 ```python
@@ -865,8 +825,6 @@ def on_readable(sock):
 扩展直接消息、房间和在线列表时，应新增消息类型，而不是在 chat 文本里塞特殊字符串；协议结构化后才容易验证和演进。
 
 ### Wireshark 如何逐字段验证 ARP 请求与响应
-<!-- src: temp/network/1.txt (Ch. 23 Sniff ARP Packets with Wireshark) -->
-
 先清理或等待邻居缓存失效，再向同网段目标发送流量，才能稳定观察 ARP。Linux 可结合命令行抓包：
 
 ```bash
@@ -899,8 +857,6 @@ sudo tcpdump -eni eth0 -c 10 arp
 若收到 Reply 但邻居仍 FAILED，应检查响应目标、重复地址、接口命名空间以及安全策略，而不是只重复发送 arping。
 
 ### TCP 与 UDP 端口扫描能发现什么
-<!-- src: temp/network/1.txt (Ch. 35 Port Scanning; Ch. 38 Port Scanning Project) -->
-
 TCP connect 扫描尝试完成操作系统的连接过程：成功通常表示端口有服务且路径允许；立即收到 RST 通常表示端口关闭；超时可能表示丢包、防火墙丢弃、目标不可达或返回路径异常。
 
 ```python
@@ -944,8 +900,6 @@ with ThreadPoolExecutor(max_workers=32) as pool:
 并发数、每次超时和目标数量共同决定扫描压力。记录扫描源、时间、参数和授权单，结果才能用于审计和复现。
 
 ### 防火墙如何与连接状态和 NAT 协同过滤流量
-<!-- src: temp/network/1.txt (Ch. 36 Firewalls) -->
-
 无状态防火墙逐包匹配地址、协议和端口；有状态防火墙还跟踪连接，能区分新建连接和已建立连接的返回流量。主机防火墙保护单机，网络防火墙保护多个网段，云安全组则在虚拟网络边界实施规则。
 
 ```mermaid
@@ -993,8 +947,6 @@ Trace 可能产生大量输出，只应在受控条件下加精确过滤。远�
 - 定期清理临时规则和失效对象。
 
 ### 缓冲区越界和资源耗尽为什么来自不可信输入
-<!-- src: temp/network/1.txt (Ch. 37.1 Buffer Overflow and Overrun) -->
-
 网络输入由不受信任的对端控制。攻击者可以发送超长字段、非法编码、重复消息、极慢数据、恶意路径、注入字符串或精心构造的二进制长度。
 
 安全解析的基本原则：
@@ -1039,8 +991,6 @@ if len(header_buffer) > MAX_HEADER:
 超时最好使用单调时钟计算截止时间，避免系统时间跳变延长限制。
 
 ### 命令注入、SQL 注入与 XSS 应该如何防御
-<!-- src: temp/network/1.txt (Ch. 37.2 Command Injection, SQL Injection and Cross Site Scripting) -->
-
 注入的共同根因是把不可信数据拼进另一种语言，让数据被解释成指令。不同解释器需要不同的结构化 API，不能依赖一个通用“过滤特殊字符”函数。
 
 #### 命令注入
@@ -1091,8 +1041,6 @@ cursor.execute(
 安全是协议设计和资源治理的一部分，不能等功能完成后再补。
 
 ### 用分层思路定位连接失败与请求异常
-<!-- src: temp/network/1.txt (Ch. 3 Sockets API; Ch. 5.6 HTTP Hints; Ch. 18 IP Routing; Ch. 31 DNS; Ch. 36 Firewalls) -->
-
 排障应从明确现象开始：哪个客户端、访问哪个名称和端口、何时开始、稳定还是间歇、具体错误和超时时间是什么。然后沿数据路径逐层收集证据。
 
 | 层次 | 核心问题 | 常用检查 |
@@ -1145,8 +1093,6 @@ sudo tcpdump -ni any -w server.pcap 'host 192.0.2.10 and port 443'
 抓包包含业务数据和凭据风险，应限制时长、过滤范围、访问权限与保存周期。
 
 ### 建立一套从地址到应用的网络排障清单
-<!-- src: temp/network/1.txt (Ch. 23 Wireshark; Ch. 25-28 Packet Tracer; Ch. 34 dig; Ch. 35 Port Scanning) -->
-
 下面是一套可重复执行的只读优先检查顺序：
 
 ```bash
