@@ -953,3 +953,42 @@ bridge fdb show 2>/dev/null
 - 用抓包证明 MAC 逐跳变化而端到端 IP 通常不变。
 
 完成本册后，应能画出任意一次局域网通信中 IP 包与 Ethernet 帧的封装关系，并手工判断目标走直连还是默认网关。下一册将在此基础上讨论 TCP、UDP、路由算法以及 DNS、DHCP、NAT 等网络服务。
+
+### TCP Stream、五元组与抓包中的分层术语
+
+抓包分析需要先把同一通信的身份和层次固定下来。五元组是源 IP、目的 IP、传输层协议、源端口和目的端口；它通常足以把 TCP 流与其他并发连接区分开，但 NAT、代理和负载均衡会在不同观察点改写其中字段。
+
+| 抓包字段 | 所在层 | 排障用途 |
+| --- | --- | --- |
+| MAC、EtherType | 链路层 | 判断本地链路和下一跳 |
+| 源/目的 IP、TTL、分片字段 | 网络层 | 判断路径、转发和 MTU |
+| 端口、SYN/ACK、序列号 | 传输层 | 识别连接、可靠性和方向 |
+| TLS、HTTP、DNS 载荷 | 应用/会话层 | 判断协商、请求和响应 |
+
+Wireshark 的 `tcp.stream` 是基于抓包内容建立的本地编号，不是协议字段，也不应跨文件直接比较。先用五元组和时间范围缩小候选，再用 Follow Stream 查看一个连接的双向顺序。
+
+```bash
+# 在客户端观察点，仅保留目标四层流量并限制采集时长
+sudo timeout 30 tcpdump -ni any -s 128 -w client.pcap \
+  'host 203.0.113.20 and tcp port 443'
+```
+
+抓包点只代表该接口能看到的方向。交换机未做镜像时，普通主机看不到其他端口的单播；虚拟网卡、隧道和 NAT 也可能让同一报文在不同点拥有不同的 MAC 或 IP。结论必须写明观察点和时间窗口。
+
+### 分段、MSS、IP 分片与 TSO 如何影响抓包
+
+TCP 分段发生在传输层，依据 MSS 把字节流拆成多个 TCP 段；IP 分片发生在网络层，把一个 IP 包拆成多个片。MSS 通常由端点根据接口或路径 MTU 计算并在握手中通告；接收窗口是独立的流量控制量，不能把 MSS 等同于链路 MTU。
+
+| 现象 | 可能解释 | 首项证据 |
+| --- | --- | --- |
+| 小包探测成功，大请求卡住 | PMTUD 黑洞、隧道 MTU 或防火墙阻断 ICMP | `tracepath`、DF/Packet Too Big、双端抓包 |
+| 抓包看到超大 TCP 段 | TSO/GSO 在主机抓包点尚未卸载 | 网卡 offload 设置、线上接口抓包 |
+| 大 UDP 报文出现多个片 | IPv4 分片 | Identification、Fragment Offset、MF |
+
+```bash
+ip link show dev eth0
+tracepath 203.0.113.20
+ping -M do -s 1400 -c 3 203.0.113.20
+```
+
+主机抓包可能发生在网卡卸载之前或之后，Wireshark 的“TCP segment of a reassembled PDU”和重传标记因此只能作为线索。需要时在发送端、接收端或镜像链路同时采集，并记录 MTU、封装层和 offload 状态。修改 MTU 前先准备回滚，验证时比较大包成功率、重传和应用延迟。

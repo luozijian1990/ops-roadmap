@@ -887,3 +887,89 @@ HTTPS 抓包通常看不到 HTTP 正文，但仍能观察 DNS、握手、TLS Ale
 10. NAT 为什么要求返回流量命中同一状态边界？
 
 能用一张时序图把 DNS、路由、ARP、NAT、TCP、TLS 与 HTTP 连起来，才算真正掌握了这些看似分散的协议。
+
+### 握手失败、SYN 重传与 RST 应该如何建立证据矩阵
+
+先把客户端和服务端的同一时间窗口对齐，再按包级现象建立假设：
+
+| 现象 | 首要假设 | 不能单凭它证明 |
+| --- | --- | --- |
+| SYN 重传且无响应 | 静默丢弃、路径或回程故障 | 具体是哪一台设备丢弃 |
+| SYN 后立即 RST | 端口未监听或策略主动拒绝 | 应用是否已收到业务数据 |
+| 服务端有 SYN ACK，客户端没有 | 回程丢失、客户端策略或抓包点遗漏 | 服务端一定对公网可达 |
+| 三次握手完成后立即 RST | 应用拒绝、协议不符或进程退出 | 是网络设备还是应用发送 RST |
+
+```bash
+sudo timeout 20 tcpdump -ni any -tttt -s 128 -w handshake.pcap \
+  'host 203.0.113.20 and tcp port 443'
+ss -nt state syn-sent '( dport = :443 )'
+```
+
+客户端和服务端抓包都出现 SYN，才能把问题边界缩到更靠后的阶段。若只在一个观察点看到包，要考虑镜像丢包、过滤条件、时间不同步和握手包未被纳入文件。验证时用相同源地址、端口和超时重现，并保留成功与失败样本作对照。
+
+### FIN、RST 与 connection reset 的协议和业务语义
+
+FIN 表示一个方向没有更多字节，连接仍可在另一方向传输；RST 是立即终止状态的信号，可能由内核、应用或中间设备产生。日志中的 `connection reset by peer` 只说明本地 Socket 收到了复位，不能直接等同于“远端进程崩溃”。
+
+排查时记录 RST 的发送方向、序列号是否落在有效窗口、前后是否有 FIN，以及应用日志中的关闭原因。Wireshark 的 Expert Information 可能因重排、缺包或卸载产生启发式提示，必须回到原始序列号和双端时间线复核。
+
+#### FIN/RST 最小时间线
+
+```text
+主动方 -> 被动方  FIN, seq=u
+被动方 -> 主动方  ACK, ack=u+1
+被动方 -> 主动方  FIN, seq=v
+主动方 -> 被动方  ACK, ack=v+1
+```
+
+若抓包缺少第一个 FIN，分析器可能把后续 FIN 显示成连接的起始关闭；若 RST 的序列号不在有效窗口，也不能仅凭颜色标记断定它终止了该流。将相对序列号切换为裸序列号，并检查抓包文件的起始时间，能减少这种误判。
+
+### TCP keepalive、应用心跳与 HTTP keep-alive 如何区分
+
+TCP keepalive 是内核在连接空闲时发送的探测；应用心跳是协议消息，通常携带请求 ID、租约或业务状态；HTTP keep-alive 只是复用同一 TCP 连接的策略。三者的间隔、超时和故障语义不同，不能互相替代。
+
+```bash
+ss -tin dst 203.0.113.20
+sysctl net.ipv4.tcp_keepalive_time net.ipv4.tcp_keepalive_intvl net.ipv4.tcp_keepalive_probes
+```
+
+若心跳超时导致应用重启，先在客户端和服务端核对心跳是否发出、是否到达、响应是否返回，再检查中间设备的空闲连接回收。验证应模拟静默、单向阻断和进程暂停三种场景，确保重连退避和幂等处理不会形成重启风暴。
+
+### 重传、窗口、拥塞与 MTU 如何组成 TCP 性能诊断链
+
+性能下降的现象可能是吞吐低、RTT 增大、重传升高、零窗口或 MSS 异常。按时间线同时记录 `ss -tin`、抓包和应用耗时，才能区分发送端拥塞窗口、接收端通告窗口、路径 MTU 和应用读取速度。
+
+```bash
+ss -tin dst 203.0.113.20
+sudo tcpdump -ni any -tt -s 128 -w performance.pcap \
+  'host 203.0.113.20 and tcp'
+```
+
+`tcp.analysis.retransmission`、`tcp.analysis.fast_retransmission` 和 `tcp.analysis.spurious_retransmission` 都是分析器推断。抓包点漏掉原始段、ACK 延迟、TSO/GRO 或时间戳异常都可能造成误判。修复后应使用相同负载和观察窗口比较 RTT、重传率、窗口和有效吞吐，而不是只看一次请求是否成功。
+
+### TLS 握手失败如何沿版本、SNI、证书与密码套件排查
+
+TLS 失败应先确定 TCP 已完成握手，再区分 ClientHello 未到达、服务端返回 Alert、证书验证失败和应用主动关闭。SNI 缺失可能命中默认虚拟主机；版本或密码套件不交集会在协商阶段失败；证书链、主机名和系统时间问题通常在客户端验证阶段暴露。
+
+```bash
+openssl s_client -connect 203.0.113.20:443 \
+  -servername example.com -brief -timeout 5 </dev/null
+```
+
+抓包可看到版本、SNI、ALPN、Alert 方向和时间间隔，但加密后的 HTTP 内容不可见。将 `openssl` 输出、服务端 TLS 日志和双端抓包按时间关联；不要为了“看明文”在生产环境导出私钥或绕过证书校验。修复后同时验证正确 SNI、错误 SNI、过期证书和不支持版本等对照路径。
+
+#### TLS 证书链的可验证证据
+
+仅看到“证书错误”不足以判断是过期、主机名不匹配还是中间证书缺失。保留服务端发送的完整链、客户端使用的信任库和系统时间，再比较不同客户端的验证结果：
+
+```bash
+openssl s_client -connect 203.0.113.20:443 -servername example.com \
+  -showcerts -verify_return_error </dev/null
+date -u
+```
+
+`-showcerts` 展示服务端实际发送的链，不能证明客户端信任该链；客户端还需检查本地 CA store、主机名和有效期。不同 OpenSSL 版本的选项和默认信任库可能不同，命令输出应记录版本和退出状态。
+
+#### 传输性能的判定边界
+
+RTO 重传通常伴随计时器到期，快速重传通常伴随重复 ACK 或 SACK 缺口；两者都可能因 ACK 丢失、抓包漏包或接收端延迟确认而出现。使用 `ss -tin` 的 RTT、重传计数和拥塞窗口作主机侧证据，再用序列号时间线验证分析器标记。
