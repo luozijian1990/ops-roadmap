@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Python 运维自动化与工程实践 · 第四册：运维工具架构 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Python 运维自动化与工程实践 · 第四册：运维工具架构</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Python 运维自动化与工程实践 · 第四册：运维工具架构", "intro": "", "parts": [{"title": "第十四章 · 脚本越写越大时，先判断它到底要长成什么", "sections": [{"title": "哪些信号说明一次性脚本已经不该继续往下堆？", "content": "脚本变长不是拆系统的充分条件。\n真正需要演进的是职责、状态、运行时和协作边界开始互相冲突。\n\n以下信号值得停下来设计：\n\n- 同一逻辑被 CLI、定时任务和 Web 请求重复复制。\n- 一次执行超过调用方允许的请求时间。\n- 任务需要重试、排队、暂停、恢复和查询进度。\n- 多人同时操作产生覆盖或重复副作用。\n- 失败后无法知道进行到哪一步。\n- 权限、审计和 Secret 不能再靠单机文件满足。\n- 部署频率、扩缩容方式或依赖与主应用不同。\n\n#### 先画当前执行路径\n\n```text\n用户/CI\n  -> ops-check CLI\n     -> 读取配置\n     -> 查询资产 API\n     -> 并发巡检\n     -> 写报告\n     -> 返回退出码\n```\n\n如果这个流程在几十秒内完成、单用户执行、状态只需本地报告，保持 CLI 往往最好。\n不要因为可能将来有页面，就提前引入数据库、消息队列和多个服务。\n\n#### 用变化原因寻找模块边界\n\n配置解析因为格式变化，探针因为协议变化，报告因为消费者变化。\n让不同变化原因进入不同模块，就能先做进程内模块化，不必马上分布式化。\n\n#### 量化问题而不是使用形容词\n\n```text\n目标数：500 -> 20,000\n单目标 P95：0.3s\n允许并发：50\n任务截止时间：10min\n允许重复副作用：0\n结果保留：90d\n同时提交者：20\n```\n\n有了规模、可靠性和合规约束，组件选择才有依据。\n\n#### 本节练习\n\n对现有脚本填写一张演进卡：触发问题、当前证据、目标指标、最小改动、验证方式和回退方案。\n如果只能写“更专业”“以后扩展”，先不拆。", "subs": ["先画当前执行路径", "用变化原因寻找模块边界", "量化问题而不是使用形容词", "本节练习"]}, {"title": "CLI、Backend、Worker、Scheduler 和 Agent 可以怎样组合？", "content": "```mermaid\nflowchart LR\n    A[CLI 或用户] --> B[Backend]\n    B --> C[任务事实源]\n    C --> D[Worker]\n    E[Scheduler] --> B\n    D --> F[受管系统]\n    G[Agent] --> B\n```\n\n这不是推荐的默认全家桶，而是一张职责地图。最小方案可以只有 CLI；只有真实约束出现后，才沿箭头增加入口、持久状态或异步执行。\n\n这些名称代表运行职责，不是必须全部购买的套餐。\n\n| 组件 | 主要职责 | 典型触发 |\n| --- | --- | --- |\n| CLI | 人工与流水线入口 | 即时执行、可等待 |\n| Backend | 鉴权、接收请求、查询状态 | 多用户、需要 API/UI |\n| Worker | 执行长任务和重试 | 请求时间短于任务时间 |\n| Scheduler | 按时间创建任务 | 周期巡检、补偿任务 |\n| Agent | 靠近目标执行与采集 | 网络隔离、主机本地能力 |\n\n#### 从最小组合开始\n\n```text\n阶段 A：CLI -> 目标\n阶段 B：CLI -> Backend -> 目标\n阶段 C：CLI/UI -> Backend -> Queue -> Worker -> 目标\n阶段 D：Scheduler ---------> Queue -> Worker\n阶段 E：Backend/Worker <--------------> Agent\n```\n\n阶段不是成熟度排名。\n若 CLI 已满足可靠性，停在 A 是正确选择。\n\n#### Backend 不应亲自跑所有长任务\n\nHTTP 请求通常有网关超时和并发上限。\nBackend 接收任务、校验权限、生成 operation ID、持久化意图并快速返回；Worker 执行并更新状态。\n\n```json\n{\n  \"operation_id\": \"op-123\",\n  \"state\": \"queued\",\n  \"status_url\": \"/operations/op-123\"\n}\n```\n\n#### Scheduler 只负责触发，不复制业务逻辑\n\n定时器创建与人工入口相同的任务命令，业务规则由 Worker 共用。\n否则“手工运行”和“夜间运行”会逐渐产生不同版本。\n\n#### Agent 增加的是治理面\n\nAgent 需要注册、身份、升级、心跳、兼容、资源限制、离线缓存和卸载。\n仅为了执行一个 SSH 命令，不一定值得在每台主机常驻进程。\n\n#### 本节练习\n\n为三种场景选择最小组合：单人每周巡检 100 台、多团队提交耗时 30 分钟的变更、隔离网络中 10,000 台主机采集指标。\n写出不选其他组件的证据和未来触发条件。\n\n#### 组件选择工作台：先证明需要，再承担长期成本\n\n组件选型不是把候选能力全部装进系统，而是为当前约束选择最小组合。\n每个候选都从触发信号、最小职责、失败模式、验证证据和移除条件五个角度评审；任何一项答不出来，都先标记为待验证。\n\n| 组件 | 真实触发信号 | 最小职责 | 首要风险 | 暂缓条件 |\n| --- | --- | --- | --- | --- |\n| CLI | 人工或流水线需要稳定入口 | 参数 输出 退出码 | 长任务占用调用方 | 只有库内函数调用 |\n| Backend | 多用户提交和查询状态 | 鉴权 接单 查询 | 同步执行拖垮请求 | 单用户同步任务足够 |\n| Worker | 任务需脱离请求恢复 | 领取 执行 提交 | 重复执行和失租 | 任务能在请求预算内结束 |\n| Scheduler | 明确存在周期触发 | 只创建 operation | 重复触发和时区错误 | 已有平台调度可复用 |\n| Agent | 必须在目标本地执行 | 身份 心跳 有界执行 | 权限与升级面扩大 | 远程 API 已满足需求 |\n| 数据库任务表 | 需要持久状态与抢占 | 事实源 状态机 租约 | 热点和迁移复杂度 | 文件或同步结果已足够 |\n| 消息队列 | 数据库轮询已达瓶颈 | 通知 削峰 重投 | 积压与重复语义 | 没有吞吐证据 |\n| 幂等层 | 重试可能重复副作用 | 业务键 去重 对账 | 错误键误合并请求 | 操作天然只读 |\n| 生命周期管理 | 进程承接在途任务 | 就绪 排空 截止退出 | 清理无限等待 | 一次性短命令 |\n| 可观测与审计 | 需要排障与追责 | 事件 指标 操作证据 | 高基数和敏感泄露 | 不能定义处置动作 |\n| Python 运行时 | SDK 与交付速度优先 | 控制面和数据编排 | 分发与 CPU 上限 | 目标只有极小运行时 |\n| Go 运行时 | 常驻分发与资源预算明确 | Agent 或高并发服务 | 双语言维护成本 | 没有基准和长期 owner |\n\n**CLI：保留同步契约**\n\n采用前先量化单次任务时长和调用者能等待多久。\n最小方案只包含参数解析、稳定 stdout、诊断 stderr、退出码和 dry-run；不要在 CLI 进程里悄悄启动无人管理的后台线程。\n\n验证至少覆盖：\n\n- 未知参数在副作用前退出。\n- 非交互环境绝不等待确认。\n- 部分失败有稳定退出码和完整性字段。\n- SIGINT 后有限收尾且不留下子进程。\n- 从安装产物而非源码目录调用入口。\n\n若任务经常超过调用方超时或需要断线续查，保留 CLI 作为客户端，把执行迁到持久任务系统。\n\n**Backend：只接单和查询，不吞下长任务**\n\nBackend 的采用信号是多用户、集中鉴权、共享状态和查询需求，不是“想做一个页面”。\n一次写请求应完成身份确认、参数校验、幂等登记和 operation 创建，然后尽快返回可查询标识。\n\n容量证据要区分请求吞吐和任务吞吐。\n若 handler 直接执行 SSH、云 API 或批量巡检，HTTP 超时会和业务截止时间纠缠，滚动发布也会中断任务。\n故障注入应覆盖客户端断开、数据库提交失败、重复提交和旧客户端 schema。\n\nBackend 无长期所有者或只有单人本地使用时，CLI 往往是更小的方案。\n\n**Worker：用可恢复状态换来额外复杂度**\n\nWorker 只在任务必须脱离请求生命周期、能够被领取并在失败后恢复时引入。\n它需要原子领取、租约、心跳、幂等执行、结果提交和排空退出；“从队列取消息后调用函数”还不是完整 Worker。\n\n验证要暂停进程于三处：副作用前、副作用后结果提交前、提交后确认前。\n三次演练分别证明可重领、unknown 对账和重复确认策略。\n还要测失租后旧 Worker 是否停止副作用，而不是只记录 warning。\n\n如果任务小于几秒且调用方可安全重试，独立 Worker 的部署和排障成本可能大于收益。\n\n**Scheduler：触发 operation 而不是复制业务逻辑**\n\nScheduler 只回答何时触发和用哪个业务幂等键，不应再实现一份巡检或变更逻辑。\n时间语义必须写明时区、夏令时、错过窗口、补跑和重叠策略。\n\n验证将时钟推进到边界，覆盖重复 tick、进程暂停后恢复和同一窗口双实例竞争。\n通过条件不是“任务最终出现”，而是每个逻辑窗口只产生允许数量的 operation。\n\n已有 Kubernetes CronJob、企业调度平台或 CI 定时器满足审计和重试要求时，优先复用，不再自建调度服务。\n\n**Agent：本地能力必须值得治理成本**\n\n只有中心端无法安全完成本地采集、离线缓冲或特权操作时，才考虑 Agent。\n最小 Agent 仍需要唯一身份、证书轮换、心跳抖动、命令 allowlist、资源上限、签名升级和版本兼容。\n\n威胁模型必须假设控制面消息可能被重放、目标主机可能失联、升级只完成一部分。\n越权测试要证明 Agent 拒绝 allowlist 外动作，并且日志不会泄露本机 Secret。\n\n若远程管理 API 已能提供所需能力，部署到每台主机的 Agent 是额外攻击面，不是默认捷径。\n\n**数据库任务表：先作为事实源**\n\n中小规模系统常可用数据库任务表同时保存 operation、状态、租约和结果摘要。\n领取查询必须有索引并使用条件更新；状态转换由数据库约束或事务保护，不能只依赖应用里的 if。\n\n容量实验记录队列深度、最老任务年龄、锁等待、领取延迟和写放大。\n如果 20k 目标都更新同一 operation 行，热点可能来自进度设计，而不是数据库品牌。\n\n当数据量和竞争仍在预算内，不要仅因“队列更专业”就增加消息系统。\n\n**消息队列：传递通知，不取代事实源**\n\n消息队列适合数据库轮询已经形成可测瓶颈、需要削峰或多个消费者独立扩展的场景。\n消息至少携带 schema 版本、operation ID、幂等键、创建时间和 trace 上下文，业务状态仍回到明确事实源。\n\n故障验证包括重复投递、乱序、未知 schema、消费者长暂停、死信堆积和 broker 不可用。\n只有团队能监测积压、执行重放并维护升级，吞吐收益才抵得过新组件成本。\n\n低吞吐任务直接从数据库领取更容易对账，也减少一条分布式一致性边界。\n\n**幂等层：业务意图必须稳定**\n\n幂等键应代表“同一次变更意图”，不能使用每次重试都会变化的随机值。\n存储层唯一约束是并发最后防线，执行层还要保存外部 operation ID，用于副作用结果未知时查询。\n\n验证同时发起两个相同请求，确认只产生一次外部动作；再用相同参数但不同业务窗口，确认不会错误合并。\n还要定义记录保留期和请求参数摘要，避免旧键永久阻止合法操作。\n\n只读检查通常天然可重复，但输出落盘与审计写入仍需各自的覆盖策略。\n\n**生命周期管理：退出是协议的一部分**\n\n常驻进程收到终止信号后依次停止接单、传播取消、等待安全点、提交结果、释放租约和关闭资源。\n每一步都有独立截止时间，总和必须小于编排器宽限期。\n\n就绪探针回答是否还能接新任务，存活探针只回答进程是否需要重启。\n排空期间就绪应先失败，但存活不能立刻失败，否则编排器会跳过清理。\n\n验证用真实信号而不只调用内部函数，并观察在途数、退出耗时、租约与孤儿进程。\n\n**可观测与审计：每个信号都要指向动作**\n\n指标保留低基数聚合，日志记录目标级上下文，trace 串联跨组件路径，审计证明谁在何时基于什么意图执行了什么。\n四者用途不同，不能用一份巨型 JSON 同时替代。\n\n先写处置问题再建指标：队列是否积压、失败是否集中在认证、租约是否丢失、版本是否碎片化。\noperation ID 和 target 通常进入日志或 trace，不进入指标标签。\n\n审计不可用时的策略按动作风险分级，并通过故障注入证明副作用与审计的先后关系。\n\n**Python 运行时：优先交付控制面能力**\n\nPython 适合 SDK 丰富、数据处理明显、交付速度重要且团队已能维护依赖的控制面。\n判断依据包括端到端工时、依赖兼容、启动与 RSS、CPU profile、分发方式和排障体验。\n\n优化前先测 I/O 等待与 CPU 热点。\n若瓶颈是外部 API，换语言通常不会改变吞吐上限；若是常驻内存、启动风暴或持续 CPU，才进入运行时对照实验。\n\n依赖锁、wheel smoke 和目标平台测试属于选择成本，不能只比较源代码行数。\n\n**Go 运行时：由分发和资源证据触发**\n\n大量主机上的常驻 Agent、严格内存预算、单二进制分发和高并发网络服务可能更适合 Go。\n但重写会失去一部分 Python SDK 与团队熟悉度，还会产生双语言构建、监控和安全升级体系。\n\n用同一 fixture、同一并发、同一正确性摘要比较启动、峰值 RSS、CPU、吞吐和 P95。\n若基准没有触发预先写好的阈值，就保留 Python；若触发，也只迁移真正受约束的组件。\n\n每项选择最终填写四个字段：\n\n~~~text\n采用或暂缓：\n本次证据：\n仍未验证：\n复审触发与负责人：\n~~~\n\n架构评审允许删除组件。\n当触发信号消失、维护成本持续高于价值或已有平台能力覆盖职责时，应合并或下线，而不是让组件因历史惯性永久存在。", "subs": ["从最小组合开始", "Backend 不应亲自跑所有长任务", "Scheduler 只负责触发", "Agent 增加的是治理面", "本节练习", "组件选择工作台"]}, {"title": "出现哪些真实问题后，才值得把组件拆成独立进程？", "content": "模块边界是代码组织，进程边界是故障、资源和部署隔离。\n跨进程会带来序列化、网络失败、版本兼容、可观测性和一致性成本。\n\n值得拆分的证据包括：\n\n- CPU 或内存资源模型明显不同，需要独立限额和扩缩容。\n- 长任务必须跨 Backend 重启继续。\n- 安全权限必须隔离，例如 Worker 才能访问生产凭证。\n- 发布频率冲突，某适配器升级不应重启入口服务。\n- 一个组件故障会拖垮全部请求，需要熔断隔离。\n- 不同网络区域只能通过受控队列或 Agent 连接。\n\n#### 先定义消息契约\n\n```json\n{\n  \"schema_version\": 1,\n  \"operation_id\": \"op-123\",\n  \"action\": \"check.http\",\n  \"target\": {\"host\": \"api-a\", \"port\": 443},\n  \"deadline\": \"2026-09-01T10:10:00Z\",\n  \"attempt\": 1\n}\n```\n\n消息不传 Python 对象和开放式任意命令。\nWorker 按允许的动作类型解析和授权，未知版本进入隔离队列。\n\n#### 数据库和队列解决不同问题\n\n数据库保存可查询的事实与状态；队列传递待处理工作并实现消费协调。\n小规模系统可以用数据库任务表完成领取，避免一开始同时维护两套基础设施。\n\n#### 用 SQLite 做一次可运行的领取实验\n\n在引入独立数据库或消息队列前，可以先用标准库 `sqlite3` 验证状态、领取和幂等契约。\n这个实验只证明单机进程间竞争，不证明生产数据库的锁语义或容量。\n\n```python\nfrom __future__ import annotations\n\nimport sqlite3\nfrom dataclasses import dataclass\nfrom datetime import UTC, datetime, timedelta\nfrom pathlib import Path\n\n\n@dataclass(frozen=True, slots=True)\nclass ClaimedJob:\n    operation_id: str\n    action: str\n    payload: str\n    lease_owner: str\n    lease_until: str\n\n\nSCHEMA = \"\"\"\nCREATE TABLE IF NOT EXISTS jobs (\n    operation_id TEXT PRIMARY KEY,\n    idempotency_key TEXT NOT NULL UNIQUE,\n    action TEXT NOT NULL,\n    payload TEXT NOT NULL,\n    state TEXT NOT NULL CHECK (\n        state IN ('queued', 'running', 'succeeded', 'failed', 'unknown')\n    ),\n    lease_owner TEXT,\n    lease_until TEXT,\n    attempt INTEGER NOT NULL DEFAULT 0,\n    result TEXT\n);\nCREATE INDEX IF NOT EXISTS jobs_claim\nON jobs(state, lease_until, operation_id);\n\"\"\"\n\n\ndef connect(path: Path) -> sqlite3.Connection:\n    connection = sqlite3.connect(path, isolation_level=None)\n    connection.row_factory = sqlite3.Row\n    connection.execute(\"PRAGMA foreign_keys = ON\")\n    connection.execute(\"PRAGMA busy_timeout = 3000\")\n    connection.executescript(SCHEMA)\n    return connection\n\n\ndef enqueue(\n    connection: sqlite3.Connection,\n    *,\n    operation_id: str,\n    idempotency_key: str,\n    action: str,\n    payload: str,\n) -> bool:\n    cursor = connection.execute(\n        \"\"\"\n        INSERT INTO jobs(operation_id, idempotency_key, action, payload, state)\n        VALUES (?, ?, ?, ?, 'queued')\n        ON CONFLICT(idempotency_key) DO NOTHING\n        \"\"\",\n        (operation_id, idempotency_key, action, payload),\n    )\n    return cursor.rowcount == 1\n\n\ndef claim_one(\n    connection: sqlite3.Connection,\n    *,\n    owner: str,\n    now: datetime,\n    lease_seconds: int,\n) -> ClaimedJob | None:\n    lease_until = now + timedelta(seconds=lease_seconds)\n    connection.execute(\"BEGIN IMMEDIATE\")\n    try:\n        row = connection.execute(\n            \"\"\"\n            SELECT operation_id\n            FROM jobs\n            WHERE state = 'queued'\n               OR (state = 'running' AND lease_until < ?)\n            ORDER BY operation_id\n            LIMIT 1\n            \"\"\",\n            (now.isoformat(),),\n        ).fetchone()\n        if row is None:\n            connection.execute(\"COMMIT\")\n            return None\n\n        claimed = connection.execute(\n            \"\"\"\n            UPDATE jobs\n            SET state = 'running',\n                lease_owner = ?,\n                lease_until = ?,\n                attempt = attempt + 1\n            WHERE operation_id = ?\n              AND (state = 'queued' OR lease_until < ?)\n            RETURNING operation_id, action, payload, lease_owner, lease_until\n            \"\"\",\n            (owner, lease_until.isoformat(), row[\"operation_id\"], now.isoformat()),\n        ).fetchone()\n        connection.execute(\"COMMIT\")\n    except BaseException:\n        connection.execute(\"ROLLBACK\")\n        raise\n\n    return ClaimedJob(**dict(claimed)) if claimed is not None else None\n\n\ndef finish(\n    connection: sqlite3.Connection,\n    *,\n    operation_id: str,\n    owner: str,\n    result: str,\n) -> bool:\n    cursor = connection.execute(\n        \"\"\"\n        UPDATE jobs\n        SET state = 'succeeded', result = ?, lease_owner = NULL, lease_until = NULL\n        WHERE operation_id = ? AND state = 'running' AND lease_owner = ?\n        \"\"\",\n        (result, operation_id, owner),\n    )\n    return cursor.rowcount == 1\n\n\nif __name__ == \"__main__\":\n    database = connect(Path(\"jobs.db\"))\n    enqueue(\n        database,\n        operation_id=\"op-001\",\n        idempotency_key=\"daily-check:2026-09-02\",\n        action=\"check.http\",\n        payload='{\"url\":\"http://127.0.0.1:8000/health\"}',\n    )\n    print(claim_one(database, owner=\"worker-a\", now=datetime.now(UTC), lease_seconds=30))\n```\n\n`BEGIN IMMEDIATE` 让“选择候选”和“更新领取”处在一个写事务中；条件更新仍校验状态与租约，避免只依赖先查后改。\n生产数据库要按其隔离级别改写，例如使用行锁或 `SKIP LOCKED`，并以真实并发测试证明同一时刻不会有两个有效 owner。\n\n最小回归测试同时打开两个连接：\n\n```python\nfrom datetime import UTC, datetime, timedelta\n\n\ndef test_duplicate_enqueue_and_expired_lease(tmp_path):\n    path = tmp_path / \"jobs.db\"\n    first = connect(path)\n    second = connect(path)\n\n    assert enqueue(\n        first,\n        operation_id=\"op-1\",\n        idempotency_key=\"same-intent\",\n        action=\"check.http\",\n        payload=\"{}\",\n    )\n    assert not enqueue(\n        second,\n        operation_id=\"op-2\",\n        idempotency_key=\"same-intent\",\n        action=\"check.http\",\n        payload=\"{}\",\n    )\n\n    now = datetime.now(UTC)\n    claimed = claim_one(first, owner=\"worker-a\", now=now, lease_seconds=5)\n    assert claimed is not None\n    assert claim_one(second, owner=\"worker-b\", now=now, lease_seconds=5) is None\n\n    reclaimed = claim_one(\n        second,\n        owner=\"worker-b\",\n        now=now + timedelta(seconds=6),\n        lease_seconds=5,\n    )\n    assert reclaimed is not None\n    assert reclaimed.operation_id == \"op-1\"\n    assert not finish(\n        first,\n        operation_id=\"op-1\",\n        owner=\"worker-a\",\n        result='{\"ok\":true}',\n    )\n```\n\n最后一个断言证明旧 owner 失租后不能提交结果。\n实验还没证明外部副作用是否重复；那需要业务幂等键、外部 operation ID 和下一节的 unknown 对账共同完成。\n\n#### 拆分前先做故障表\n\n| 故障 | 未拆分 | 拆分后新增 |\n| --- | --- | --- |\n| 进程崩溃 | 一次命令失败 | 消息可能重投 |\n| 网络断开 | 目标调用失败 | Backend 与 Worker 也会断 |\n| 版本不一致 | 同一发布物 | 消息 schema 兼容 |\n| 重复请求 | 本地处理 | 跨进程幂等与去重 |\n\n如果没有能力处理新增故障，拆分可能降低可靠性。\n\n#### 本章检查点\n\n```text\n[ ] 先有量化问题，再选择组件\n[ ] 模块化先于进程拆分\n[ ] 每个进程有独立资源、权限或生命周期理由\n[ ] 消息 schema 有版本、截止时间和幂等标识\n[ ] 新增网络与重复投递故障有测试\n```\n\n#### 架构决策记录 ADR-001：采用数据库任务表\n\n```text\n标题：使用 PostgreSQL 任务表连接 Backend 与 Worker\n状态：Accepted\n日期：2026-09-01\n\n背景：\n- 任务最长 30 分钟，不能占用 HTTP 请求。\n- 需要查询状态、取消、重试与审计。\n- 当前峰值每分钟 20 个任务，不需要高吞吐消息流。\n- 团队已有 PostgreSQL 运维能力，没有消息队列值守经验。\n\n决定：\n- Backend 在事务中写 operation 与 job。\n- Worker 使用带锁查询领取到期任务。\n- 租约到期后允许其他 Worker 重新领取。\n- 所有处理依赖幂等键与状态机。\n\n结果：\n- 少维护一个基础设施组件。\n- 数据库同时承担查询与任务协调负载。\n- 必须监测领取延迟、锁等待和表膨胀。\n\n替代方案：\n- 进程内后台任务：重启会丢，不满足恢复。\n- 独立消息队列：能力充足，但当前运维成本过高。\n- cron 扫描文件：并发、审计和原子领取难保证。\n\n复审触发：\n- 峰值超过每分钟 1,000 个任务。\n- 数据库任务负载影响业务查询。\n- 需要跨区域流式投递或复杂消费组。\n```\n\nADR 不是一次性证明正确，而是保存当时约束和触发复审条件。\n\n#### 任务与操作模型\n\n```sql\nCREATE TYPE operation_state AS ENUM (\n    'queued',\n    'running',\n    'succeeded',\n    'failed',\n    'cancelling',\n    'cancelled',\n    'unknown'\n);\n\nCREATE TABLE operations (\n    id UUID PRIMARY KEY,\n    idempotency_key TEXT NOT NULL UNIQUE,\n    actor TEXT NOT NULL,\n    action TEXT NOT NULL,\n    target_scope JSONB NOT NULL,\n    request_digest TEXT NOT NULL,\n    state operation_state NOT NULL,\n    result JSONB,\n    error_category TEXT,\n    created_at TIMESTAMPTZ NOT NULL,\n    started_at TIMESTAMPTZ,\n    finished_at TIMESTAMPTZ,\n    version BIGINT NOT NULL DEFAULT 0\n);\n\nCREATE TABLE jobs (\n    id UUID PRIMARY KEY,\n    operation_id UUID NOT NULL REFERENCES operations(id),\n    state TEXT NOT NULL,\n    attempt INTEGER NOT NULL DEFAULT 0,\n    available_at TIMESTAMPTZ NOT NULL,\n    lease_owner TEXT,\n    lease_until TIMESTAMPTZ,\n    deadline TIMESTAMPTZ NOT NULL,\n    created_at TIMESTAMPTZ NOT NULL,\n    updated_at TIMESTAMPTZ NOT NULL\n);\n\nCREATE INDEX jobs_available_idx\nON jobs (available_at, created_at)\nWHERE state = 'queued';\n```\n\n`operations` 面向用户意图和查询，`jobs` 面向执行尝试。\n一次 operation 可以因为重试产生多个 attempt，但不能产生第二次业务副作用。\n\n#### 状态跃迁表\n\n| 当前状态 | 事件 | 下一状态 | 条件 |\n| --- | --- | --- | --- |\n| queued | worker_claimed | running | 租约原子获得 |\n| queued | cancel_requested | cancelled | 尚未开始 |\n| running | completed | succeeded | 结果与审计已提交 |\n| running | expected_failure | failed | 确认未成功 |\n| running | cancel_requested | cancelling | 发出取消意图 |\n| cancelling | worker_ack | cancelled | 副作用已停止 |\n| running | lease_expired | queued | 操作可安全重试 |\n| running | result_uncertain | unknown | 禁止自动重试 |\n\n任何表中没有的跃迁都拒绝，并记录当前版本和请求者。\n\n```python\nfrom enum import StrEnum\n\n\nclass State(StrEnum):\n    QUEUED = \"queued\"\n    RUNNING = \"running\"\n    SUCCEEDED = \"succeeded\"\n    FAILED = \"failed\"\n    CANCELLING = \"cancelling\"\n    CANCELLED = \"cancelled\"\n    UNKNOWN = \"unknown\"\n\n\nALLOWED_TRANSITIONS: dict[State, set[State]] = {\n    State.QUEUED: {State.RUNNING, State.CANCELLED},\n    State.RUNNING: {\n        State.SUCCEEDED,\n        State.FAILED,\n        State.CANCELLING,\n        State.QUEUED,\n        State.UNKNOWN,\n    },\n    State.CANCELLING: {State.CANCELLED, State.UNKNOWN},\n    State.SUCCEEDED: set(),\n    State.FAILED: set(),\n    State.CANCELLED: set(),\n    State.UNKNOWN: set(),\n}\n\n\ndef require_transition(current: State, next_state: State) -> None:\n    if next_state not in ALLOWED_TRANSITIONS[current]:\n        raise ValueError(f\"invalid operation transition: {current} -> {next_state}\")\n```\n\n允许 `running -> queued` 只适用于明确可重试且租约过期的任务。\n非幂等动作不能通过这条路径自动重放。\n\n#### Backend 创建操作\n\n```python\nfrom dataclasses import dataclass\nfrom datetime import UTC, datetime, timedelta\nfrom uuid import UUID, uuid4\n\n\n@dataclass(frozen=True, slots=True)\nclass CreateOperation:\n    idempotency_key: str\n    actor: str\n    action: str\n    targets: tuple[str, ...]\n    deadline_seconds: int\n\n\n@dataclass(frozen=True, slots=True)\nclass OperationReceipt:\n    operation_id: UUID\n    state: State\n    reused: bool\n\n\nclass OperationRepository(Protocol):\n    def find_by_key(self, key: str) -> Operation | None: ...\n    def create_with_job(self, operation: Operation, job: Job) -> None: ...\n\n\ndef create_operation(\n    command: CreateOperation,\n    repository: OperationRepository,\n    clock: Clock,\n) -> OperationReceipt:\n    validate_action(command.action)\n    validate_targets(command.targets)\n    validate_deadline(command.deadline_seconds)\n\n    existing = repository.find_by_key(command.idempotency_key)\n    if existing is not None:\n        return OperationReceipt(existing.id, existing.state, reused=True)\n\n    now = clock.now()\n    operation_id = uuid4()\n    operation = Operation(\n        id=operation_id,\n        idempotency_key=command.idempotency_key,\n        actor=command.actor,\n        action=command.action,\n        targets=command.targets,\n        state=State.QUEUED,\n        created_at=now,\n        version=0,\n    )\n    job = Job(\n        id=uuid4(),\n        operation_id=operation_id,\n        state=\"queued\",\n        attempt=0,\n        available_at=now,\n        deadline=now + timedelta(seconds=command.deadline_seconds),\n    )\n\n    try:\n        repository.create_with_job(operation, job)\n    except DuplicateIdempotencyKey:\n        winner = repository.find_by_key(command.idempotency_key)\n        if winner is None:\n            raise\n        return OperationReceipt(winner.id, winner.state, reused=True)\n\n    return OperationReceipt(operation_id, State.QUEUED, reused=False)\n```\n\n先查后插只是减少冲突，数据库唯一约束负责最终正确性。\n捕获唯一冲突后重新查询获胜记录，让并发请求得到同一 operation ID。", "subs": ["先定义消息契约", "数据库和队列解决不同问题", "用 SQLite 做一次可运行的领取实验", "拆分前先做故障表", "本章检查点", "架构决策记录 ADR", "任务与操作模型", "状态跃迁表", "Backend 创建操作"]}]}, {"title": "第十五章 · 工具跑进生产后，失败和退出都要有安排", "sections": [{"title": "服务准备退出时，怎样停止接单并处理手里的任务？", "content": "```mermaid\nstateDiagram-v2\n    [*] --> Ready\n    Ready --> Draining: stop signal\n    Draining --> Finishing: stop claiming\n    Finishing --> Closed: commit or deadline\n    Closed --> [*]\n```\n\n退出不是一条信号处理语句，而是从“可接单”到“只收尾”再到“资源已关闭”的状态转换。\n\n优雅退出不是收到信号后立刻 `sys.exit()`。\n它是一个有限时间内停止新工作、处理或取消在途任务、提交可确认结果并释放资源的协议。\n\n```text\nRUNNING\n  --SIGTERM--> DRAINING\n  --all done--> STOPPED\n  --grace expired--> FORCED STOP\n```\n\n#### 就绪与存活要分开\n\n进入 DRAINING 后，就绪检查应失败，让负载均衡停止发送新请求；存活检查仍成功，给进程清理时间。\n若二者共用一个“健康”状态，平台可能在清理尚未完成时反复强杀重启。\n\n#### Worker 停止领取新任务\n\n```python\nasync def worker_loop(queue: JobQueue, stop: asyncio.Event) -> None:\n    while not stop.is_set():\n        job = await queue.receive(timeout=1.0)\n        if job is None:\n            continue\n        await process_job(job)\n```\n\n真实实现还要在停止信号和 `receive()` 之间避免竞态，并决定已领取任务的租约如何续期。\n\n#### 每个清理步骤都有截止时间\n\n```python\nasync def shutdown(running_tasks: set[asyncio.Task[object]]) -> None:\n    for task in running_tasks:\n        task.cancel()\n\n    try:\n        async with asyncio.timeout(10.0):\n            await asyncio.gather(*running_tasks, return_exceptions=True)\n    except TimeoutError:\n        logger.error(\"shutdown grace period exceeded\")\n```\n\n宽限期要小于编排平台的强制终止时间，并留出日志刷新与网络关闭余量。\n\n#### 用一个协调器统一停止意图和在途任务\n\n信号处理器只设置停止事件；真正的 await、日志和资源关闭留在正常协程上下文。\n协调器同时限制新任务创建，并维护可以等待或取消的在途集合。\n\n```python\nfrom __future__ import annotations\n\nimport asyncio\nimport signal\nfrom collections.abc import Awaitable, Callable\nfrom dataclasses import dataclass, field\nfrom typing import TypeVar\n\n\nT = TypeVar(\"T\")\n\n\n@dataclass(slots=True)\nclass DrainCoordinator:\n    stop: asyncio.Event = field(default_factory=asyncio.Event)\n    running: set[asyncio.Task[object]] = field(default_factory=set)\n\n    @property\n    def accepting(self) -> bool:\n        return not self.stop.is_set()\n\n    def request_stop(self) -> None:\n        self.stop.set()\n\n    def start(self, awaitable: Awaitable[T]) -> asyncio.Task[T]:\n        if not self.accepting:\n            raise RuntimeError(\"worker is draining\")\n        task = asyncio.create_task(awaitable)\n        self.running.add(task)\n        task.add_done_callback(self.running.discard)\n        return task\n\n    async def drain(self, grace_seconds: float) -> bool:\n        self.stop.set()\n        if not self.running:\n            return True\n\n        done, pending = await asyncio.wait(\n            self.running,\n            timeout=grace_seconds,\n        )\n        for task in pending:\n            task.cancel()\n        if pending:\n            await asyncio.gather(*pending, return_exceptions=True)\n        return not pending\n\n\ndef install_signal_handlers(\n    loop: asyncio.AbstractEventLoop,\n    coordinator: DrainCoordinator,\n) -> None:\n    for signum in (signal.SIGINT, signal.SIGTERM):\n        loop.add_signal_handler(signum, coordinator.request_stop)\n\n\nasync def serve(\n    receive: Callable[[], Awaitable[object | None]],\n    handle: Callable[[object], Awaitable[None]],\n    coordinator: DrainCoordinator,\n) -> None:\n    while coordinator.accepting:\n        job = await receive()\n        if job is None:\n            continue\n        coordinator.start(handle(job))\n```\n\n`asyncio.wait()` 超时只返回 pending，不会自动取消；代码必须显式取消并继续收集异常，否则任务可能在关闭客户端后继续运行。\n`add_signal_handler()` 的平台支持需在目标操作系统验证，Windows 服务应使用对应的控制事件适配器。\n\n测试不依赖真实信号也能先固定状态转换：\n\n```python\nasync def test_drain_rejects_new_work_and_cancels_overdue_task():\n    coordinator = DrainCoordinator()\n    blocker = asyncio.Event()\n\n    async def never_finishes() -> None:\n        await blocker.wait()\n\n    task = coordinator.start(never_finishes())\n    complete = await coordinator.drain(grace_seconds=0.01)\n\n    assert complete is False\n    assert coordinator.accepting is False\n    assert task.cancelled()\n\n    coroutine = never_finishes()\n    try:\n        with pytest.raises(RuntimeError, match=\"draining\"):\n            coordinator.start(coroutine)\n    finally:\n        coroutine.close()\n```\n\n这条单测证明协调器行为，不证明 SIGTERM 已从编排器传入。\n候选环境要启动真实进程、发送信号，并记录 readiness、在途数、退出耗时、租约和子进程残留。\n\n#### 结果提交与消息确认排序\n\n```text\n执行副作用\n  -> 持久化结果\n  -> 写审计\n  -> 确认消息\n```\n\n若先确认消息再持久化结果，崩溃会丢任务。\n若结果已提交但确认前崩溃，消息会重投，所以处理仍需幂等。\n\n#### 本节练习\n\n在测试环境对 Worker 发送 SIGTERM，验证不再领取任务、在途任务按策略完成或取消、状态可查询、宽限期后退出且没有未确认状态丢失。\n\n#### 原子领取任务\n\nPostgreSQL 领取语句可以使用 `FOR UPDATE SKIP LOCKED`，具体事务和隔离级别要与数据库团队验证：\n\n```sql\nWITH candidate AS (\n    SELECT id\n    FROM jobs\n    WHERE state = 'queued'\n      AND available_at <= now()\n      AND deadline > now()\n    ORDER BY available_at, created_at\n    FOR UPDATE SKIP LOCKED\n    LIMIT 1\n)\nUPDATE jobs\nSET state = 'running',\n    attempt = attempt + 1,\n    lease_owner = :worker_id,\n    lease_until = now() + interval '30 seconds',\n    updated_at = now()\nWHERE id = (SELECT id FROM candidate)\nRETURNING *;\n```\n\n没有返回行代表当前没有可领取任务，Worker 应带抖动等待，不能紧密空转查询。\n\n#### Worker 主循环\n\n```python\nimport asyncio\nimport random\n\n\nasync def worker_loop(\n    worker_id: str,\n    repository: JobRepository,\n    executor: OperationExecutor,\n    stop: asyncio.Event,\n) -> None:\n    while not stop.is_set():\n        job = await repository.claim(worker_id=worker_id, lease_seconds=30)\n\n        if job is None:\n            try:\n                await asyncio.wait_for(stop.wait(), timeout=random.uniform(0.2, 0.5))\n            except TimeoutError:\n                pass\n            continue\n\n        await handle_claimed_job(\n            worker_id=worker_id,\n            job=job,\n            repository=repository,\n            executor=executor,\n        )\n```\n\n#### 租约续期\n\n长任务必须定期续租，更新条件同时检查 owner、state 和当前 version。\n\n```sql\nUPDATE jobs\nSET lease_until = now() + interval '30 seconds',\n    updated_at = now()\nWHERE id = :job_id\n  AND state = 'running'\n  AND lease_owner = :worker_id\n  AND lease_until > now()\nRETURNING version;\n```\n\n续租失败时，当前 Worker 不再拥有任务。\n它必须停止产生新副作用，查询操作状态，并进入安全收尾。\n\n#### 心跳与业务执行分离\n\n```python\nasync def run_with_lease(\n    job: Job,\n    worker_id: str,\n    repository: JobRepository,\n    operation: Awaitable[OperationResult],\n) -> OperationResult:\n    lease_lost = asyncio.Event()\n\n    async def heartbeat() -> None:\n        while True:\n            await asyncio.sleep(10)\n            renewed = await repository.renew(job.id, worker_id, 30)\n            if not renewed:\n                lease_lost.set()\n                return\n\n    operation_task = asyncio.create_task(operation)\n    heartbeat_task = asyncio.create_task(heartbeat())\n    lease_task = asyncio.create_task(lease_lost.wait())\n\n    done, pending = await asyncio.wait(\n        {operation_task, lease_task},\n        return_when=asyncio.FIRST_COMPLETED,\n    )\n\n    if lease_task in done and lease_lost.is_set():\n        operation_task.cancel()\n        await asyncio.gather(operation_task, return_exceptions=True)\n        raise LeaseLost(job.id)\n\n    heartbeat_task.cancel()\n    lease_task.cancel()\n    await asyncio.gather(heartbeat_task, lease_task, return_exceptions=True)\n    return await operation_task\n```\n\n这是生命周期示意。\n生产实现需要确保异常路径总会取消三个任务，并处理操作无法立即取消的情况。\n\n\n#### 优雅退出协调器\n\n```python\n@dataclass(frozen=True, slots=True)\nclass ShutdownPolicy:\n    grace_seconds: float\n    cancel_running: bool\n\n\nasync def supervise(\n    workers: list[asyncio.Task[None]],\n    stop: asyncio.Event,\n    policy: ShutdownPolicy,\n) -> None:\n    await stop.wait()\n\n    if policy.cancel_running:\n        for worker in workers:\n            worker.cancel()\n\n    try:\n        async with asyncio.timeout(policy.grace_seconds):\n            await asyncio.gather(*workers, return_exceptions=True)\n    except TimeoutError:\n        for worker in workers:\n            worker.cancel()\n        await asyncio.gather(*workers, return_exceptions=True)\n        raise ShutdownDeadlineExceeded\n```\n\n实际 Worker 任务与当前 operation 子任务应分开跟踪，避免取消主循环却遗失正在执行的任务。", "subs": ["就绪与存活要分开", "Worker 停止领取新任务", "每个清理步骤都有截止时间", "用一个协调器统一停止意图和在途任务", "结果提交与消息确认排序", "本节练习", "原子领取任务", "Worker 主循环", "租约续期", "心跳与业务执行分离", "优雅退出协调器"]}, {"title": "同一个任务被重复执行时，怎样避免产生第二次副作用？", "content": "```mermaid\nstateDiagram-v2\n    [*] --> Queued\n    Queued --> Running: claim\n    Running --> Succeeded: commit result\n    Running --> Retryable: temporary failure\n    Running --> Unknown: outcome unclear\n    Retryable --> Queued: retry budget\n    Unknown --> Succeeded: reconcile success\n    Unknown --> Failed: reconcile failure\n```\n\n`Unknown` 不能直接等同于失败：副作用可能已经发生，只是确认响应丢失。此时要查询外部 operation ID 或交给人工对账，盲目重试会制造第二次变更。\n\n网络超时无法告诉调用者“请求没到”还是“服务端做完但响应丢了”。\n因此队列重投、客户端重试和人工重复点击都可能让同一动作执行多次。\n\n#### 幂等键代表业务意图\n\n随机生成新 UUID 只标识一次尝试。\n同一业务请求的重试必须复用同一个 key，例如由请求者、动作、目标和变更版本共同确定。\n\n```python\nfrom hashlib import sha256\n\n\ndef idempotency_key(actor: str, action: str, target: str, revision: str) -> str:\n    canonical = \"\\n\".join((actor, action, target, revision))\n    return sha256(canonical.encode(\"utf-8\")).hexdigest()\n```\n\n不要把 Secret 或可猜测的敏感正文直接放进键。\n\n#### 数据库唯一约束是最后防线\n\n```sql\nCREATE TABLE operations (\n    id BIGSERIAL PRIMARY KEY,\n    idempotency_key TEXT NOT NULL UNIQUE,\n    state TEXT NOT NULL,\n    result JSONB,\n    created_at TIMESTAMPTZ NOT NULL\n);\n```\n\n两个 Worker 同时插入相同键时，唯一约束保证只有一个成功。\n单纯“先查询不存在，再插入”有竞态。\n\n#### 状态机拒绝非法跃迁\n\n```text\nqueued -> running -> succeeded\n                  -> failed\n                  -> unknown\n```\n\n`succeeded` 不应回到 `running`。\n外部动作超时且无法确认结果时用 `unknown`，不要贸然当作失败并再次执行。\n\n#### 查询再决定是否重试\n\n若外部系统支持按请求 ID 查询，超时后先查询结果；能安全确认未执行再重试。\n无法查询且操作非幂等时，升级人工处理比自动重复更安全。\n\n#### 把不确定结果建模为可对账对象\n\n适配器不能只返回布尔值。\n它至少要区分已确认成功、确认未执行、已知永久失败、可恢复失败和结果未知，并尽量保存外部 operation ID。\n\n```python\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\nfrom enum import StrEnum\nfrom typing import Protocol\n\n\nclass Outcome(StrEnum):\n    SUCCEEDED = \"succeeded\"\n    NOT_APPLIED = \"not_applied\"\n    PERMANENT_FAILURE = \"permanent_failure\"\n    RETRYABLE_FAILURE = \"retryable_failure\"\n    UNKNOWN = \"unknown\"\n\n\n@dataclass(frozen=True, slots=True)\nclass ApplyResult:\n    outcome: Outcome\n    external_id: str | None\n    detail: str\n\n\nclass ChangeClient(Protocol):\n    def apply(self, *, key: str, target: str) -> ApplyResult: ...\n\n    def query(self, external_id: str) -> ApplyResult: ...\n\n\nclass OperationStore(Protocol):\n    def save_external_id(self, operation_id: str, external_id: str) -> None: ...\n\n    def set_state(self, operation_id: str, state: str, detail: str) -> None: ...\n\n\ndef apply_once(\n    *,\n    operation_id: str,\n    idempotency_key: str,\n    target: str,\n    client: ChangeClient,\n    store: OperationStore,\n) -> ApplyResult:\n    result = client.apply(key=idempotency_key, target=target)\n\n    if result.external_id is not None:\n        store.save_external_id(operation_id, result.external_id)\n\n    if result.outcome is Outcome.SUCCEEDED:\n        store.set_state(operation_id, \"succeeded\", result.detail)\n    elif result.outcome is Outcome.PERMANENT_FAILURE:\n        store.set_state(operation_id, \"failed\", result.detail)\n    elif result.outcome in {Outcome.RETRYABLE_FAILURE, Outcome.NOT_APPLIED}:\n        store.set_state(operation_id, \"retryable\", result.detail)\n    else:\n        store.set_state(operation_id, \"unknown\", result.detail)\n\n    return result\n\n\ndef reconcile(\n    *,\n    operation_id: str,\n    external_id: str,\n    client: ChangeClient,\n    store: OperationStore,\n) -> ApplyResult:\n    result = client.query(external_id)\n    if result.outcome is Outcome.SUCCEEDED:\n        store.set_state(operation_id, \"succeeded\", result.detail)\n    elif result.outcome is Outcome.NOT_APPLIED:\n        store.set_state(operation_id, \"retryable\", result.detail)\n    elif result.outcome is Outcome.PERMANENT_FAILURE:\n        store.set_state(operation_id, \"failed\", result.detail)\n    else:\n        store.set_state(operation_id, \"unknown\", result.detail)\n    return result\n```\n\n接口示意刻意没有在 `UNKNOWN` 分支调用 `apply()`。\n对账过程只有确认未执行后才把状态改为 `retryable`；查询本身失败时继续保留 `unknown`，并产生工单或告警。\n\n测试用记录型假对象固定调用次数：\n\n```python\ndef test_unknown_result_is_queried_before_second_apply():\n    client = RecordingClient(\n        apply_result=ApplyResult(Outcome.UNKNOWN, \"remote-7\", \"timeout\"),\n        query_result=ApplyResult(Outcome.SUCCEEDED, \"remote-7\", \"done\"),\n    )\n    store = RecordingStore()\n\n    first = apply_once(\n        operation_id=\"op-7\",\n        idempotency_key=\"change-7\",\n        target=\"host-7\",\n        client=client,\n        store=store,\n    )\n    assert first.outcome is Outcome.UNKNOWN\n\n    final = reconcile(\n        operation_id=\"op-7\",\n        external_id=\"remote-7\",\n        client=client,\n        store=store,\n    )\n\n    assert final.outcome is Outcome.SUCCEEDED\n    assert client.apply_calls == 1\n    assert client.query_calls == 1\n```\n\n这个测试证明编排逻辑不会盲目二次调用，不证明远端真的遵守幂等键。\n候选环境还要用可回滚对象执行重复请求，并核对远端审计或资源版本。\n\n#### 本节练习\n\n并发提交 20 次相同幂等键，验证只有一个外部副作用，其余调用得到同一 operation ID 或现有结果。\n再模拟“副作用完成、结果写入前崩溃”，验证系统进入可人工判断的状态。\n\n#### 风险登记表：按信号和处置排序，不复制同一张卡\n\n风险项共用 owner、状态、复查日期和证据链接四个字段，不必为每一项重复相同模板。\n先用一张表比较触发机制、控制与可观测信号，再为高优先级风险编写独立 runbook。\n\n| 风险 | 主要触发 | 预防或限制 | 关键监测信号 |\n| --- | --- | --- | --- |\n| 重复副作用 | 消息重投或人工重复 | 唯一约束与外部幂等键 | 同键调用次数 |\n| 结果未知 | 副作用后响应丢失 | 保存外部 ID 并对账 | unknown 数量与年龄 |\n| 租约双主 | Worker 停顿后恢复 | owner 加版本条件更新 | 失租提交冲突 |\n| 队列积压 | 下游变慢或容量不足 | 并发上限与扩容阈值 | 最老任务年龄 |\n| 重试风暴 | 大量短暂失败 | 抖动 全局预算 熔断 | 重试与原请求比 |\n| 取消失效 | 适配器吞掉取消 | 传播取消和有限宽限 | 取消耗时 |\n| 退出丢任务 | 先确认后持久化 | 先提交结果再确认 | 部署后异常在途数 |\n| 权限扩大 | 共用管理员身份 | 按动作和环境拆身份 | 权限拒绝与变更 |\n| Secret 泄露 | 日志或异常携带凭证 | 源头不记录和假值扫描 | Secret 扫描命中 |\n| 审计中断 | 审计存储不可用 | 高风险 fail closed | 审计缺失率 |\n| schema 不兼容 | 新旧组件并行 | 版本字段和兼容窗口 | unknown schema |\n| 数据库热点 | 领取或进度高频写 | 索引 分片进度 限频 | 锁等待和写延迟 |\n| 高基数爆炸 | 目标进入指标标签 | 低基数指标 详情进日志 | 时间序列数量 |\n| 时钟偏差 | 多主机墙钟不一致 | 统一租约时间和单调计时 | 负耗时和异常过期 |\n| Agent 失联 | 网络隔离或证书过期 | 有界缓存与离线状态 | 失联率和缓存占用 |\n| Agent 升级失败 | 批量分发部分失败 | 签名 canary 自动回滚 | 版本碎片 |\n| 资源耗尽 | 无界并发 响应 日志 | 每层容量和系统配额 | RSS FD 队列深度 |\n| 告警风暴 | 每个目标单独告警 | 按动作和分类聚合 | 告警量与处置能力 |\n| 回滚不兼容 | 新版写入新状态 | 向后兼容迁移 | 旧 Worker 解析失败 |\n| 无人维护 | 缺少值班和升级责任 | owner 预算 runbook | 告警无人确认 |\n\n风险优先级不能只看发生概率。\n结果未知、权限扩大、Secret 泄露和审计中断即使低频，也可能因为不可逆副作用或合规影响进入最高处置级别。\n\n可以用一个小模型保证排序规则一致，但分数不能替代人工判断：\n\n```python\nfrom dataclasses import dataclass\nfrom enum import StrEnum\n\n\nclass RiskDecision(StrEnum):\n    BLOCK = \"block\"\n    MITIGATE = \"mitigate\"\n    ACCEPT_WITH_REVIEW = \"accept_with_review\"\n\n\n@dataclass(frozen=True, slots=True)\nclass RiskInput:\n    likelihood: int\n    impact: int\n    detectable: bool\n    reversible: bool\n    has_owner: bool\n\n\ndef decide_risk(value: RiskInput) -> RiskDecision:\n    for name, score in {\n        \"likelihood\": value.likelihood,\n        \"impact\": value.impact,\n    }.items():\n        if not 1 <= score <= 5:\n            raise ValueError(f\"{name} must be between 1 and 5\")\n\n    if not value.has_owner:\n        return RiskDecision.BLOCK\n    if value.impact == 5 and not value.reversible:\n        return RiskDecision.BLOCK\n\n    score = value.likelihood * value.impact\n    if not value.detectable:\n        score += 5\n    if not value.reversible:\n        score += 5\n\n    if score >= 15:\n        return RiskDecision.MITIGATE\n    return RiskDecision.ACCEPT_WITH_REVIEW\n```\n\n这里把“没有 owner”直接设为阻断条件，因为无人处置的告警和恢复方案没有实际意义。\n不可逆且最高影响的动作也不能仅靠低概率获得接受结论。\n\n测试至少覆盖无 owner、不可逆高影响、非法分值和边界分数。\n团队若调整阈值，要保存调整原因和历史风险的重算结果；否则同一风险会因表格版本不同得到冲突结论。\n\n定量分数只帮助排序。\n最终仍需说明具体失效机制、当前控制、验证证据、剩余风险和接受者，尤其不能把“有监控”误写成“风险已消失”。\n\n**重复副作用与结果未知共用一条对账链**\n\n写操作开始前登记业务幂等键，收到外部 ID 立即持久化。\n响应超时后状态进入 unknown，由独立对账读取远端结果；只有确认未执行才允许重新排队。\n\n通过证据包括：\n\n- 相同业务键并发提交只生成一条 operation。\n- 远端 apply 调用次数为 1。\n- 副作用后断开连接会进入 unknown。\n- 对账成功后不再执行 apply。\n- 无法查询时产生人工任务而非自动重试。\n\n监测既看 unknown 数量，也看最老 unknown 年龄；数量很小但长时间无人处理同样危险。\n\n**租约双主与退出丢任务要联合演练**\n\n暂停 Worker A 直到租约过期，让 Worker B 重新领取，再恢复 A。\nA 的心跳和结果提交必须因 owner 或 version 不匹配而影响 0 行，并立即停止后续副作用。\n\n随后对 B 发送终止信号，验证：\n\n- readiness 先失败。\n- 不再领取新任务。\n- 手中结果在宽限期内提交。\n- 提交后才确认消息。\n- 超过截止时间时租约可被新 Worker 恢复。\n\n只验证“进程退出码为 0”看不到任务是否遗失，也看不到旧 owner 是否越权写入。\n\n**重试风暴需要系统级预算**\n\n单任务最多三次不代表系统安全。\n当一千个任务同时遇到 503，仍可能产生三千次请求；预算要同时限制每任务次数、operation 总时间和全局重试速率。\n\n~~~text\n窗口：60 秒\n原始请求上限：1000\n重试请求上限：200\n单目标最大尝试：3\nRetry-After 上限：30 秒\n熔断触发：连续失败率超过阈值\n恢复方式：半开探测后逐步放量\n~~~\n\n演练观察下游请求率、队列最老年龄和熔断状态。\n如果降压只通过无限堆积实现，故障仍未解决。\n\n**Secret 与审计风险按副作用阶段处理**\n\n副作用前发现审计不可用，高风险动作停止且执行器调用次数为 0。\n副作用后审计失败，操作进入 unknown 并启动对账；不能补写一条虚构成功事件。\n\n发现 Secret 泄露时先阻断传播和轮换凭证，再修复日志。\n删除应用本地文件不等于清除采集器、工单和对象存储中的副本，恢复记录要覆盖整条传播链。\n\n**回滚兼容要用双版本状态副本验证**\n\n候选版本写入一份可丢弃状态，旧版本随后读取、领取和展示。\n若旧版不能忽略新增字段或状态，就需要向后兼容迁移、前滚修复或维护窗口，不能把重新安装旧产物写成回滚。\n\n每项风险最后只补充这些变化字段：\n\n~~~text\n风险编号：\n当前优先级：\nowner 与值班角色：\n状态：open mitigated accepted retired\n本次演练证据：\n剩余风险：\n接受理由：\n下一动作：\n复查触发或日期：\n~~~\n\naccepted 不是永久忽略。\n约束、规模、依赖版本或 owner 发生变化时重新评审；组件下线后将对应风险标记 retired，并验证监控和权限也一并清理。\n#### 取消 API 的乐观并发\n\n```sql\nUPDATE operations\nSET state = CASE\n        WHEN state = 'queued' THEN 'cancelled'::operation_state\n        WHEN state = 'running' THEN 'cancelling'::operation_state\n        ELSE state\n    END,\n    version = version + 1\nWHERE id = :operation_id\n  AND version = :expected_version\n  AND state IN ('queued', 'running')\nRETURNING *;\n```\n\n没有返回行时，Backend 重新读取状态，区分版本冲突、已结束和不存在。\n\n#### 查询 API 的稳定响应\n\n```json\n{\n  \"schema_version\": 1,\n  \"operation_id\": \"018f0000-0000-7000-8000-000000000001\",\n  \"state\": \"running\",\n  \"progress\": {\n    \"planned\": 20000,\n    \"completed\": 7300,\n    \"passed\": 7142,\n    \"failed\": 158\n  },\n  \"attempt\": 1,\n  \"created_at\": \"2026-09-01T10:00:00Z\",\n  \"started_at\": \"2026-09-01T10:00:03Z\",\n  \"finished_at\": null,\n  \"links\": {\n    \"self\": \"/operations/018f0000-0000-7000-8000-000000000001\",\n    \"cancel\": \"/operations/018f0000-0000-7000-8000-000000000001/cancel\"\n  }\n}\n```\n\n进度数字必须来自同一一致性快照，不能出现 completed 大于 planned。", "subs": ["幂等键代表业务意图", "数据库唯一约束是最后防线", "状态机拒绝非法跃迁", "查询再决定是否重试", "把不确定结果建模为可对账对象", "本节练习", "风险登记表：按信号和处置排序，不复制同一张卡", "取消 API 的乐观并发", "查询 API 的稳定响应"]}, {"title": "自动重试到什么程度应该停下来交给人工？", "content": "重试用于穿越短暂故障，不用于掩盖永久错误。\n每次重试都会增加外部负载、等待时间和重复副作用概率。\n\n#### 建立错误分类表\n\n| 分类 | 示例 | 默认动作 |\n| --- | --- | --- |\n| transient | 连接重置、503、限流 | 有界退避重试 |\n| permanent | 400、认证失败、配置错误 | 立即失败 |\n| conflict | 版本冲突、锁占用 | 查询状态后决定 |\n| unknown | 超时后结果不明 | 停止自动操作，人工确认 |\n\n#### 同时限制次数与总时间\n\n尝试 3 次只是一个维度。\n还要设置整体 deadline，让排队、连接、执行和退避都不能超过任务 SLA。\n\n#### 让重试计划先成为纯函数\n\n把“要不要重试”和“真的睡眠后调用”分开，边界值就能在毫秒内测试。\n计划器输入错误分类、尝试次数、剩余预算和服务端建议，输出下一步动作。\n\n```python\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\nfrom enum import StrEnum\nfrom random import Random\n\n\nclass ErrorKind(StrEnum):\n    TRANSIENT = \"transient\"\n    RATE_LIMITED = \"rate_limited\"\n    PERMANENT = \"permanent\"\n    CONFLICT = \"conflict\"\n    UNKNOWN = \"unknown\"\n\n\nclass RetryAction(StrEnum):\n    RETRY = \"retry\"\n    FAIL = \"fail\"\n    RECONCILE = \"reconcile\"\n    ESCALATE = \"escalate\"\n\n\n@dataclass(frozen=True, slots=True)\nclass RetryDecision:\n    action: RetryAction\n    delay_seconds: float\n    reason: str\n\n\ndef plan_retry(\n    *,\n    kind: ErrorKind,\n    attempt: int,\n    max_attempts: int,\n    remaining_seconds: float,\n    retry_after: float | None,\n    random: Random,\n) -> RetryDecision:\n    if kind is ErrorKind.PERMANENT:\n        return RetryDecision(RetryAction.FAIL, 0.0, \"permanent failure\")\n    if kind is ErrorKind.UNKNOWN:\n        return RetryDecision(RetryAction.RECONCILE, 0.0, \"outcome unknown\")\n    if kind is ErrorKind.CONFLICT:\n        return RetryDecision(RetryAction.RECONCILE, 0.0, \"state may have changed\")\n    if attempt >= max_attempts:\n        return RetryDecision(RetryAction.ESCALATE, 0.0, \"attempt budget exhausted\")\n\n    exponential = min(30.0, 2.0 ** max(0, attempt - 1))\n    requested = retry_after if kind is ErrorKind.RATE_LIMITED else None\n    base = max(exponential, requested or 0.0)\n    delay = base * random.uniform(0.8, 1.2)\n\n    if delay >= remaining_seconds:\n        return RetryDecision(RetryAction.ESCALATE, 0.0, \"deadline exhausted\")\n    return RetryDecision(RetryAction.RETRY, delay, \"bounded backoff\")\n```\n\n`Retry-After` 不是无条件服从的无限等待；它仍受任务总 deadline 和调用方 SLA 约束。\n冲突也不等于短暂网络错误，应先读取当前版本或状态再决定。\n\n参数化测试覆盖动作边界：\n\n```python\nimport pytest\nfrom random import Random\n\n\n@pytest.mark.parametrize(\n    (\"kind\", \"attempt\", \"remaining\", \"expected\"),\n    [\n        (ErrorKind.PERMANENT, 1, 60.0, RetryAction.FAIL),\n        (ErrorKind.UNKNOWN, 1, 60.0, RetryAction.RECONCILE),\n        (ErrorKind.CONFLICT, 1, 60.0, RetryAction.RECONCILE),\n        (ErrorKind.TRANSIENT, 3, 60.0, RetryAction.RETRY),\n        (ErrorKind.TRANSIENT, 5, 60.0, RetryAction.ESCALATE),\n        (ErrorKind.TRANSIENT, 3, 1.0, RetryAction.ESCALATE),\n    ],\n)\ndef test_retry_decision(kind, attempt, remaining, expected):\n    decision = plan_retry(\n        kind=kind,\n        attempt=attempt,\n        max_attempts=5,\n        remaining_seconds=remaining,\n        retry_after=None,\n        random=Random(7),\n    )\n    assert decision.action is expected\n```\n\n固定随机种子让抖动测试可重复，但生产中不同 Worker 不应共享完全相同的退避序列。\n集成测试还要观察实际请求数、总耗时和取消传播，纯函数不能证明客户端真的停止调用。\n\n#### 重试预算保护下游\n\n当大量任务同时失败时，限制全局重试率，配合熔断与降级。\n否则 100 个原请求可能放大为 300 个请求，进一步压垮恢复中的服务。\n\n#### 人工接管要带上下文\n\n```json\n{\n  \"operation_id\": \"op-123\",\n  \"state\": \"unknown\",\n  \"last_error_category\": \"response_lost\",\n  \"attempts\": 2,\n  \"target\": \"api-a\",\n  \"requested_action\": \"restart\",\n  \"next_action\": \"check external operation op-ext-9 before retry\"\n}\n```\n\n不能只发“执行失败，请查看日志”。\n\n#### 本章检查点\n\n```text\n[ ] 退出先摘除流量，再停止领取任务\n[ ] 清理有宽限期，取消会传播\n[ ] 消息确认发生在结果持久化之后\n[ ] 幂等键跨重试复用并有唯一约束\n[ ] 未知结果不自动当作未执行\n[ ] 重试按分类、次数、deadline 和全局预算限制\n```\n\n#### 操作执行结果分类\n\n```python\nclass OutcomeKind(StrEnum):\n    SUCCEEDED = \"succeeded\"\n    PERMANENT_FAILURE = \"permanent_failure\"\n    TRANSIENT_FAILURE = \"transient_failure\"\n    UNCERTAIN = \"uncertain\"\n    CANCELLED = \"cancelled\"\n\n\n@dataclass(frozen=True, slots=True)\nclass OperationResult:\n    kind: OutcomeKind\n    external_id: str | None\n    message: str\n    retry_after_seconds: float | None = None\n```\n\nWorker 不能通过异常字符串决定重试，应由适配器映射成稳定分类。\n\n#### 退避与 deadline\n\n```python\ndef next_attempt_time(\n    *,\n    now: datetime,\n    deadline: datetime,\n    attempt: int,\n    retry_after_seconds: float | None,\n    random_fraction: float,\n) -> datetime | None:\n    exponential = min(60.0, 0.5 * (2 ** (attempt - 1)))\n    requested = retry_after_seconds or 0.0\n    base = max(exponential, requested)\n    jitter = base * 0.2 * random_fraction\n    candidate = now + timedelta(seconds=base + jitter)\n\n    if candidate >= deadline:\n        return None\n    return candidate\n```\n\n返回 `None` 表示剩余预算不足，进入最终失败或人工处理。\n\n#### 处理结果的决策表\n\n| 结果 | 操作状态 | Job 状态 | 后续 |\n| --- | --- | --- | --- |\n| succeeded | succeeded | done | 记录外部 ID，确认完成 |\n| permanent_failure | failed | done | 不重试，给修复建议 |\n| transient_failure 且有预算 | queued | queued | 设置下次 available_at |\n| transient_failure 且无预算 | failed | done | 标 deadline_exhausted |\n| uncertain | unknown | blocked | 停止自动重试 |\n| cancelled | cancelled | done | 保存已完成子结果 |\n\n\n#### Worker 指标\n\n```text\noperations_submitted_total{action}\noperations_completed_total{action,outcome}\noperation_duration_seconds{action,outcome}\njobs_claimed_total{worker}\njob_claim_latency_seconds\njob_attempts_total{outcome}\njob_lease_renewal_failures_total\njob_queue_depth{state}\njob_oldest_available_age_seconds\nworker_inflight_jobs{worker}\nworker_shutdown_duration_seconds\nidempotency_reuse_total{action}\noperations_unknown_total{action}\n```\n\n不要把 operation ID、目标主机或用户作为高基数指标标签；这些细节进入日志和追踪。\n\n#### 服务级目标候选\n\n```text\n提交可用性：99.9% 合法请求在 1 秒内返回 operation ID\n调度延迟：99% 可执行任务在 30 秒内被领取\n状态新鲜度：运行中进度延迟不超过 15 秒\n重复副作用：已知为 0，任何一例触发事故\n未知结果：每月低于全部操作的 0.01%\n优雅退出：99% Worker 在 20 秒宽限期内停止\n```\n\nSLO 数值必须结合业务风险、基础设施和测量能力评审，不应直接照抄示例。\n\n#### 告警要指向动作\n\n| 信号 | 条件示例 | 值班动作 |\n| --- | --- | --- |\n| 最老任务年龄 | 连续 10 分钟超阈值 | 查 Worker 容量、领取错误、数据库锁 |\n| 租约续期失败 | 5 分钟显著增加 | 查数据库延迟和 Worker 停顿 |\n| unknown 增长 | 任意非零突增 | 停止自动重试，核对外部系统 |\n| 失败率上升 | 按 action 超过基线 | 区分配置、认证、依赖故障 |\n| 幂等复用突增 | 超过请求比例阈值 | 查客户端重试风暴或重复点击 |", "subs": ["建立错误分类表", "同时限制次数与总时间", "让重试计划先成为纯函数", "重试预算保护下游", "人工接管要带上下文", "本章检查点", "操作执行结果分类", "退避与 deadline", "处理结果的决策表", "Worker 指标", "服务级目标候选", "告警要指向动作"]}]}, {"title": "第十六章 · 最后回到选择：这项工作真的适合 Python 吗？", "sections": [{"title": "哪些运维任务用 Python 能更快交付，也更容易维护？", "content": "Python 的优势在于表达力、成熟库、交付速度和与文本/API/系统工具的连接能力。\n它尤其适合：\n\n- 配置与清单转换。\n- API 编排与资产对账。\n- 中小规模批量巡检。\n- 报表、告警归并与数据清洗。\n- CI/CD 辅助和发布验证。\n- 已有 Python 平台的 Backend、Worker 与内部 CLI。\n\n#### 团队能力比基准跑分更重要\n\n一个团队能测试、排障、打包和维护的 Python 工具，通常胜过没人能安全修改的“更快”实现。\n选择还要看已有库、部署平台、安全扫描和 on-call 经验。\n\n#### 性能问题先测量\n\nI/O 密集工具常被网络延迟主导，换语言未必改善外部 SLA。\n先用有界并发、连接复用、批处理和算法修复验证瓶颈；若 CPU、内存或启动分发确实不满足，再评估替代。\n\n#### Python 也需要工程边界\n\n解释型语言不等于只能写脚本。\n锁定依赖、入口点、类型、测试、日志和发布产物能让 Python 工具成为稳定产品。\n\n#### 何时再引入消息队列\n\n数据库任务表达到以下真实边界后，再评估队列：\n\n- 任务写入和领取负载影响核心数据库。\n- 需要大量独立消费组读取相同事件。\n- 跨区域缓存与断线恢复成为核心需求。\n- 峰值流量需要独立削峰，数据库无法经济扩展。\n- 消息保留、重放和顺序语义已有明确要求。\n\n引入队列后仍保留 operation 数据库作为查询事实源。\n消息传递通常是至少一次，幂等和 unknown 状态不会因此消失。\n\n#### 何时再引入 Agent\n\n只有中心 Worker 无法触达目标、本地采集需要主机权限、或数据量不适合集中传输时考虑 Agent。\n设计前回答：\n\n```text\nAgent 如何注册和证明机器身份？\n控制面如何吊销单台 Agent？\n证书如何轮换？\n离线多久视为失联？\n离线任务是否缓存，容量多少？\n命令集合是允许列表还是任意 Shell？\n升级失败如何回滚？\n最低兼容版本是什么？\n每台 CPU/内存/磁盘预算是多少？\n日志和指标如何限制高基数？\n卸载后残留哪些文件和权限？\n```\n\n如果这些问题还没有所有者，Agent 不是捷径，而是新的产品。", "subs": ["团队能力比基准跑分更重要", "性能问题先测量", "Python 也需要工程边界", "何时再引入消息队列", "何时再引入 Agent"]}, {"title": "面对大量主机、常驻 Agent 或低延迟服务，为什么要认真考虑 Go？", "content": "Go 常见优势是单一原生二进制、较低常驻开销、启动快、并发模型直接和跨环境分发方便。\n这些特征与大量主机 Agent、长期运行网络服务和资源受限环境更匹配。\n\n#### 用约束矩阵比较\n\n| 约束 | Python 倾向 | Go 倾向 |\n| --- | --- | --- |\n| 快速连接 API 与数据处理 | 强 | 可行但开发量可能更高 |\n| 单文件跨主机分发 | 需打包方案 | 原生二进制常更直接 |\n| 大量常驻实例内存 | 需实测 | 通常更有优势 |\n| CPU 密集并行 | 进程/扩展 | goroutine 不等于 CPU，但运行时更适合并行 |\n| 团队现有能力 | Python 团队优先 | Go 团队优先 |\n| Python 专属 SDK | 直接复用 | 可能需自建协议层 |\n\n表格是候选方向，不是结论。\n必须用代表性负载测量内存、CPU、启动、吞吐、P95/P99 延迟和部署复杂度。\n\n#### Agent 还要看升级与兼容\n\n语言之外，Agent 需要签名发布、回滚、协议版本、心跳抖动、离线行为和最小权限。\n若这些能力没有设计，换成 Go 也不会自动可靠。\n\n#### 可以混合而不是二选一\n\n控制面 Backend 与自动化编排使用 Python，主机 Agent 使用 Go，通过版本化协议交互，是常见边界。\n拆分理由应是部署与资源模型不同，而不是语言偏好。\n\n#### 本节练习\n\n选取 1,000 个模拟目标，分别制作 Python 与 Go 最小探针原型。\n在同一机器、相同并发、相同超时和失败比例下测量；把开发时间、产物大小和诊断能力也计入结论。\n\n#### Python 与 Go 对照实验记录\n\n```text\n共同协议版本：\n共同 fixture 摘要：\n目标数量：\n成功/超时/失败比例：\n并发上限：\n单项超时：\n总 deadline：\n运行轮数：\n预热方式：\n\nPython 版本与构建：\nPython 产物大小：\nPython 启动时间：\nPython 峰值 RSS：\nPython CPU 时间：\nPython 总吞吐：\nPython P95/P99：\n\nGo 版本与构建：\nGo 产物大小：\nGo 启动时间：\nGo 峰值 RSS：\nGo CPU 时间：\nGo 总吞吐：\nGo P95/P99：\n\n实现工时对比：\n依赖与安全扫描：\n跨平台分发：\n诊断体验：\n团队维护能力：\n最终选择：\n触发复审条件：\n```\n\n综合实验最后要得出的不是“微服务更可靠”。\n真正结论应是：每增加一个组件，都要有当前约束、可执行验证、明确所有者和移除或升级条件。", "subs": ["用约束矩阵比较", "Agent 还要看升级与兼容", "可以混合而不是二选一", "本节练习", "Python 与 Go 对照实验记录"]}, {"title": "怎样把前面的知识收束成一个可验证的批量巡检 CLI？", "content": "最终项目 `ops-check` 接收一份目标配置，并发访问 localhost 测试端点，输出稳定 JSON Lines 与摘要。\n默认只检查，不执行变更；所有外部调用有超时，所有并发有上限。\n\n这里的分文件代码是可组合的接口示意，不能把单个片段的 AST 通过称为项目运行通过。抽取实验时必须按项目树组装文件、安装锁定依赖，并执行单测、localhost 集成测试和入口 smoke。\n若最终运行在 Kubernetes 中，探针、终止宽限期与工作负载控制器的系统行为继续参考 [Kubernetes 专题](../../cloud-native/kubernetes/README.md)；任务事实源与消息传递分别参考 [MySQL 专题](../../data-systems/mysql/README.md) 和 [Kafka 专题](../../data-systems/kafka/README.md)。\n\n#### 项目结构\n\n```text\nops-check/\n├── pyproject.toml\n├── src/ops_check/\n│   ├── __init__.py\n│   ├── cli.py\n│   ├── config.py\n│   ├── domain.py\n│   ├── http_probe.py\n│   ├── runner.py\n│   └── report.py\n└── tests/\n    ├── fixtures/\n    │   ├── targets.json\n    │   └── invalid.json\n    ├── test_cli.py\n    ├── test_config.py\n    ├── test_report.py\n    └── test_runner.py\n```\n\n#### 领域模型\n\n```python\nfrom dataclasses import dataclass\nfrom enum import StrEnum\n\n\nclass ResultCategory(StrEnum):\n    OK = \"ok\"\n    TIMEOUT = \"timeout\"\n    UNREACHABLE = \"unreachable\"\n    INVALID_RESPONSE = \"invalid_response\"\n    INTERNAL_ERROR = \"internal_error\"\n\n\n@dataclass(frozen=True, slots=True)\nclass Target:\n    name: str\n    url: str\n    timeout_seconds: float\n\n\n@dataclass(frozen=True, slots=True)\nclass CheckResult:\n    target: str\n    category: ResultCategory\n    latency_ms: float | None\n    message: str\n\n    @property\n    def ok(self) -> bool:\n        return self.category is ResultCategory.OK\n```\n\n#### 运行器边界\n\n```python\nfrom collections.abc import Callable, Iterable\nfrom concurrent.futures import ThreadPoolExecutor, as_completed\n\n\nProbe = Callable[[Target], CheckResult]\n\n\ndef run_checks(\n    targets: Iterable[Target],\n    probe: Probe,\n    *,\n    concurrency: int,\n) -> list[CheckResult]:\n    if not 1 <= concurrency <= 64:\n        raise ValueError(\"concurrency must be between 1 and 64\")\n\n    target_list = list(targets)\n    results: list[CheckResult] = []\n\n    with ThreadPoolExecutor(max_workers=concurrency) as executor:\n        future_to_target = {\n            executor.submit(probe, target): target\n            for target in target_list\n        }\n\n        for future in as_completed(future_to_target):\n            target = future_to_target[future]\n            try:\n                result = future.result()\n            except ExpectedProbeError as exc:\n                result = CheckResult(\n                    target=target.name,\n                    category=exc.category,\n                    latency_ms=None,\n                    message=str(exc),\n                )\n            results.append(result)\n\n    return sorted(results, key=lambda item: item.target)\n```\n\n排序让并发完成次序不会造成输出漂移。\n海量目标版本应改用固定在途窗口，避免一次创建全部 Future。\n\n#### 退出码规则\n\n```python\ndef exit_code(results: list[CheckResult], *, complete: bool) -> int:\n    if not complete:\n        return 3\n    if any(not result.ok for result in results):\n        return 1\n    return 0\n```\n\n配置错误在进入执行器前返回 2，用户中断返回 130。\n\n#### 验收场景\n\n```text\n场景 1：两个 localhost 端点都返回合法健康响应\n期望：complete=true，退出 0\n\n场景 2：一个端点超时，另一个成功\n期望：两条结果均存在，失败分类 timeout，退出 1\n\n场景 3：配置端口或 URL 非法\n期望：不发任何请求，stderr 指出字段，退出 2\n\n场景 4：批次截止时间到达\n期望：停止新任务，标记 incomplete，退出 3\n\n场景 5：运行中 SIGINT\n期望：有限清理，不输出“全部完成”，退出 130\n```\n\n#### 最终交付门禁\n\n```bash\nruff format --check .\nruff check .\npython -m mypy src\npython -m pytest\npython -m build\npython -m venv /tmp/ops-check-smoke\n/tmp/ops-check-smoke/bin/python -m pip install dist/*.whl\n/tmp/ops-check-smoke/bin/ops-check --help\n```\n\n临时路径在真实执行时应使用 `mktemp -d`，并在确认目标后清理；这里展示的是门禁形态。\n\n#### 全系列最终复盘\n\n第一册让你读懂对象、输入、控制流和异常。\n第二册让代码安全连接文件、命令、CLI、HTTP 与并发。\n第三册让工具可安装、可配置、可观察、可测试和可诊断。\n第四册让你根据真实约束选择进程边界、生命周期与语言。\n\n判断一个运维 Python 项目是否可以交付，最后回到这些问题：\n\n```text\n[ ] 输入是否经过可信边界\n[ ] 操作是否有 dry-run、授权与审计\n[ ] 外部调用是否有超时、重试分类和总预算\n[ ] 并发与队列是否有上限\n[ ] 重复执行是否安全，未知状态是否会停下来\n[ ] 中断和部署退出是否能有限收尾\n[ ] 输出、日志、指标和退出码是否能解释结果\n[ ] 干净环境是否能安装并运行\n[ ] 测试是否覆盖真实失败而非只覆盖 happy path\n[ ] Python 是否仍符合部署、规模和团队约束\n```\n\n会写语法只是起点。\n能把一次自动化动作的输入、执行、失败、证据和演进边界讲清楚，才是运维工程师真正需要的 Python 能力。\n\n#### 用纯状态转换固定架构契约\n\n数据库、队列和 Worker 都围绕同一组状态工作时，先把合法事件写成纯函数。\n适配器负责持久化与并发控制，转换函数只决定某个状态收到某个事件后能否前进。\n\n```python\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass, replace\nfrom enum import StrEnum\n\n\nclass OperationState(StrEnum):\n    QUEUED = \"queued\"\n    RUNNING = \"running\"\n    RETRY_WAIT = \"retry_wait\"\n    SUCCEEDED = \"succeeded\"\n    FAILED = \"failed\"\n    UNKNOWN = \"unknown\"\n    CANCELLED = \"cancelled\"\n\n\nclass Event(StrEnum):\n    CLAIM = \"claim\"\n    SUCCEED = \"succeed\"\n    TEMPORARY_FAILURE = \"temporary_failure\"\n    PERMANENT_FAILURE = \"permanent_failure\"\n    LOSE_OUTCOME = \"lose_outcome\"\n    RETRY_DUE = \"retry_due\"\n    RECONCILE_SUCCESS = \"reconcile_success\"\n    RECONCILE_FAILURE = \"reconcile_failure\"\n    CANCEL = \"cancel\"\n\n\n@dataclass(frozen=True, slots=True)\nclass Operation:\n    operation_id: str\n    state: OperationState\n    attempt: int = 0\n    detail: str = \"\"\n\n\nTRANSITIONS: dict[tuple[OperationState, Event], OperationState] = {\n    (OperationState.QUEUED, Event.CLAIM): OperationState.RUNNING,\n    (OperationState.QUEUED, Event.CANCEL): OperationState.CANCELLED,\n    (OperationState.RUNNING, Event.SUCCEED): OperationState.SUCCEEDED,\n    (OperationState.RUNNING, Event.TEMPORARY_FAILURE): OperationState.RETRY_WAIT,\n    (OperationState.RUNNING, Event.PERMANENT_FAILURE): OperationState.FAILED,\n    (OperationState.RUNNING, Event.LOSE_OUTCOME): OperationState.UNKNOWN,\n    (OperationState.RUNNING, Event.CANCEL): OperationState.CANCELLED,\n    (OperationState.RETRY_WAIT, Event.RETRY_DUE): OperationState.QUEUED,\n    (OperationState.RETRY_WAIT, Event.CANCEL): OperationState.CANCELLED,\n    (OperationState.UNKNOWN, Event.RECONCILE_SUCCESS): OperationState.SUCCEEDED,\n    (OperationState.UNKNOWN, Event.RECONCILE_FAILURE): OperationState.FAILED,\n}\n\n\ndef transition(operation: Operation, event: Event, detail: str = \"\") -> Operation:\n    key = (operation.state, event)\n    try:\n        next_state = TRANSITIONS[key]\n    except KeyError as error:\n        raise ValueError(\n            f\"illegal transition: {operation.state.value} + {event.value}\"\n        ) from error\n\n    attempt = operation.attempt + 1 if event is Event.CLAIM else operation.attempt\n    return replace(\n        operation,\n        state=next_state,\n        attempt=attempt,\n        detail=detail,\n    )\n```\n\n终态没有向外转换，因此成功操作不能被再次 claim。\n`UNKNOWN` 只接受对账结果，不接受 `RETRY_DUE`；这条限制直接阻止“超时就再做一次”的危险默认。\n\n```python\nimport pytest\n\n\n@pytest.mark.parametrize(\n    (\"start\", \"event\", \"expected\"),\n    [\n        (OperationState.QUEUED, Event.CLAIM, OperationState.RUNNING),\n        (OperationState.QUEUED, Event.CANCEL, OperationState.CANCELLED),\n        (OperationState.RUNNING, Event.SUCCEED, OperationState.SUCCEEDED),\n        (\n            OperationState.RUNNING,\n            Event.TEMPORARY_FAILURE,\n            OperationState.RETRY_WAIT,\n        ),\n        (OperationState.RUNNING, Event.LOSE_OUTCOME, OperationState.UNKNOWN),\n        (\n            OperationState.UNKNOWN,\n            Event.RECONCILE_SUCCESS,\n            OperationState.SUCCEEDED,\n        ),\n        (\n            OperationState.UNKNOWN,\n            Event.RECONCILE_FAILURE,\n            OperationState.FAILED,\n        ),\n    ],\n)\ndef test_legal_transitions(start, event, expected):\n    operation = Operation(\"op-1\", start)\n    assert transition(operation, event).state is expected\n\n\n@pytest.mark.parametrize(\n    \"terminal\",\n    [\n        OperationState.SUCCEEDED,\n        OperationState.FAILED,\n        OperationState.CANCELLED,\n    ],\n)\ndef test_terminal_state_cannot_be_claimed(terminal):\n    operation = Operation(\"op-1\", terminal)\n    with pytest.raises(ValueError, match=\"illegal transition\"):\n        transition(operation, Event.CLAIM)\n\n\ndef test_unknown_cannot_enter_retry_without_reconciliation():\n    operation = Operation(\"op-1\", OperationState.UNKNOWN)\n    with pytest.raises(ValueError, match=\"illegal transition\"):\n        transition(operation, Event.RETRY_DUE)\n```\n\n纯函数测试不能证明数据库并发写安全。\n持久层更新仍要带旧状态和版本条件，例如 `WHERE id = ? AND state = ? AND version = ?`；影响行数不是 1 时，调用方重新读取事实，而不是覆盖另一 Worker 的结果。\n\n把状态转换与审计事件放在同一事务边界时，还要决定审计存储不可用的策略。\n高风险写操作通常在审计落盘失败时停止；若副作用已发生而审计提交失败，则状态进入 `unknown` 并触发对账，不能伪造一条成功审计后继续。\n\n状态机验收至少覆盖四层：\n\n| 层次 | 主要证据 | 不能证明 |\n| --- | --- | --- |\n| 纯函数 | 合法与非法转换 | 数据库竞争 |\n| 存储集成 | 条件更新和事务回滚 | 多实例故障时序 |\n| 进程故障注入 | 崩溃 重启 失租 | 真实下游幂等 |\n| 候选环境 | 远端对账与审计连续性 | 未演练的生产规模 |\n\n每新增一个状态或事件，都要同时更新转换表、持久化约束、API schema、指标分类、升级兼容和回滚测试。\n如果无法说明旧 Worker 遇到新状态时怎样处理，就不具备滚动升级条件。\n\n#### 第四册综合实验：从同步 CLI 演进到可恢复任务系统\n\n实验假设：批量检查增长到 20,000 个目标，单批可能运行 30 分钟，多个团队通过页面和 CI 提交，并要求任务可查询、可取消、可审计。\n这些约束已经超过同步 HTTP 请求的合理生命周期，因此引入 Backend、任务表和 Worker。\n暂不引入消息队列；Worker 通过数据库租约领取任务，先验证最小组合。\n\n#### 故障演练一：Worker 在副作用前崩溃\n\n```text\n准备：创建可幂等测试动作，租约 10 秒。\n注入：Worker 领取后、调用外部系统前强制退出。\n预期：租约到期后任务重新排队。\n预期：attempt 增加，但外部副作用总数仍为 1。\n观察：job lease、领取延迟、操作状态、审计事件。\n通过：最终 succeeded，只有一次外部动作。\n失败：任务永久 running，或出现两次副作用。\n```\n\n#### 故障演练二：副作用后、结果提交前崩溃\n\n```text\n准备：外部假系统记录 idempotency key 和外部 operation ID。\n注入：外部动作成功后终止 Worker，不写本地结果。\n预期：恢复 Worker 按同一键查询外部结果。\n预期：确认成功后补写结果，不再次执行。\n无法查询时：operation 进入 unknown，禁止自动重试。\n通过：副作用一次，最终状态可解释。\n失败：直接重试导致重复动作。\n```\n\n#### 故障演练三：数据库短暂不可用\n\n```text\n准备：运行多个 Worker，建立正常基线。\n注入：阻断测试数据库连接 20 秒。\n预期：Worker 不领取新任务。\n预期：在途任务若无法续租，停止新副作用。\n预期：恢复后带抖动重连，不形成连接风暴。\n观察：连接错误、续租失败、队列年龄、unknown。\n通过：无重复副作用，恢复时间在目标内。\n```\n\n#### 故障演练四：收到部署终止信号\n\n```text\n准备：一个 5 秒任务和一个 60 秒任务，宽限期 15 秒。\n注入：发送 SIGTERM。\n预期：就绪立即失败，停止领取新任务。\n预期：短任务完成并提交。\n预期：长任务按策略取消或释放租约。\n预期：15 秒内退出，状态不是假成功。\n观察：shutdown duration、inflight、lease owner、审计。\n```\n\n#### 故障演练五：重复提交风暴\n\n```text\n准备：固定同一 idempotency key。\n注入：100 个并发客户端提交相同请求。\n预期：数据库只有一条 operation 与一条初始 job。\n预期：所有成功响应返回同一 operation ID。\n预期：idempotency reuse 指标增加。\n通过：外部动作只有一次，没有 500 风暴。\n```\n\n#### 故障演练六：时钟发生跳变\n\n```text\n准备：持续时间使用单调时钟，数据库期限使用服务端时间。\n注入：在测试替身中让墙钟向后移动。\n预期：单次耗时不为负数。\n预期：租约判断由数据库统一完成。\n预期：日志时间可能变化但 operation 顺序仍由版本和事件 ID 判断。\n```\n\n#### 故障演练七：外部系统返回永久认证失败\n\n```text\n注入：所有请求返回 401。\n预期：分类 permanent_failure。\n预期：不进行指数重试。\n预期：错误日志不包含 Authorization。\n预期：告警聚合到 action 和错误分类，而不是每目标一条告警。\n```\n\n#### 故障演练八：外部系统返回限流\n\n```text\n注入：前两次返回 429 和有限 Retry-After，第三次成功。\n预期：等待值受 deadline 和最大退避限制。\n预期：多个 Worker 加抖动。\n预期：没有超过全局重试预算。\n预期：attempt 与最终结果完整记录。\n```\n\n#### 故障演练九：消息 schema 未知\n\n即使当前使用任务表，也要把 job payload 当版本化消息。\n\n```text\n注入：schema_version=99。\n预期：Worker 不猜测字段。\n预期：任务进入隔离状态，记录版本与 operation ID。\n预期：不打印完整敏感 payload。\n预期：发布兼容告警指向生产者版本。\n```\n\n#### 故障演练十：审计存储不可用\n\n```text\n低风险只读巡检：可按策略继续，并把待补审计写受控缓冲。\n高风险变更：默认拒绝执行。\n缓冲有容量、加密、重放和过期策略。\n审计恢复后按 operation ID 去重补写。\n任何降级都产生高优先级告警。\n```\n\n#### 架构验收矩阵\n\n| 编号 | 约束 | 设计证据 | 运行证据 |\n| --- | --- | --- | --- |\n| A01 | 长任务不占 HTTP | 异步 operation API | 提交延迟测试 |\n| A02 | 可查询 | operation 状态模型 | 查询 API 集成测试 |\n| A03 | 可取消 | cancelling 状态 | SIGTERM/取消演练 |\n| A04 | 可恢复 | job 租约 | Worker 崩溃演练 |\n| A05 | 不重复 | 幂等键与唯一约束 | 并发提交演练 |\n| A06 | 结果不明会停止 | unknown 终态 | 响应丢失演练 |\n| A07 | 重试有界 | deadline 与预算 | 429/503 演练 |\n| A08 | 权限隔离 | Worker 专用身份 | 拒绝越权测试 |\n| A09 | 可审计 | 事件 schema | 审计不可用演练 |\n| A10 | 可扩容 | 原子领取 | 多 Worker 竞争测试 |\n| A11 | 可升级 | schema version | 新旧版本兼容测试 |\n| A12 | 可观测 | 指标与结构日志 | 告警演练 |\n| A13 | 可回退 | 发布与数据库回退计划 | canary 回退演练 |\n| A14 | 资源有界 | 并发、队列、输出上限 | 压力测试 |\n| A15 | 安全退出 | draining 协议 | 部署终止演练 |\n\n#### 不要遗漏的反向问题\n\n- 如果只用 CLI，具体哪条约束无法满足？\n- 如果只加 Backend 而不加 Worker，会在哪个超时边界失败？\n- 如果用进程内队列，重启时未完成任务如何恢复？\n- 如果加消息队列，谁维护、谁告警、谁升级？\n- 如果部署 Agent，如何证明身份和撤销权限？\n- 如果拆成服务，schema 如何向前向后兼容？\n- 如果选择 Python，容量证据是否覆盖真实并发？\n- 如果选择 Go，团队排障与 SDK 重写成本是多少？\n- 如果状态为 unknown，谁在多久内接管？\n- 如果审计不可用，哪些动作必须停止？\n\n#### 生产准备评审记录模板\n\n```text\n服务名称：\n负责人：\n值班团队：\n业务动作：\n只读/变更：\n峰值提交率：\n目标总量：\n单任务最大时长：\n单项超时：\n批次 deadline：\n最大并发：\n最大排队深度：\n幂等键定义：\n外部系统是否支持查询：\nunknown 接管人：\n重试分类：\n最大尝试：\n全局重试预算：\n任务持久化位置：\n租约时长：\n续租间隔：\n优雅退出宽限期：\nSecret 来源：\n审计目标：\n审计失败策略：\n日志保留期：\n结果保留期：\n数据分类：\n删除策略：\nSLO：\n告警：\nRunbook：\n容量测试证据：\n故障演练证据：\n回退步骤：\n未验证风险：\n批准人：\n复审日期：\n```\n\n#### 最终选型结论模板\n\n```text\n问题：\n当前证据：\n目标规模：\n可靠性要求：\n安全与合规要求：\n已有基础设施：\n团队能力：\n\n采用组件：\n每个组件的唯一职责：\n不采用组件：\n不采用原因：\nPython 承担范围：\nGo 承担范围：\n组件间协议：\n状态事实源：\n幂等键：\nunknown 处理：\n退出宽限期：\n重试预算：\n审计失败策略：\n\n容量证据：\n故障演练证据：\n安全验证证据：\n干净部署证据：\n回退演练证据：\nNOT VERIFIED：\n\n复审触发：\n移除条件：\n负责人：\n复审日期：\n```\n\n如果结论无法填出“不采用什么”和“何时复审”，通常说明选型仍是技术清单，不是对约束的回答。\n真正成熟的架构允许在证据变化时缩小，而不是只能不断增加组件。\n\n#### 最终演练记录要能由下一位维护者重放\n\n架构评审结束后，把选型结论转换成一次故障演练任务。\n不要只贴监控截图；保留输入摘要、候选产物、注入时机、观察查询和恢复动作。\n\n```text\n演练编号：\n对应风险：\n候选版本与摘要：\n环境与权限：\n初始 operation 状态：\n目标数量与并发：\n外部系统替身或沙箱：\n\n注入故障：\n注入位置：副作用前 副作用后 提交前 确认前\n注入时间：\n预期状态转换：\n预期退出或恢复时间：\n预期重试次数：\n预期审计事件：\n\n实际状态时间线：\n实际外部调用次数：\n实际退出或恢复时间：\n实际队列最老年龄：\n实际日志查询：\n实际指标查询：\n实际审计记录：\n残留进程 文件 租约 消息：\n\n结果：PASS FAIL NOT VERIFIED BLOCKED\n偏差说明：\n未验证边界：\n回退是否执行：\n后续动作与负责人：\n复查日期：\n```\n\n至少轮换四个故障点：领取后崩溃、副作用后响应丢失、审计存储不可用、排空期间超过宽限期。\n每次只改变一个主要变量，才能把状态变化与故障机制对应起来。\n\n通过标准必须可观察，例如“旧 owner 的条件更新影响 0 行”“相同幂等键的远端调用次数为 1”“SIGTERM 后 15 秒内无新领取”。\n“看起来恢复了”不是可复核结论；队列清空也可能是任务被错误丢弃。\n\n演练之后再检查反向证据：\n\n- 是否有任务被标成功但缺少审计。\n- 是否有消息已确认但结果仍未持久化。\n- 是否有 unknown 被自动改成 retryable。\n- 是否有失租 Worker 继续写入。\n- 是否有回滚版本无法读取候选版本状态。\n- 是否有指标聚合正常但目标级日志全部丢失。\n\n只有已实际执行且满足条件的项标记 PASS。\nSQLite、假客户端和 localhost 的结果分别限定为单机事务、编排逻辑和协议测试；真实数据库、多实例 Worker、生产 IAM 与编排器信号仍需在对应环境验证。\n\n完成后由未参与实现的人按记录重放一次关键场景。\n如果对方必须依赖口头补充才能找到命令、输入或判定条件，交付材料仍不完整。\n架构的价值不只在正常路径能运行，也在故障发生时，值班人员能根据状态、证据和所有者做出下一步动作。\n最终选择可以是保持单一 CLI；只要它满足当前规模和恢复要求，这同样是经过验证的架构结论。\n复杂度不是成熟度的替代品。\n\n把这份记录与代码版本绑定，下一次扩容、拆分或换语言时先比较旧触发条件是否仍成立。\n如果证据已经变化，就允许缩小方案并删除不再创造价值的组件。", "subs": ["项目结构", "领域模型", "运行器边界", "退出码规则", "验收场景", "最终交付门禁", "全系列最终复盘", "用纯状态转换固定架构契约", "第四册综合实验", "故障演练一：Worker 在副作用前崩溃", "故障演练二：副作用后、结果提交前崩溃", "故障演练三：数据库短暂不可用", "故障演练四：收到部署终止信号", "故障演练五：重复提交风暴", "故障演练六：时钟发生跳变", "故障演练七：外部系统返回永久认证失败", "故障演练八：外部系统返回限流", "故障演练九：消息 schema 未知", "故障演练十：审计存储不可用", "架构验收矩阵", "不要遗漏的反向问题", "生产准备评审记录模板", "最终选型结论模板", "最终演练记录要能由下一位维护者重放"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
