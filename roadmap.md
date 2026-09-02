@@ -40,6 +40,9 @@ flowchart LR
   dataSystems --> kafka[Kafka]
   dataSystems --> rabbitmq[RabbitMQ]
 
+  root --> programming[编程与自动化]
+  programming --> pythonForOperations[Python 运维自动化与工程实践]
+
   root --> delivery[持续交付]
   delivery --> ansible[Ansible]
   delivery --> jenkins[Jenkins]
@@ -60,7 +63,7 @@ flowchart LR
   classDef rootNode fill:#1d4ed8,stroke:#1e3a8a,color:#ffffff,stroke-width:3px
   classDef categoryNode fill:#dbeafe,stroke:#3b82f6,color:#172554,stroke-width:2px
   class root rootNode
-  class systems,architecture,cloudNative,observability,dataSystems,delivery,webInfra,aiInfra,aiops,aiAgent categoryNode
+  class systems,architecture,cloudNative,observability,dataSystems,programming,delivery,webInfra,aiInfra,aiops,aiAgent categoryNode
 ```
 
 > 说明：思维导图用于展示知识版图；README 中原有的内容导航表格仍更适合作为可点击入口。
