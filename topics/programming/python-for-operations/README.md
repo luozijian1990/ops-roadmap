@@ -9,6 +9,8 @@
 - 使用 `pathlib`、`shutil`、`subprocess`、CLI、HTTP 客户端和有界并发完成自动化。
 - 管理项目结构、虚拟环境、`pyproject.toml`、依赖锁、配置、Secret、日志与审计。
 - 使用类型检查、Ruff、pytest、假对象、localhost 服务和诊断工具建立质量门禁。
+- 区分引用计数、循环引用、GC、`tracemalloc` 与 RSS 证据，并定位 event loop 阻塞、取消和资源清理问题。
+- 选择 wheel、`uv tool`/pipx、zipapp 或 PyInstaller 等交付方式，依据部署、容量和团队约束判断 Python/Go 边界。
 - 设计 Backend、Worker、Scheduler 和 Agent 的边界，并处理幂等、租约、重试和优雅退出。
 
 ## 推荐学习顺序

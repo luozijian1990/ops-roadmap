@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Go 运维开发与云原生工程 · 第三册：系统自动化与 CLI · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Go 运维开发与云原生工程 · 第三册：系统自动化与 CLI</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Go 运维开发与云原生工程 · 第三册：系统自动化与 CLI", "intro": "", "parts": [{"title": "第九章 · 逐步处理文本、字节和大文件", "sections": [{"title": "字符串、字节切片和 rune 怎样避免乱码与错误截断？", "content": "Go 字符串是一段只读字节，通常承载 UTF-8，但类型本身不保证编码。\n`len(s)` 返回字节数，按索引得到 byte；`for range` 才按 UTF-8 解码 rune。\n日志截断、列宽和协议长度必须先确认单位。\n\n```go\nfunc preview(s string, maxRunes int) string {\n\trunes := []rune(strings.ToValidUTF8(s, \"�\"))\n\tif len(runes) <= maxRunes { return string(runes) }\n\treturn string(runes[:maxRunes]) + \"…\"\n}\n```\n\n`[]rune` 会分配内存，不适合无界大文件。\n大流量处理应使用 `utf8.DecodeRune` 或流式 reader。\n判断成功时既看输出没有乱码，也要保留非法输入计数；静默替换会丢失取证信息。\n\n#### 用测试固定字节与字符边界\n\n测试至少覆盖纯 ASCII、中文、Emoji、空字符串和截断的 UTF-8 字节。\n若输出用于终端列宽，rune 数也不等于显示宽度；此时应明确只保证“不切坏 UTF-8”，不要声称能完美对齐所有终端。\n将原始字节摘要、替换次数和结果分别记录，既便于排障，也避免把无法解码的生产证据彻底抹掉。\n\n```go\nfunc TestPreviewKeepsUTF8(t *testing.T) {\n\tgot := preview(\"节点🙂\", 2)\n\tif !utf8.ValidString(got) || got != \"节点…\" {\n\t\tt.Fatalf(\"unexpected preview %q\", got)\n\t}\n}\n```\n\n#### byte 和 string 转换的所有权\n\n`string(data)` 与 `[]byte(text)` 通常会产生复制，换来不可变字符串与可变字节之间清晰边界。\n不要为了减少一次复制使用 unsafe 转换；源 buffer 被复用后，字符串内容可能变化，破坏 map key、日志和并发安全。\n\n处理协议时保留原始 byte，在确认编码后再转 string。\n计算摘要、压缩和网络传输通常按 byte；匹配人类文本、JSON 字段和路径时按约定编码处理。\n\n#### 字符串拼接与扫描\n\n少量拼接用 `+` 清晰；循环构建大文本使用 `strings.Builder` 或直接写入 `io.Writer`。\n预估容量可减少分配，但不能根据不可信长度无限 Grow。\n热路径优化前用 benchmark 证明。\n\n扫描大文本时避免反复 `strings.Split` 生成全部片段。\n按行、分隔符或 token 流式读取，并对单 token 设置上限。\n搜索 ASCII 协议标志可用 bytes，面向用户的大小写转换则要说明语言规则。\n\n#### 编码错误的三种策略\n\n配置和安全策略文件通常遇到无效 UTF-8就拒绝；日志分析可替换并计数；取证工具则应保存原始字节和摘要。\n策略必须由用途决定，不能统一“忽略错误”。\n\n练习：输入包含中文、emoji、组合字符、无效序列与 2MiB 单行，分别输出 byte length、rune count、valid 标记和安全 preview。\n确认程序内存有界且不会把无效证据静默改写。\n\n#### 文本边界验收\n\n用原始 byte fixture 保存 ASCII、中文、emoji、组合字符、无效 UTF-8 和超长行。\n分别断言字节上限、有效性、替换计数、preview 和摘要。\n输出用于终端时只承诺 UTF-8 完整，不把 rune 数冒充视觉宽度。\n\n#### 正常与失败输出都固定\n\n对输入 `node-深圳-01`，按 rune 截取应保留完整 UTF-8；按任意字节数截取可能落在中文编码中间。\n程序先决定字段是协议字节还是用户文本，再选择算法。\n\n```text\ninput_bytes=16 valid_utf8=true preview=\"node-深圳\"\n```\n\n无效 UTF-8 可直接拒绝、替换后标记 degraded，或保存原始 bytes 供取证。\n不能悄悄替换后仍报告完全成功。\n测试同时断言有效性、字节上限和错误类别，避免终端“看起来正常”掩盖数据损坏。", "subs": ["用测试固定字节与字符边界", "byte 和 string 转换的所有权", "字符串拼接与扫描", "编码错误的三种策略", "文本边界验收", "正常与失败输出都固定"]}, {"title": "`io.Reader` 与 `io.Writer` 怎样把处理链拆开？", "content": "面向 `io.Reader`/`io.Writer` 编程，可以让同一逻辑读取文件、HTTP body 或内存，并写向终端、文件或测试 buffer。\n业务函数不需要知道资源从哪里来。\n\n```go\nfunc filterErrors(r io.Reader, w io.Writer) error {\n\ts := bufio.NewScanner(r)\n\tfor s.Scan() {\n\t\tif bytes.Contains(s.Bytes(), []byte(\"ERROR\")) {\n\t\t\tif _, err := fmt.Fprintln(w, s.Text()); err != nil { return err }\n\t\t}\n\t}\n\treturn s.Err()\n}\n```\n\n资源的打开和关闭留在入口层；接收 Reader 的函数通常不负责关闭它。\n复制数据时设置大小上限，避免不可信响应占满磁盘。\n\n#### 组合管道时明确错误来自哪一段\n\n`io.Copy`、压缩 reader、解码器和过滤器可以层层组合，但错误必须增加阶段上下文。\n测试可用 `strings.NewReader` 提供输入、`bytes.Buffer` 接收输出，再注入一个固定在第 N 个字节失败的 Reader，确认中途失败不会被当作 EOF。\n若目标 writer 可能部分写入，调用方还要决定删除临时结果还是保留并标记 incomplete。\n\n#### Reader 的短读不是 EOF\n\n`Read` 可以同时返回 `n > 0` 与 error，也可以只返回当前可用的少量数据。\n调用方必须先处理前 n 个字节，再判断 error。\n不要假设一次 Read 填满 buffer。\n固定长度协议使用 `io.ReadFull`，复制固定上限使用 `io.CopyN` 或 `LimitReader`。\n\n#### Writer 也可能短写\n\nWriter 应返回写入字节数和错误；`n < len(p)` 且 err 为 nil 属于异常短写。\n标准辅助函数通常会处理，但自定义 writer 和组合链要测试。\n最终写文件的成功必须包含 encoder、buffer flush、file sync 与 close 的结果。\n\n#### 装饰器式组合\n\n```go\nfunc process(r io.Reader, w io.Writer, max int64) error {\n\tlimited := io.LimitReader(r, max+1)\n\tbuffered := bufio.NewReader(limited)\n\tif err := transform(buffered, w); err != nil {\n\t\treturn fmt.Errorf(\"transform stream: %w\", err)\n\t}\n\treturn nil\n}\n```\n\ngzip、hash、tee 和限流 reader 可以组合，但关闭责任仍由创建资源的层承担。\n`io.Reader` 接口没有 Close，业务函数不应猜测并关闭传入对象。\n\n#### 故障注入练习\n\n实现 `failAfterReader` 和 `failAfterWriter`，分别在第 N 字节返回错误。\n验证处理函数保留阶段上下文、不会把部分输出标记成功、临时文件被清理。\n再用一个每次只返回 1 byte 的 reader 证明代码没有依赖满读。\n\n#### 管道契约验收\n\n输入 reader 每次只返回少量字节、在 N 字节失败；writer 短写或中途失败。\n处理函数必须保留已经读取的数据语义、返回阶段上下文且不关闭不属于自己的资源。\n最终文件只在完整成功后替换。\n\n#### 完整示例：限制复制并保留关闭责任\n\n下面是可运行的最小过滤器。\n它不把输入一次性读入内存，遇到上游短读会继续读取，遇到 writer 错误则立即停止并把错误返回给调用方。\n\n#### Reader/Writer 是控制流协议\n\n`io.Reader` 允许一次只返回部分数据，甚至同时返回 `n > 0` 和一个错误；调用方必须先消费有效字节，再按契约处理错误。\n`io.Writer` 也可能短写，因此复制循环不能假设一次 Write 就完成；这正是接口组合能把文件、网络和测试 fake 接到同一处理链的原因。\n用一个每次只返回 3 个字节的 fake Reader 和一次短写的 fake Writer 运行复制函数，检查总字节数、最终错误和已写前缀。\n\n#### 短读短写实验记录应保留进度\n\n短读实验不应只断言“最后字符串相等”。运维工具更关心失败发生在什么进度、已经写出的临时结果是否会被误认为完整，以及重试是否会重复已经确认的字节。\n\n下面的 fake reader 每次最多返回 3 个字节，并在指定位置返回错误；它是可编译片段，依赖 `io` 和 `errors`：\n\n```go\ntype failReader struct {\n\tdata []byte\n\tpos  int\n\tfailAt int\n}\n\nfunc smaller(a, b int) int {\n\tif a < b {\n\t\treturn a\n\t}\n\treturn b\n}\n\nfunc (r *failReader) Read(p []byte) (int, error) {\n\tif r.pos >= len(r.data) {\n\t\treturn 0, io.EOF\n\t}\n\tif r.pos == r.failAt {\n\t\treturn 0, errors.New(\"injected read failure\")\n\t}\n\tn := smaller(3, len(p))\n\tn = smaller(n, len(r.data)-r.pos)\n\tcopy(p[:n], r.data[r.pos:r.pos+n])\n\tr.pos += n\n\treturn n, nil\n}\n```\n\n如果需要兼容 Go 1.20 及更早版本，把 `min` 换成普通比较函数；不要为了示例方便隐藏最低版本。\n记录实验时至少保存：每次 `Read` 的 `n`、累计字节数、最终错误、临时输出长度和清理结果。\n通过条件是完整输入才替换目标文件；中途失败只能留下带 `incomplete` 标记的临时文件，不能把部分输出作为成功报告。\n\n```mermaid\nflowchart LR\n    R[Reader] --> B[bounded buffer]\n    B --> W[Writer]\n    W --> O[output]\n    R -. short read/error .-> E[error with progress]\n    W -. short write/error .-> E\n```\n\n```go\nfunc CopyLines(dst io.Writer, src io.Reader, maxLine int) error {\n\tscanner := bufio.NewScanner(src)\n\tscanner.Buffer(make([]byte, 1024), maxLine)\n\tfor scanner.Scan() {\n\t\tif _, err := fmt.Fprintln(dst, scanner.Text()); err != nil {\n\t\t\treturn fmt.Errorf(\"write line: %w\", err)\n\t\t}\n\t}\n\tif err := scanner.Err(); err != nil {\n\t\treturn fmt.Errorf(\"read lines: %w\", err)\n\t}\n\treturn nil\n}\n```\n\n这是局部片段，调用方拥有 `src` 和 `dst` 的关闭责任。\n验收时用一个只返回部分字节的 reader 和一个写到第 N 次就失败的 writer，确认错误没有被吞掉；用超长行验证内存上限生效。", "subs": ["组合管道时明确错误来自哪一段", "Reader 的短读不是 EOF", "Writer 也可能短写", "装饰器式组合", "故障注入练习", "管道契约验收", "完整示例：限制复制并保留关闭责任", "Reader/Writer 是控制流协议", "短读短写实验记录应保留进度"]}, {"title": "日志大到放不进内存时，缓冲、扫描和流式写入怎样取舍？", "content": "`bufio.Scanner` 使用方便，但默认 token 上限可能不适合超长日志行。\n可以用 `Scanner.Buffer` 设置经过预算的上限，或使用 `bufio.Reader.ReadString`/`ReadBytes` 处理长记录。\n上限触发必须报告，而不是把半行当成完整记录。\n\n```go\nscanner := bufio.NewScanner(r)\nscanner.Buffer(make([]byte, 64*1024), 1024*1024)\nfor scanner.Scan() { /* 逐行解析 */ }\nif err := scanner.Err(); err != nil { return fmt.Errorf(\"scan log: %w\", err) }\n```\n\n流式处理应记录已读字节、有效行、坏行和输出行，失败时才能判断结果是否完整。\n写报告先落临时文件、同步并原子替换，避免读者看到半份结果。\n\n#### rename 解决可见性，不自动解决持久性\n\n临时文件写完后 rename 通常能让读者看到旧版本或新版本，而不是中间状态；但断电持久性还涉及文件同步和父目录元数据。\n跨平台行为、符号链接和并发写入仍需单独定义，不能把“原子替换”误解为事务或权限校验。\n实验中在替换前后并发读取目标文件，另外注入写入失败和进程退出，确认读者只看到旧版本或完整新版本，并记录未覆盖的持久性保证。\n\n```mermaid\nflowchart LR\n    A[old target] --> R[readers]\n    D[data] --> T[temp file]\n    T --> S[fsync file]\n    S --> N[rename target]\n    N --> B[new complete target]\n    T -. write failure .-> X[remove temp, keep old]\n```\n\n#### 轮转与压缩输入不能先全部展开\n\n按明确策略枚举并排序轮转文件，逐个打开；gzip 文件只在当前 reader 上解压，处理完立即关闭。\n跨文件去重只保存有界摘要或时间窗口，不把原始行全部放进 map。\n\n```text\ndiscover -> sort -> open one -> optional gzip\n-> scan bounded record -> aggregate -> close -> next\n```\n\n指标包含 bytes_read、records_ok、records_bad、records_oversized 和 files_failed。\n在第二个压缩文件制造 CRC 错误，确认第一份结果保留为 partial，整体退出码不会误报全成功。\n\n#### 建立容量与坏数据策略\n\n开始前写清单文件上限、单行上限、坏行上限和输出上限。\n遇到一条坏行是立即失败、跳过并告警，还是输出隔离文件，取决于用途；安全配置生成通常应快速失败，日志统计则可允许有限坏行。\n练习时生成一条超过上限的日志，确认程序返回非零、旧报告仍完整、临时文件被清理且计数没有把坏行算成成功。\n\n#### Scanner 与 Reader 的取舍\n\nScanner 适合按行或 token 解析，API 简洁但 token 上限必须显式设置；Reader 适合需要保留分隔符、处理超长记录或精确控制 buffer 的场景。\n`ReadString` 返回数据和 error，最后一段可能伴随 EOF，仍要处理数据。\n\n#### 流式聚合而不是保存明细\n\n如果目标只是统计每个错误码数量，不必保存所有日志行。\n使用 map 聚合计数，保存有限样例与首末时间；高基数 key 仍要设上限，超过时归入 `other`。\n结果中记录 scanned、matched、invalid、truncated 和 bytesRead，保证计数可解释。\n\n#### 压缩与多文件输入\n\n根据文件扩展名或明确参数创建 gzip reader，关闭由入口负责。\n遍历目录时固定排序以保证报告稳定，拒绝越过允许根目录的符号链接。\n轮转日志要定义顺序和重复边界，不能把 `.1` 与当前文件的重叠记录统计两次。\n\n#### 内存与吞吐验收\n\n生成远大于预期内存的 fixture，运行时观察 RSS 而不是只看 Go heap。\n分别测试正常行、最大合法行、超限行和大量坏行。\nbenchmark 保存 bytes/op 与 MB/s；优化 buffer 后确认错误计数和输出摘要未改变。\n\n#### 大文件运行证据\n\nfixture 大于预期内存，运行时记录 RSS、处理吞吐、scanned/matched/invalid/truncated 和输出摘要。\n故意超过单行、坏行与高基数上限，验证策略和退出码。\n旧报告在任何失败后保持可解析。\n\n#### 流式验收看趋势而不是单点\n\n分别处理 10MiB、100MiB 和 1GiB fixture，记录最大 RSS 是否近似稳定、吞吐是否线性、坏行计数是否准确。\n若内存随文件大小同比增长，说明链路某处仍在累积明细。\n保存命令、工具链和 fixture 摘要，让下一次优化可重复比较。", "subs": ["rename 解决可见性", "轮转与压缩输入不能先全部展开", "建立容量与坏数据策略", "Scanner 与 Reader 的取舍", "流式聚合而不是保存明细", "压缩与多文件输入", "内存与吞吐验收", "大文件运行证据", "流式验收看趋势而不是单点"]}]}, {"title": "第十章 · 控制文件、进程和退出时的副作用", "sections": [{"title": "路径、权限和原子替换怎样避免写出半份配置？", "content": "路径先经 `filepath.Clean`，但 Clean 不能证明它仍在允许目录。\n将候选路径转为绝对路径并用 `filepath.Rel` 验证边界；还要考虑符号链接。\n高风险工具最好只接受逻辑名称，再由白名单映射到固定路径。\n\n```go\nfunc atomicWrite(path string, data []byte, mode fs.FileMode) error {\n\tdir := filepath.Dir(path)\n\tf, err := os.CreateTemp(dir, \".update-*\")\n\tif err != nil {\n\t\treturn err\n\t}\n\ttmp := f.Name()\n\tdefer os.Remove(tmp)\n\tif err := f.Chmod(mode); err != nil {\n\t\tf.Close()\n\t\treturn err\n\t}\n\tif _, err := f.Write(data); err != nil {\n\t\tf.Close()\n\t\treturn err\n\t}\n\tif err := f.Sync(); err != nil {\n\t\tf.Close()\n\t\treturn err\n\t}\n\tif err := f.Close(); err != nil {\n\t\treturn err\n\t}\n\treturn os.Rename(tmp, path)\n}\n```\n\n跨文件系统 Rename 可能失败，Windows 与 Unix 语义也不同。\n写完后重新读取并校验，记录旧版本备份和回滚步骤。\n\n#### 文件更新验收表\n\n| 场景 | 预期结果 |\n| --- | --- |\n| 目标目录不可写 | 更新前失败，旧文件不变 |\n| 写到一半磁盘满 | 临时文件失败，旧文件仍可读 |\n| 新内容校验失败 | 不执行替换并保留诊断 |\n| 替换成功 | 权限正确，新内容可重新解析 |\n| 进程收到信号 | 不留下被误认为正式配置的半文件 |\n\n备份也要设置数量和保留时间。\n把每次写入都永久备份会从可靠性措施变成磁盘事故来源。\n\n#### 路径边界不能只靠 Clean\n\n`filepath.Clean` 只做词法整理，不能阻止符号链接逃逸。\n高风险写入优先打开受控根目录并使用平台支持的安全相对路径操作；至少先求绝对路径和 Rel，拒绝 `..`，再检查目标父目录的符号链接与所有权。\n\n临时文件必须创建在目标同目录，避免跨文件系统 rename。\n文件 mode 还会受 umask 影响；Secret 配置通常要求 0600，并在写后重新 Stat 验证。\n不要先创建世界可读文件再 chmod，存在短暂泄露窗口。\n\n#### 原子替换不等于业务正确\n\nrename 只能保证读者看到旧版或新版，不能证明新配置能被服务加载。\n替换前用解析器和业务校验验证临时内容；替换后重新读取，必要时调用目标服务的 check-config；reload 失败则按 runbook 回滚旧版本。\n\n多个进程同时写同一文件时，单次 rename 仍可能最后写入者覆盖前者。\n使用版本号、内容摘要或文件锁实现乐观并发控制，冲突时拒绝而不是静默覆盖。\n\n#### 文件系统故障实验\n\n在临时目录测试只读父目录、现有目标权限、无效内容、同名并发更新和中途取消。\n磁盘满不易在普通单元测试稳定模拟，可通过失败 writer 验证逻辑，再在限制大小的隔离文件系统做集成测试。\n记录旧文件摘要和最终摘要证明失败未破坏正式内容。\n\n#### 文件变更交接记录\n\n每次高风险写入保存目标、旧摘要、新摘要、校验器、mode、操作者、备份和回滚。\n运行前输出 plan，验证目标仍是预期版本再替换。\n并发冲突和校验失败都不得修改正式文件。\n\n#### 文件操作的证据顺序\n\n先在同一文件系统的临时目录创建临时文件，再写入、`Sync`、关闭，最后 `Rename`。\n如果 `Rename` 成功，只能说明目录项切换完成；还要根据恢复目标决定是否同步父目录。\n权限测试应在非特权临时用户下运行，并检查实际 mode，而不是只看代码中的八进制常量。\n\n```text\nvalidate path -> create temp with 0600 -> write bounded bytes\n-> sync file -> close -> rename -> sync parent when required\n```\n\n故障注入包括临时目录只读、目标文件被替换为符号链接、磁盘写满和进程在 rename 前退出。\n每次实验都记录旧文件是否仍可读取、临时文件是否泄漏以及下一次运行能否恢复。", "subs": ["文件更新验收表", "路径边界不能只靠 Clean", "原子替换不等于业务正确", "文件系统故障实验", "文件变更交接记录", "文件操作的证据顺序"]}, {"title": "调用外部命令时，怎样保留退出码、超时和标准错误？", "content": "使用 `exec.CommandContext` 和参数数组，不把用户输入拼进 `sh -c`。\n分别限制运行时间和输出大小；命令超时后还要确认子进程是否随进程组退出。\n\n```go\nctx, cancel := context.WithTimeout(parent, 10*time.Second)\ndefer cancel()\ncmd := exec.CommandContext(ctx, \"systemctl\", \"is-active\", \"demo.service\")\nvar stdout, stderr bytes.Buffer\ncmd.Stdout, cmd.Stderr = &stdout, &stderr\nerr := cmd.Run()\n```\n\n对 `*exec.ExitError` 读取退出码，对 `ctx.Err()` 区分超时；日志记录动作模板、目标和结果，但不打印 Secret。\n远程动作使用固定动作到参数的映射，绝不提供任意 Shell 入口。\n\n#### 输出必须有容量上限\n\n`bytes.Buffer` 会把完整 stdout/stderr 放进内存，不适合未知命令。\n可写入有大小限制的 ring buffer 或临时文件，同时保留截断标记。\n验收分别模拟退出 0、退出 3、无法找到命令、超时和输出洪泛；只有退出码 0 且业务校验通过才算成功。\n自动重试前必须证明命令幂等，像“创建用户”这类动作更适合先查询状态。\n\n#### 区分启动失败与退出失败\n\n命令不存在、权限不足会在 Start/Run 阶段返回启动错误；程序已启动后返回非零通常是 `*exec.ExitError`。\n结果模型应保存 started、exitCode、timedOut、stdoutTruncated 和 stderrTruncated，不能把所有情况压成字符串。\n\n#### 环境、目录和 PATH\n\n子进程默认继承父环境和工作目录。\n生产工具应构造最小环境、显式设置工作目录，并固定可执行文件路径或受控 PATH。\n传给命令的 Secret 可能在进程列表出现，优先使用受限文件或 stdin，并确认命令不会回显。\n\n#### 子进程树与取消\n\nCommandContext 通常能终止直接进程，但通过 shell 或工具派生的孙进程可能残留。\n按目标 OS 设置进程组，取消时先发温和终止，等待短窗口后强制结束，并用进程列表验证。\n跨平台行为必须分别测试。\n\n#### 命令适配器练习\n\n用当前测试二进制模拟退出 0、退出 7、输出超过 1MiB、忽略终止信号和派生子进程。\n不要依赖系统 `sleep` 或 `sh`，测试自身可通过辅助模式运行。\n确认错误分类、输出上限和取消后无残留进程。\n\n#### 命令执行契约\n\n为每个允许动作固定二进制路径、参数 schema、环境、目录、deadline、最大输出和幂等性。\n结果区分未启动、非零退出、超时和业务校验失败。\n测试取消后检查整个进程组，不只检查直接子进程。\n\n#### 启动错误和退出错误必须分开\n\n`exec.CommandContext` 返回错误时，可能是程序不存在、权限拒绝、工作目录无效，也可能是进程已经启动但最终非零退出。\n运维工具应把这些类别映射到不同的诊断字段，避免把“找不到二进制”误报成业务检查失败。\n\n```go\ncmd := exec.CommandContext(ctx, program, args...)\ncmd.Dir = workDir\ncmd.Env = append([]string{\"PATH=/usr/bin:/bin\"}, extraEnv...)\noutput, err := cmd.CombinedOutput()\nif err != nil {\n\tvar exitErr *exec.ExitError\n\tif errors.As(err, &exitErr) {\n\t\treturn fmt.Errorf(\"program exited status=%d stderr=%q\", exitErr.ExitCode(), clip(output, 4096))\n\t}\n\treturn fmt.Errorf(\"start program: %w\", err)\n}\n```\n\n`clip` 必须按字节上限截断，不能把可能包含凭证的全部输出写入日志。\n测试至少覆盖不存在命令、非零退出、超时和超大 stderr。", "subs": ["输出必须有容量上限", "区分启动失败与退出失败", "环境、目录和 PATH", "子进程树与取消", "命令适配器练习", "命令执行契约", "启动错误和退出错误必须分开"]}, {"title": "收到终止信号后，怎样停止接单、清理资源并限时退出？", "content": "信号应转换为统一取消上下文。\n关闭顺序通常是：标记 not-ready、停止接单、取消后台循环、等待在途任务、刷新有限缓冲、超时后退出。\n\n```go\nctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)\ndefer stop()\nif err := run(ctx); err != nil && !errors.Is(err, context.Canceled) {\n\tslog.Error(\"run failed\", \"error\", err)\n\tos.Exit(1)\n}\n```\n\n不要在 signal handler 中完成所有清理，也不要无限等待。\n部署平台的终止宽限期必须大于应用内部 shutdown deadline，并通过实际发送 SIGTERM 验证退出码、日志和未完成任务状态。\n\n#### 用时间线验证关闭而不是只看最后退出\n\n记录收到信号、readiness 失败、停止提交任务、在途数归零、资源关闭和进程退出六个时间点。\n故意放入一个超过 shutdown deadline 的任务，确认程序记录被放弃任务而不是永久挂住。\n第二次信号可以定义为强制退出，但必须在 runbook 中写清数据风险。\n\n#### 每个组件分配关闭预算\n\n平台给 30 秒 termination grace，应用不能给每个组件各 30 秒串行等待。\n可以预留 5 秒摘流量、20 秒处理在途、3 秒刷新状态、2 秒兜底退出。\n并行关闭独立组件可缩短总时间，但错误仍要汇总。\n\n#### readiness 先于 listener 关闭\n\n先标记 not-ready，让负载均衡停止新流量；等待传播窗口后调用 Server.Shutdown。\n只关闭 listener 可能让平台在状态尚未更新时继续转发并看到连接拒绝。\n传播窗口来自实际平台观察，不应随手 sleep。\n\n#### 长任务的恢复语义\n\n无法在窗口内完成的写任务，必须在开始前持久化状态或具备幂等键。\nshutdown 时把 lease 释放、标记 cancelled 或等待租约过期，由任务协议决定。\n内存中的“正在执行”随进程消失，不能事后准确恢复。\n\n#### 信号测试\n\n函数测试直接 cancel context；进程级测试构建二进制、等待 ready 标志、发送 SIGTERM，并测量事件顺序和退出时间。\n再发送第二次信号验证强制路径。\nWindows Service 与 Unix signal 模型不同，需要平台适配测试。\n\n#### Shutdown 运行证据\n\n记录 signal、not-ready、停止提交、active 归零、flush 和 exit 时间。\n平台 grace 大于内部总预算。\n测试正常排空、超时取消和第二次强制信号，并说明未完成副作用如何恢复或对账。\n\n#### 信号时间线应该能被重放\n\n对常驻服务记录 `SIGTERM received`、`accept=false`、`inflight drained`、`resources closed` 和最终退出时间。\n测试启动一个本地 listener，发送信号后再发起新请求，确认新请求被拒绝而已接收请求获得关闭预算。\n超过预算时要有明确的强制退出和遗留任务记录，不能静默截断。\n\n#### 进程级测试验证真实信号\n\n不要向当前 `go test` 进程发送 SIGTERM。\n先构建辅助二进制，以随机本地端口启动，通过 ready 文件或握手确认已接单，再向子进程发信号并收集 stdout、stderr 与退出状态。\n测试要求 readiness 先变更、在途任务获得预算、超时任务留下可恢复状态。\n\n如果测试只看到进程退出，仍不能证明关闭顺序正确。\n每个组件的内部 deadline 应短于平台 grace period，并预留最终日志 flush 与退出时间。\nreadiness 变更后的摘流等待必须根据网关和服务发现的实际传播延迟测量，不能把固定 sleep 当成协议。\n关闭阶段若持久化状态或关键资源释放失败，退出码和最终日志必须区分正常终止与不完整清理。\n\n#### 进程组实验要明确平台边界\n\n`exec.CommandContext` 默认只负责直接子进程；脚本或程序再派生出的孙进程可能继续持有文件、端口和临时目录。\n因此进程级验证要记录进程树，而不是只检查父进程退出：\n\n```bash\npgrep -P \"$PID\" || true\nps -o pid,ppid,pgid,stat,command -p \"$PID\"\n```\n\nLinux 上可以把任务放入独立 process group，在宽限期内发送 `SIGTERM`，再对同组残留进程发送 `SIGKILL`；macOS 的命令参数和权限模型略有差异，示例必须按实际系统校正。\nWindows 没有同样的 POSIX 进程组语义，不能把 Unix 实验结果直接当作跨平台保证。\n\n验收记录至少包括：父子进程 PID/PGID、发送信号的时间、listener 是否停止接收、临时文件是否清理、最终退出码和任何残留资源。\n如果无法在当前环境验证进程组，应标记 `NOT VERIFIED`，并说明需要在哪个 Linux 运行环境复测。", "subs": ["用时间线验证关闭而不是只看最后退出", "每个组件分配关闭预算", "readiness 先于 listener 关闭", "长任务的恢复语义", "信号测试", "Shutdown 运行证据", "信号时间线应该能被重放", "进程级测试验证真实信号", "进程组实验要明确平台边界"]}]}, {"title": "第十一章 · 调用网络服务时把失败视为常态", "sections": [{"title": "一个可靠的 HTTP 客户端为什么必须统一设置超时？", "content": "默认 `http.Client` 可能无限等待。\n共享 Client 和 Transport 以复用连接，在请求上携带 context，并关闭响应体。\n总超时、连接超时和响应头超时解决不同阶段的问题。\n\n```go\ntransport := &http.Transport{MaxIdleConns: 100, MaxIdleConnsPerHost: 10, ResponseHeaderTimeout: 5 * time.Second}\nclient := &http.Client{Transport: transport, Timeout: 15 * time.Second}\nreq, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)\nresp, err := client.Do(req)\nif err != nil { return err }\ndefer resp.Body.Close()\n```\n\nTLS 校验失败不应通过 `InsecureSkipVerify` 永久绕过。\n修复信任链、SNI 或证书轮换，测试环境例外也要显式隔离。\n\n#### 响应处理也属于连接管理\n\n先检查状态码，再用 `io.LimitReader` 限制 body，并按 Content-Type 解析。\n即使不使用响应内容，也应关闭 body；为了让连接复用，通常还需在合理上限内读完。\n测试服务器分别返回慢响应头、慢 body、超大 body、非法 JSON 和 503，确认错误分类与耗时符合预期。\n\n#### Transport 是共享资源\n\n每个请求新建 Client/Transport 会丢失连接复用并增加 socket。\n为相同网络策略复用长生命周期 Client；不要在使用后修改 Transport 字段。\n限制每主机连接、空闲连接和空闲超时，避免批量巡检把下游压垮。\n\n#### 超时覆盖不同阶段\n\nDial timeout 控制建立连接，TLS handshake timeout 控制握手，ResponseHeaderTimeout 控制等待 header，Client.Timeout 覆盖包括读取 body 的整体交换，请求 context 再受更外层批次 deadline 约束。\n只设一个连接 timeout 不能防止服务无限慢读 body。\n\n#### 重定向、代理与 SSRF\n\n默认 Client 会跟随重定向。\n面向不可信 URL 的工具应限制次数，并重新校验每个 Location 的 scheme、host 和目标网段，防止重定向到 metadata 或内网管理地址。\n代理来自环境时也要纳入诊断；认证 header 跨域重定向不可泄露。\n\n#### TLS 诊断\n\n证书失败时记录 hostname、证书有效期和错误类别，不记录私钥或完整 token。\n自定义 CA 使用独立 cert pool，并保留系统根；不要把 `InsecureSkipVerify` 当成修复。\n测试证书轮换期间新旧信任重叠和错误 SNI。\n\n#### HTTP 客户端验收\n\nhttptest 覆盖慢 header、慢 body、超大 body、重定向环、非法 JSON、连接重用与取消。\n集成环境再验证企业代理、真实 CA、DNS 与 IPv4/IPv6。\n指标区分 DNS、connect、TLS、TTFB 和 body 阶段，才能定位“请求慢”。\n\n#### HTTP 诊断输出\n\n诊断包含 endpoint host、代理来源、deadline、attempt、状态码和阶段耗时，不包含 query Secret、Authorization 或 body。\n对 TLS 错误输出证书类别和 hostname。\n用 request ID 关联下游，但限制日志基数和长度。\n\n#### 分层 timeout 的最小实现\n\n客户端总 timeout 保护整个请求，request context deadline 保护单次调用，Transport 的 dial、TLS handshake、response header timeout 保护具体阶段。\n它们不能互相矛盾：内部 deadline 应服从外层剩余时间。\n\n```go\ntransport := &http.Transport{\n\tDialContext: (&net.Dialer{Timeout: 2 * time.Second}).DialContext,\n\tTLSHandshakeTimeout: 3 * time.Second,\n\tResponseHeaderTimeout: 5 * time.Second,\n}\nclient := &http.Client{Transport: transport, Timeout: 10 * time.Second}\n```\n\n响应体必须关闭并设置读取上限。\n对用户可控 URL，先限制 scheme、解析后的 IP 范围和重定向次数；否则“巡检 URL”可能被利用为 SSRF。", "subs": ["响应处理也属于连接管理", "Transport 是共享资源", "超时覆盖不同阶段", "重定向、代理与 SSRF", "TLS 诊断", "HTTP 客户端验收", "HTTP 诊断输出", "分层 timeout 的最小实现"]}, {"title": "分页、限流、重试和幂等怎样共同防止漏查与重复操作？", "content": "分页循环要保存下一页游标、检查重复游标并设置最大页数。\n收到 429 或暂时性 5xx 时，只有幂等请求才自动重试，并同时限制次数、总时间和并发。\n\n```text\n请求 -> 分类结果 -> 成功返回\n             -> 永久错误停止\n             -> 可重试且有预算 -> 退避 -> 重试\n             -> 结果未知 -> 查询状态或人工对账\n```\n\nPOST 是否可重试取决于服务端幂等键或查询接口。\n网络断开可能发生在服务端已执行之后，盲目重复会制造第二次副作用。\n\n#### 退避必须服从总 deadline\n\n指数退避加入随机抖动，避免大量实例同步重试；每次等待前检查剩余 deadline。\n服务端提供 `Retry-After` 时在策略允许范围内尊重它，但仍受客户端最大等待约束。\n记录 attempts、最终分类和累计等待，不能为每次失败都打印 ERROR 制造告警风暴。\n\n#### 分页必须有终止不变量\n\n每次请求记录当前 cursor，响应提供 next cursor。\n若 next 为空则结束；若重复出现已见 cursor 或页数超过上限则失败。\n结果去重依据稳定资源 ID，而不是展示名称。\nAPI 若在分页过程中变化，要了解 snapshot token 或一致性语义，否则可能漏项或重复。\n\n#### 速率和并发分别限制\n\n并发上限控制同时在途请求，token bucket 控制单位时间请求数。\n下游限制为 10 QPS 不等于只能 10 并发；两者需根据延迟共同配置。\n收到 429 时降低压力并尊重 Retry-After，不能让所有 worker 各自无协调重试。\n\n#### 幂等键的生命周期\n\n对创建型 POST，客户端为一次逻辑操作生成 key，所有网络重试复用它。\n服务端持久保存 key 与结果，并定义保留期和相同 key 不同 payload 的冲突。\n客户端超时后优先按 key 查询状态，避免结果未知时再次创建。\n\n#### 重试放大预算\n\n3 层各重试 3 次，最坏可能产生 27 次下游调用。\n只在最了解幂等性和 deadline 的一层重试；其他层传播可分类错误。\n记录原始调用数、attempt 与最终成功，告警关注最终失败和重试率。\n\n#### 分页与重试练习\n\nhttptest 依次返回两页、重复 cursor、429+Retry-After、503 和超时。\n注入 fake clock 或可控等待，验证最大页数、去重、总 deadline 和取消。\n对 POST 模拟服务端已提交但连接断开，确认客户端使用同一幂等键查询。\n\n#### API 可靠性验收\n\n模拟重复 cursor、页间数据变化、429、503、慢响应和 POST 结果未知。\n确认最大页数、总 deadline、抖动重试、同一幂等键和数量守恒。\n统计实际下游调用数，防止多层重试放大。\n\n#### 429 不是普通 500\n\n收到 `429` 时优先读取 `Retry-After`，并将等待时间裁剪到剩余 deadline；没有该头时使用带抖动的指数退避。\n服务端返回 500 是否可重试，还要结合请求是否幂等。\n分页请求若在重试期间数据发生变化，应使用服务端 cursor 或快照，而不是继续递增 offset 造成漏项。\n\n```text\nrequest -> classify status\n  2xx -> validate body and advance cursor\n  429 -> honor Retry-After within budget\n  5xx/network -> retry only when idempotent\n  4xx -> return actionable input or auth error\n```", "subs": ["退避必须服从总 deadline", "分页必须有终止不变量", "速率和并发分别限制", "幂等键的生命周期", "重试放大预算", "分页与重试练习", "API 可靠性验收", "429 不是普通 500"]}, {"title": "TCP 服务怎样限制连接、设置 deadline 并完成优雅退出？", "content": "每连接一个 goroutine 很直观，但监听器、连接数、读写 deadline 和消息大小仍须有界。\n先获取信号取消，再关闭 listener 解除 Accept，最后等待连接处理退出。\n\n```go\nsem := make(chan struct{}, 100)\nfor {\n\tconn, err := ln.Accept()\n\tif err != nil { /* 判断关闭或临时错误 */ }\n\tsem <- struct{}{}\n\tgo func() {\n\t\tdefer func(){ <-sem }()\n\t\tdefer conn.Close()\n\t\t_ = conn.SetDeadline(time.Now().Add(30*time.Second))\n\t\thandle(conn)\n\t}()\n}\n```\n\nTCP 没有消息边界，必须定义长度、分隔符和最大帧；半包、粘包、慢客户端和异常断开都应进入测试。\n\n#### TCP 字节流为什么必须自己 framing\n\n一次 Read 返回的是当前可用字节，不对应发送端的一次 Write；内核缓冲、拥塞控制和调度都会改变分段。\n应用协议必须用长度前缀、分隔符或固定宽度恢复消息边界，并对长度设置上限，避免恶意输入造成内存和等待无限增长。\n用客户端把一个完整帧拆成三次 Write，再发送超过最大长度的帧；服务端应能恢复一条消息并拒绝第二种输入。\n\n```mermaid\nsequenceDiagram\n    participant C as Client\n    participant K as TCP stream\n    participant S as Framer\n    C->>K: write partial frame 1\n    C->>K: write partial frame 2\n    C->>K: write partial frame 3\n    K->>S: bytes arrive in arbitrary chunks\n    S->>S: buffer until length or delimiter\n    S-->>C: complete message or reject oversized frame\n```\n\n#### 用 `net.Pipe` 和本地监听器分层测试\n\n纯协议处理可用 `net.Pipe` 构造双向连接，监听与关闭行为再用 `127.0.0.1:0` 的真实 socket 测试。\n注入只发送半帧的客户端、超过最大帧的客户端和读到一半断开的客户端，观察连接是否释放、信号退出是否卡住以及错误日志是否包含远端地址但不包含敏感载荷。\n\n#### Accept 错误分类\n\nlistener 关闭后 Accept 返回错误是正常退出路径；临时资源错误可带退避重试；未知永久错误应结束 server。\n不能对所有错误立即 continue 形成高 CPU 热循环。\n关闭由 owner 执行，并通过 context 统一触发。\n\n#### 帧协议必须限制内存\n\n长度前缀协议先读取固定 header，校验长度不超过上限，再分配 body；分隔符协议使用有界 reader，找不到分隔符且超限就关闭连接。\n永远不要直接信任客户端声明的 4GiB 长度并分配。\n\n#### 慢连接与半关闭\n\n每个读写阶段设置 deadline，并在成功处理新帧后按协议刷新。\n客户端只发一个字节后停住时，连接必须在预算内释放。\nTCP half-close、RST 和 EOF 的业务含义不同，但都要保证资源清理和有限日志。\n\n#### 连接级容量\n\nsemaphore 获取也要可取消；达到容量时可以暂停 Accept 或接受后立即返回明确协议错误，选择取决于协议。\n指标包括 active、accepted、rejected、readTimeout、protocolError 和 bytes，标签不得使用远端 IP 造成高基数。\n\n#### TCP 关闭实验\n\n使用本地 listener 启动多个客户端：正常帧、半帧、超大声明、慢发送和保持空闲。\n发送 SIGTERM 后关闭 listener，等待连接 handler；超时则取消并关闭剩余连接。\n执行 race 并确认 active 回零。\n\n#### TCP 协议验收\n\n正常帧、半帧、超长声明、慢发送、空闲、RST 和 shutdown 都进入测试。\n每个连接有 read/write deadline 和 frame 上限，active/rejected/protocolError 指标可观察。\n关闭 listener 后等待 handler 在预算内归零。\n\n#### framing 先于业务解析\n\nTCP 只提供字节流，一次 `Read` 可能得到半个头或多个完整帧。\n协议应定义长度前缀、最大帧大小和校验失败后的连接动作；解析器不能根据一次 read 的边界猜消息完整。\n\n```go\nfunc readFrame(r io.Reader, max uint32) ([]byte, error) {\n\tvar n uint32\n\tif err := binary.Read(r, binary.BigEndian, &n); err != nil {\n\t\treturn nil, err\n\t}\n\tif n > max {\n\t\treturn nil, fmt.Errorf(\"frame too large: %d\", n)\n\t}\n\tpayload := make([]byte, n)\n\tif _, err := io.ReadFull(r, payload); err != nil {\n\t\treturn nil, fmt.Errorf(\"read frame: %w\", err)\n\t}\n\treturn payload, nil\n}\n```\n\n用 `net.Pipe` 注入分段 header、慢发送、半关闭和超过上限的帧，确认 handler 在 deadline 内返回且不会按攻击者声明的长度无限分配。", "subs": ["TCP 字节流为什么必须自己 framing", "用 net.Pipe 和本地监听器分层测试", "Accept 错误分类", "帧协议必须限制内存", "慢连接与半关闭", "连接级容量", "TCP 关闭实验", "TCP 协议验收", "framing 先于业务解析"]}]}, {"title": "第十二章 · 把脚本能力封装成自动化友好的 CLI", "sections": [{"title": "单命令何时使用 `flag`，多子命令何时值得引入 Cobra？", "content": "一个入口、少量参数时标准库 `flag` 足够。\n出现多个稳定子命令、共享参数、帮助树和补全需求时再引入 Cobra。\n框架不能替代业务边界，命令函数应只做参数适配并调用可测试服务。\n\n```text\nops-check\n  check      执行只读巡检\n  plan       输出将执行的动作\n  apply      经确认执行变更\n  version    输出版本与构建信息\n```\n\n每个子命令定义输入、stdout schema、stderr、退出码和副作用。\n危险命令要求 `--confirm` 或计划 ID，非交互环境不能通过默认 yes 绕过。\n\n#### 命令树应保持薄\n\nCobra 的 `RunE` 只完成参数绑定、调用服务和错误返回，不在全局变量里初始化网络客户端。\n使用 `SilenceUsage` 避免运行期错误重复打印帮助；输入错误才展示用法。\n测试直接调用可注入 writer 的根命令，确认同一进程多次执行不会残留 flag 状态。\n\n#### 先设计 CLI 契约\n\n每个命令写 usage、参数来源、stdout、stderr、退出码、副作用与幂等性。\nflag 名使用 kebab-case 并保持兼容；删除参数要经过废弃周期。\n非交互环境遇到缺失确认必须失败，不能等待 stdin 永久挂住。\n\n#### flag 与位置参数\n\n稳定可选项用 flag，少量核心对象可用位置参数。\n批量目标更适合文件或 stdin，避免命令行长度和进程列表泄露。\n互斥参数和必填组合在解析后统一校验，错误指出冲突字段和修复方式。\n\n#### plan 与 apply\n\n高风险 CLI 先生成计划，包含目标、动作、当前版本和摘要；apply 接收计划 ID 或摘要，执行前确认环境未变化。\n`--dry-run` 必须走到副作用边界前的完整校验，而不是一进入命令就返回“成功”。\n\n#### 补全和帮助也是 API\n\n帮助中写默认值、单位、环境变量与退出码，示例使用非生产目标。\nshell completion 不应动态访问生产 API 或输出 Secret。\n快照测试帮助文本时只固定关键段，避免框架无关格式变化造成大量脆弱测试。\n\n#### CLI 结构练习\n\n先用标准 flag 实现单命令；需求增加 plan/apply/version 后再迁移 Cobra。\n保持内部 Service API 不变，证明框架替换只影响 adapter。\n测试同一进程连续运行两个命令，避免全局 flag 污染。\n\n#### 命令兼容性记录\n\n为子命令保存 usage、flag、默认值、stdout schema、stderr 和退出码。\n新版本新增字段保持兼容，废弃 flag 有迁移周期。\n以真实二进制运行帮助、错误参数、非交互确认和 SIGTERM 测试。\n\n#### 命令树保持薄而可重复调用\n\n入口只绑定参数、调用 service 并映射错误。\n网络客户端、logger 和配置在根入口组装后显式传入，不能藏在包级变量或 `init` 中。\n这样同一测试进程可以连续执行两次命令，第二次不会继承第一次的 flag 与 writer。\n\n`plan` 输出不可变摘要，`apply` 接收或重算摘要，高风险动作绑定审批。\n帮助和 completion 不能触发生产网络或读取 Secret。\n契约测试运行 `--help`、未知命令、缺失参数和同进程重复执行，固定 stderr 与退出码。\n\n真实二进制测试还要确认 completion 和 help 不访问网络，未知命令快速失败，危险 apply 在非交互环境缺少确认时不会等待 stdin。", "subs": ["命令树应保持薄", "先设计 CLI 契约", "flag 与位置参数", "plan 与 apply", "补全和帮助也是 API", "CLI 结构练习", "命令兼容性记录", "命令树保持薄而可重复调用"]}, {"title": "参数、环境变量、配置文件和 Secret 冲突时应该听谁的？", "content": "常见优先级是显式参数高于环境变量，高于配置文件，高于安全默认值。\n优先级必须在 `--help` 和诊断输出中可见，但诊断只显示 Secret 来源，不显示 Secret 值。\n\n```go\ntype Config struct { Endpoint string; Timeout time.Duration; Token string }\n```\n\n先合并各来源，再一次性校验并转换成内部配置。\n配置热重载必须定义原子快照和失败行为；小工具通常重启更简单。\n\n#### 输出配置来源而不是 Secret 值\n\n`diagnose` 可以显示 `endpoint=file`、`timeout=flag`、`token=environment`，同时把 Token 值替换为 `[redacted]`。\n环境变量缺失、空值和格式错误要区分；配置文件权限过宽时至少告警。\n练习时让四种来源提供冲突值，验证优先级与帮助文档一致。\n\n#### 原始配置与可信配置分离\n\n原始层保留指针或 Set 标志以区分缺失，合并层记录来源，可信层只包含已经校验的非歧义类型。\n核心业务只接收可信配置，不再读取环境或应用默认值。\n\n```text\ndefaults file environment flags\n        -> merge with provenance\n        -> parse types\n        -> validate fields and relationships\n        -> immutable runtime config\n```\n\n#### 未知字段和拼写错误\n\n配置文件默认应拒绝未知字段，避免 `timeuot` 被忽略后使用危险默认值。\n需要向前兼容时明确允许的扩展区。\n错误包含文件和字段路径，不打印整份含 Secret 配置。\n\n#### Secret 的获取与轮换\n\n环境变量便于注入但会进入进程环境和诊断工具；文件应限制权限；平台 Secret provider 可支持轮换。\n程序不把 Secret 写入 config dump、panic、URL query 或命令参数。\n热轮换时使用原子快照，并测试旧连接何时失效。\n\n#### 配置重载语义\n\n收到 SIGHUP 或文件事件后，先完整读取、解析和校验新配置，再一次性替换。\n失败继续使用旧配置并告警，不能留下半更新状态。\n改变监听地址、身份根或存储连接等字段可能不支持热更新，应明确要求重启。\n\n#### 配置诊断练习\n\n构造默认、文件、环境和 flag 四层冲突，输出脱敏后的最终值及来源。\n加入未知字段、权限过宽、空 Secret 与跨字段 timeout 冲突。\n重载无效配置后确认旧配置仍生效且 readiness 语义符合设计。\n\n#### 配置来源验收\n\n四层来源冲突时输出最终非敏感值和 provenance；Secret 只显示来源。\n未知字段、空值、权限过宽和热重载失败都有明确错误。\n无效新配置不得替换正在运行的旧快照。\n\n#### pflag、Viper 与 Cobra 分别解决什么\n\nCobra 管命令树和帮助，pflag 提供 GNU 风格参数，Viper 聚合文件、环境变量与 flag。\n三者常一起出现，但不是必须成套引入：只有一个命令和几个参数时，标准库 `flag` 更容易审计；稳定多子命令 CLI 才按选型矩阵默认 Cobra，确有多来源配置需求时再加入 Viper。\n\nViper 的自动环境绑定和弱类型转换可能让拼写错误或空字符串悄悄覆盖默认值。\n更稳妥的做法是把它限制在 adapter 层：读取所有来源到 `RawConfig`，记录字段来源，严格解码成类型明确的结构，再统一校验。\n业务包不导入 Cobra、pflag 或 Viper。\n\n```text\ndefaults -> config file -> environment -> flags\n       collect raw values and source metadata\n       -> strict decode -> cross-field validate -> trusted Config\n```\n\n布尔值要区分“没有提供”和“显式 false”，可以检查 pflag 的 `Changed`；duration 使用 `time.ParseDuration`，容量必须带单位；未知配置键默认报错。\nSecret 通过文件、环境注入或外部 Secret provider 获取，diagnose 只输出 `source=environment`，绝不输出值。\n\n#### 配置重载不是重新调用 Viper\n\n长期进程重载时，先完整读取并验证新配置，再原子替换不可变快照。\n对连接地址、凭证和并发等字段分别定义是否支持热更新；不支持的变化返回“需要重启”，不能半数生效。\nwatcher 事件可能重复且编辑器常用临时文件 rename，重载逻辑应去抖并以最终文件内容为准。\n\n测试构造默认、文件、环境和 flag 四层冲突，验证优先级、空值、未知键、无效 duration、Secret 脱敏和 `Changed` 语义。\n对运行中重载，故意提交坏配置，确认旧快照继续服务且 readiness、日志和退出码符合约定。", "subs": ["输出配置来源而不是 Secret 值", "原始配置与可信配置分离", "未知字段和拼写错误", "Secret 的获取与轮换", "配置重载语义", "配置诊断练习", "配置来源验收", "pflag、Viper 与 Cobra 分别解决什么", "配置重载不是重新调用 Viper"]}, {"title": "同一个 CLI 怎样为人提供表格，又为流水线提供稳定 JSON 和退出码？", "content": "机器输出需要稳定 schema，不受颜色、终端宽度和日志影响。\n文本模式可用 `text/tabwriter`，JSON 模式只向 stdout 输出一个合法文档，日志写 stderr。\n\n| 退出码 | 含义 |\n| --- | --- |\n| 0 | 全部检查成功 |\n| 1 | CLI 输入或内部执行失败 |\n| 2 | 执行完成但存在目标失败 |\n| 3 | 操作被取消或超过总 deadline |\n\n综合验收使用固定测试数据运行文本和 JSON 两种模式，以 `jq` 校验 JSON，以 Shell 捕获退出码，并测试无权限、超时、SIGTERM 和部分失败。\n产物用 `go version -m` 检查模块与构建信息，并记录 SHA-256 供分发核对。\n\n#### CLI 契约回归脚本\n\n```bash\nset +e\n./ops-check check --fixture testdata/partial.json --json >result.json 2>diagnostic.log\nstatus=$?\nset -e\njq -e '.summary.failed == 1' result.json\ntest \"$status\" -eq 2\n! grep -E 'token|password|secret' diagnostic.log\n```\n\n脚本验证的是已约定行为，不等于真实生产巡检。\n最后还要在目标 OS/架构运行二进制，确认 CA、DNS、代理、时区、信号和文件权限符合部署环境。\n\n#### 第三册综合实验：可测试的批量 HTTP 巡检 CLI\n\n综合项目保持三层：`main` 处理退出，`run` 处理 CLI 契约，`checkAll` 处理有界并发。\n下面是可独立保存为 `main.go` 的标准库版本：\n\n```go\npackage main\n\nimport (\n\t\"context\"\n\t\"encoding/json\"\n\t\"errors\"\n\t\"flag\"\n\t\"fmt\"\n\t\"net/http\"\n\t\"os\"\n\t\"os/signal\"\n\t\"strings\"\n\t\"sync\"\n\t\"syscall\"\n\t\"time\"\n)\n\ntype result struct {\n\tTarget string `json:\"target\"`\n\tOK     bool   `json:\"ok\"`\n\tError  string `json:\"error,omitempty\"`\n}\n\nfunc checkAll(ctx context.Context, client *http.Client, targets []string, workers int) []result {\n\tjobs := make(chan string)\n\tout := make(chan result)\n\tvar wg sync.WaitGroup\n\tfor i := 0; i < workers; i++ {\n\t\twg.Add(1)\n\t\tgo func() {\n\t\t\tdefer wg.Done()\n\t\t\tfor target := range jobs {\n\t\t\t\tr := result{Target: target}\n\t\t\t\treq, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)\n\t\t\t\tif err == nil {\n\t\t\t\t\tvar resp *http.Response\n\t\t\t\t\tresp, err = client.Do(req)\n\t\t\t\t\tif err == nil {\n\t\t\t\t\t\tresp.Body.Close()\n\t\t\t\t\t\tr.OK = resp.StatusCode >= 200 && resp.StatusCode < 300\n\t\t\t\t\t\tif !r.OK {\n\t\t\t\t\t\t\terr = fmt.Errorf(\"status %d\", resp.StatusCode)\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif err != nil {\n\t\t\t\t\tr.Error = err.Error()\n\t\t\t\t}\n\t\t\t\tselect {\n\t\t\t\tcase out <- r:\n\t\t\t\tcase <-ctx.Done():\n\t\t\t\t\treturn\n\t\t\t\t}\n\t\t\t}\n\t\t}()\n\t}\n\tgo func() {\n\t\tdefer close(jobs)\n\t\tfor _, target := range targets {\n\t\t\tselect {\n\t\t\tcase jobs <- target:\n\t\t\tcase <-ctx.Done():\n\t\t\t\treturn\n\t\t\t}\n\t\t}\n\t}()\n\tgo func() { wg.Wait(); close(out) }()\n\tresults := make([]result, 0, len(targets))\n\tfor r := range out {\n\t\tresults = append(results, r)\n\t}\n\treturn results\n}\n\nfunc run(ctx context.Context, args []string) int {\n\tfs := flag.NewFlagSet(\"ops-check\", flag.ContinueOnError)\n\ttargetsRaw := fs.String(\"targets\", \"\", \"comma-separated HTTP URLs\")\n\tworkers := fs.Int(\"workers\", 4, \"maximum concurrent checks\")\n\ttimeout := fs.Duration(\"timeout\", 5*time.Second, \"timeout for each HTTP request\")\n\tif err := fs.Parse(args); err != nil {\n\t\treturn 1\n\t}\n\tif *workers < 1 || *workers > 32 || *timeout <= 0 {\n\t\tfmt.Fprintln(os.Stderr, \"invalid workers or timeout\")\n\t\treturn 1\n\t}\n\tvar targets []string\n\tfor _, value := range strings.Split(*targetsRaw, \",\") {\n\t\tif value = strings.TrimSpace(value); value != \"\" {\n\t\t\ttargets = append(targets, value)\n\t\t}\n\t}\n\tif len(targets) == 0 {\n\t\tfmt.Fprintln(os.Stderr, \"at least one target is required\")\n\t\treturn 1\n\t}\n\tclient := &http.Client{Timeout: *timeout}\n\tresults := checkAll(ctx, client, targets, *workers)\n\tif err := json.NewEncoder(os.Stdout).Encode(results); err != nil {\n\t\tfmt.Fprintln(os.Stderr, err)\n\t\treturn 1\n\t}\n\tif errors.Is(ctx.Err(), context.Canceled) {\n\t\treturn 3\n\t}\n\tfor _, r := range results {\n\t\tif !r.OK {\n\t\t\treturn 2\n\t\t}\n\t}\n\treturn 0\n}\n\nfunc main() {\n\tctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)\n\tdefer stop()\n\tos.Exit(run(ctx, os.Args[1:]))\n}\n```\n\n先用 `httptest.Server` 写成功、500、慢响应三个测试，再执行 `go test -race`。\n当前实现还有一个刻意保留的评审点：取消发生时，尚未提交的目标不会出现在结果数组；生产契约必须决定它们是记为 cancelled，还是由顶层批次状态统一表达。\n读者应先固定这个契约，再修改实现，而不是仅让测试数量变多。\n\n#### 把综合实验拆成可维护边界\n\n单文件便于讲解，却不适合持续增加能力。\n第二轮重构应保持依赖从入口指向内部能力：\n\n```text\nops-check/\n├── cmd/ops-check/main.go          # 信号、真实环境、os.Exit\n├── internal/app/run.go            # 参数解析、编排、退出码\n├── internal/check/http.go         # HTTP 协议与错误分类\n├── internal/report/json.go        # 稳定机器输出\n├── internal/report/table.go       # 人类输出\n├── internal/targets/file.go       # 流式读取目标\n└── internal/atomicfile/write.go   # 原子写报告\n```\n\n`run` 接收 `[]string`、`io.Reader`、`io.Writer` 和依赖接口，返回退出码；只有 `main` 调用 `os.Exit`。\n这样测试不会终止测试进程，也不必替换全局 stdout。\n参数库只是入口适配器，不能让 Cobra command 对象渗入 checker。\n\n#### 流式目标读取与坏数据策略\n\n运维清单可能有几十万行。\n读取时既要限制单行大小，也要给出行号，不能因为 Scanner 默认上限而静默失败：\n\n```go\nfunc ReadTargets(r io.Reader, maxLine int) ([]string, error) {\n\tif maxLine < 1 {\n\t\treturn nil, fmt.Errorf(\"max line must be positive\")\n\t}\n\tscanner := bufio.NewScanner(r)\n\tscanner.Buffer(make([]byte, 64*1024), maxLine)\n\tvar targets []string\n\tseen := make(map[string]struct{})\n\tfor line := 1; scanner.Scan(); line++ {\n\t\tvalue := strings.TrimSpace(scanner.Text())\n\t\tif value == \"\" || strings.HasPrefix(value, \"#\") {\n\t\t\tcontinue\n\t\t}\n\t\tif _, ok := seen[value]; ok {\n\t\t\tcontinue\n\t\t}\n\t\tif _, err := url.ParseRequestURI(value); err != nil {\n\t\t\treturn nil, fmt.Errorf(\"line %d: invalid target: %w\", line, err)\n\t\t}\n\t\tseen[value] = struct{}{}\n\t\ttargets = append(targets, value)\n\t}\n\tif err := scanner.Err(); err != nil {\n\t\treturn nil, fmt.Errorf(\"scan targets: %w\", err)\n\t}\n\treturn targets, nil\n}\n```\n\n这里选择“遇到坏行整批失败”。\n若业务要容忍坏行，应返回 `targets` 与结构化 diagnostics，并设置“有警告”的退出状态；绝不能打印一行警告后仍返回完全成功，让流水线误判。\n清单超大时进一步改成迭代式 channel，但必须沿用第二册的取消与背压规则。\n\n#### HTTP 错误分类与重试判定\n\nHTTP 成功不等于只看 `err == nil`。\n客户端要区分传输失败、协议状态、响应格式和业务状态：\n\n| 类别 | 示例 | 默认动作 |\n| --- | --- | --- |\n| 输入错误 | URL 非法、协议不允许 | 不重试，退出码表示用法错误 |\n| 认证授权 | 401、403 | 不盲重试，提示凭证或权限问题 |\n| 限流 | 429 | 尊重 `Retry-After`，受总 deadline 限制 |\n| 临时服务失败 | 502、503、504 | 幂等请求可退避重试 |\n| 永久资源状态 | 404、业务校验失败 | 记录目标失败，不重试 |\n| 传输失败 | DNS、连接重置、TLS | 按错误类型与预算判断 |\n\n重试循环必须把“单次超时”和“整个目标的 deadline”分开。\n每次尝试都创建请求上下文，但退避等待也要监听父上下文。\n加入全抖动避免大量实例同一时刻重试。\n若服务返回 `Retry-After`，仍需裁剪到剩余预算内。\n\n不要重试非幂等写操作，除非服务端提供幂等键且客户端在所有重试中复用同一个键。\n读取响应体要设上限；即使状态码失败，也可读取一小段用于诊断，但不能把可能包含凭证的整段响应写入日志。\n\n#### 原子报告与进程退出语义\n\n报告写文件采用“同目录临时文件—写入—同步—关闭—重命名”的顺序。\n同目录保证 rename 不跨文件系统；权限应显式设置；任一步失败都保留旧文件并清理临时文件。\n对要求掉电一致性的场景，还需同步父目录；Windows 的替换语义与 Unix 不完全相同，跨平台工具必须实测。\n\nCLI 退出码是一项公开 API，建议固定并写进 `--help`：\n\n| 退出码 | 含义 | 流水线动作 |\n| --- | --- | --- |\n| 0 | 所有目标完成且健康 | 继续 |\n| 1 | 参数、配置或本地执行错误 | 修正调用方式 |\n| 2 | 巡检完成但存在不健康目标 | 标记业务检查失败 |\n| 3 | 收到取消或超过总 deadline | 按调度策略重试或终止 |\n| 4 | 输出不完整或持久化失败 | 不消费残缺报告 |\n\n日志写 stderr，JSON 或表格写 stdout。\nJSON 字段名、类型与缺省值必须稳定；新增字段通常兼容，删除或改类型需要版本策略。\n表格可为人优化，不应成为脚本解析接口。\n\n#### 外部命令的安全边界\n\n需要调用 `ping`、`journalctl` 或厂商 CLI 时，直接传参数数组，不拼接 shell 字符串：\n\n```go\nfunc RunCommand(ctx context.Context, name string, args []string, limit int64) ([]byte, error) {\n\tallowed := map[string]bool{\"ping\": true, \"journalctl\": true}\n\tif !allowed[name] {\n\t\treturn nil, fmt.Errorf(\"command %q is not allowed\", name)\n\t}\n\tcmd := exec.CommandContext(ctx, name, args...)\n\tvar output bytes.Buffer\n\tcmd.Stdout = &limitedWriter{W: &output, N: limit}\n\tcmd.Stderr = &limitedWriter{W: &output, N: limit}\n\tif err := cmd.Run(); err != nil {\n\t\treturn output.Bytes(), fmt.Errorf(\"run %s: %w\", name, err)\n\t}\n\treturn output.Bytes(), nil\n}\n```\n\n示例中的 `limitedWriter` 需要在项目中实现，并在超过容量时返回明确错误。\n程序路径应通过部署配置固定，避免被不可信 `PATH` 劫持。\n凭证不放命令行参数，因为它可能出现在进程列表与审计日志；优先使用受限权限文件描述符或标准输入，并确认子进程不会回显。\n\n进程组也是边界：`CommandContext` 终止直接子进程，不一定清理它创建的孙进程。\n若工具会派生进程，要按目标操作系统设置进程组并测试取消后的残留，不可从 Unix 行为推断 Windows。\n\n#### CLI 契约测试矩阵\n\n核心测试不启动外部二进制，直接调用 `run`：\n\n- 空目标、非法 workers、非法 duration 返回 1，stderr 有简洁原因；\n- 全成功返回 0，stdout 是可解码 JSON，stderr 不混入普通日志；\n- 一个 500 返回 2，成功目标仍在报告中；\n- `httptest.Server` 阻塞时取消上下文，返回 3 且无 goroutine 泄漏；\n- stdout writer 人为返回错误时返回 4；\n- 相同输入的 JSON 字段与退出码稳定；\n- 目标文件包含 BOM、空行、注释、重复值、超长行和无效 UTF-8 时行为明确；\n- SIGTERM 的进程级测试确认停止接单、等待窗口和最终退出码。\n\n端到端测试再构建一次真实二进制，用 shell 捕获 stdout、stderr 和 `$?`。\n这不是重复测试：函数测试证明逻辑，二进制测试证明参数接线、信号和进程契约。\n\n#### 第三册完成标准\n\n- 可处理超过内存舒适区的输入，单行、响应体和命令输出都有上限；\n- 文件更新不会暴露半成品，旧文件在失败时仍可用；\n- 子进程使用参数数组、白名单、deadline，并保留退出状态和有限诊断；\n- HTTP 客户端复用 transport，设置完整超时，关闭响应体并按幂等性重试；\n- SIGTERM 后先停止接收新工作，再限时等待，超时路径可观测；\n- stdout、stderr、JSON schema 与退出码形成明确 CLI 契约；\n- 单元、race、`httptest` 和真实二进制契约测试全部通过。", "subs": ["CLI 契约回归脚本", "第三册综合实验", "把综合实验拆成可维护边界", "流式目标读取与坏数据策略", "HTTP 错误分类与重试判定", "原子报告与进程退出语义", "外部命令的安全边界", "CLI 契约测试矩阵", "第三册完成标准"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

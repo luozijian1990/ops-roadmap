@@ -2146,6 +2146,77 @@ localhost 与 mock 无法证明真实 IAM；结论必须标明在哪个环境验
 比较相同输入下的输出摘要、失败分类和峰值资源。
 “快两倍但漏了 5% 目标”不是优化。
 
+#### Python 运行时诊断：从对象数量到 RSS
+
+Python 工具变慢或内存上涨时，先区分“对象仍被引用”“解释器保留分配”“外部资源增长”三类现象。
+引用计数通常会及时释放无环对象；循环引用交给 cyclic GC，释放时机和批次边界不一定相同；RSS 还包含解释器、扩展模块、线程栈和分配器保留的页。
+因此 `len(results)` 下降并不能证明 RSS 立刻下降，`gc.collect()` 也不是修复无界缓存的按钮。
+
+下面的脚本只演示观察顺序，使用 Python 3.9+ 标准库：
+
+```python
+from __future__ import annotations
+
+import gc
+import tracemalloc
+
+
+def make_batch(size: int) -> list[dict[str, int]]:
+    return [{"value": index} for index in range(size)]
+
+
+tracemalloc.start()
+before = tracemalloc.take_snapshot()
+batch = make_batch(10_000)
+after = tracemalloc.take_snapshot()
+
+for statistic in after.compare_to(before, "lineno")[:3]:
+    print(statistic)
+
+del batch
+collected = gc.collect()
+print("collected:", collected)
+```
+
+它只能指出 Python 分配热点，不能解释 NumPy、openssl、socket buffer 或文件页缓存。
+现场还应记录进程 RSS、目标数量、队列深度、响应体上限和异常 traceback 是否仍被 Future 持有；对比固定输入的多轮结果，才能区分峰值和持续增长。
+
+循环引用实验应保存三份证据：删除引用前的对象数量、`gc.collect()` 返回值、删除引用后的 tracemalloc 差异。
+如果对象被全局缓存、日志上下文或任务表引用，GC 没有机会回收，下一步应找持有者而不是继续调阈值。
+
+异步批次还要检查 event loop 是否被阻塞：把一个 `time.sleep(0.2)` 放进 async 函数，和 `await asyncio.sleep(0.2)` 做对照，记录同时启动的任务完成时间。
+阻塞调用会占住唯一的 event loop，表现为所有目标一起变慢；把阻塞工作移到受控线程池后，仍要设置线程数、队列和取消后的清理。
+
+```python
+import asyncio
+import time
+
+
+async def blocking() -> str:
+    time.sleep(0.2)
+    return "blocking"
+
+
+async def cooperative() -> str:
+    await asyncio.sleep(0.2)
+    return "cooperative"
+
+
+async def main() -> None:
+    started = time.perf_counter()
+    await asyncio.gather(blocking(), cooperative())
+    print(f"elapsed={time.perf_counter() - started:.3f}s")
+
+
+asyncio.run(main())
+```
+
+预期耗时接近 0.4 秒，说明阻塞函数延迟了本可并行等待的任务；改为两个 cooperative 后才接近 0.2 秒。
+这不是生产容量基准，只用于确认 event loop 的因果关系。
+
+取消测试需要同时断言任务状态和资源清理：TaskGroup/`gather` 的异常传播方式不同，取消一个任务不代表所有 socket、临时文件和线程都已结束。
+验收记录写清取消发出时间、任务最终状态、清理耗时和未完成副作用；无法确认远端结果时进入 `unknown`，不要把 `CancelledError` 改写成成功。
+
 #### 第三册收束
 
 ```text

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Go 运维开发与云原生工程 · 第二册：并发与运行时 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Go 运维开发与云原生工程 · 第二册：并发与运行时</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "Go 运维开发与云原生工程 · 第二册：并发与运行时", "intro": "", "parts": [{"title": "第五章 · 创建 goroutine 之前先画清任务生命周期", "sections": [{"title": "goroutine 与操作系统线程是什么关系，调度器替我们做了什么？", "content": "goroutine 是由 Go 运行时调度的并发执行单元，不等同于操作系统线程。\n运行时把大量可运行 goroutine 映射到较少的线程上，并处理栈增长、网络轮询和抢占等工作。\n这降低了创建并发任务的成本，却没有取消 CPU、内存、文件描述符和下游容量限制。\n\n```mermaid\nflowchart LR\n    A[任务输入] --> B[有界队列]\n    B --> C[Worker goroutine]\n    B --> D[Worker goroutine]\n    C --> E[HTTP 或系统调用]\n    D --> E\n    E --> F[结果汇总]\n```\n\n#### 并发不是并行的同义词\n\n并发描述多个任务在时间上交错推进；并行表示多个任务在同一时刻使用不同执行资源。\nI/O 巡检即使只用少量 CPU，也能通过并发隐藏等待；CPU 密集任务能否提速还受核心数、算法和内存带宽影响。\n先测串行基线，再逐步增加并发，观察吞吐、P95、错误率和依赖压力。\n\n#### goroutine 很轻但不是免费\n\n每个 goroutine 都需要栈和调度状态，内部还可能持有连接、定时器或缓冲。\n下面的写法没有退出条件，会持续泄漏：\n\n```go\nfunc leak(ch <-chan string) {\n\tgo func() {\n\t\tfor value := range ch {\n\t\t\tfmt.Println(value)\n\t\t}\n\t}()\n}\n```\n\n调用方既不知道谁关闭 `ch`，也不能取消内部 goroutine。\n生产代码应把生命周期归属写进接口：由父任务提供 `context`，创建者等待子任务结束，channel 的发送与关闭责任明确。\n\n#### 用观测验证而不是猜调度器\n\n当延迟升高时，先观察 goroutine 数、阻塞位置、CPU profile、mutex/block profile 和 trace。\n不要根据某一篇旧文章中的调度器内部实现直接优化；内部细节会演进，业务可观察的阻塞、队列和资源才是稳定证据。\n\n#### G M P 模型只保留排障所需部分\n\nG 表示 goroutine 及其栈和调度状态，M 表示操作系统线程，P 持有执行 Go 代码所需的调度资源。\nP 的数量受 `GOMAXPROCS` 控制，决定同一时刻可执行 Go 代码的并行度；阻塞系统调用、CGO 与运行时行为会使实际线程数不同。\n\n```text\nRunnable G queue\n      -> P selects G\n      -> M executes G\n      -> block yield or preempt\n      -> another G runs\n```\n\n应用不直接管理这个线程池。\n业务真正要控制的是任务数量、goroutine 生命周期、连接和下游预算。\n调度器会复用线程，但不会替应用限制 HTTP QPS 或数据库连接。\n\n#### G、M、P 与阻塞的因果关系\n\nG 是待执行的 goroutine，M 是操作系统线程，P 提供执行 Go 代码所需的调度资源；G 阻塞时，P 可以让其他 G 继续运行。\n网络轮询和抢占改善了利用率，却不会消除锁竞争、连接池耗尽或 cgroup CPU throttling，因此要把运行时 profile 与业务队列指标放在同一时间线上。\n验证时分别运行 CPU 密集和阻塞 I/O 任务，改变 `GOMAXPROCS` 与 worker 数，比较 runnable goroutine、CPU throttled time、队列等待和 p95。\n\n```mermaid\nflowchart LR\n    G1[Runnable goroutine] --> Q[P queue]\n    G2[Blocked goroutine] --> N[Network poller]\n    Q --> M[OS thread M]\n    N --> Q\n    M --> R[Run or preempt]\n```\n\n#### 阻塞与饱和不是一回事\n\ngoroutine 可能等待 channel、mutex、网络 I/O、timer、系统调用或 GC。\nCPU 低不等于并发不足：大量任务卡在同一锁或连接池时，增加 goroutine 只会扩大队列。\nCPU 高也可能来自序列化、压缩、重试风暴或忙循环，不一定是有效业务吞吐。\n\n应用层记录在途任务、队列深度、等待时长和下游延迟；运行时层观察 goroutine、heap、GC、mutex 和调度。\n两层结合，才能区分业务积压与运行时异常。\n\n#### CPU 密集与 I O 密集任务\n\nI/O 等待期间可以调度其他 goroutine，适度并发能提高吞吐。\nCPU 密集任务最终受核心和容器配额约束，worker 远多于可用 CPU 往往增加切换与缓存压力。\n对哈希、压缩任务先在 `GOMAXPROCS` 附近建立基线；对 HTTP 巡检按 QPS、延迟、连接和内存共同计算。\n\n练习时分别实现 CPU 计算与等待本地 `httptest.Server` 的版本，改变 worker 和 `GOMAXPROCS`，记录吞吐、p95、goroutine 与 CPU。\n解释吞吐停止增长后，瓶颈转移到了哪里。\n\n#### 用时间线读一次调度现场\n\n排障时把一次任务拆成“进入队列、开始执行、等待外部 I/O、收到取消、提交结果、退出”六个时间点。\n可在每个点记录单调时钟和任务 ID；不要用墙上时钟计算耗时，因为 NTP 校时可能让时间向后跳。\n\n```go\ntype Span struct {\n\tTask   string\n\tQueued time.Time\n\tStart  time.Time\n\tEnd    time.Time\n}\n\nfunc (s Span) QueueWait() time.Duration { return s.Start.Sub(s.Queued) }\nfunc (s Span) RunTime() time.Duration   { return s.End.Sub(s.Start) }\n```\n\n如果 queue wait 增长而 run time 稳定，瓶颈在调度或下游配额；如果两者一起增长，先检查依赖延迟和资源争用。\n把这两个时长分开是判断“增加 worker 是否有用”的最小证据。\n\n#### 容器 CPU 配额是并发上限的一部分\n\n宿主机有 16 个 CPU 不代表容器能同时运行 16 个 Go 线程。\nCPU limit 较小时，运行时会受到 cgroup throttling；大量 runnable goroutine 只会在配额恢复时争抢执行。\n压测记录应同时保存容器 limit、`GOMAXPROCS`、CPU throttled time 和请求 p95。\n生产调整并发前，先确认是配额不足还是锁、网络和连接池阻塞。", "subs": ["并发不是并行的同义词", "goroutine 很轻但不是免费", "用观测验证而不是猜调度器", "G M P 模型只保留排障所需部分", "G、M、P 与阻塞的因果关系", "阻塞与饱和不是一回事", "CPU 密集与 I O 密集任务", "用时间线读一次调度现场", "容器 CPU 配额是并发上限的一部分"]}, {"title": "谁负责等待、取消和回收 goroutine？", "content": "创建 goroutine 的代码应负责它的结束路径。\n常见结构是父级 `context` 传播取消，`WaitGroup` 等待全部子任务，结果 channel 由发送方协调关闭。\n只调用 `cancel()` 而不等待退出，进程仍可能在资源释放前结束。\n\n```go\nfunc runWorkers(ctx context.Context, n int, jobs <-chan Target) error {\n\tvar wg sync.WaitGroup\n\twg.Add(n)\n\tfor i := 0; i < n; i++ {\n\t\tgo func(workerID int) {\n\t\t\tdefer wg.Done()\n\t\t\tfor {\n\t\t\t\tselect {\n\t\t\t\tcase <-ctx.Done():\n\t\t\t\t\treturn\n\t\t\t\tcase target, ok := <-jobs:\n\t\t\t\t\tif !ok {\n\t\t\t\t\t\treturn\n\t\t\t\t\t}\n\t\t\t\t\tcheck(ctx, workerID, target)\n\t\t\t\t}\n\t\t\t}\n\t\t}(i)\n\t}\n\twg.Wait()\n\treturn ctx.Err()\n}\n```\n\n#### `context` 只传递请求范围信号\n\n`Context` 适合 deadline、取消和请求范围元数据。\n它通常作为第一个参数沿调用链传递，不应为方便而存入长期对象，也不应用来承载配置或可选函数参数。\n派生的 cancel 函数要尽快 `defer cancel()`，释放定时器资源。\n\n#### 取消是请求，不是强制中断\n\nGo 不会安全地从外部杀死任意 goroutine。\n任务必须在等待 channel、网络 I/O、批次边界或其他安全点检查 `ctx.Done()`。\n若底层库不接收 context，取消可能无法及时传播；评审依赖时要验证其超时和取消能力。\n\n#### `WaitGroup` 只计数，不传播错误\n\n需要“任一任务失败就取消其余任务”时，可使用标准模式自行组合 context、错误 channel，或在项目允许的情况下采用 `errgroup`。\n无论使用什么工具，都应定义：返回第一个错误还是全部错误、已开始任务如何收尾、部分成功怎样呈现。\n\n#### 生命周期表先于代码\n\n| goroutine | 创建者 | 输入关闭者 | 退出条件 | 等待者 | 错误去向 |\n| --- | --- | --- | --- | --- | --- |\n| producer | `Run` | 自己关闭 jobs | 输入结束或 ctx 取消 | worker 间接等待 | ctx 或结果 |\n| worker | `Run` | 不关闭 jobs | jobs 关闭或 ctx 取消 | WaitGroup | results |\n| closer | `Run` | 关闭 results | WaitGroup 完成 | range consumer | 无 |\n\n任一列答不上来，都说明生命周期仍隐藏在实现细节中。\n“后台任务不重要所以不用等”会在测试、滚动发布与重复调用中累积成泄漏。\n\n#### Context 的传播规则\n\n请求范围函数把 context 作为首参数向下传递，不保存进 struct、不传 nil，也不把它当配置容器。\nvalue 只放 request ID 或 trace 上下文等跨 API 元数据，不放 logger、数据库连接和普通业务参数。\n\n```go\nfunc (c *Client) Get(ctx context.Context, id string) (Target, error) {\n\treq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+\"/targets/\"+id, nil)\n\tif err != nil {\n\t\treturn Target{}, fmt.Errorf(\"build request: %w\", err)\n\t}\n\treturn c.do(req)\n}\n```\n\n不要在深层函数使用 `context.Background()` 切断取消。\n真正需要请求结束后继续的审计或清理，应建立独立、有界、可等待的生命周期。\n\n#### 取消后的清理与错误\n\n取消只是关闭一个信号。\ngoroutine 仍需从阻塞调用返回、释放锁与文件，并报告状态。\n若依赖 API 不接受 context，就无法保证及时取消；外围超时只能限制等待，底层操作可能仍继续。\n\n“首错取消”适合不可分割任务，“继续汇总”适合批量巡检。\n若要首错取消又要知道每个未完成项，必须为 cancelled 结果建模。\n测试可让一个 worker 阻塞、一个失败、一个等待发送，然后取消父 context，确认全部退出。\n\n#### 取消原因也属于结果契约\n\n调用方需要区分主动取消、deadline 到期和上游失败触发的级联取消。\n带原因的取消函数和 `context.Cause` 从 Go 1.20 起可用；项目若要兼容较旧工具链，则在任务结果中显式保存 `cause` 字段，不要只把所有情况压成字符串 `context canceled`。\n无论采用哪种方式，都要规定日志级别和退出码：用户主动取消通常不是程序错误，deadline 则应计入超时指标。\n\n```go\nctx, cancel := context.WithCancelCause(context.Background())\ncancel(fmt.Errorf(\"dependency budget exhausted\"))\n<-ctx.Done()\nfmt.Println(context.Cause(ctx))\n```\n\n这是局部片段，必须在项目 `go.mod` 声明的最低版本上编译验证。\n取消原因不能携带 Secret，也不应把底层响应体整段塞进错误。", "subs": ["context 只传递请求范围信号", "取消是请求，不是强制中断", "WaitGroup 只计数", "生命周期表先于代码", "Context 的传播规则", "取消后的清理与错误", "取消原因也属于结果契约"]}, {"title": "怎样用 goroutine profile 和运行指标发现泄漏？", "content": "泄漏通常表现为 goroutine 数持续增长、连接不释放、内存随请求上升或关闭超时。\n一次快照只能说明当时状态；可靠判断需要在稳定负载下比较基线、峰值和任务结束后的回落。\n\n```go\nvar active = expvar.NewInt(\"active_checks\")\n\nfunc observedCheck(ctx context.Context, target Target) error {\n\tactive.Add(1)\n\tdefer active.Add(-1)\n\treturn checkTarget(ctx, target)\n}\n```\n\n#### 建立可解释指标\n\n至少观察在途任务、队列深度、完成数、错误分类、超时数和任务耗时。\n`runtime.NumGoroutine()` 可作为趋势线索，但不是泄漏证明：HTTP 连接、垃圾回收和运行时内部任务都会改变数值。\n\n#### 安全使用诊断端点\n\n`net/http/pprof` 会暴露堆栈、路径和运行细节，不应无认证监听公网。\n更安全的做法是只监听 loopback 或独立管理端口，通过受控隧道访问，并设置采集窗口、文件权限与保留时间。\n\n```bash\ngo tool pprof http://127.0.0.1:6060/debug/pprof/goroutine\ngo tool trace trace.out\n```\n\n比较 profile 时记录版本、负载、持续时间和配置。\n优化后再次执行同样场景，确认错误率没有上升、取消仍能完成、资源能回落。\n\n#### 先定义正常基线\n\nHTTP server、连接池、指标系统和运行时本来就会创建长期 goroutine。\n上线前在空闲、稳定负载和峰值记录基线，关注负载结束后是否回落到可解释范围，而不是设定一个脱离场景的固定总数。\n\n`worker_active`、`jobs_queued`、`requests_inflight` 和 `buffer_bytes` 比总 goroutine 更可行动。\n总数增长时先定位组件，再用 profile 找创建栈。\n\n#### 获取并比较 profile\n\n```bash\ncurl -fsS 'http://127.0.0.1:6060/debug/pprof/goroutine?debug=2' > goroutines.txt\ngo tool pprof -top 'http://127.0.0.1:6060/debug/pprof/goroutine'\n```\n\n重点看大量 goroutine 是否停在 channel send/receive、mutex、网络读、timer 或自建循环。\n间隔采集两到三次，判断堆栈数量是暂时波动还是持续累积。\n一次 profile 只能证明采集窗口内的状态。\n\n#### 常见泄漏模式\n\n- 结果消费者提前退出，worker 永久阻塞发送；\n- ticker 未 Stop，消费循环没有退出；\n- 网络调用缺少 context 或 timeout；\n- 每次重连启动新循环，旧循环未取消；\n- 生产者等待写满队列，而消费者已经退出；\n- 测试启动 server 或 goroutine 后未 cleanup。\n\n修复不能只增大 channel。\n应让拥有发送生命周期的一方关闭 channel，并让每个阻塞点都有完成或取消路径。\n\n#### 从 profile 栈回到代码所有者\n\n看到大量 `chan send` 栈时，先沿调用栈找到创建 goroutine 的业务函数，再查它的接收者是否可能提前返回。\n看到 `time.NewTicker` 栈时，搜索对应 `Stop` 是否在同一生命周期内注册。\n把 profile 中的函数名、源码位置和预计退出条件写进现场记录，下一次采样才能判断修复是否生效。\n\n```bash\ncurl -fsS 'http://127.0.0.1:6060/debug/pprof/goroutine?debug=2' \\\n  | rg -n 'chan send|chan receive|time.NewTicker|net/http' \\\n  | head -n 40\n```\n\n命令只用于本机受控诊断。\n若管理端口没有认证，必须限制监听地址和网络 ACL；不要把 profile 内容粘贴到公开工单。\n\n#### 泄漏回归与现场记录\n\n优先等待组件自己的活动计数归零。\n测试重复启动和取消几十次，超时后打印 goroutine profile。\n生产现场记录负载、队列、在途指标、两次 profile、常见堆栈、止损操作和恢复曲线；若必须重启，也尽量先保存有界诊断证据。", "subs": ["建立可解释指标", "安全使用诊断端点", "先定义正常基线", "获取并比较 profile", "常见泄漏模式", "从 profile 栈回到代码所有者", "泄漏回归与现场记录"]}]}, {"title": "第六章 · 用 channel 传递任务，同时保留背压", "sections": [{"title": "无缓冲与有缓冲 channel 分别建立了什么同步关系？", "content": "无缓冲 channel 需要发送方与接收方同时就绪，强调交接；有缓冲 channel 允许有限数量的任务排队，强调容量。\n缓冲不是越大越好：过大队列会增加陈旧任务、内存和关闭时间，并把下游过载隐藏得更久。\n\n```go\njobs := make(chan Target, 20)\nresults := make(chan Result, 20)\n```\n\n#### 容量来自预算\n\n队列容量应根据最大可接受等待时间、单任务耗时和 worker 数推导。\n例如 5 个 worker、平均每项 1 秒、最多接受 4 秒排队，可以从 20 左右开始测量，而不是随手写 `10000`。\n\n#### 发送和接收都可能阻塞\n\n生产者发送时应能响应取消：\n\n```go\nselect {\ncase jobs <- target:\n\treturn nil\ncase <-ctx.Done():\n\treturn ctx.Err()\n}\n```\n\n如果只写 `jobs <- target`，队列满时生产者无法停止。\n消费者也应区分 channel 关闭和零值，使用 `value, ok := <-ch`。\n\n#### channel 传值会复制\n\n复制结构体不等于深拷贝，其中的 slice、map 和指针仍可能共享底层数据。\n跨 goroutine 传递后，最好把数据视为不可变，或明确由接收者取得唯一所有权。\n\n#### 用排队论做第一版预算\n\n如果 5 个 worker 每秒各完成 1 个任务，稳定服务能力约 5 个每秒。\n输入长期达到 8 个每秒时，无论 channel 多大，积压都会持续增长；扩大 buffer 只会推迟失败。\n先保证长期到达率低于服务率，再用 buffer 吸收短暂突发。\n\n队列等待时间也属于任务总时延。\n监控 enqueue 到 worker 开始的时间，而不只测执行耗时。\n目标已在队列等待 30 秒后再给它 10 秒请求 timeout，可能已经违背 20 秒总 SLO。\n\n#### channel 方向表达所有权\n\n函数参数使用 `<-chan T` 和 `chan<- T` 表达只收或只发，使误关闭和误发送更早被编译器发现。\n返回 channel 的函数必须在文档中说明谁消费、何时关闭以及调用方停止消费会怎样。\n\n```go\nfunc produce(ctx context.Context, out chan<- Target, targets []Target) error {\n\tfor _, target := range targets {\n\t\tselect {\n\t\tcase out <- target:\n\t\tcase <-ctx.Done():\n\t\t\treturn ctx.Err()\n\t\t}\n\t}\n\treturn nil\n}\n```\n\n#### nil channel 的特殊语义\n\n对 nil channel 发送和接收会永久阻塞，close 会 panic。\n在 select 中 nil channel 的 case 永远不可选，这可用于动态启停分支，但会增加理解成本。\n配置错误意外留下 nil channel 时，程序可能静默挂住，因此构造器应建立非 nil 不变量。\n\n#### 背压实验\n\n让消费者每次等待 100ms，分别用容量 0、10、1000 的 channel 处理 100 个任务，记录生产耗时、峰值队列、总耗时与取消延迟。\n观察大 buffer 为什么让生产者很快返回，却没有提高最终处理能力。", "subs": ["容量来自预算", "发送和接收都可能阻塞", "channel 传值会复制", "用排队论做第一版预算", "channel 方向表达所有权", "nil channel 的特殊语义", "背压实验"]}, {"title": "channel 应该由谁关闭，`select` 又怎样处理超时和退出？", "content": "一般由发送方关闭 channel，因为发送方最清楚何时不会再产生值。\n接收方不要为了“停止等待”擅自关闭，否则并发发送可能触发 `send on closed channel`。\n多发送方场景由一个协调者等待全部发送者后关闭。\n\n```go\nvar producers sync.WaitGroup\nproducers.Add(2)\nfor i := 0; i < 2; i++ {\n\tgo func() {\n\t\tdefer producers.Done()\n\t\tproduce(ctx, jobs)\n\t}()\n}\ngo func() {\n\tproducers.Wait()\n\tclose(jobs)\n}()\n```\n\n#### 关闭是广播完成，不是资源析构\n\n关闭 channel 后，接收者仍可读出缓冲中的剩余值。\nchannel 不需要像文件那样“释放”；关闭它的目的主要是告诉接收方不会再有数据。\n只用于单次通知的 channel 可以 `close(done)` 广播。\n\n#### 统一 deadline，避免层层创建互相矛盾的超时\n\n最外层为一次操作建立总 deadline，内部依赖可以设置更短的单次超时，但不能超过剩余时间。\n循环里使用 `time.After` 会重复分配定时器；长期循环应复用 `Timer` 或 `Ticker` 并在结束时停止。\n\n#### 公平性不要靠想象\n\n多个 case 同时可用时，`select` 会选择一个可执行分支，但业务不能依赖固定顺序。\n优先级需求应通过不同队列、显式状态或分阶段处理实现，而不是假设源码排列代表优先级。\n\n#### 关闭协议而不是到处 recover\n\n最常见协议是生产者关闭数据 channel，协调者关闭结果 channel，消费者只读取。\n不要通过 `recover` 掩盖重复 close 或 send-after-close；这类 panic 说明所有权设计错误。\n多个 producer 使用 WaitGroup，由唯一协调者在全部结束后 close。\n\n只需广播取消时，可创建 `done := make(chan struct{})` 并由单一 owner close；所有等待者同时被唤醒。\n现代代码通常直接使用 context，但 done channel 仍适合组件内部、无需错误原因的简单通知。\n\n#### Timer 与 Ticker 生命周期\n\n`time.After` 适合低频一次性等待；热循环中反复创建会产生大量 timer。\n可复用 `time.Timer`，Stop 后处理可能已到达的值，再 Reset。\nTicker 用于周期动作，退出时 Stop，但 Stop 不会关闭其 channel，消费者必须依赖 context 结束。\n\n```go\nticker := time.NewTicker(interval)\ndefer ticker.Stop()\nfor {\n\tselect {\n\tcase <-ticker.C:\n\t\tcollect()\n\tcase <-ctx.Done():\n\t\treturn ctx.Err()\n\t}\n}\n```\n\n若一次 collect 超过 interval，必须决定跳过、串行延后还是允许重叠。\n默认在同一循环串行执行可避免重入，但实际频率会下降；需要并发时仍要设置上限。\n\n#### select 中的取消竞争\n\n当发送与取消同时可执行时，select 可能选择发送，因此“调用 cancel 后绝不再产生一个结果”不能仅靠普通 select 保证。\n若协议要求严格停止，需在提交前后重新检查状态，或让单一状态机决定是否接受；多数场景则把取消定义为尽快停止，允许已就绪操作完成。\n\n#### 超时分层练习\n\n建立批次 10 秒、单目标 2 秒、重试退避 200ms 的链路。\n用慢 server 验证单目标不会超过 2 秒，所有尝试和退避不会超过批次剩余时间，取消后 timer 和 ticker 都停止。", "subs": ["关闭是广播完成", "统一 deadline", "公平性不要靠想象", "关闭协议而不是到处 recover", "Timer 与 Ticker 生命周期", "select 中的取消竞争", "超时分层练习"]}, {"title": "批量巡检怎样限制 worker 数量并汇总部分失败？", "content": "批量任务应同时限制全局并发和单目标压力，保留每个目标结果，并定义整体退出码。\n遇到一个失败是否取消全批次取决于业务：只读巡检通常继续收集，其余强依赖步骤可能快速失败。\n\n```go\ntype CheckResult struct {\n\tTarget string\n\tErr    error\n}\n\nfunc worker(ctx context.Context, jobs <-chan Target, out chan<- CheckResult) {\n\tfor target := range jobs {\n\t\terr := checkTarget(ctx, target)\n\t\tselect {\n\t\tcase out <- CheckResult{Target: target.Name, Err: err}:\n\t\tcase <-ctx.Done():\n\t\t\treturn\n\t\t}\n\t}\n}\n```\n\n#### 结果汇总必须知道期望数量\n\n协调者负责启动固定 worker、提交任务、关闭 jobs、等待 worker，再关闭 results。\n不要在等待结果的同一 goroutine 中同步提交超过缓冲容量的任务，否则可能形成互等。\n\n#### 部分失败是正式状态\n\n建议区分：全部成功、部分失败、输入错误、认证失败和执行器故障。\nJSON 中保留每个目标的状态与错误类别；退出码例如 `0` 表示全成功，`2` 表示部分失败，`1` 表示程序自身失败。\n具体数字应写入 CLI 契约并测试。\n\n#### 什么时候升级为独立 Worker\n\n进程内 worker 无法保证进程重启后的任务恢复。\n只有任务需要持久化、自动重试、多实例消费或独立扩缩容时，才考虑任务表与独立进程；消息队列不是业务状态的唯一来源，任务的操作者、参数、状态、错误和时间仍需可审计存储。\n\n#### worker pool 的关闭顺序\n\n正确关闭顺序是停止接收新批次、停止生产 jobs、等待 worker 完成或取消、关闭 results、完成汇总。\n若先关闭 results，仍在发送的 worker 会 panic；若只关闭 jobs 不等待，进程可能丢掉在途结果。\n\n```text\naccept=false\n  -> producer stops and closes jobs\n  -> workers drain or observe cancellation\n  -> WaitGroup reaches zero\n  -> coordinator closes results\n  -> collector finishes report\n```\n\n关闭窗口需要预算。\n只读巡检可能允许取消剩余任务；写操作可能必须完成提交或记录可恢复状态。\n不能用同一个粗暴超时处理所有副作用。\n\n#### 全局与每目标并发\n\n全局 worker 上限保护进程，但同一目标可能仍被所有 worker 同时访问。\n按主机、租户或 API endpoint 增加局部 semaphore，避免单目标被压垮。\n获取多个限制器时保持固定顺序，或者设计为只需一次获取，减少死锁。\n\n限流控制速率，semaphore 控制同时在途数量，队列控制等待容量。\n三者回答不同问题，不能互相替代。\nHTTP transport 的连接上限还会形成另一层等待，应将它纳入指标。\n\n#### 部分失败报告模型\n\n结果至少包含 target、状态、错误码、可重试性、attempt、开始和结束时间。\n错误全文供诊断，稳定 code 供机器判断。\n整体 summary 包含 total、succeeded、failed、cancelled 和 incomplete，确保数量守恒。\n\n取消时未开始的目标是 `cancelled` 还是不出现在结果中必须固定。\n缺少结果而 summary 仍称 complete 会误导自动化。\n\n#### worker pool 验收\n\n使用可控 fake 验证并发峰值；随机返回部分错误验证数量守恒；消费者变慢验证背压；取消验证所有 active 归零；执行 `go test -race -count=20` 增加调度交错。\n最后用基准逐步增加 worker，找到吞吐不再增长的点，并检查下游错误率。", "subs": ["结果汇总必须知道期望数量", "部分失败是正式状态", "什么时候升级为独立 Worker", "worker pool 的关闭顺序", "全局与每目标并发", "部分失败报告模型", "worker pool 验收"]}]}, {"title": "第七章 · 共享状态不可避免时选择最小同步工具", "sections": [{"title": "Mutex、RWMutex 和 channel 应该按什么条件选择？", "content": "channel 适合传递所有权和事件；Mutex 适合保护一组内存不变量。\n不要把“用 channel 才是 Go 风格”当成教条，也不要让每个字段拥有独立锁而失去整体一致性。\n\n```go\ntype Registry struct {\n\tmu      sync.RWMutex\n\ttargets map[string]Target\n}\n\nfunc (r *Registry) Get(name string) (Target, bool) {\n\tr.mu.RLock()\n\tdefer r.mu.RUnlock()\n\ttarget, ok := r.targets[name]\n\treturn target, ok\n}\n```\n\n#### 锁保护不变量而不是代码行\n\n先写出“名称唯一”“计数与明细一致”等不变量，再让同一临界区完成相关字段更新。\n持锁期间避免网络、磁盘和可能回调未知代码的操作，否则延迟和死锁风险会扩大。\n\n#### happens-before 是可见性的依据\n\n没有同步关系时，一个 goroutine 写变量、另一个 goroutine 随后“看起来晚一点”读取，仍然是数据竞争；`time.Sleep` 不建立内存可见性。\nchannel 发送完成发生在对应接收完成之前，channel close 发生在接收者观察到关闭之前，Mutex 的 Unlock 与后续 Lock、Once 完成与后续 Do 返回都建立规范定义的同步关系。\n实验输出应同时保存 race 报告和同步版本的稳定结果，不能只记录“这次打印了 42”。\n\n```mermaid\nflowchart LR\n    W[Write shared state] --> S[Channel or Unlock]\n    S --> R[Receive or Lock]\n    R --> V[Read visible state]\n    X[time.Sleep] -. no ordering .-> V\n```\n\n```go\nvar value int\nready := make(chan struct{})\ngo func() {\n\tvalue = 42\n\tclose(ready)\n}()\n<-ready\nfmt.Println(value)\n```\n\n这里 `close` 与接收建立发布/获取关系，因此读取 `value` 有依据。\n把 `<-ready` 换成 sleep 既可能竞争，也无法由时间长短修复。\n原子操作只对参与原子协议的状态提供保证，不能让旁边多个普通字段自动组成一致快照。\n\n#### RWMutex 不保证更快\n\n读锁允许并行读，但管理开销和写者等待可能让它不如普通 Mutex。\n只有读路径占绝对多数、临界区有实际成本且 profile 证明锁竞争时，才保留 RWMutex。\n\n#### 拷贝锁是严重错误\n\n包含 Mutex 的值在首次使用后不得复制，相关方法通常使用指针 receiver。\n运行 `go vet` 可发现部分 copylocks 问题，但设计时仍应避免按值传递含锁结构。\n\n#### 临界区从不变量推导\n\n假设 Registry 同时保存目标 map 与健康目标计数，更新两者必须处于同一把锁内；分别用两个锁会让读者观察到不一致快照。\n先在注释中写 `healthy == count(target.Status == Healthy)`，再让 Add、Update、Delete 都维护它。\n\n读取复合状态时也要在同一临界区复制快照，解锁后再做 JSON 编码或网络发送。\n持锁执行慢操作会阻塞所有访问；解锁后直接返回内部 map 又会让调用方绕过保护。\n\n#### 固定锁顺序避免死锁\n\n若确实要同时获得两个对象锁，所有路径保持相同顺序，例如按稳定 ID 排序后加锁。\n更好的设计常是提高聚合边界，用一把锁保护事务，或通过消息让单一 owner 更新。\n\n排查死锁时抓 goroutine profile，寻找相互等待的 Lock 和 channel；检查 defer 是否因函数不返回而迟迟不 unlock；检查持锁回调是否再次进入同一对象。\nGo mutex 不可重入。\n\n#### RWMutex 的测量\n\n用 benchmark 构造实际读写比例和临界区工作，而不是只测空锁。\n记录 ns/op、吞吐和 mutex profile。\n读操作很短、写入频繁或 CPU 核少时，RWMutex 可能更慢。\n优化后仍要运行 race 和不变量测试。\n\n#### 锁封装练习\n\n实现 Registry 的 `Snapshot`、`Upsert` 和 `Delete`，内部 map 不导出。\n并行启动读写测试，执行 race；故意把编码放进读锁再用慢 writer 观察写者等待，然后改为锁内复制、锁外编码。", "subs": ["锁保护不变量而不是代码行", "happens", "RWMutex 不保证更快", "拷贝锁是严重错误", "临界区从不变量推导", "固定锁顺序避免死锁", "RWMutex 的测量", "锁封装练习"]}, {"title": "Cond、原子操作、Once 和 WaitGroup 各自保护什么不变量？", "content": "这些工具解决的问题不同：`WaitGroup` 等待一组任务结束，`Once` 确保初始化最多执行一次，原子操作更新单个简单状态，`Cond` 让等待者在条件可能变化时重新检查谓词。\n\n| 工具 | 合适场景 | 常见误用 |\n| --- | --- | --- |\n| WaitGroup | 等待已知一组 goroutine | 边 Wait 边不受控 Add；复制 |\n| Once | 进程内一次初始化 | 初始化失败后无法自然重试 |\n| atomic | 计数、指针快照等单值状态 | 用多个原子变量拼业务事务 |\n| Cond | 复杂条件等待与广播 | 不在循环中重查条件 |\n\n```go\ncond.L.Lock()\nfor !ready() {\n\tcond.Wait()\n}\nuseResource()\ncond.L.Unlock()\n```\n\n`Wait` 会原子地解锁并等待，醒来后重新加锁；被唤醒只表示条件“可能”变化，因此必须在循环中检查。\n多数简单生产者消费者场景用 channel 更直观，没必要为了展示 Cond 增加复杂度。\n\n#### 原子不等于无锁业务逻辑\n\n原子计数适合指标，但“任务状态、结果和更新时间必须一起变化”属于复合不变量，应使用锁或持久化事务。\n混合原子和普通访问同一变量会产生数据竞争。\n\n#### WaitGroup 的使用边界\n\n`Add` 应在创建 goroutine 的父级执行，避免 goroutine 尚未 Add 而 Wait 已返回。\n每个成功 Add 对应一次 Done，通常在 goroutine 开头 defer。\nWaitGroup 可复用，但上一轮 Wait 完成前不能开始混乱的下一轮计数。\n\n它不限制并发、不取消任务、不收集结果。\n需要这些能力就组合 semaphore、context 和结果模型，不能从 WaitGroup 推断工作成功。\n\n#### Once 的失败语义\n\n`sync.Once` 把函数执行一次，即使函数内部初始化失败或 panic，再次调用也不会自然重试。\n需要返回错误时可把结果保存在同一对象并让所有调用者读取；需要可重试初始化时，使用显式状态机和锁。\n\n适合 Once 的例子是构造进程级不可变 lookup table；不适合依赖网络的登录、配置拉取或数据库连接。\n后者会因短暂故障把进程永久锁在失败状态。\n\n#### 原子快照\n\n`atomic.Int64` 适合计数；`atomic.Pointer` 或 `atomic.Value` 可发布构建完成的不可变配置快照。\nwriter 创建全新对象后一次 Store，reader Load 后只读。\n若 reader 修改内部 map，原子替换并没有保护内部数据。\n\n#### Cond 的典型协议\n\nCond 的条件由关联锁保护。\n修改条件的一方持锁更新状态，再 Signal 或 Broadcast；等待方在 for 循环中检查。\nSignal 不承诺唤醒哪个等待者，Broadcast 可能造成惊群。\n若状态可以自然表示为一次性 channel 通知或任务队列，优先用更简单机制。\n\n#### 同步原语选择练习\n\n为“活动请求数”“配置热更新”“容量为 N 的任务槽”“等待缓存首次加载”“任务状态与结果”分别选择 atomic、原子快照、buffered channel/semaphore、Once/显式状态和 mutex。\n为每项写出不变量与失败测试，避免按 API 熟悉度选工具。\n\n#### 错误时序要能被测试捕获\n\n故意把 `WaitGroup.Add(1)` 放进新 goroutine，再让父级立即 `Wait`，测试可能偶发提前返回；这说明 Add 必须在启动前完成。\n让 Once 初始化第一次返回临时错误，再调用第二次，观察初始化不会自动重试；据此把网络初始化改成带状态与退避的显式过程。\n对 Cond，制造没有循环检查谓词的等待者并广播两次，确认唤醒不等于条件成立。\n\n```text\nbad:  go func { Add 1; work; Done } -> Wait may return first\ngood: Add 1 -> go func { defer Done; work } -> Wait\n```\n\n这些实验应执行 `go test -race -count=100`，但“没有复现”不能证明错误用法安全。\n同步契约首先来自内存模型与 API 规则，压力测试只增加观察机会。", "subs": ["原子不等于无锁业务逻辑", "WaitGroup 的使用边界", "Once 的失败语义", "原子快照", "Cond 的典型协议", "同步原语选择练习", "错误时序要能被测试捕获"]}, {"title": "`sync.Map` 与 `sync.Pool` 为什么不能当作通用性能按钮？", "content": "`sync.Map` 针对特定并发访问模式优化，并牺牲了静态类型和普通 map 的清晰度。\n大多数业务状态更适合 `map` 加锁。\n只有 key 相对稳定、并发读多写少，或不同 goroutine 写不同 key，且 profile 证明收益时再考虑。\n\n`sync.Pool` 保存可临时复用的对象，运行时可在任意垃圾回收周期清空它。\n它不是缓存，不能承载必须存在的数据，也不能用来复用含敏感内容而未清理的缓冲。\n\n```go\nvar buffers = sync.Pool{\n\tNew: func() any { return new(bytes.Buffer) },\n}\n\nfunc render(v any) []byte {\n\tbuf := buffers.Get().(*bytes.Buffer)\n\tbuf.Reset()\n\tdefer func() {\n\t\tbuf.Reset()\n\t\tbuffers.Put(buf)\n\t}()\n\t_ = json.NewEncoder(buf).Encode(v)\n\treturn bytes.Clone(buf.Bytes())\n}\n```\n\n返回前必须复制数据，否则 buffer 放回池后会被后续使用覆盖。\n是否值得使用 Pool 要靠 allocation profile 和 benchmark 证明；先减少不必要分配、缩小对象生命周期通常更清楚。\n\n#### sync Map 的适用模式\n\n官方语义针对写一次读多次的缓存，或不同 goroutine 操作不相交 key 的场景。\n需要“检查后更新”“按多个字段保持一致”时，`LoadOrStore` 等单操作仍无法组成业务事务。\n泛型 map 加 RWMutex 通常类型更清晰。\n\n使用 `Range` 时看到的不是某一时刻的一致快照，回调中其他 goroutine 可以修改。\n若报表要求一致视图，应在自己的锁下复制普通 map，或从持久存储读取事务快照。\n\n#### Pool 的生命周期和安全\n\nPool 中对象可能随 GC 消失，所以只能做优化，不能依赖命中率保证功能。\nPut 前清理长度、引用和 Secret；对超大 buffer 可直接丢弃，避免偶发大请求让池长期保留高容量对象。\n\n```go\nif buf.Cap() <= 64<<10 {\n\tbuf.Reset()\n\tbuffers.Put(buf)\n}\n```\n\n返回 slice、string 或 reader 若仍引用池对象，Put 后会产生数据破坏甚至竞争。\n最安全是使用期间完全拥有，输出前复制，defer 清理归还。\n\n#### 用 profile 决定是否引入\n\n先保存 `-benchmem` 的 allocs/op 与 B/op，再看 alloc_space/inuse_space profile 找热点。\n引入 Pool 后重复多轮 benchmark，同时监控内存峰值、GC 和并发正确性。\n若收益很小，移除复杂优化。\n\n#### 反优化练习\n\n先实现普通 map+mutex 与每次新建 buffer 的清晰版本，建立测试和 benchmark；再分别换成 sync.Map 与 Pool。\n若数据没有证明改进，保留简单版本，并在评审记录中说明为什么没有采用“看起来更高级”的工具。\n\n#### 敏感 buffer 必须在归还前清理\n\nPool 复用的 `[]byte` 可能曾装过 Token、响应体或配置。\n归还前清零有效长度覆盖的区域，并为容量设置上限；偶发 8 MiB buffer 不应进入长期复用池。\n取出后总是重置长度，调用方不得在 Put 后继续持有引用。\n\n```go\nfunc putBuffer(pool *sync.Pool, buf []byte) {\n\tclear(buf)\n\tif cap(buf) <= 64<<10 {\n\t\tpool.Put(buf[:0])\n\t}\n}\n```\n\n这是局部片段，内置函数 `clear` 从 Go 1.21 起可用；更低版本需要显式清零循环或提高项目最低工具链。\n测试把醒目的假 Secret 写入 buffer，归还再取出后扫描底层容量；随后比较启用 Pool 前后的分配与 RSS，避免只看 `allocs/op` 忽略常驻容量。", "subs": ["sync Map 的适用模式", "Pool 的生命周期和安全", "用 profile 决定是否引入", "反优化练习", "敏感 buffer 必须在归还前清理"]}]}, {"title": "第八章 · 用测试、竞争检测和性能证据关闭并发风险", "sections": [{"title": "第一个表驱动测试应该覆盖成功、失败和边界中的什么？", "content": "表驱动测试适合对同一行为组合多组输入。\n名称应写清条件和期望，失败输出包含输入差异。\n不要把所有行为塞进一个巨大表，也不要只测试内部函数调用次数。\n\n```go\nfunc TestParsePort(t *testing.T) {\n\ttests := []struct {\n\t\tname    string\n\t\traw     string\n\t\twant    uint16\n\t\twantErr bool\n\t}{\n\t\t{name: \"valid\", raw: \"8080\", want: 8080},\n\t\t{name: \"zero\", raw: \"0\", wantErr: true},\n\t\t{name: \"too large\", raw: \"70000\", wantErr: true},\n\t\t{name: \"text\", raw: \"http\", wantErr: true},\n\t}\n\tfor _, tt := range tests {\n\t\tt.Run(tt.name, func(t *testing.T) {\n\t\t\tgot, err := parsePort(tt.raw)\n\t\t\tif (err != nil) != tt.wantErr || got != tt.want {\n\t\t\t\tt.Fatalf(\"parsePort(%q)=(%d,%v)\", tt.raw, got, err)\n\t\t\t}\n\t\t})\n\t}\n}\n```\n\n测试错误时优先断言 `errors.Is`、类型或稳定字段，不要把会变化的整段错误文字当成唯一契约。\n\n#### 并行测试需要隔离状态\n\n调用 `t.Parallel()` 前确认测试不共享环境变量、固定端口、当前目录和全局变量。\n`t.Setenv` 与临时目录能改善隔离，但并行测试仍需理解其生命周期。\n\n#### 从行为分区设计用例\n\n先写等价类：合法、输入拒绝、依赖失败、调用方取消和内部不变量错误；再为每类选择边界。\n并发函数还要覆盖零任务、worker 为 1、worker 大于任务数、消费者变慢与取消恰好发生在发送时。\n\n表中只放输入和预期，复杂环境准备放 helper。\nhelper 调用 `t.Helper()`，失败信息才能指向具体 case。\n测试名写条件，例如 `cancel_while_result_blocked`，不要只写 `case_3`。\n\n#### 测试数量守恒和不变量\n\n不要只断言“没有错误”。\n批量结果应验证 `succeeded + failed + cancelled == submitted`、目标不重复、并发峰值不超过上限、取消后 active 最终归零。\n顺序若是契约就逐项比较，不是契约则按 key 比较，避免测试偶然调度顺序。\n\n#### 测试 panic 和清理\n\n核心代码通常不应 panic。\n确需验证 panic 时使用 defer recover，并同时确认资源清理；HTTP 边界的 recover 测试应检查返回 500、request ID 和日志，而不是让测试因 panic 直接结束。\n\n使用 `t.Cleanup` 关闭 server、cancel context 和恢复全局设置。\ncleanup 按后进先出执行，与资源获取顺序对应。\n测试失败路径同样必须清理。\n\n#### 模糊测试补充边界\n\n解析器、协议输入和状态转换适合 fuzz。\n先加入能表达业务边界的 seed，fuzz 中检查不 panic、输出满足不变量、编码解码可往返。\nfuzz 不能替代表驱动的业务语义测试，但能发现截断、无效 UTF-8 和意外组合。\n\n```go\nfunc FuzzParsePort(f *testing.F) {\n\tf.Add(\"8080\")\n\tf.Add(\"-1\")\n\tf.Fuzz(func(t *testing.T, raw string) {\n\t\tport, err := parsePort(raw)\n\t\tif err == nil && port == 0 {\n\t\t\tt.Fatalf(\"successful parse returned zero for %q\", raw)\n\t\t}\n\t})\n}\n```", "subs": ["并行测试需要隔离状态", "从行为分区设计用例", "测试数量守恒和不变量", "测试 panic 和清理", "模糊测试补充边界"]}, {"title": "不连接真实主机、网络和时钟，测试如何保持可重复？", "content": "把不可控边界替换为接口或标准测试工具。\nHTTP 客户端可使用 `httptest.Server`，文件使用 `t.TempDir()`，输入输出使用 `io.Reader` 和 `io.Writer`，时间可传入 `Clock` 或 deadline。\n\n```go\nfunc TestClientTimeout(t *testing.T) {\n\tserver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n\t\ttime.Sleep(50 * time.Millisecond)\n\t\tw.WriteHeader(http.StatusOK)\n\t}))\n\tdefer server.Close()\n\n\tclient := &http.Client{Timeout: 10 * time.Millisecond}\n\t_, err := client.Get(server.URL)\n\tif err == nil {\n\t\tt.Fatal(\"expected timeout\")\n\t}\n}\n```\n\n依赖真实睡眠的测试可能在慢 CI 上抖动。\n更稳定的做法是由 handler 等待测试控制的 channel，并用合理 deadline 防止测试永久挂起。\n\n#### 测试替身保持最小\n\n不要为了 mock 大接口生成大量无意义方法。\n接口由使用方定义且尽量小，fake 只记录必要输入并返回指定结果。\n集成测试再验证真实客户端与协议兼容。\n\n#### HTTP 使用可控握手而不是 sleep\n\nhandler 通过 channel 通知“请求已到达”，再等待测试释放。\n测试先确认调用已经进入 handler，然后取消 context 或关闭 release。\n这样测试验证因果，而不是猜 CI 在 50ms 内会调度到哪一步。\n\n```go\nstarted := make(chan struct{})\nrelease := make(chan struct{})\nserver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {\n\tclose(started)\n\t<-release\n\tw.WriteHeader(http.StatusOK)\n}))\nt.Cleanup(server.Close)\n```\n\n仍需给整个测试设置兜底 deadline，防止实现缺陷永久挂起。\n不要在 handler 中调用 `t.Fatal`，因为它运行在另一个 goroutine；通过 channel 把观察结果传回测试 goroutine。\n\n#### 时钟和 timer 的替换层次\n\n纯计算函数直接接收 `now time.Time` 最简单。\n需要多次 Now 或 timer 时定义小 Clock 接口，但 fake clock 也必须正确模拟推进和等待，否则测试通过的是自创语义。\n另一种方式是把“何时触发”留给外层，核心函数只处理一次 tick。\n\n#### 文件、环境与网络隔离\n\n文件测试使用 `t.TempDir` 和显式路径，不修改共享 cwd。\n环境用 `t.Setenv`，不要与 `t.Parallel` 混用。\n监听地址使用 `127.0.0.1:0` 让系统分配端口，不写死 8080。\nTLS 行为用 `httptest.NewTLSServer`，并使用它提供的受信客户端，而不是全局关闭证书校验。\n\n#### fake 与真实依赖的证据边界\n\nfake 能证明调用顺序和错误处理，不能证明 SQL、HTTP 编码、Kubernetes defaulting 或认证协议。\nrepository 使用容器化真实数据库做集成测试；Kubernetes Controller 用 envtest；外部 SaaS 使用供应商 sandbox 或契约测试。\n每层报告自己真正验证的内容。\n\n#### 可重复性练习\n\n把包含 `time.Sleep`、固定端口和真实公网请求的测试改成 channel handshake、随机本地端口和 httptest。\n执行 `go test -count=50` 与 `go test -race`，记录修改前后的失败率和耗时分布。", "subs": ["测试替身保持最小", "HTTP 使用可控握手而不是 sleep", "时钟和 timer 的替换层次", "文件、环境与网络隔离", "fake 与真实依赖的证据边界", "可重复性练习"]}, {"title": "race、benchmark、pprof、trace 和 GC 证据应该按什么顺序使用？", "content": "先保证正确性，再查数据竞争，然后测基线，最后 profile 热点。\n四者回答不同问题：测试验证行为，race 检测已执行路径上的竞争，benchmark 比较可重复性能，pprof/trace 解释资源消耗和调度。\n\n```bash\ngo test ./...\ngo test -race ./...\ngo test -run '^$' -bench BenchmarkCheck -benchmem ./internal/checker\ngo test -run '^$' -bench BenchmarkCheck -cpuprofile cpu.out ./internal/checker\ngo tool pprof cpu.out\n```\n\n#### benchmark 防止编译器消除与环境噪声\n\n基准应使用真实结果、保持输入可比，并记录 Go 版本、CPU、并发和参数。\n一次更快不能证明改进；使用多轮结果比较分布，确认正确性测试仍通过。\n\n#### race 通过不代表没有竞争\n\nrace detector 只能发现运行时实际发生的冲突。\n为并发路径设计压力测试、重复执行，并覆盖取消、关闭和错误分支。\n它有额外开销，不应直接把 race 模式性能当作生产性能。\n\n#### 优化必须带回归边界\n\n任何减少锁、复用 buffer 或改变队列的优化都要回答：错误是否仍完整、顺序契约是否变化、取消是否更慢、内存峰值是否转移到队列。\n第二册的最终验收不是“跑得快”，而是并发量有界、所有任务可结束、失败可汇总且证据可重复。\n\n#### 先区分 heap、RSS 与容器 OOM\n\nGo heap profile 描述运行时管理的 Go 对象，RSS 还包含 goroutine 栈、mmap、共享库、CGO 分配和内核计入的常驻页。\n容器 OOM 依据 cgroup 记账，不会因为 heap profile 看起来不大就自动放过进程。\n排查顺序是先确认 cgroup limit 与 OOM 事件，再比较 RSS、Go heap、goroutine、离线 buffer 和外部库占用。\n\n```bash\ngo tool pprof -top http://127.0.0.1:6060/debug/pprof/heap\ncurl -fsS http://127.0.0.1:6060/debug/metrics \\\n  | rg '/gc/heap|/memory/classes|/sched/goroutines'\n```\n\nprofile 采集时记录负载、版本、运行时长和 GC 设置。\n`alloc_space` 适合找累计分配热点，`inuse_space` 适合看采样时仍存活的对象；一次采样不能证明泄漏，需在负载结束并经历 GC 后观察是否回落。\n\n#### `GOGC` 与 `GOMEMLIMIT` 是约束，不是修复按钮\n\n`GOGC` 控制相对 heap 增长触发 GC 的目标，较小值通常换取更多 CPU 以降低 heap 峰值；`GOMEMLIMIT` 为运行时提供软内存目标，但不包含进程所有内存，也不是容器 hard limit。\n`GOMEMLIMIT` 需要 Go 1.19 及以上；部署到更旧工具链时只能使用其他运行时或容器层面的约束。\n设置过低会造成频繁 GC 和吞吐下降，仍可能因非 Go 内存或短时峰值 OOM。\n\n容器内应给运行时目标留出非 heap、内核记账和突发余量。\n例如 limit 为 512 MiB 时，不应把 `GOMEMLIMIT` 直接设成 512 MiB。\n先在代表性负载下测量基础 RSS、栈、连接和峰值，再决定余量并通过压测验证。\n\n```bash\nGOGC=100 GOMEMLIMIT=400MiB ./bounded-runner\nGODEBUG=gctrace=1 ./bounded-runner 2>gc.trace\n```\n\n`gctrace` 适合短时诊断，不应长期无界写日志。\n观察 GC CPU、heap goal、RSS、吞吐和 p99；若降低内存后 timeout 与错误率上升，不能仅因“没有 OOM”就判定成功。\n\n#### GC 只管理 Go 堆的一部分\n\nheap goal 描述运行时希望控制的 Go 堆增长，RSS 还包括线程栈、映射、CGO 和文件页缓存；容器 OOM 依据的是整体 cgroup 使用量。\n调参前先区分存活对象、分配速率、无界队列和非 Go 内存，否则降低 `GOGC` 可能只是用更多 CPU 换来暂时的 RSS 下降。\n用固定负载分别采集 `gctrace`、heap profile、RSS 和 cgroup `memory.current`，确认调参改变的是哪一类资源。\n\n#### 用 escape analysis 解释分配，而不是猜性能\n\n编译器会根据值的生命周期决定对象放在栈上还是堆上。\n返回局部变量的指针、把值装入接口、闭包捕获循环变量、或把大对象交给长期保存的 goroutine，都可能增加堆分配；这只是线索，不等于“堆分配一定是 bug”。\n\n用编译器报告定位候选路径：\n\n```bash\ngo test -gcflags='-m=2' ./internal/checker 2>escape.txt\nrg -n 'escapes to heap|moved to heap|leaking param' escape.txt\n```\n\n下面的完整程序用于观察接口装箱和返回指针的差异，要求 Go 1.18+（使用 `any`），输出数字本身不是跨机器基准：\n\n```go\npackage main\n\nimport \"fmt\"\n\ntype sample struct {\n\tvalue [32]byte\n}\n\nfunc asInterface() any {\n\treturn sample{}\n}\n\nfunc asPointer() *sample {\n\treturn &sample{}\n}\n\nfunc main() {\n\tfmt.Printf(\"%T %T\\n\", asInterface(), asPointer())\n}\n```\n\n验证顺序应是：先用 benchmark 确认分配和延迟确实影响当前场景，再用 escape 报告提出最小改动，最后用 `-benchmem`、正确性测试和 RSS 复测。\n不要为了消除一条 `escapes to heap` 牺牲接口边界、可读性或数据安全。\n如果对象被 channel、缓存、日志字段或任务表长期持有，真正的问题通常是所有权和生命周期，而不是某一次编译器选择。\n\n#### 从证据选择工具\n\n| 问题 | 首选证据 | 不能单独证明 |\n| --- | --- | --- |\n| 是否有数据竞争 | `go test -race` 的实际路径 | 未执行路径无竞争 |\n| 改动是否更快 | 多轮 benchmark 与环境 | 生产尾延迟一定下降 |\n| CPU 花在哪里 | CPU profile | 等待依赖的墙钟时间 |\n| 存活对象来自哪里 | heap inuse profile | 全部 RSS 来源 |\n| goroutine 为什么不退出 | goroutine profile 与 owner 指标 | 一次数量升高就是泄漏 |\n| 调度和阻塞如何交错 | trace、block/mutex profile | 长期容量是否足够 |\n\n练习在隔离容器中逐步增加目标结果体积，分别记录 heap、RSS、GC CPU 和 OOM 事件。\n然后设置软内存目标并降低队列容量，判断问题来自存活数据、分配速率还是无界排队。\n最终报告必须包含修改前后相同负载，而不是只展示优化后的截图。\n\n#### 贯穿实验：有界巡检执行器\n\n下面的执行器把生命周期责任放在一个函数里：调用者提供上下文与目标；函数创建 worker、关闭任务队列、等待 worker、关闭结果队列并返回完整结果。\n任何 goroutine 都能指出创建者、退出条件和等待者。\n\n```go\npackage runner\n\nimport (\n\t\"context\"\n\t\"fmt\"\n\t\"sync\"\n)\n\ntype Checker interface {\n\tCheck(context.Context, string) error\n}\n\ntype Result struct {\n\tIndex  int\n\tTarget string\n\tErr    error\n}\n\nfunc Run(ctx context.Context, checker Checker, targets []string, workers int) ([]Result, error) {\n\tif workers < 1 {\n\t\treturn nil, fmt.Errorf(\"workers must be positive\")\n\t}\n\tif workers > len(targets) {\n\t\tworkers = len(targets)\n\t}\n\tif len(targets) == 0 {\n\t\treturn []Result{}, nil\n\t}\n\n\ttype job struct {\n\t\tindex  int\n\t\ttarget string\n\t}\n\tjobs := make(chan job)\n\tresults := make(chan Result)\n\n\tvar wg sync.WaitGroup\n\twg.Add(workers)\n\tfor i := 0; i < workers; i++ {\n\t\tgo func() {\n\t\t\tdefer wg.Done()\n\t\t\tfor {\n\t\t\t\tselect {\n\t\t\t\tcase <-ctx.Done():\n\t\t\t\t\treturn\n\t\t\t\tcase item, ok := <-jobs:\n\t\t\t\t\tif !ok {\n\t\t\t\t\t\treturn\n\t\t\t\t\t}\n\t\t\t\t\tresult := Result{Index: item.index, Target: item.target}\n\t\t\t\t\tresult.Err = checker.Check(ctx, item.target)\n\t\t\t\t\tselect {\n\t\t\t\t\tcase results <- result:\n\t\t\t\t\tcase <-ctx.Done():\n\t\t\t\t\t\treturn\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}()\n\t}\n\n\tgo func() {\n\t\tdefer close(jobs)\n\t\tfor index, target := range targets {\n\t\t\tselect {\n\t\t\tcase jobs <- job{index, target}:\n\t\t\tcase <-ctx.Done():\n\t\t\t\treturn\n\t\t\t}\n\t\t}\n\t}()\n\tgo func() {\n\t\twg.Wait()\n\t\tclose(results)\n\t}()\n\n\tout := make([]Result, 0, len(targets))\n\tfor result := range results {\n\t\tout = append(out, result)\n\t}\n\treturn out, ctx.Err()\n}\n```\n\n这个版本采用“取消后只返回已完成结果”的契约。\n另一种合法契约是为每个未完成目标补一条 `context.Canceled`；两者不能混用，否则调用方无法判断结果缺失是取消、程序缺陷还是输入去重造成的。\n生产实现还应决定结果是否保持输入顺序。\n若排序，使用 `Index` 恢复顺序，而不是让 worker 串行等待。\n\n#### 用可控替身验证并发上限\n\n测试并发代码时，不要用“睡 100 毫秒后大概完成”作为主要同步方式。\n下面的 fake 用 channel 控制释放时机，用原子计数记录同时执行的峰值：\n\n```go\ntype blockingChecker struct {\n\trelease <-chan struct{}\n\tactive  atomic.Int64\n\tpeak    atomic.Int64\n}\n\nfunc (b *blockingChecker) Check(ctx context.Context, _ string) error {\n\tcurrent := b.active.Add(1)\n\tdefer b.active.Add(-1)\n\tfor {\n\t\told := b.peak.Load()\n\t\tif current <= old || b.peak.CompareAndSwap(old, current) {\n\t\t\tbreak\n\t\t}\n\t}\n\tselect {\n\tcase <-b.release:\n\t\treturn nil\n\tcase <-ctx.Done():\n\t\treturn ctx.Err()\n\t}\n}\n```\n\n测试步骤是：启动 `Run`；等待 `active` 到达 worker 数；确认 `peak` 没超过上限；关闭 `release`；等待函数返回。\n等待条件仍应带测试 deadline，避免实现错误让 CI 永久挂住。\n随后再增加取消测试：不关闭 `release`，取消上下文，要求 `Run` 在限定时间内返回且活动数最终归零。\n\n#### 泄漏、死锁和背压的故障注入\n\n并发验收至少覆盖下面四类失败，而不只是全成功路径：\n\n| 故障 | 注入方式 | 应观察到的结果 |\n| --- | --- | --- |\n| 单目标慢 | fake 阻塞一个目标 | 活动 worker 不超过上限，其他目标仍可推进 |\n| 调用方取消 | 关闭 cancel channel | 生产者、worker 和汇总者均退出 |\n| 结果消费变慢 | 消费端受控阻塞 | worker 在发送处背压，内存不无限增长 |\n| checker 部分失败 | 按目标返回错误 | 其他结果保留，失败不被最后一个错误覆盖 |\n\ngoroutine 数只能作为线索。\n测试前后直接比较 `runtime.NumGoroutine()` 容易受到测试框架和运行时后台 goroutine 干扰。\n更可靠的是为自己的组件暴露活动任务 gauge，结合超时等待其归零；遇到异常再抓 goroutine profile，按创建栈定位所有者。\n\n死锁排查从“谁在等谁”入手：channel 是否无人接收、关闭权是否重复、锁顺序是否相反、持锁期间是否调用未知代码、错误分支是否漏掉 `Done`。\n不要先增大 buffer；buffer 只会改变死锁出现的时间。\n\n#### 容量预算示例\n\n假设巡检依赖允许 100 QPS，单请求 p95 为 200ms，每个结果约 2KiB，进程可给未处理结果 20MiB。\n仅按吞吐估算的并发约为 `100 × 0.2 = 20`，再为抖动预留余量也不应直接开几千 worker。\n若结果队列容量 1000，最坏驻留约 2MiB；但真实预算还要加目标字符串、HTTP buffer、TLS 状态和 GC 放大。\n\n容量参数应能回答：\n\n- worker 数受哪个下游限额约束；\n- channel 容量允许吸收多长时间的突发；\n- 单任务最大内存和最大执行时间是多少；\n- 超过预算时是阻塞、拒绝、降级还是落盘；\n- 哪个指标会在达到危险水位前告警。\n\n#### 第二册完成标准\n\n- 每个 goroutine 都有明确所有者、退出条件和等待路径；\n- channel 的发送方、接收方与关闭方唯一且可从代码看出；\n- 所有阻塞点都能被完成、取消或 deadline 解开；\n- 并发上限来自依赖和资源预算，不来自随手写的常量；\n- 部分失败、取消和结果顺序都有书面契约；\n- 测试不依赖真实网络与无界睡眠，并覆盖取消时的清理；\n- `go test ./...`、`go test -race ./...` 通过；\n- benchmark 保存环境和基线，pprof 结论能指向具体热点，而不是凭感觉“加并发”。", "subs": ["benchmark 防止编译器消除与环境噪声", "race 通过不代表没有竞争", "优化必须带回归边界", "先区分 heap、RSS 与容器 OOM", "GOGC 与 GOMEMLIMIT 是约束", "GC 只管理 Go 堆的一部分", "用 escape analysis 解释分配", "从证据选择工具", "贯穿实验：有界巡检执行器", "用可控替身验证并发上限", "泄漏、死锁和背压的故障注入", "容量预算示例", "第二册完成标准"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
