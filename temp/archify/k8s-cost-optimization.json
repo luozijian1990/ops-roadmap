@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kubernetes 竞价实例成本优化架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/luozijian1990/ops-roadmap.git",
+      "revision": "90f30e7c7947e900f5353c10a83f6621c0269e61"
+    },
+    "viewBox": [1240, 650],
+    "views": [
+      {
+        "id": "capacity-path",
+        "label": "弹性算力供给",
+        "focus": ["cron-hpa", "pending-workload", "cluster-autoscaler", "spot-node-group", "ondemand-node-group"],
+        "note": "CronHPA 提前调整容量需求，Cluster Autoscaler 优先扩展竞价节点，库存不足时由按需节点兜底。"
+      },
+      {
+        "id": "interruption-path",
+        "label": "中断处置链路",
+        "focus": ["cloud-interruption", "notify-handler", "replacement-node", "cordon-node", "drain-pods", "terminate-node"],
+        "note": "中断信号到达后立即准备替代节点，同时封锁、排空并终止旧节点。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "cron-hpa",
+      "type": "backend",
+      "label": "CronHPA",
+      "sublabel": "预扩容 / 定时缩容",
+      "pos": [48, 86],
+      "size": [154, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 548, "label": "弹性伸缩组合"}]
+    },
+    {
+      "id": "pending-workload",
+      "type": "backend",
+      "label": "弹性容量需求",
+      "sublabel": "HPA 最小副本 / Pending Pod",
+      "pos": [262, 86],
+      "size": [176, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 550, "label": "调整 HPA 最小副本"}]
+    },
+    {
+      "id": "cluster-autoscaler",
+      "type": "backend",
+      "label": "Cluster Autoscaler",
+      "sublabel": "节点组优先级扩容",
+      "tag": "竞价优先",
+      "pos": [508, 86],
+      "size": [184, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 308, "label": "节点组优先级"}]
+    },
+    {
+      "id": "spot-node-group",
+      "type": "cloud",
+      "label": "竞价实例节点组",
+      "sublabel": "弹性算力",
+      "tag": "优先级 20",
+      "pos": [782, 48],
+      "size": [178, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 230, "label": "K8s 落地架构"}]
+    },
+    {
+      "id": "ondemand-node-group",
+      "type": "cloud",
+      "label": "按需实例节点组",
+      "sublabel": "稳定算力兜底",
+      "tag": "优先级 10",
+      "pos": [782, 150],
+      "size": [178, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 261, "label": "节点组分类"}]
+    },
+    {
+      "id": "cloud-interruption",
+      "type": "external",
+      "label": "云厂商中断信号",
+      "sublabel": "库存不足 / 价格变化",
+      "pos": [48, 366],
+      "size": [174, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 198, "label": "竞价实例工作流程"}]
+    },
+    {
+      "id": "notify-handler",
+      "type": "backend",
+      "label": "Notify Handler",
+      "sublabel": "中断收集与处置",
+      "tag": "2-3 分钟窗口",
+      "pos": [300, 366],
+      "size": [178, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 269, "label": "中断处理"}]
+    },
+    {
+      "id": "replacement-node",
+      "type": "cloud",
+      "label": "创建替代节点",
+      "sublabel": "恢复可调度容量",
+      "pos": [520, 260],
+      "size": [166, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 277, "label": "中断信号处理流程"}]
+    },
+    {
+      "id": "cordon-node",
+      "type": "security",
+      "label": "封锁旧节点",
+      "sublabel": "禁止新 Pod 调度",
+      "pos": [540, 366],
+      "size": [166, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 281, "label": "禁止旧节点调度"}]
+    },
+    {
+      "id": "drain-pods",
+      "type": "backend",
+      "label": "排空旧节点 Pod",
+      "sublabel": "迁移业务负载",
+      "pos": [780, 366],
+      "size": [170, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 283, "label": "排空旧节点 Pod"}]
+    },
+    {
+      "id": "terminate-node",
+      "type": "external",
+      "label": "终止旧节点",
+      "sublabel": "主动终止或云回收",
+      "pos": [1030, 366],
+      "size": [166, 66],
+      "sources": [{"path": "cases/finops/kubernetes-cost-optimization.md", "line": 284, "label": "节点终止分支"}]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Kubernetes 集群：弹性容量与节点组",
+      "wraps": ["cron-hpa", "pending-workload", "cluster-autoscaler", "spot-node-group", "ondemand-node-group"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "cron-to-demand",
+      "from": "cron-hpa",
+      "to": "pending-workload",
+      "label": "调整最小副本",
+      "variant": "dashed",
+      "labelAt": [232, 166]
+    },
+    {
+      "id": "demand-to-ca",
+      "from": "pending-workload",
+      "to": "cluster-autoscaler",
+      "label": "触发节点扩容",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ca-to-spot",
+      "from": "cluster-autoscaler",
+      "to": "spot-node-group",
+      "label": "优先扩容",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ca-to-ondemand",
+      "from": "cluster-autoscaler",
+      "to": "ondemand-node-group",
+      "label": "库存不足时兜底",
+      "variant": "dashed"
+    },
+    {
+      "id": "signal-to-handler",
+      "from": "cloud-interruption",
+      "to": "notify-handler",
+      "label": "发送回收通知",
+      "variant": "emphasis"
+    },
+    {
+      "id": "handler-to-replacement",
+      "from": "notify-handler",
+      "to": "replacement-node",
+      "label": "立即创建",
+      "variant": "emphasis",
+      "fromSide": "top"
+    },
+    {
+      "id": "handler-to-cordon",
+      "from": "notify-handler",
+      "to": "cordon-node",
+      "label": "禁止调度",
+      "variant": "security"
+    },
+    {
+      "id": "cordon-to-drain",
+      "from": "cordon-node",
+      "to": "drain-pods",
+      "label": "安全排空",
+      "variant": "emphasis"
+    },
+    {
+      "id": "drain-to-terminate",
+      "from": "drain-pods",
+      "to": "terminate-node",
+      "label": "排空后终止",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "稳定性基线",
+      "items": ["竞价节点承载弹性服务，按需节点承载稳定服务并在库存不足时兜底", "Cluster Autoscaler 以节点组优先级控制成本与可用性的取舍"]
+    },
+    {
+      "dot": "rose",
+      "title": "中断窗口",
+      "items": ["云厂商不会等待处置完成才回收实例", "收到信号后并行准备替代容量，再封锁、排空并终止旧节点"]
+    },
+    {
+      "dot": "cyan",
+      "title": "可预测弹性",
+      "items": ["CronHPA 调整 HPA 最小副本以覆盖规律流量", "HPA 和 Cluster Autoscaler 继续承接突发流量与节点供给"]
+    }
+  ]
+}
