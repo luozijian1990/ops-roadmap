@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "VFS 与存储路径",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [980, 760],
+    "views": [
+      { "id": "stack", "label": "下行栈", "focus": ["app", "sys", "vfs", "cache", "fs", "blk", "device"], "note": "一次文件 I/O 从应用穿过 VFS、缓存、文件系统和块层。" },
+      { "id": "cache", "label": "页缓存", "focus": ["cache", "fs", "blk", "device"], "note": "缓存命中可以短路设备访问，未命中才下行。" },
+      { "id": "backends", "label": "文件系统分流", "focus": ["vfs", "local", "pseudo", "network", "overlay"], "note": "统一的 VFS 接口之下，不同文件系统连接不同后端。" }
+    ]
+  },
+  "lanes": [{ "id": "user", "label": "用户与内核入口" }, { "id": "kernel", "label": "内核 I/O 栈" }, { "id": "storage", "label": "存储后端" }, { "id": "overlaylane", "label": "分层后端" }],
+  "phases": [
+    { "id": "entry", "label": "入口与抽象", "fromCol": 0, "toCol": 1 },
+    { "id": "translate", "label": "缓存与文件系统", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "device", "label": "设备访问", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["app", "sys", "vfs", "cache", "fs", "blk", "device"],
+  "nodes": [
+    { "id": "app", "lane": "user", "col": 0, "type": "frontend", "label": "应用程序", "sublabel": "read() / write()" },
+    { "id": "sys", "lane": "user", "col": 1, "type": "backend", "label": "系统调用", "sublabel": "sys_read / sys_write" },
+    { "id": "vfs", "lane": "kernel", "col": 2, "type": "backend", "label": "VFS", "sublabel": "inode / dentry 抽象" },
+    { "id": "cache", "lane": "kernel", "col": 3, "type": "database", "label": "页缓存", "sublabel": "命中可直接返回" },
+    { "id": "fs", "lane": "kernel", "col": 4, "type": "backend", "label": "具体文件系统", "sublabel": "Ext4 / XFS / NFS" },
+    { "id": "blk", "lane": "kernel", "col": 5, "type": "messagebus", "label": "通用块层 blk-mq", "sublabel": "排队、合并、调度", "width": 130 },
+    { "id": "device", "lane": "storage", "col": 5, "type": "cloud", "label": "设备与存储", "sublabel": "磁盘或远端存储" },
+    { "id": "local", "lane": "storage", "col": 2, "type": "database", "label": "本地磁盘 FS", "sublabel": "Ext4 / XFS" },
+    { "id": "pseudo", "lane": "storage", "col": 3, "type": "backend", "label": "伪文件系统", "sublabel": "procfs / tmpfs，内存" },
+    { "id": "network", "lane": "storage", "col": 4, "type": "external", "label": "网络文件系统", "sublabel": "NFS / SMB" },
+    { "id": "overlay", "lane": "overlaylane", "col": 4, "type": "backend", "label": "叠加文件系统", "sublabel": "OverlayFS，容器常用" }
+  ],
+  "edges": [
+    { "id": "app-sys", "from": "app", "to": "sys", "label": "陷入内核", "role": "main" },
+    { "id": "sys-vfs", "from": "sys", "to": "vfs", "label": "统一入口", "role": "main" },
+    { "id": "vfs-cache", "from": "vfs", "to": "cache", "label": "先查缓存", "role": "main" },
+    { "id": "cache-fs", "from": "cache", "to": "fs", "label": "未命中", "role": "main" },
+    { "id": "fs-blk", "from": "fs", "to": "blk", "label": "翻译为块请求", "role": "main" },
+    { "id": "blk-device", "from": "blk", "to": "device", "label": "交给驱动", "role": "main" },
+    { "id": "vfs-local", "from": "vfs", "to": "local", "label": "本地 FS", "role": "branch" },
+    { "id": "vfs-pseudo", "from": "vfs", "to": "pseudo", "label": "内存 FS", "role": "branch" },
+    { "id": "vfs-network", "from": "vfs", "to": "network", "label": "网络 FS", "role": "branch" },
+    { "id": "vfs-overlay", "from": "vfs", "to": "overlay", "label": "分层 FS", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "关键分岔", "items": ["页缓存命中可绕过设备 I/O", "VFS 统一接口，后端实现各异"] },
+    { "dot": "amber", "title": "观测", "items": ["iostat -xz 1 观察块设备", "vmstat 1 结合缓存与回写判断"] }
+  ]
+}

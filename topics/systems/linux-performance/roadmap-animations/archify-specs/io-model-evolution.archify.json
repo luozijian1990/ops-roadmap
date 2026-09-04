@@ -1,0 +1,56 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "从 C10K 到 C1000K：I/O 模型演进",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [1100, 700],
+    "views": [
+      { "id": "evolution", "label": "模型演进", "focus": ["blocking", "select", "poll", "epoll"], "note": "并发模型逐步从每连接一线程演进到只处理就绪事件。" },
+      { "id": "trigger", "label": "epoll 触发", "focus": ["lt", "et", "nonblock", "eagain"], "note": "ET 需要非阻塞并读到 EAGAIN，LT 更容易正确使用。" },
+      { "id": "capacity", "label": "C1000K 资源墙", "focus": ["fd", "memory", "state", "queue", "softirq"], "note": "百万连接会同时放大 fd、内存、队列和软中断成本。" }
+    ]
+  },
+  "lanes": [{ "id": "model", "label": "并发模型" }, { "id": "event", "label": "事件语义" }, { "id": "capacity", "label": "容量边界" }, { "id": "system", "label": "系统边界" }],
+  "phases": [
+    { "id": "old", "label": "传统模型", "fromCol": 0, "toCol": 0 },
+    { "id": "multiplex", "label": "I/O 多路复用", "fromCol": 1, "toCol": 3, "variant": "emphasis" },
+    { "id": "scale", "label": "百万连接", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["blocking", "select", "poll", "epoll"],
+  "nodes": [
+    { "id": "blocking", "lane": "model", "col": 0, "type": "frontend", "label": "阻塞 I/O", "sublabel": "一连接一线程" },
+    { "id": "select", "lane": "model", "col": 1, "type": "backend", "label": "select", "sublabel": "线性扫描 fd 集合" },
+    { "id": "poll", "lane": "model", "col": 2, "type": "backend", "label": "poll", "sublabel": "数组管理，仍全遍历" },
+    { "id": "epoll", "lane": "model", "col": 3, "type": "database", "label": "epoll", "sublabel": "只返回就绪事件" },
+    { "id": "lt", "lane": "event", "col": 2, "type": "backend", "label": "水平触发 LT", "sublabel": "可读写就持续通知" },
+    { "id": "et", "lane": "event", "col": 3, "type": "security", "label": "边缘触发 ET", "sublabel": "状态变化才通知" },
+    { "id": "nonblock", "lane": "event", "col": 4, "type": "backend", "label": "非阻塞循环", "sublabel": "配合 ET 使用" },
+    { "id": "eagain", "lane": "event", "col": 5, "type": "cloud", "label": "读到 EAGAIN", "sublabel": "避免漏读与饥饿" },
+    { "id": "fd", "lane": "capacity", "col": 3, "type": "backend", "label": "文件描述符", "sublabel": "ulimit / file-max" },
+    { "id": "memory", "lane": "capacity", "col": 4, "type": "database", "label": "连接内存", "sublabel": "缓冲与对象 × N" },
+    { "id": "state", "lane": "system", "col": 4, "type": "backend", "label": "TCP 状态与 conntrack", "sublabel": "定时器和连接跟踪", "width": 160 },
+    { "id": "queue", "lane": "capacity", "col": 5, "type": "messagebus", "label": "队列与临时端口", "sublabel": "somaxconn / backlog" },
+    { "id": "softirq", "lane": "system", "col": 5, "type": "cloud", "label": "软中断与事件循环", "sublabel": "均衡且不能阻塞", "width": 150 }
+  ],
+  "edges": [
+    { "id": "blocking-select", "from": "blocking", "to": "select", "label": "单线程多 fd", "role": "main" },
+    { "id": "select-poll", "from": "select", "to": "poll", "label": "去掉集合上限", "role": "main" },
+    { "id": "poll-epoll", "from": "poll", "to": "epoll", "label": "只处理活跃连接", "role": "main" },
+    { "id": "epoll-lt", "from": "epoll", "to": "lt", "label": "默认语义", "role": "branch" },
+    { "id": "epoll-et", "from": "epoll", "to": "et", "label": "可选语义", "role": "branch" },
+    { "id": "et-nonblock", "from": "et", "to": "nonblock", "label": "必须配合", "role": "branch" },
+    { "id": "nonblock-eagain", "from": "nonblock", "to": "eagain", "label": "循环读写", "role": "branch" },
+    { "id": "epoll-fd", "from": "epoll", "to": "fd", "label": "规模放大", "role": "branch" },
+    { "id": "fd-memory", "from": "fd", "to": "memory", "label": "固定成本", "role": "branch" },
+    { "id": "memory-state", "from": "memory", "to": "state", "label": "连接状态", "role": "branch" },
+    { "id": "state-queue", "from": "state", "to": "queue", "label": "资源边界", "role": "branch" },
+    { "id": "queue-softirq", "from": "queue", "to": "softirq", "label": "整机协同", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "选择建议", "items": ["先用 LT 保证正确，再评估 ET", "ET 必须非阻塞并读到 EAGAIN"] },
+    { "dot": "amber", "title": "C1000K 检查", "items": ["fd、内存、conntrack、队列", "网卡多队列与 reactor 不阻塞"] }
+  ]
+}

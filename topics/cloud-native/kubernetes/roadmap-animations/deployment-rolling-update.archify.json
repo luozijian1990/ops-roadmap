@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kubernetes Deployment Rolling Update",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "views": [
+      {"id":"revision","label":"新旧 ReplicaSet","focus":["deployment","controller","old-rs","new-rs"],"note":"模板变化生成新 ReplicaSet，旧副本暂时保留。"},
+      {"id":"rollout","label":"滚动替换","focus":["new-rs","new-pods","service","old-rs"],"note":"先扩新副本并等待 Ready，再按窗口缩减旧副本。"},
+      {"id":"pause","label":"暂停与回滚","focus":["controller","pause","rollback","old-rs","new-rs"],"note":"异常时暂停推进，确认问题后回滚到上一版本。"}
+    ]
+  },
+  "lanes": [
+    {"id":"control","label":"控制面"},
+    {"id":"replicas","label":"ReplicaSet 与 Pod"},
+    {"id":"traffic","label":"流量与可用性"},
+    {"id":"recovery","label":"暂停与回滚","variant":"exception"}
+  ],
+  "phases": [
+    {"id":"observe","label":"Observe","fromCol":0,"toCol":1},
+    {"id":"surge","label":"Scale up","fromCol":2,"toCol":3,"variant":"emphasis"},
+    {"id":"cutover","label":"Cut over","fromCol":4,"toCol":5,"variant":"dashed"}
+  ],
+  "groups": [
+    {"id":"rollout-window","label":"RollingUpdate window","lane":"replicas","fromCol":2,"toCol":5,"variant":"emphasis"},
+    {"id":"recovery-path","label":"Recovery path","lane":"recovery","fromCol":3,"toCol":5,"variant":"security"}
+  ],
+  "mainPath":["deployment","controller","new-rs","new-pods","service","stable"],
+  "semanticChecks":{"allowedRoots":["deployment"],"allowedTerminals":["old-rs","old-pods","stable","rollback"],"requiredEdges":[{"from":"deployment","to":"controller"},{"from":"controller","to":"new-rs"},{"from":"new-rs","to":"new-pods"},{"from":"new-pods","to":"service"},{"from":"service","to":"old-rs"},{"from":"controller","to":"pause"},{"from":"pause","to":"rollback"}]},
+  "nodes": [
+    {"id":"deployment","lane":"control","col":0,"type":"backend","label":"Deployment","sublabel":"replicas=3","tag":"desired state","width":142},
+    {"id":"controller","lane":"control","col":1,"type":"backend","label":"Deployment Controller","sublabel":"rollout reconcile","tag":"control loop","width":158},
+    {"id":"old-rs","lane":"replicas","col":4,"type":"cloud","label":"old ReplicaSet","sublabel":"old=3","width":110},
+    {"id":"new-rs","lane":"replicas","col":2,"type":"cloud","label":"new ReplicaSet","sublabel":"hash=def · new=0","tag":"revision 2","width":142},
+    {"id":"new-pods","lane":"replicas","col":3,"type":"backend","label":"New Pods","sublabel":"creating → Ready","tag":"maxSurge=1","width":142},
+    {"id":"service","lane":"traffic","col":4,"type":"cloud","label":"Service / Endpoints","sublabel":"只接 Ready Pod","tag":"available=3","width":154},
+    {"id":"old-pods","lane":"replicas","col":5,"type":"backend","label":"Old Pods","sublabel":"terminating one by one","tag":"maxUnavailable=1","width":142},
+    {"id":"stable","lane":"traffic","col":5,"type":"external","label":"Revision 2 Stable","sublabel":"old=0 · new=3","tag":"rollout complete","width":150},
+    {"id":"pause","lane":"recovery","col":3,"type":"security","label":"Paused Rollout","sublabel":"指标异常 / inspect","tag":"kubectl rollout pause","width":150},
+    {"id":"rollback","lane":"recovery","col":5,"type":"messagebus","label":"Rollback","sublabel":"old=3 · new=0","tag":"restore revision 1","width":142}
+  ],
+  "edges": [
+    {"id":"template-change","from":"deployment","to":"controller","label":"模板变更 / reconcile","variant":"emphasis","role":"main"},
+    {"id":"create-rs","from":"controller","to":"new-rs","label":"创建 hash=def","variant":"emphasis","role":"main"},
+    {"id":"scale-new","from":"new-rs","to":"new-pods","label":"scale up +1","variant":"emphasis","role":"main"},
+    {"id":"ready-endpoints","from":"new-pods","to":"service","label":"Ready 后加入 Endpoints","variant":"emphasis","role":"main"},
+    {"id":"scale-old","from":"service","to":"old-pods","label":"缩 old RS 一份","role":"main"},
+    {"id":"old-rs-scale","from":"service","to":"old-rs","label":"old RS replicas 递减","variant":"dashed","role":"branch"},
+    {"id":"complete","from":"service","to":"stable","label":"available=3","variant":"emphasis","role":"main"},
+    {"id":"pause-on-error","from":"controller","to":"pause","label":"异常时暂停","variant":"security","role":"error"},
+    {"id":"rollback-action","from":"pause","to":"rollback","label":"回滚 revision 1","variant":"security","role":"error"}
+  ],
+  "cards": [
+    {"dot":"cyan","title":"滚动窗口","items":["maxSurge=1 允许临时多一个新 Pod","新 Pod Ready 后才缩减旧副本","Service 只把 Ready Pod 放入 Endpoints"]},
+    {"dot":"emerald","title":"完成条件","items":["new ReplicaSet 达到 desired replicas","old ReplicaSet 缩到 0 但保留历史","available 数量满足最小可用约束"]},
+    {"dot":"rose","title":"恢复语义","items":["异常时 pause 冻结后续 scale 变化","rollback 通过 ReplicaSet replicas 恢复上一版本","恢复和继续 rollout 都由控制器收敛"]}
+  ]
+}

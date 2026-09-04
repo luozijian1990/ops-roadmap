@@ -1,0 +1,10 @@
+{
+  "schema_version": 2, "diagram_type": "workflow",
+  "meta": {"title":"DNS 解析路径", "locale":"zh-CN", "animation":"trace", "quality_profile":"showcase", "views":[{"id":"cache-hit","label":"缓存命中","focus":["app","stub","cache"],"note":"本地缓存直接返回地址。"},{"id":"recursive","label":"递归解析","focus":["app","stub","cache","resolver","authoritative"],"note":"缓存未命中时走递归 DNS 链路。"}]},
+  "lanes":[{"id":"host","label":"客户端主机"},{"id":"dns","label":"DNS 服务"}],
+  "phases":[{"id":"query","label":"Query","fromCol":0,"toCol":1},{"id":"resolve","label":"Resolve","fromCol":2,"toCol":3,"variant":"emphasis"},{"id":"reply","label":"Reply","fromCol":4,"toCol":5}],
+  "mainPath":["app","stub","cache","resolver","authoritative"],
+  "nodes":[{"id":"app","lane":"host","col":0,"type":"frontend","label":"应用","sublabel":"getaddrinfo()"},{"id":"stub","lane":"host","col":1,"type":"backend","label":"Stub Resolver","sublabel":"/etc/resolv.conf"},{"id":"cache","lane":"host","col":2,"type":"database","label":"本地缓存","sublabel":"TTL"},{"id":"resolver","lane":"dns","col":3,"type":"backend","label":"递归解析器","sublabel":"迭代查询"},{"id":"authoritative","lane":"dns","col":4,"type":"external","label":"权威 DNS","sublabel":"A / AAAA"},{"id":"timeout","lane":"host","col":4,"type":"security","label":"SERVFAIL","sublabel":"重试或降级","width":120}],
+  "edges":[{"id":"app-stub","from":"app","to":"stub","label":"name lookup"},{"id":"stub-cache","from":"stub","to":"cache","label":"查缓存","variant":"emphasis"},{"id":"cache-resolver","from":"cache","to":"resolver","label":"miss","role":"branch"},{"id":"resolver-auth","from":"resolver","to":"authoritative","label":"UDP/TCP 53"},{"id":"auth-resolver","from":"authoritative","to":"resolver","label":"record","role":"return"},{"id":"resolver-timeout","from":"resolver","to":"timeout","label":"timeout","variant":"security","role":"error"}],
+  "cards":[{"dot":"amber","title":"排障信号","items":["TTL 决定缓存命中率","超时、SERVFAIL 与 UDP/TCP 切换需要分层观测"]}]
+}

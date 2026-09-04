@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {"title": "Linux 网络收发路径", "locale": "zh-CN", "animation": "trace", "quality_profile": "showcase", "views": [{"id":"rx","label":"接收路径","focus":["nic","driver","softirq","stack","socket"],"note":"数据包从网卡进入 socket 的关键路径。"},{"id":"tx","label":"发送路径","focus":["socket","stack","qdisc","driver","nic"],"note":"应用数据经协议栈和队列发送到网卡。"}]},
+  "lanes": [{"id":"kernel","label":"内核网络栈"},{"id":"hardware","label":"设备与应用"}],
+  "phases": [{"id":"ingress","label":"Ingress","fromCol":0,"toCol":1},{"id":"process","label":"协议处理","fromCol":2,"toCol":3,"variant":"emphasis"},{"id":"egress","label":"Egress","fromCol":4,"toCol":5}],
+  "mainPath": ["nic","driver","softirq","stack","socket"],
+  "nodes": [
+    {"id":"nic","lane":"hardware","col":0,"type":"external","label":"网卡 NIC","sublabel":"DMA ring"},{"id":"driver","lane":"kernel","col":1,"type":"backend","label":"驱动 NAPI","sublabel":"poll + napi_gro"},{"id":"softirq","lane":"kernel","col":2,"type":"backend","label":"NET_RX_SOFTIRQ","sublabel":"软中断预算"},{"id":"stack","lane":"kernel","col":3,"type":"backend","label":"协议栈","sublabel":"L2 → L3 → L4"},{"id":"socket","lane":"hardware","col":4,"type":"frontend","label":"Socket / 应用","sublabel":"recvmsg()"},{"id":"qdisc","lane":"kernel","col":4,"type":"messagebus","label":"Qdisc 队列","sublabel":"发送整形"}],
+  "edges": [{"id":"nic-driver","from":"nic","to":"driver","label":"RX DMA","variant":"emphasis"},{"id":"driver-softirq","from":"driver","to":"softirq","label":"poll budget"},{"id":"softirq-stack","from":"softirq","to":"stack","label":"skb"},{"id":"stack-socket","from":"stack","to":"socket","label":"deliver"},{"id":"socket-qdisc","from":"socket","to":"qdisc","label":"sendmsg()","role":"branch"},{"id":"qdisc-driver","from":"qdisc","to":"driver","label":"TX DMA","variant":"dashed","role":"return"}],
+  "cards": [{"dot":"cyan","title":"性能关注点","items":["软中断预算耗尽会造成 backlog 增长","RX/TX 队列和 NAPI poll 决定吞吐上限"]}]
+}

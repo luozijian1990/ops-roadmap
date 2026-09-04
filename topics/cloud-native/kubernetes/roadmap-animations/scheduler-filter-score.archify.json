@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kubernetes Scheduler: Filter and Score",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "viewBox": [1200, 760],
+    "views": [
+      { "id": "requests", "label": "资源需求计算", "focus": ["pod", "queue"] },
+      { "id": "filter", "label": "Filter", "focus": ["queue", "filter", "nodes"] },
+      { "id": "score", "label": "Score 与 Bind", "focus": ["score", "selected", "api"] }
+    ]
+  },
+  "lanes": [
+    { "id": "control", "label": "调度控制面" },
+    { "id": "cluster", "label": "候选节点" },
+    { "id": "binding", "label": "绑定结果", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "observe", "label": "Observe", "fromCol": 0, "toCol": 1 },
+    { "id": "filter-phase", "label": "Filter", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "score-phase", "label": "Score / Bind", "fromCol": 4, "toCol": 5 }
+  ],
+  "groups": [
+    { "id": "scheduling-cycle", "label": "Scheduling Cycle", "lane": "control", "fromCol": 0, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["pod", "queue", "filter", "score", "selected", "api"],
+  "semanticChecks": {
+    "allowedRoots": ["pod"],
+    "allowedTerminals": ["api"],
+    "requiredEdges": [
+      { "from": "pod", "to": "queue" },
+      { "from": "queue", "to": "filter" },
+      { "from": "filter", "to": "score" },
+      { "from": "score", "to": "selected" },
+      { "from": "selected", "to": "api" }
+    ]
+  },
+  "nodes": [
+    { "id": "pod", "lane": "control", "col": 0, "type": "frontend", "label": "Pending Pod", "sublabel": "requests 待计算", "tag": "source" },
+    { "id": "queue", "lane": "control", "col": 1, "type": "messagebus", "label": "SchedulingQueue", "sublabel": "activeQ", "tag": "queue", "width": 150 },
+    { "id": "filter", "lane": "control", "col": 2, "type": "backend", "label": "Filter Plugins", "sublabel": "资源 / 亲和性", "tag": "predicate" },
+    { "id": "nodes", "lane": "cluster", "col": 3, "type": "cloud", "label": "Candidate Nodes", "sublabel": "node-a / b / c / d", "tag": "feasibility", "width": 160 },
+    { "id": "score", "lane": "control", "col": 4, "type": "backend", "label": "Score Plugins", "sublabel": "按权重汇总", "tag": "ranking" },
+    { "id": "selected", "lane": "cluster", "col": 5, "type": "cloud", "label": "node-c", "sublabel": "highest score", "tag": "selected" },
+    { "id": "api", "lane": "binding", "col": 5, "type": "external", "label": "API Server · Bind", "sublabel": "spec.nodeName=node-c", "tag": "commit", "width": 180 }
+  ],
+  "edges": [
+    { "id": "enqueue", "from": "pod", "to": "queue", "label": "enqueue Pod key", "role": "main" },
+    { "id": "run-filter", "from": "queue", "to": "filter", "label": "run predicates", "role": "main" },
+    { "id": "check-nodes", "from": "filter", "to": "nodes", "label": "feasibility checks", "role": "branch" },
+    { "id": "feasible", "from": "filter", "to": "score", "label": "feasible nodes", "role": "main" },
+    { "id": "score-input", "from": "nodes", "to": "score", "label": "plugin scores", "role": "branch" },
+    { "id": "score-result", "from": "score", "to": "selected", "label": "highest score", "role": "main" },
+    { "id": "bind", "from": "selected", "to": "api", "label": "Bind / PodScheduled=True", "role": "main" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Requests", "items": ["普通容器 requests 求和，init containers 取最大值。", "最终 request = max(sum(app), max(init))。"] },
+    { "dot": "emerald", "title": "Filter → Score", "items": ["Filter 淘汰不可行节点，淘汰结果不会进入评分。", "Score 按插件权重汇总后选择最高分。"] },
+    { "dot": "amber", "title": "Bind", "items": ["Scheduler 通过 API Server 写入 spec.nodeName。", "Pod 状态更新为 PodScheduled=True。"] }
+  ]
+}

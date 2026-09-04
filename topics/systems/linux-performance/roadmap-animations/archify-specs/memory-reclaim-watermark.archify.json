@@ -1,0 +1,156 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "内存水位与回收",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "viewBox": [
+      1200,
+      760
+    ],
+    "views": [
+      {
+        "id": "overview",
+        "label": "核心路径",
+        "focus": [
+          "free",
+          "low",
+          "kswapd",
+          "direct"
+        ]
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Linux 性能路径"
+    },
+    {
+      "id": "side",
+      "label": "观测与异常"
+    }
+  ],
+  "phases": [
+    {
+      "id": "pressure",
+      "label": "水位变化",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "reclaim",
+      "label": "回收执行",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "resume",
+      "label": "压力解除",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "nodes": [
+    {
+      "id": "free",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "空闲页充足",
+      "sublabel": "free > high",
+      "width": 145
+    },
+    {
+      "id": "low",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "跌破 low",
+      "sublabel": "触发回收",
+      "width": 145
+    },
+    {
+      "id": "kswapd",
+      "lane": "main",
+      "col": 2,
+      "type": "backend",
+      "label": "kswapd",
+      "sublabel": "后台异步回收",
+      "width": 145
+    },
+    {
+      "id": "direct",
+      "lane": "main",
+      "col": 3,
+      "type": "security",
+      "label": "直接回收",
+      "sublabel": "分配线程阻塞",
+      "width": 145
+    },
+    {
+      "id": "high",
+      "lane": "main",
+      "col": 5,
+      "type": "external",
+      "label": "恢复到 high",
+      "sublabel": "压力解除",
+      "width": 145
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "free",
+      "to": "low",
+      "label": "页被分配",
+      "role": "main"
+    },
+    {
+      "id": "e2",
+      "from": "low",
+      "to": "kswapd",
+      "label": "唤醒后台回收",
+      "role": "branch"
+    },
+    {
+      "id": "e3",
+      "from": "kswapd",
+      "to": "high",
+      "label": "回收到 high",
+      "role": "branch"
+    },
+    {
+      "id": "e4",
+      "from": "low",
+      "to": "direct",
+      "label": "回收跟不上",
+      "role": "branch"
+    },
+    {
+      "id": "e5",
+      "from": "direct",
+      "to": "high",
+      "label": "同步回收后继续",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "核心路径",
+      "items": [
+        "按阶段观察现象、定位瓶颈并验证结果。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "排障提示",
+      "items": [
+        "保留原始指标作为基线，修复后使用同一指标复测。"
+      ]
+    }
+  ]
+}

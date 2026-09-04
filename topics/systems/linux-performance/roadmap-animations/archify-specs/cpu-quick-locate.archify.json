@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "CPU 性能快速定位",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [1200, 760],
+    "views": [
+      { "id": "entry", "label": "三个入口", "focus": ["top", "vmstat", "pidstat"], "note": "先用 top、vmstat、pidstat 确认 CPU 压力来自哪里。" },
+      { "id": "branch", "label": "按指标分叉", "focus": ["top", "runq", "cs", "hot"], "note": "按运行队列、上下文切换和热点函数选择下一步。" },
+      { "id": "loop", "label": "完整闭环", "focus": ["top", "runq", "hot", "fix", "verify"], "note": "定位、修复、复测形成闭环。" }
+    ]
+  },
+  "lanes": [{ "id": "observe", "label": "观测入口" }, { "id": "diagnose", "label": "分叉诊断" }, { "id": "close", "label": "修复验证" }],
+  "phases": [{ "id": "collect", "label": "采样", "fromCol": 0, "toCol": 1 }, { "id": "branching", "label": "按指标分叉", "fromCol": 2, "toCol": 3, "variant": "emphasis" }, { "id": "closure", "label": "闭环", "fromCol": 4, "toCol": 5, "variant": "dashed" }],
+  "mainPath": ["top", "runq", "cs", "hot", "fix", "verify"],
+  "nodes": [
+    { "id": "top", "lane": "observe", "col": 0, "type": "frontend", "label": "top", "sublabel": "进程 CPU 排名", "width": 150 },
+    { "id": "vmstat", "lane": "observe", "col": 1, "type": "backend", "label": "vmstat 1", "sublabel": "系统级指标", "width": 150 },
+    { "id": "pidstat", "lane": "observe", "col": 2, "type": "backend", "label": "pidstat -u", "sublabel": "线程级采样", "width": 150 },
+    { "id": "runq", "lane": "diagnose", "col": 2, "type": "backend", "label": "运行队列高?", "sublabel": "r / load", "width": 150 },
+    { "id": "cs", "lane": "diagnose", "col": 3, "type": "backend", "label": "切换/中断", "sublabel": "cs、in", "width": 150 },
+    { "id": "hot", "lane": "diagnose", "col": 4, "type": "backend", "label": "perf 热点", "sublabel": "函数与调用栈", "width": 150 },
+    { "id": "fix", "lane": "close", "col": 4, "type": "security", "label": "施加修复", "sublabel": "限流 / 调度 / 代码", "width": 150 },
+    { "id": "verify", "lane": "close", "col": 5, "type": "backend", "label": "复测确认", "sublabel": "指标回落", "width": 150 }
+  ],
+  "edges": [
+    { "id": "top-runq", "from": "top", "to": "runq", "label": "确认进程" },
+    { "id": "vmstat-runq", "from": "vmstat", "to": "runq", "label": "r / us sy" },
+    { "id": "pidstat-cs", "from": "pidstat", "to": "cs", "label": "线程分布" },
+    { "id": "runq-cs", "from": "runq", "to": "cs", "label": "切换异常?", "variant": "emphasis" },
+    { "id": "cs-hot", "from": "cs", "to": "hot", "label": "采样热点" },
+    { "id": "hot-fix", "from": "hot", "to": "fix", "label": "定位根因", "variant": "security" },
+    { "id": "fix-verify", "from": "fix", "to": "verify", "label": "再次采样", "variant": "emphasis" }
+  ],
+  "cards": [{ "dot": "cyan", "title": "快速入口", "items": ["top 看谁在消耗 CPU", "vmstat 看系统是否整体繁忙", "pidstat 下钻到线程"] }, { "dot": "emerald", "title": "闭环", "items": ["先判定运行队列或切换异常", "用 perf 找到可执行的热点", "修复后必须用同一指标复测"] }]
+}

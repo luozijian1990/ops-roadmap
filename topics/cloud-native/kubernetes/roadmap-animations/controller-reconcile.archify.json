@@ -1,0 +1,69 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kubernetes Controller Reconcile",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "views": [
+      {"id": "queue", "label": "事件入队", "focus": ["api", "informer", "queue"]},
+      {"id": "diff", "label": "状态对比", "focus": ["cache", "worker", "desired"]},
+      {"id": "action", "label": "执行动作", "focus": ["worker", "api-write", "replicaset"]},
+      {"id": "retry", "label": "失败重试", "focus": ["worker", "retry", "queue"]}
+    ]
+  },
+  "lanes": [
+    {"id": "control", "label": "控制面"},
+    {"id": "state", "label": "状态与对象"},
+    {"id": "node", "label": "节点执行", "variant": "exception"}
+  ],
+  "phases": [
+    {"id": "observe", "label": "Observe", "fromCol": 0, "toCol": 1, "variant": "default"},
+    {"id": "decide", "label": "Decide", "fromCol": 2, "toCol": 3, "variant": "emphasis"},
+    {"id": "act", "label": "Act", "fromCol": 4, "toCol": 5, "variant": "default"}
+  ],
+  "groups": [
+    {"id": "event-loop", "label": "事件驱动循环", "lane": "control", "fromCol": 0, "toCol": 5, "variant": "dashed"}
+  ],
+  "mainPath": ["api", "informer", "queue", "worker", "api-write", "replicaset"],
+  "semanticChecks": {
+    "allowedRoots": ["api"],
+    "allowedTerminals": ["desired", "replicaset", "retry"],
+    "requiredEdges": [
+      {"from": "api", "to": "informer"},
+      {"from": "informer", "to": "queue"},
+      {"from": "queue", "to": "worker"},
+      {"from": "worker", "to": "api-write"},
+      {"from": "worker", "to": "retry"},
+      {"from": "retry", "to": "queue"}
+    ]
+  },
+  "nodes": [
+    {"id": "api", "lane": "control", "col": 0, "type": "backend", "label": "API Server · Watch", "sublabel": "发布对象变更事件", "tag": "source", "width": 170},
+    {"id": "informer", "lane": "control", "col": 1, "type": "backend", "label": "Informer", "sublabel": "更新本地缓存", "tag": "reflect"},
+    {"id": "cache", "lane": "state", "col": 2, "type": "database", "label": "Lister Cache", "sublabel": "desired/current", "tag": "read-only"},
+    {"id": "queue", "lane": "control", "col": 2, "type": "messagebus", "label": "WorkQueue", "sublabel": "namespace/name 去重", "tag": "key"},
+    {"id": "worker", "lane": "control", "col": 3, "type": "backend", "label": "Worker", "sublabel": "Reconcile(key)", "tag": "control loop"},
+    {"id": "desired", "lane": "state", "col": 3, "type": "backend", "label": "Desired State", "sublabel": "desired=3", "tag": "spec"},
+    {"id": "api-write", "lane": "control", "col": 4, "type": "backend", "label": "API Server · Write", "sublabel": "校验并持久化对象", "tag": "action", "width": 170},
+    {"id": "replicaset", "lane": "node", "col": 5, "type": "cloud", "label": "ReplicaSet", "sublabel": "创建缺失 Pod", "tag": "action"},
+    {"id": "retry", "lane": "control", "col": 4, "type": "backend", "label": "Retry / Backoff", "sublabel": "失败后重新入队", "tag": "error", "width": 150, "yOffset": 150}
+  ],
+  "edges": [
+    {"id": "watch", "from": "api", "to": "informer", "label": "Watch event", "role": "main"},
+    {"id": "enqueue", "from": "informer", "to": "queue", "label": "生成 key: prod/web", "role": "main"},
+    {"id": "read-cache", "from": "queue", "to": "worker", "label": "取出 key", "role": "main"},
+    {"id": "cache-view", "from": "worker", "to": "cache", "label": "读取最新缓存", "role": "branch"},
+    {"id": "compare", "from": "cache", "to": "desired", "label": "diff desired=3 / current=2", "role": "main"},
+    {"id": "update", "from": "worker", "to": "api-write", "label": "创建 / 更新对象", "role": "main"},
+    {"id": "apply", "from": "api-write", "to": "replicaset", "label": "持久化期望状态", "role": "main"},
+    {"id": "fail", "from": "worker", "to": "retry", "label": "API 失败", "role": "error", "variant": "security"},
+    {"id": "requeue", "from": "retry", "to": "queue", "label": "指数退避后重试", "role": "error"}
+  ],
+  "cards": [
+    {"dot": "cyan", "title": "核心事实", "items": ["事件回调只生成 key，不直接执行 reconcile。", "Worker 每次都从缓存读取最新状态。"]},
+    {"dot": "emerald", "title": "收敛动作", "items": ["diff 为空时标记成功。", "有差异时通过 API Server 推动对象收敛。"]},
+    {"dot": "amber", "title": "失败语义", "items": ["临时错误进入 Retry / Backoff。", "重试仍围绕同一个 namespace/name key。"]}
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kubernetes Pod 创建全链路",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "views": [
+      {"id":"request","label":"请求入站","focus":["client","api","etcd"]},
+      {"id":"controllers","label":"控制器展开","focus":["deployment","replicaset","scheduler"]},
+      {"id":"binding","label":"调度绑定","focus":["scheduler","kubelet","csi"]},
+      {"id":"startup","label":"节点启动","focus":["kubelet","pod"]}
+    ]
+  },
+  "lanes": [
+    {"id":"client","label":"客户端"},
+    {"id":"control","label":"控制面"},
+    {"id":"node","label":"工作节点","variant":"exception"}
+  ],
+  "phases": [
+    {"id":"request","label":"Request","fromCol":0,"toCol":1},
+    {"id":"control","label":"Control loop","fromCol":2,"toCol":3,"variant":"emphasis"},
+    {"id":"node","label":"Node startup","fromCol":4,"toCol":5}
+  ],
+  "mainPath":["client","api","deployment","replicaset","scheduler","kubelet","pod"],
+  "nodes":[
+    {"id":"client","lane":"client","col":0,"type":"external","label":"kubectl","sublabel":"提交 Pod / Deployment","width":140},
+    {"id":"api","lane":"control","col":1,"type":"backend","label":"API Server","sublabel":"校验并持久化","width":150},
+    {"id":"etcd","lane":"control","col":0,"type":"database","label":"etcd","sublabel":"对象状态","width":130},
+    {"id":"deployment","lane":"control","col":2,"type":"backend","label":"Deployment Controller","sublabel":"展开期望副本","width":170},
+    {"id":"replicaset","lane":"control","col":3,"type":"backend","label":"ReplicaSet Controller","sublabel":"创建 Pod 对象","width":170},
+    {"id":"scheduler","lane":"control","col":4,"type":"backend","label":"Scheduler","sublabel":"Filter / Score / Bind","width":160},
+    {"id":"kubelet","lane":"node","col":4,"type":"backend","label":"kubelet","sublabel":"拉取并启动","width":140},
+    {"id":"csi","lane":"node","col":3,"type":"cloud","label":"CSI / Volume","sublabel":"挂载存储","width":145},
+    {"id":"pod","lane":"node","col":5,"type":"cloud","label":"Pod Ready","sublabel":"Running / Ready","tag":"完成","width":145}
+  ],
+  "edges":[
+    {"id":"submit","from":"client","to":"api","label":"POST object","role":"main"},
+    {"id":"persist","from":"api","to":"etcd","label":"写入 desired state","role":"branch"},
+    {"id":"expand","from":"api","to":"deployment","label":"watch event","role":"main"},
+    {"id":"create-rs","from":"deployment","to":"replicaset","label":"创建 ReplicaSet","role":"main"},
+    {"id":"create-pod","from":"replicaset","to":"scheduler","label":"创建待调度 Pod","role":"main"},
+    {"id":"bind","from":"scheduler","to":"kubelet","label":"写入 spec.nodeName","role":"main"},
+    {"id":"volume","from":"kubelet","to":"csi","label":"挂载卷","role":"branch"},
+    {"id":"ready","from":"kubelet","to":"pod","label":"进程启动 + readiness","role":"main"}
+  ],
+  "cards":[
+    {"dot":"cyan","title":"请求与控制器","items":["API Server 先校验并写入 etcd。","Deployment / ReplicaSet 控制器逐层创建对象。"]},
+    {"dot":"emerald","title":"节点启动","items":["Scheduler 绑定节点后由 kubelet 执行。","CSI、CRI、CNI 协作完成存储、容器和网络。"]},
+    {"dot":"amber","title":"Ready 条件","items":["进程启动不等于 Ready。","readiness probe 通过后才进入可用后端。"]}
+  ]
+}

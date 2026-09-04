@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "I/O 快速定位：四步定位法",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [1100, 800],
+    "views": [
+      { "id": "four-steps", "label": "四步定位", "focus": ["symptom", "resource", "behavior", "root"], "note": "从症状到根因，再回到修复后的复测。" },
+      { "id": "questions", "label": "诊断必问", "focus": ["qmode", "qsize", "qcache", "qowner", "qbase"], "note": "读写模式、缓存、归属和基线决定诊断方向。" },
+      { "id": "tools", "label": "专项工具", "focus": ["capacity", "objects", "syscall", "hotspot"], "note": "按容量、对象、系统调用和块层热点选择工具。" }
+    ]
+  },
+  "lanes": [{ "id": "observe", "label": "观测" }, { "id": "diagnose", "label": "定位" }, { "id": "questions", "label": "诊断问题" }, { "id": "tools", "label": "专项工具" }, { "id": "verify", "label": "修复验证" }],
+  "phases": [
+    { "id": "signal", "label": "确认症状", "fromCol": 0, "toCol": 1 },
+    { "id": "owner", "label": "定位责任", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "fix", "label": "修复复测", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["symptom", "resource", "behavior", "root", "verify"],
+  "nodes": [
+    { "id": "symptom", "lane": "observe", "col": 0, "type": "frontend", "label": "确认 I/O 症状", "sublabel": "延迟、吞吐、队列" },
+    { "id": "resource", "lane": "observe", "col": 1, "type": "backend", "label": "定位设备与资源", "sublabel": "iostat / vmstat" },
+    { "id": "behavior", "lane": "diagnose", "col": 2, "type": "database", "label": "分析 I/O 行为", "sublabel": "pidstat / strace / bpf", "width": 150 },
+    { "id": "root", "lane": "diagnose", "col": 3, "type": "security", "label": "形成根因假设", "sublabel": "应用与存储原理" },
+    { "id": "verify", "lane": "verify", "col": 5, "type": "cloud", "label": "修复并复测", "sublabel": "对照基线" },
+    { "id": "qmode", "lane": "questions", "col": 1, "type": "backend", "label": "读写与访问模式", "sublabel": "随机还是顺序" },
+    { "id": "qsize", "lane": "questions", "col": 2, "type": "backend", "label": "请求大小与持久化", "sublabel": "fsync / block size", "width": 150 },
+    { "id": "qcache", "lane": "questions", "col": 3, "type": "database", "label": "缓存与设备", "sublabel": "命中还是打盘" },
+    { "id": "qowner", "lane": "questions", "col": 4, "type": "backend", "label": "进程、线程、文件", "sublabel": "责任归属", "width": 150 },
+    { "id": "qbase", "lane": "questions", "col": 5, "type": "cloud", "label": "干扰与基线", "sublabel": "相对正常值" },
+    { "id": "capacity", "lane": "tools", "col": 2, "type": "backend", "label": "容量类", "sublabel": "df -h / df -i" },
+    { "id": "objects", "lane": "tools", "col": 3, "type": "backend", "label": "对象与 fd", "sublabel": "slabtop / lsof" },
+    { "id": "syscall", "lane": "tools", "col": 4, "type": "backend", "label": "调用与事件", "sublabel": "strace / opensnoop" },
+    { "id": "hotspot", "lane": "tools", "col": 5, "type": "messagebus", "label": "热点与块延迟", "sublabel": "filetop / biosnoop" }
+  ],
+  "edges": [
+    { "id": "symptom-resource", "from": "symptom", "to": "resource", "label": "先看全局", "role": "main" },
+    { "id": "resource-behavior", "from": "resource", "to": "behavior", "label": "缩小范围", "role": "main" },
+    { "id": "behavior-root", "from": "behavior", "to": "root", "label": "证据归因", "role": "main" },
+    { "id": "root-verify", "from": "root", "to": "verify", "label": "修复后复测", "role": "main" },
+    { "id": "behavior-qmode", "from": "behavior", "to": "qmode", "label": "定性问题", "role": "branch" },
+    { "id": "qmode-qsize", "from": "qmode", "to": "qsize", "label": "请求特征", "role": "branch" },
+    { "id": "qsize-qcache", "from": "qsize", "to": "qcache", "label": "缓存路径", "role": "branch" },
+    { "id": "qcache-qowner", "from": "qcache", "to": "qowner", "label": "归属", "role": "branch" },
+    { "id": "qowner-qbase", "from": "qowner", "to": "qbase", "label": "基线对照", "role": "branch" },
+    { "id": "behavior-capacity", "from": "behavior", "to": "capacity", "label": "专项工具", "role": "branch" },
+    { "id": "capacity-objects", "from": "capacity", "to": "objects", "label": "继续下钻", "role": "branch" },
+    { "id": "objects-syscall", "from": "objects", "to": "syscall", "label": "调用证据", "role": "branch" },
+    { "id": "syscall-hotspot", "from": "syscall", "to": "hotspot", "label": "块层热点", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "起手式", "items": ["iostat -xz 1 · vmstat 1", "pidstat -d 1 · iotop -oPa"] },
+    { "dot": "rose", "title": "原则", "items": ["先定性，再选工具", "脱离设备基线谈慢没有意义"] }
+  ]
+}

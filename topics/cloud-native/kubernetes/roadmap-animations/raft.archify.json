@@ -1,0 +1,66 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Raft Consensus: Election, Replication, Recovery",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "views": [
+      {"id":"election","label":"领导选举","focus":["followers","candidate","leader","votes"],"note":"选举超时后候选人提升 term 并争取多数票。"},
+      {"id":"replication","label":"日志复制","focus":["client","leader","entries","followers","commit"],"note":"Leader 复制日志，获得多数确认后提交并响应客户端。"},
+      {"id":"partition","label":"分区与恢复","focus":["leader","partition","isolated","new-leader","rejoin"],"note":"分区侧无法形成多数，恢复后通过 term 和日志匹配重新加入。"}
+    ]
+  },
+  "lanes": [
+    {"id":"client","label":"客户端"},
+    {"id":"cluster","label":"Raft 集群"},
+    {"id":"log","label":"日志与提交"},
+    {"id":"failure","label":"分区与恢复","variant":"exception"}
+  ],
+  "phases": [
+    {"id":"vote","label":"Vote","fromCol":0,"toCol":1,"variant":"emphasis"},
+    {"id":"append","label":"AppendEntries","fromCol":2,"toCol":3},
+    {"id":"commit","label":"Commit","fromCol":4,"toCol":5,"variant":"dashed"}
+  ],
+  "groups": [
+    {"id":"majority","label":"多数派路径","lane":"cluster","fromCol":1,"toCol":4,"variant":"emphasis"},
+    {"id":"partition-path","label":"分区恢复路径","lane":"failure","fromCol":2,"toCol":5,"variant":"security"}
+  ],
+  "mainPath":["followers","candidate","votes","leader","entries","followers-ack","commit"],
+  "semanticChecks":{"allowedRoots":["followers","client"],"allowedTerminals":["commit","rejoin"],"requiredEdges":[{"from":"followers","to":"candidate"},{"from":"candidate","to":"votes"},{"from":"votes","to":"leader"},{"from":"client","to":"leader"},{"from":"leader","to":"entries"},{"from":"entries","to":"followers-ack"},{"from":"followers-ack","to":"commit"},{"from":"partition","to":"new-leader"},{"from":"isolated","to":"rejoin"}]},
+  "nodes": [
+    {"id":"followers","lane":"cluster","col":0,"type":"backend","label":"Followers","width":150},
+    {"id":"candidate","lane":"cluster","col":1,"type":"security","label":"Candidate B","width":142},
+    {"id":"votes","lane":"cluster","col":2,"type":"messagebus","label":"RequestVote","width":154},
+    {"id":"leader","lane":"cluster","col":3,"type":"backend","label":"Leader B","width":142},
+    {"id":"client","lane":"client","col":2,"type":"external","label":"Client","width":130},
+    {"id":"entries","lane":"log","col":4,"type":"database","label":"Replicated Log","width":154},
+    {"id":"followers-ack","lane":"cluster","col":4,"type":"messagebus","label":"Follower ACKs","width":148},
+    {"id":"commit","lane":"log","col":5,"type":"cloud","label":"Commit Index","width":148},
+    {"id":"partition","lane":"failure","col":3,"type":"security","label":"Network Partition","width":154},
+    {"id":"isolated","lane":"failure","col":4,"type":"security","label":"Isolated Node","width":148},
+    {"id":"new-leader","lane":"failure","col":4,"type":"backend","label":"New Leader","width":146,"yOffset":150},
+    {"id":"rejoin","lane":"failure","col":5,"type":"cloud","label":"Rejoin & Catch Up","width":154}
+  ],
+  "edges": [
+    {"id":"timeout","from":"followers","to":"candidate","label":"election timeout","variant":"emphasis","role":"main"},
+    {"id":"request-vote","from":"candidate","to":"votes","label":"RequestVote(term=1)","variant":"emphasis","role":"main"},
+    {"id":"majority-vote","from":"votes","to":"leader","label":"majority → Leader","variant":"emphasis","role":"main"},
+    {"id":"client-command","from":"client","to":"leader","label":"command","variant":"emphasis","role":"main"},
+    {"id":"append-log","from":"leader","to":"entries","label":"AppendEntries","role":"main"},
+    {"id":"replicate","from":"entries","to":"followers-ack","label":"复制到 Followers","variant":"emphasis","role":"main"},
+    {"id":"commit-majority","from":"followers-ack","to":"commit","label":"多数确认后 commit","variant":"emphasis","role":"main"},
+    {"id":"heartbeat","from":"leader","to":"followers","label":"heartbeat","variant":"dashed","role":"return"},
+    {"id":"partition-start","from":"leader","to":"partition","label":"网络分区","variant":"security","role":"error"},
+    {"id":"isolate","from":"partition","to":"isolated","label":"无法形成多数","variant":"security","role":"error"},
+    {"id":"elect-new","from":"partition","to":"new-leader","label":"多数侧重新选举","variant":"security","role":"branch"},
+    {"id":"catch-up","from":"isolated","to":"rejoin","label":"恢复后补齐日志","variant":"dashed","role":"return"},
+    {"id":"term-fence","from":"new-leader","to":"rejoin","label":"更高 term 驱逐旧状态","variant":"emphasis","role":"main"}
+  ],
+  "cards": [
+    {"dot":"cyan","title":"选举安全","items":["候选人先自增 term 并给自己投票","只有多数票才能成为 Leader","心跳持续到达时 Followers 不会重复选举"]},
+    {"dot":"emerald","title":"日志提交","items":["Leader 先写本地日志，再复制给 Followers","多数节点 matchIndex 后推进 commitIndex","已提交 entry 应用到各节点状态机"]},
+    {"dot":"rose","title":"分区恢复","items":["少数侧无法提交新日志","更高 term 的 Leader 会使旧状态失效","网络恢复后通过日志匹配补齐落后节点"]}
+  ]
+}

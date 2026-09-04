@@ -1,0 +1,172 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "软中断：上半部与下半部",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "viewBox": [
+      1200,
+      760
+    ],
+    "views": [
+      {
+        "id": "overview",
+        "label": "核心路径",
+        "focus": [
+          "packet",
+          "hardirq",
+          "softirq",
+          "ksoftirqd"
+        ]
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Linux 性能路径"
+    },
+    {
+      "id": "side",
+      "label": "观测与异常"
+    }
+  ],
+  "phases": [
+    {
+      "id": "irq",
+      "label": "硬中断",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "defer",
+      "label": "延迟处理",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "done",
+      "label": "协议栈完成",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "nodes": [
+    {
+      "id": "packet",
+      "lane": "main",
+      "col": 0,
+      "type": "external",
+      "label": "网卡事件",
+      "sublabel": "收到数据",
+      "width": 145
+    },
+    {
+      "id": "hardirq",
+      "lane": "main",
+      "col": 1,
+      "type": "security",
+      "label": "硬中断上半部",
+      "sublabel": "确认并排队",
+      "width": 145
+    },
+    {
+      "id": "softirq",
+      "lane": "main",
+      "col": 2,
+      "type": "backend",
+      "label": "softirq",
+      "sublabel": "NET_RX 等",
+      "width": 145
+    },
+    {
+      "id": "ksoftirqd",
+      "lane": "main",
+      "col": 3,
+      "type": "messagebus",
+      "label": "ksoftirqd",
+      "sublabel": "过载时接管",
+      "width": 145
+    },
+    {
+      "id": "netrx",
+      "lane": "main",
+      "col": 4,
+      "type": "backend",
+      "label": "协议栈处理",
+      "sublabel": "收包完成",
+      "width": 145
+    },
+    {
+      "id": "return",
+      "lane": "side",
+      "col": 5,
+      "type": "external",
+      "label": "返回进程",
+      "sublabel": "继续原任务",
+      "width": 145
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "packet",
+      "to": "hardirq",
+      "label": "IRQ",
+      "role": "main"
+    },
+    {
+      "id": "e2",
+      "from": "hardirq",
+      "to": "softirq",
+      "label": "raise_softirq",
+      "role": "branch"
+    },
+    {
+      "id": "e3",
+      "from": "softirq",
+      "to": "ksoftirqd",
+      "label": "过载兜底",
+      "role": "branch"
+    },
+    {
+      "id": "e4",
+      "from": "ksoftirqd",
+      "to": "netrx",
+      "label": "线程上下文",
+      "role": "branch"
+    },
+    {
+      "id": "e5",
+      "from": "softirq",
+      "to": "netrx",
+      "label": "NET_RX",
+      "role": "branch"
+    },
+    {
+      "id": "e6",
+      "from": "netrx",
+      "to": "return",
+      "label": "处理完成",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "核心路径",
+      "items": [
+        "按阶段观察现象、定位瓶颈并验证结果。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "排障提示",
+      "items": [
+        "保留原始指标作为基线，修复后使用同一指标复测。"
+      ]
+    }
+  ]
+}

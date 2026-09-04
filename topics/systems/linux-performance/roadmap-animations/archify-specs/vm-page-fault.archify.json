@@ -1,0 +1,172 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "虚拟内存映射与缺页",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "viewBox": [
+      1219,
+      760
+    ],
+    "views": [
+      {
+        "id": "overview",
+        "label": "核心路径",
+        "focus": [
+          "va",
+          "tlb",
+          "fault",
+          "major"
+        ]
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Linux 性能路径"
+    },
+    {
+      "id": "side",
+      "label": "观测与异常"
+    }
+  ],
+  "phases": [
+    {
+      "id": "lookup",
+      "label": "地址翻译",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "fault",
+      "label": "缺页判断",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "recover",
+      "label": "恢复访问",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "nodes": [
+    {
+      "id": "va",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "虚拟地址 VA",
+      "sublabel": "load / store",
+      "width": 145
+    },
+    {
+      "id": "tlb",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": "TLB / 页表",
+      "sublabel": "地址翻译",
+      "width": 145
+    },
+    {
+      "id": "fault",
+      "lane": "main",
+      "col": 2,
+      "type": "security",
+      "label": "缺页处理",
+      "sublabel": "PTE 不在内存",
+      "width": 145
+    },
+    {
+      "id": "major",
+      "lane": "main",
+      "col": 3,
+      "type": "cloud",
+      "label": "主缺页",
+      "sublabel": "磁盘 I/O",
+      "width": 145
+    },
+    {
+      "id": "minor",
+      "lane": "main",
+      "col": 4,
+      "type": "backend",
+      "label": "次缺页",
+      "sublabel": "建立映射",
+      "width": 145
+    },
+    {
+      "id": "resume",
+      "lane": "main",
+      "col": 5,
+      "type": "external",
+      "label": "恢复指令",
+      "sublabel": "重新执行访问",
+      "width": 145
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "va",
+      "to": "tlb",
+      "label": "页号 + 偏移",
+      "role": "main"
+    },
+    {
+      "id": "e2",
+      "from": "tlb",
+      "to": "fault",
+      "label": "TLB 未命中",
+      "role": "branch"
+    },
+    {
+      "id": "e3",
+      "from": "fault",
+      "to": "major",
+      "label": "需要磁盘读取",
+      "role": "branch"
+    },
+    {
+      "id": "e4",
+      "from": "fault",
+      "to": "minor",
+      "label": "已有页或文件映射",
+      "role": "branch"
+    },
+    {
+      "id": "e5",
+      "from": "major",
+      "to": "resume",
+      "label": "I/O 完成",
+      "role": "branch"
+    },
+    {
+      "id": "e6",
+      "from": "minor",
+      "to": "resume",
+      "label": "建立映射",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "核心路径",
+      "items": [
+        "按阶段观察现象、定位瓶颈并验证结果。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "排障提示",
+      "items": [
+        "保留原始指标作为基线，修复后使用同一指标复测。"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Linux 进程状态机",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "viewBox": [
+      1200,
+      760
+    ],
+    "views": [
+      {
+        "id": "overview",
+        "label": "核心路径",
+        "focus": [
+          "ready",
+          "running",
+          "sleep",
+          "stopped"
+        ]
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Linux 性能路径"
+    },
+    {
+      "id": "side",
+      "label": "观测与异常"
+    }
+  ],
+  "phases": [
+    {
+      "id": "ready",
+      "label": "就绪与运行",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "wait",
+      "label": "等待状态",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "exit",
+      "label": "退出与回收",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ready",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "label": "就绪 R",
+      "sublabel": "run queue",
+      "width": 145
+    },
+    {
+      "id": "running",
+      "lane": "main",
+      "col": 1,
+      "type": "backend",
+      "label": "运行中",
+      "sublabel": "占用 CPU",
+      "width": 145
+    },
+    {
+      "id": "sleep",
+      "lane": "main",
+      "col": 2,
+      "type": "cloud",
+      "label": "睡眠 S / D",
+      "sublabel": "等待事件或 I/O",
+      "width": 145
+    },
+    {
+      "id": "stopped",
+      "lane": "main",
+      "col": 3,
+      "type": "security",
+      "label": "暂停 T",
+      "sublabel": "SIGSTOP / 调试",
+      "width": 145
+    },
+    {
+      "id": "zombie",
+      "lane": "main",
+      "col": 4,
+      "type": "security",
+      "label": "僵尸 Z",
+      "sublabel": "等待父进程 wait",
+      "width": 145
+    },
+    {
+      "id": "reap",
+      "lane": "side",
+      "col": 5,
+      "type": "external",
+      "label": "已回收 X",
+      "sublabel": "清理进程表项",
+      "width": 145
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "ready",
+      "to": "running",
+      "label": "调度",
+      "role": "main"
+    },
+    {
+      "id": "e2",
+      "from": "running",
+      "to": "sleep",
+      "label": "等待事件或磁盘 I/O",
+      "role": "branch"
+    },
+    {
+      "id": "e3",
+      "from": "sleep",
+      "to": "running",
+      "label": "事件完成",
+      "role": "branch"
+    },
+    {
+      "id": "e6",
+      "from": "running",
+      "to": "zombie",
+      "label": "exit() 后保留退出码",
+      "role": "branch"
+    },
+    {
+      "id": "e7",
+      "from": "zombie",
+      "to": "reap",
+      "label": "父进程 wait()",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "核心路径",
+      "items": [
+        "按阶段观察现象、定位瓶颈并验证结果。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "排障提示",
+      "items": [
+        "保留原始指标作为基线，修复后使用同一指标复测。"
+      ]
+    }
+  ]
+}

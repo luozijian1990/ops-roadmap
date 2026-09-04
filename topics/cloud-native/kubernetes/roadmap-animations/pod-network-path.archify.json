@@ -1,0 +1,55 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kubernetes Pod 网络数据路径",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "views": [
+      {"id":"host","label":"Pod 到主机","focus":["proc-a","eth-a","veth-a","host","host-proc"]},
+      {"id":"same-node","label":"同节点 Pod 到 Pod","focus":["proc-a","host","veth-b","pod-b"]},
+      {"id":"overlay","label":"跨节点 Overlay","focus":["proc-a","host","underlay","node-b","pod-b"]},
+      {"id":"direct","label":"跨节点 Direct Routing","focus":["host","underlay","node-b","pod-b"]}
+    ]
+  },
+  "lanes":[
+    {"id":"pod-a","label":"Pod A"},
+    {"id":"host","label":"Node A host netns"},
+    {"id":"network","label":"节点间网络","variant":"exception"},
+    {"id":"pod-b","label":"Pod B"}
+  ],
+  "phases":[
+    {"id":"emit","label":"Emit","fromCol":0,"toCol":1},
+    {"id":"route","label":"Route","fromCol":2,"toCol":3,"variant":"emphasis"},
+    {"id":"deliver","label":"Deliver","fromCol":4,"toCol":5}
+  ],
+  "mainPath":["proc-a","eth-a","veth-a","host","veth-b","pod-b"],
+  "nodes":[
+    {"id":"proc-a","lane":"pod-a","col":0,"type":"external","label":"Pod A 进程","width":145},
+    {"id":"eth-a","lane":"pod-a","col":1,"type":"backend","label":"pod eth0","width":135},
+    {"id":"veth-a","lane":"host","col":2,"type":"backend","label":"veth peer A","width":145},
+    {"id":"host","lane":"host","col":3,"type":"backend","label":"host 数据面","width":165},
+    {"id":"veth-b","lane":"pod-b","col":4,"type":"backend","label":"veth peer B","width":145},
+    {"id":"pod-b","lane":"pod-b","col":5,"type":"cloud","label":"Pod B","width":150},
+    {"id":"host-proc","lane":"host","col":4,"type":"external","label":"Host process","width":155},
+    {"id":"underlay","lane":"network","col":4,"type":"cloud","label":"物理网络","width":145},
+    {"id":"node-b","lane":"network","col":5,"type":"cloud","label":"目标节点","width":155}
+  ],
+  "edges":[
+    {"id":"emit","from":"proc-a","to":"eth-a","label":"inner packet","role":"main"},
+    {"id":"veth-in","from":"eth-a","to":"veth-a","label":"veth pair","role":"main"},
+    {"id":"route-local","from":"veth-a","to":"host","label":"host 路由","role":"main"},
+    {"id":"same-node","from":"host","to":"veth-b","label":"同节点转发","role":"main"},
+    {"id":"deliver","from":"veth-b","to":"pod-b","label":"目标 Pod IP","role":"main"},
+    {"id":"host-deliver","from":"host","to":"host-proc","label":"NodeIP 本地交付","role":"branch"},
+    {"id":"overlay","from":"host","to":"underlay","label":"VXLAN / IPIP 封装","role":"branch","variant":"security"},
+    {"id":"cross-node","from":"underlay","to":"node-b","label":"外层 NodeIP 转发","role":"branch"},
+    {"id":"decap","from":"node-b","to":"pod-b","label":"解封装后送入 Pod","role":"branch"}
+  ],
+  "cards":[
+    {"dot":"cyan","title":"Namespace 边界","items":["eth0 与 veth peer 连接 Pod netns 和 host netns。","切换 namespace 不等于经过物理网卡。"]},
+    {"dot":"emerald","title":"同节点路径","items":["同节点 Pod 间由 host 数据面转发。","内层 Pod IP 保持不变。"]},
+    {"dot":"amber","title":"跨节点路径","items":["Overlay 通过 VXLAN/IPIP 携带内层包。","Direct Routing 依赖 BGP 或静态路由，可不封装。"]}
+  ]
+}
