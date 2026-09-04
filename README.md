@@ -9,7 +9,7 @@
 ![Roadmaps](https://img.shields.io/badge/roadmaps-97-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
-[快速开始](#快速开始) · [内容导航](#内容导航) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
+[快速开始](#快速开始) · [内容导航](#内容导航) · [提示词资料库](#提示词资料库) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
 
 </div>
 
@@ -67,6 +67,10 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 | AIOps | [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |
 | AI Agent | [DeepAgent](./topics/ai-agents/deepagent/) · [Claude Agent SDK](./topics/ai-agents/claude-agent-sdk/) |
 
+## 提示词资料库
+
+[`prompts/`](./prompts/) 收录五份面向 Agentic Coding 环境的模型专项双语提示词参考文档，覆盖 Codex / GPT-5.6、DeepSeek V4、Claude Fable 5.1、GLM-5.3 和 Kimi K3。资料库说明、模型用途、官方来源和安全提醒见 [`prompts/README.md`](./prompts/README.md)。这些文档是独立参考资料，不参与 `topics/` 学习笔记和 Roadmap 生成。
+
 ## 企业案例库（整理中）
 
 [`cases/`](./cases/) 收录来自公开技术分享和文章的企业实践，按可靠性、可观测性、DevOps、AIOps、云原生、FinOps 与工程管理分类。案例保留具体组织和场景的约束，`topics/` 则负责把多个案例进一步提炼成通用学习笔记。
@@ -104,6 +108,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 ├── index.html                      # 全部路线图入口
 ├── assets/                         # README 等公共资源
 ├── cases/                          # 分类后的企业实践案例库
+├── prompts/                        # 模型专项双语提示词资料库
 ├── scripts/build-roadmaps.sh       # Roadmap 批量生成脚本
 └── topics/<category>/<topic>/
     ├── guide.md                    # 未分卷的 Markdown 笔记
