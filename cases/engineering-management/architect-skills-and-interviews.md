@@ -1,9 +1,5 @@
 # 大厂架构师必备技能和面试避杀技
 
-> 主分类：`engineering-management`  
-> 状态：`draft`  
-> 原始材料：`temp/md/大厂架构师必备技能和面试避杀技.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾
 

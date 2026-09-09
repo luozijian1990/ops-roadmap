@@ -1,9 +1,5 @@
 # 云上千万级可观测Agent SRE实践
 
-> 主分类：`reliability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/云上千万级可观测AgentSRE实践.md`  
-> 来源核验：`pending`
 
 > 分享嘉宾：于涛  
 > 主题：阿里云iLogtail千万级采集器的可靠性工程实践  

@@ -1,9 +1,5 @@
 # 虎牙直播AIOps探索与实践
 
-> 主分类：`aiops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/虎牙直播AIOps探索与实践.md`  
-> 来源核验：`pending`
 
 ## 一、背景介绍
 

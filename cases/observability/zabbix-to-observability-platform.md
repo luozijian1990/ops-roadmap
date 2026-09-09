@@ -1,9 +1,5 @@
 # 从Zabbix传统监控到应用可观测平台的演进之路
 
-> 主分类：`observability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/从Zabbix传统监控到应用可观测平台的演进之路.md`  
-> 来源核验：`pending`
 
 ## 目录
 

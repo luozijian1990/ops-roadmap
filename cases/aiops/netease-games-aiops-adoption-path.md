@@ -1,9 +1,5 @@
 # 网易游戏AIOps落地的普适性路径
 
-> 主分类：`aiops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/网易游戏AIOps落地的普适性路径.md`  
-> 来源核验：`pending`
 
 ## 分享概述
 

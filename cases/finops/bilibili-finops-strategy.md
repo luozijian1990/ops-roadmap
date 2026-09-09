@@ -1,9 +1,5 @@
 # B站FinOps优化实践与策略
 
-> 主分类：`finops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/B站FinOps优化实践与策略.md`  
-> 来源核验：`pending`
 
 > 分享嘉宾：马永志 - B站基础架构部资源运营资深运维工程师
 

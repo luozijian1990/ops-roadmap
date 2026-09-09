@@ -30,17 +30,6 @@ while IFS= read -r -d '' case_file; do
     fail "first line is not H1: cases/${relative}"
   fi
 
-  for field in '主分类：' '状态：' '原始材料：' '来源核验：'; do
-    if ! sed -n '2,16p' "${case_file}" | rg -q "${field}"; then
-      fail "missing ${field} metadata: cases/${relative}"
-    fi
-  done
-
-  declared_category="$(sed -n '2,16p' "${case_file}" | sed -n 's/^> 主分类：`\([^`]*\)`.*/\1/p' | head -1)"
-  if [[ "${declared_category}" != "${category}" ]]; then
-    fail "category mismatch (${declared_category:-missing} != ${category}): cases/${relative}"
-  fi
-
   if ! rg -Fq "(./${filename})" "${cases_root}/${category}/README.md"; then
     fail "missing from category README: cases/${relative}"
   fi

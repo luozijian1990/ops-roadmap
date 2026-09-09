@@ -1,9 +1,5 @@
 # 货拉拉一站式DevOps平台持续集成流水线
 
-> 主分类：`devops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/货拉拉一站式DevOps平台持续集成流水线.md`  
-> 来源核验：`pending`
 
 ## 分享概述
 

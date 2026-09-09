@@ -1,9 +1,5 @@
 # 技术管理如何善用镜子和尺子
 
-> 主分类：`engineering-management`  
-> 状态：`draft`  
-> 原始材料：`temp/md/技术管理如何善用镜子和尺子.md`  
-> 来源核验：`pending`
 
 ## 分享概述
 

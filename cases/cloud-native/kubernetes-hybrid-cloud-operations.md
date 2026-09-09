@@ -1,9 +1,5 @@
 # 混合云下的Kubernetes运维挑战迎刃而解
 
-> 主分类：`cloud-native`  
-> 状态：`draft`  
-> 原始材料：`temp/md/混合云下的Kubernetes运维挑战迎刃而解.md`  
-> 来源核验：`pending`
 
 ## 一、背景与趋势
 

@@ -1,9 +1,5 @@
 # 技术管理如何避免瞎折腾
 
-> 主分类：`engineering-management`  
-> 状态：`draft`  
-> 原始材料：`temp/md/技术管理如何避免瞎折腾.md`  
-> 来源核验：`pending`
 
 > 趣丸运维体系解密：从个人发展到排兵布阵
 

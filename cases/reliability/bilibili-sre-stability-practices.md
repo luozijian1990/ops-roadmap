@@ -1,9 +1,5 @@
 # B站保障业务稳定性的SRE落地实践
 
-> 主分类：`reliability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/B站保障业务稳定性的SRE落地实践.md`  
-> 来源核验：`pending`
 
 ## 一、背景介绍
 

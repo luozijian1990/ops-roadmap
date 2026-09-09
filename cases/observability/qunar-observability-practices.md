@@ -1,9 +1,5 @@
 # 去哪儿网可观测性实践
 
-> 主分类：`observability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/去哪儿网可观测性实践.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾
 

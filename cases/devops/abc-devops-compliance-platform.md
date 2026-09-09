@@ -1,9 +1,5 @@
 # DevOps在农行合规平台的落地与实战
 
-> 主分类：`devops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/DevOps在农行合规平台的落地与实战.md`  
-> 来源核验：`pending`
 
 ## 目录
 

@@ -1,9 +1,5 @@
 # 如何从工程理论探索到最佳实践
 
-> 主分类：`engineering-management`  
-> 状态：`draft`  
-> 原始材料：`temp/md/如何从工程理论探索到最佳实践.md`  
-> 来源核验：`pending`
 
 ## 分享概述
 

@@ -1,9 +1,5 @@
 # Prometheus和Zabbix的对比选型
 
-> 主分类：`observability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/Prometheus和Zabbix的对比选型.md`  
-> 来源核验：`pending`
 
 ## 分享概述
 

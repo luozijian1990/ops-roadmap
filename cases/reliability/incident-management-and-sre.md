@@ -1,9 +1,5 @@
 # 去哪儿网基于Trace的根因分析实践
 
-> 主分类：`reliability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/围绕故障管理谈SRE体系建设.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾
 梁老师 - 去哪儿网SRE工程师

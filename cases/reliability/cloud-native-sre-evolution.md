@@ -1,9 +1,5 @@
 # 云原生下的SRE进化之路
 
-> 主分类：`reliability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/云原生下的SRE进化之路.md`  
-> 来源核验：`pending`
 
 ## 一、SRE的起源与发展
 

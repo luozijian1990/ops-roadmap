@@ -1,9 +1,5 @@
 # 如何用敏捷思维做好中大型项目管理
 
-> 主分类：`engineering-management`  
-> 状态：`draft`  
-> 原始材料：`temp/md/如何用敏捷思维做好中大型项目管理.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾简介
 

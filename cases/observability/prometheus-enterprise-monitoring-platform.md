@@ -1,9 +1,5 @@
 # 基于Prometheus的企业监控平台设计与实现
 
-> 主分类：`observability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/基于Prometheus的企业监控平台设计与实现.md`  
-> 来源核验：`pending`
 
 ## 分享概述
 

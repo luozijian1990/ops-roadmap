@@ -1,9 +1,5 @@
 # 去哪儿网基于Trace的根因分析实践
 
-> 主分类：`observability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/去哪儿网基于Trace的根因分析实践.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾
 梁老师 - 去哪儿网SRE工程师，基础架构基础平台团队

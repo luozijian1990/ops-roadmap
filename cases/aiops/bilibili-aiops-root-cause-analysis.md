@@ -1,9 +1,5 @@
 # B站AIOps建设之根因分析实践
 
-> 主分类：`aiops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/B站AIOps建设之根因分析实践.md`  
-> 来源核验：`pending`
 
 ## 一、B站AIOps整体建设
 

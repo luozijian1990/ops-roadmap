@@ -1,9 +1,5 @@
 # 浙江移动SRE转型实战
 
-> 主分类：`reliability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/浙江移动SRE转型实战.md`  
-> 来源核验：`pending`
 
 ## 一、背景介绍
 

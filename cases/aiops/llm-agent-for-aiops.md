@@ -1,9 +1,5 @@
 # 大模型Agent在AIOps的探索
 
-> 主分类：`aiops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/大模型Agent在AIOps的探索.md`  
-> 来源核验：`pending`
 
 ## 一、背景与概述
 

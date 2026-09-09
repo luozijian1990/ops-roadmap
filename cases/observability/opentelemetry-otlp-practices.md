@@ -1,9 +1,5 @@
 # 可观测性体系建设及OTLP应用实践
 
-> 主分类：`observability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/可观测性体系建设及OTLP应用实践.md`  
-> 来源核验：`pending`
 
 > 分享嘉宾: 唐红建 | OPPO云服务中心高级后端工程师
 

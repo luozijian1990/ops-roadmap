@@ -1,9 +1,5 @@
 # 猪八戒网DevOps演进及CI-CD最佳实践
 
-> 主分类：`devops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/猪八戒网DevOps演进及CI-CD最佳实践.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾
 

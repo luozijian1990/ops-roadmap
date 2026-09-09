@@ -1,9 +1,5 @@
 # B站SRE数据资产体系建设
 
-> 主分类：`reliability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/B站SRE数据资产体系建设.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾
 

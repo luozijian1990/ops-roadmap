@@ -1,9 +1,5 @@
 # 网易游戏智能运维AIOps落地实践
 
-> 主分类：`aiops`  
-> 状态：`draft`  
-> 原始材料：`temp/md/网易游戏智能运维AIOps落地实践.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾
 

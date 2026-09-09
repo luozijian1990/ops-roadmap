@@ -1,9 +1,5 @@
 # 网易Kubernetes集群运维演进与思考
 
-> 主分类：`cloud-native`  
-> 状态：`draft`  
-> 原始材料：`temp/md/网易Kubernetes集群运维演进与思考.md`  
-> 来源核验：`pending`
 
 > 分享人: 刘伟 (网易杭州研究院)  
 > 受众: SRE、运维及稳定性保障工程师

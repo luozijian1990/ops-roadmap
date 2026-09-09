@@ -1,9 +1,5 @@
 # 技术管理者如何搭班子带队伍
 
-> 主分类：`engineering-management`  
-> 状态：`draft`  
-> 原始材料：`temp/md/技术管理者如何搭班子带队伍.md`  
-> 来源核验：`pending`
 
 ## 分享者简介
 

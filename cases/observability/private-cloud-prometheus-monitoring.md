@@ -1,9 +1,5 @@
 # 私有云环境下基于Prometheus的监控体系建设
 
-> 主分类：`observability`  
-> 状态：`draft`  
-> 原始材料：`temp/md/私有云环境下基于Prometheus的监控体系建设.md`  
-> 来源核验：`pending`
 
 ## 分享嘉宾简介
 
