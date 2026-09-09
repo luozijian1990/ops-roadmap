@@ -4,9 +4,9 @@
 
 **一份持续整理的个人运维学习笔记与交互式路线图合集。**
 
-![Topics](https://img.shields.io/badge/topics-30-1f2933?style=flat-square)
-![Markdown notes](https://img.shields.io/badge/markdown_notes-97-1f2933?style=flat-square)
-![Roadmaps](https://img.shields.io/badge/roadmaps-97-f4c95d?style=flat-square)
+![Topics](https://img.shields.io/badge/topics-33-1f2933?style=flat-square)
+![Markdown notes](https://img.shields.io/badge/markdown_notes-99-1f2933?style=flat-square)
+![Roadmaps](https://img.shields.io/badge/roadmaps-99-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
 [快速开始](#快速开始) · [内容导航](#内容导航) · [提示词资料库](#提示词资料库) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
@@ -51,21 +51,21 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 97 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 99 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
 | 系统基础 | [计算机网络基础](./topics/systems/network-fundamentals/) · [容器核心技术](./topics/systems/container-fundamentals/) · [Linux 底层原理](./topics/systems/linux/) · [Linux 性能优化](./topics/systems/linux-performance/) · [eBPF 运维与故障排查](./topics/systems/ebpf/) |
 | 架构设计 | [架构设计学习指南](./topics/architecture/) |
-| 云原生 | [Docker](./topics/cloud-native/docker/) · [Helm](./topics/cloud-native/helm/) · [Kubernetes](./topics/cloud-native/kubernetes/) · [Kubernetes 容器网络](./topics/cloud-native/kubernetes-networking/) · [Consul](./topics/cloud-native/consul/) · [etcd](./topics/cloud-native/etcd/) |
+| 云原生 | [Docker](./topics/cloud-native/docker/) · [Helm](./topics/cloud-native/helm/) · [Kubernetes](./topics/cloud-native/kubernetes/) · [Kubernetes 容器网络](./topics/cloud-native/kubernetes-networking/) · [Consul](./topics/cloud-native/consul/) · [etcd](./topics/cloud-native/etcd/) · [Terraform](./topics/cloud-native/terraform/) |
 | 可观测性 | [Prometheus](./topics/observability/prometheus/) · [Kube-Prometheus](./topics/observability/kube-prometheus/) · [VictoriaMetrics](./topics/observability/victoria-metrics/) · [VictoriaMetrics Flags](./topics/observability/victoria-metrics-flags/) · [VictoriaMetrics PromQL](./topics/observability/victoria-metrics-promql/) |
 | 数据系统 | [MySQL](./topics/data-systems/mysql/) · [Kafka](./topics/data-systems/kafka/) · [RabbitMQ](./topics/data-systems/rabbitmq/) |
 | 编程与自动化 | [Python 运维自动化与工程实践](./topics/programming/python-for-operations/) · [Go 运维开发与云原生工程](./topics/programming/go-for-operations/) |
 | 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) · [GitOps](./topics/delivery/gitops/) · [Argo CD](./topics/delivery/argo-cd/) |
-| Web 基础设施 | [Nginx](./topics/web/nginx/) |
+| Web 基础设施 | [Nginx](./topics/web/nginx/) · [Traefik](./topics/web/traefik/) |
 | AI 基础设施 | [GPU AI Infrastructure](./topics/ai-infrastructure/gpu/) |
 | AIOps | [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |
-| AI Agent | [DeepAgent](./topics/ai-agents/deepagent/) · [Claude Agent SDK](./topics/ai-agents/claude-agent-sdk/) |
+| AI Agent | [DeepAgent](./topics/ai-agents/deepagent/) · [Claude Agent SDK](./topics/ai-agents/claude-agent-sdk/) · [Agent 扩展工程：Skills 与 MCP](./topics/ai-agents/agent-extensions/) |
 
 ## 提示词资料库
 
@@ -126,6 +126,12 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ```bash
 ./scripts/build-roadmaps.sh
+```
+
+也可以传入具体笔记路径，仅重新生成对应的 Roadmap：
+
+```bash
+./scripts/build-roadmaps.sh topics/ai-agents/agent-extensions/skills.md
 ```
 
 如果 Skill 不在默认位置，可以通过 `LEARNING_ROADMAP_BUILDER` 指定 `build_roadmap.py`：

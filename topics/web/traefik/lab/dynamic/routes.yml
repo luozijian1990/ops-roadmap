@@ -1,0 +1,227 @@
+http:
+  routers:
+    app:
+      entryPoints:
+      - web
+      rule: Host(`app.localhost`)
+      service: a
+      middlewares: &id001
+      - auth
+    app-tls:
+      entryPoints:
+      - websecure
+      rule: Host(`app.localhost`)
+      service: a
+      middlewares: *id001
+      tls: {}
+    observe:
+      entryPoints:
+      - web
+      rule: Host(`observe.localhost`)
+      service: a
+    path-default:
+      entryPoints:
+      - web
+      rule: Host(`path.localhost`)
+      service: a
+      priority: 1
+    path-bar:
+      entryPoints:
+      - web
+      rule: Host(`path.localhost`) && PathPrefix(`/bar`)
+      service: b
+      priority: 100
+    path-foo-bar:
+      entryPoints:
+      - web
+      rule: Host(`path.localhost`) && PathPrefix(`/foo/bar`)
+      service: b
+      priority: 100
+    weighted:
+      entryPoints:
+      - web
+      rule: Host(`weighted.localhost`)
+      service: weighted
+    mirror:
+      entryPoints:
+      - web
+      rule: Host(`mirror.localhost`) && Method(`GET`)
+      service: mirror
+    failover:
+      entryPoints:
+      - web
+      rule: Host(`failover.localhost`)
+      service: failover
+    ip:
+      entryPoints:
+      - web
+      rule: Host(`ip.localhost`)
+      service: a
+      middlewares:
+      - client-allow
+    rate:
+      entryPoints:
+      - web
+      rule: Host(`rate.localhost`)
+      service: a
+      middlewares:
+      - client-rate
+    headers:
+      entryPoints:
+      - web
+      rule: Host(`headers.localhost`)
+      service: a
+    mtls:
+      entryPoints:
+      - websecure
+      rule: Host(`mtls.localhost`)
+      service: backend-mtls
+      tls:
+        options: client-mtls
+    grpc:
+      entryPoints:
+      - web
+      rule: Host(`grpc.localhost`)
+      service: grpc
+    ws:
+      entryPoints:
+      - web
+      rule: Host(`ws.localhost`)
+      service: ws
+  services:
+    a:
+      loadBalancer:
+        servers:
+        - url: http://backend-a:8080
+        healthCheck:
+          path: /health
+          interval: 1s
+          timeout: 500ms
+    b:
+      loadBalancer:
+        servers:
+        - url: http://backend-b:8080
+        healthCheck:
+          path: /health
+          interval: 1s
+          timeout: 500ms
+    backend-mtls:
+      loadBalancer:
+        servers:
+        - url: https://backend-a:8443
+        serversTransport: backend-mtls
+    weighted:
+      weighted:
+        services:
+        - name: a
+          weight: 3
+        - name: b
+          weight: 1
+    mirror:
+      mirroring:
+        service: a
+        mirrorBody: false
+        mirrors:
+        - name: b
+          percent: 100
+    failover:
+      failover:
+        service: a
+        fallback: b
+    grpc:
+      loadBalancer:
+        servers:
+        - url: h2c://backend-a:50051
+    ws:
+      loadBalancer:
+        servers:
+        - url: http://backend-a:8081
+  middlewares:
+    auth:
+      basicAuth:
+        users:
+        - learner:{SHA}ncs60LBxA4HE0DVAllNXR50PocU=
+    client-allow:
+      ipAllowList:
+        sourceRange:
+        - 172.30.39.30/32
+        ipStrategy:
+          depth: 1
+    client-rate:
+      rateLimit:
+        average: 1
+        period: 10s
+        burst: 2
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+  serversTransports:
+    backend-mtls:
+      serverName: backend-a
+      rootCAs:
+      - /certs/ca.crt
+      certificates:
+      - certFile: /certs/client.crt
+        keyFile: /certs/client.key
+tls:
+  certificates:
+  - certFile: /certs/server.crt
+    keyFile: /certs/server.key
+  options:
+    client-mtls:
+      clientAuth:
+        caFiles:
+        - /certs/ca.crt
+        clientAuthType: RequireAndVerifyClientCert
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/server.crt
+        keyFile: /certs/server.key
+tcp:
+  routers:
+    echo:
+      entryPoints:
+      - echo
+      rule: HostSNI(`*`)
+      service: echo
+      middlewares:
+      - allowed
+      - budget
+    echo-tls:
+      entryPoints:
+      - echotls
+      rule: HostSNI(`tcp.localhost`)
+      service: echo
+      tls: {}
+  middlewares:
+    allowed:
+      ipAllowList:
+        sourceRange:
+        - 172.30.39.30/32
+    budget:
+      inFlightConn:
+        amount: 2
+  services:
+    echo:
+      loadBalancer:
+        servers:
+        - address: backend-a:7000
+        healthCheck:
+          send: 'PING
+
+            '
+          expect: PONG
+          interval: 2s
+          timeout: 1s
+udp:
+  routers:
+    dns:
+      entryPoints:
+      - dns
+      service: dns
+  services:
+    dns:
+      loadBalancer:
+        servers:
+        - address: backend-a:5353

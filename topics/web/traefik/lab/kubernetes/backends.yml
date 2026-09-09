@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik-notes
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-a
+  namespace: traefik-notes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-a
+  template:
+    metadata:
+      labels:
+        app: backend-a
+    spec:
+      containers:
+      - name: app
+        image: traefik-review-backend:2026-09-07
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: BACKEND
+          value: a
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: tcp
+          containerPort: 7000
+        - name: dns
+          containerPort: 5353
+          protocol: UDP
+        - name: https
+          containerPort: 8443
+        - name: grpc
+          containerPort: 50051
+        - name: ws
+          containerPort: 8081
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+        volumeMounts:
+        - name: certs
+          mountPath: /certs
+          readOnly: true
+      volumes:
+      - name: certs
+        secret:
+          secretName: backend-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-a
+  namespace: traefik-notes
+spec:
+  selector:
+    app: backend-a
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+  - name: tcp
+    port: 7000
+    targetPort: tcp
+  - name: dns
+    port: 5353
+    targetPort: dns
+    protocol: UDP
+  - name: https
+    port: 8443
+    targetPort: https
+  - name: grpc
+    port: 50051
+    targetPort: grpc
+  - name: ws
+    port: 8081
+    targetPort: ws
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-b
+  namespace: traefik-notes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-b
+  template:
+    metadata:
+      labels:
+        app: backend-b
+    spec:
+      containers:
+      - name: app
+        image: traefik-review-backend:2026-09-07
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: BACKEND
+          value: b
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: tcp
+          containerPort: 7000
+        - name: dns
+          containerPort: 5353
+          protocol: UDP
+        - name: https
+          containerPort: 8443
+        - name: grpc
+          containerPort: 50051
+        - name: ws
+          containerPort: 8081
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+        volumeMounts:
+        - name: certs
+          mountPath: /certs
+          readOnly: true
+      volumes:
+      - name: certs
+        secret:
+          secretName: backend-certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-b
+  namespace: traefik-notes
+spec:
+  selector:
+    app: backend-b
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+  - name: tcp
+    port: 7000
+    targetPort: tcp
+  - name: dns
+    port: 5353
+    targetPort: dns
+    protocol: UDP
+  - name: https
+    port: 8443
+    targetPort: https
+  - name: grpc
+    port: 50051
+    targetPort: grpc
+  - name: ws
+    port: 8081
+    targetPort: ws

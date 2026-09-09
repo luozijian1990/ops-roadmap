@@ -1,0 +1,92 @@
+name: traefik-review-39
+services:
+  traefik:
+    image: traefik:v3.6.25
+    command:
+    - --configFile=/etc/traefik/traefik.yml
+    ports:
+    - 127.0.0.1:28080:80
+    - 127.0.0.1:28443:443
+    - 127.0.0.1:29100:9100
+    - 127.0.0.1:27000:7000
+    - 127.0.0.1:27443:7443
+    - 127.0.0.1:25353:5353/udp
+    volumes:
+    - ./traefik.yml:/etc/traefik/traefik.yml:ro
+    - ./dynamic:/dynamic:ro
+    - ./certs:/certs:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.39.10
+  backend-a:
+    build: ./app
+    image: traefik-review-backend:2026-09-07
+    environment:
+      BACKEND: a
+    volumes:
+    - ./certs:/certs:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.39.21
+  backend-b:
+    image: traefik-review-backend:2026-09-07
+    environment:
+      BACKEND: b
+    volumes:
+    - ./certs:/certs:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.39.22
+  front:
+    image: nginx:1.28.0-alpine
+    ports:
+    - 127.0.0.1:28081:80
+    volumes:
+    - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.39.11
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+    - 127.0.0.1:29090:9090
+    networks:
+    - lab
+  otel:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command:
+    - --config=/etc/otel.yaml
+    volumes:
+    - ./otel.yaml:/etc/otel.yaml:ro
+    networks:
+    - lab
+  consul:
+    image: hashicorp/consul:1.21.5
+    command:
+    - agent
+    - -dev
+    - -client=0.0.0.0
+    networks:
+    - lab
+  client:
+    image: traefik-review-backend:2026-09-07
+    profiles:
+    - tools
+    entrypoint:
+    - python
+    volumes:
+    - ./certs:/certs:ro
+    - ./checks.py:/checks.py:ro
+    networks:
+      lab:
+        ipv4_address: 172.30.39.30
+    environment:
+      PYTHONPATH: /app
+networks:
+  lab:
+    ipam:
+      config:
+      - subnet: 172.30.39.0/24

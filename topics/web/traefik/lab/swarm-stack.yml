@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  traefik:
+    image: traefik:v3.6.25
+    command:
+    - --entrypoints.web.address=:80
+    - --providers.swarm.endpoint=unix:///var/run/docker.sock
+    - --providers.swarm.exposedbydefault=false
+    - --providers.swarm.network=review39-edge
+    ports:
+    - target: 80
+      published: 38080
+      protocol: tcp
+      mode: host
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+    - edge
+    deploy:
+      placement:
+        constraints:
+        - node.role == manager
+      replicas: 1
+  whoami:
+    image: traefik/whoami:v1.11.0
+    networks:
+    - edge
+    deploy:
+      replicas: 2
+      labels:
+        traefik.enable: 'true'
+        traefik.http.routers.swarm-demo.rule: Host(`swarm.localhost`)
+        traefik.http.services.swarm-demo.loadbalancer.server.port: '80'
+        traefik.swarm.network: review39-edge
+networks:
+  edge:
+    external: true
+    name: review39-edge

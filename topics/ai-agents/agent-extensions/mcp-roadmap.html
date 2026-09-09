@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MCP 工程化学习笔记：面向运维与 SRE · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>MCP 工程化学习笔记：面向运维与 SRE</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "MCP 工程化学习笔记：面向运维与 SRE", "intro": "Model Context Protocol（MCP）是一套让 AI 应用连接外部系统的开放协议。它把数据源、可执行工具和交互工作流放进统一的连接模型，模型负责理解任务，Host 和 Client 负责编排，Server 负责在明确边界内提供能力。\n\n本笔记基于 MCP 官方文档的本地材料，面向运维和 SRE 梳理协议结构、接入方式、Server 与 Client 的工作原理，以及规模扩大后的性能和安全问题。第 5 章以 personal-mcp 项目中的 Prometheus 查询插件解释工具契约、外部 API 适配和结果语义，并将同一案例贯穿到 Client 编排与运维判断中。阅读重点是理解各层如何协作、失败意味着什么、能力和权限边界在哪里。", "parts": [{"title": "第 1 章 · 理解 MCP 如何连接 AI 与运维系统", "sections": [{"title": "1.1 MCP 为什么适合作为 AI 的连接层", "content": "<!-- src: 1.txt; 2.txt -->\n\n传统集成通常要为每个 AI 应用单独编写数据库、日志系统或 SaaS 的适配代码。MCP 把连接方式和能力描述统一下来，AI 应用只需要实现 Host 和 Client，外部系统则通过 MCP Server 提供工具、资源或提示。相同的 Server 可以被多个支持 MCP 的客户端复用，连接对象也不再绑定某一个模型供应商。\n\nMCP 的职责是交换上下文和调用能力，不负责模型如何推理、Agent 如何规划任务，也不替代企业的认证、网络隔离、密钥管理和变更流程。对 SRE 来说，MCP 更像一个受控的能力适配层：告警查询、日志检索、CMDB 查询和发布状态检查可以通过它暴露给模型，但每个动作仍要按照真实服务来设计权限、审计和恢复。\n\n用户问“过去一小时 API 错误率是否升高”时，Host 先决定是否需要 Prometheus 能力，Client 再查找合适的工具，Server 用经过校验的 PromQL 查询 Prometheus，最后把结果和状态返回给模型。模型可以解释趋势，却不能因为协议提供了工具就自动获得写入监控系统或修改生产配置的权限。\n\n直接调用 API 时，应用通常把请求格式、认证和错误处理写在自己的代码里；使用 MCP 后，这些系统能力由 Server 封装成工具契约，Host 通过统一的发现和调用方式使用它们。统一协议减少了重复适配，但也把工具描述、Schema、权限和结果大小变成模型可见的设计面，Server 不能只关注“把 HTTP 请求发出去”。\n\n如果任务只有一个固定的后端调用，且不需要让模型选择工具或组合多个系统，直接调用可能更简单。MCP 适合需要跨客户端复用、让模型按上下文选择能力，或需要把资源、工具和提示组织在一起的场景。判断时要比较完整生命周期成本，包括 Server 进程、认证、观测、升级和安全评审，而不是只比较第一次开发的代码量。\n\n#### 阅读版本、材料来源和知识边界\n\n本笔记以本地材料采用的 MCP 2026-07-28 为协议基线。材料中的 Python 教程要求 MCP SDK 2.0.0 或更高版本，但其他语言示例的依赖与更新进度不完全相同。协议日期、SDK 包版本和 Host 产品版本是三套编号；理解某段示例时，需要分别确认它采用的数据模型、SDK 接口和客户端支持范围。\n\n来源上，第 1、2 章主要对应 `1.txt` 和 `2.txt` 的[协议架构](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture)，其中 `3.txt`、`4.txt` 与 `2.txt` 重复。第 3 章依据 `5/6.txt` 的[本地接入](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers)与[远程接入](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-remote-servers)，第 4 章依据 `7.txt` 的 [Agent Skills 开发方法](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-with-agent-skills)。\n\n第 5、6 章沿用 `8/9.txt` 中 [Server](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server) 与 [Client](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-client) 的讲解线索，以 Prometheus 插件替换原教程案例。第 7 章参考 `10.txt` 的[客户端最佳实践](https://modelcontextprotocol.io/docs/2026-07-28/develop/clients/client-best-practices)，`11.txt` 与其重复；第 8 章参考 `12.txt` 的[安全最佳实践](https://modelcontextprotocol.io/specification/2026-07-28/basic/security_best_practices)，第 9 章串联前述知识。\n\n本地材料位于 `temp/mcp-docs/`，上述编号用于追溯来源。正文可独立阅读，代码和报文用于解释机制，不依赖配套工程，也不表示已经完成运行验证。Prometheus 案例参照 `personal-mcp/src/plugins/prometheus` 的实际实现，源码阅读基于该项目提交 `3665c45` 对应的工作区。工具注册、查询适配、配置读取分别来自 `index.ts`、`client.ts`、`config.ts`，配置管理来自 `config-manager.ts`。文中会区分已有实现与用于说明扩展方式的设想；协议原理仍以本地官方材料为依据，阅读不需要安装该项目。\n\n材料提及但未展开的扩展，只说明其用途并保留阅读入口，不从概念介绍推导出完整接口。文中“建议”通常是工程判断；标有协议版本的字段与规则才适用于相应版本的通信契约。", "subs": ["阅读版本、材料来源和知识边界"]}, {"title": "1.2 Tools、Resources 和 Prompts 分别解决什么问题", "content": "<!-- src: 1.txt; 2.txt -->\n\nServer 可以提供三类核心原语。Tools 是可执行函数，例如查询指标、搜索日志或创建工单；Resources 是供模型读取的上下文，例如文件、数据库记录或 API 响应；Prompts 是可复用的交互模板，用来固化事故复盘、发布检查或容量评估的提问方式。Client 通常先用 `*/list` 发现这些对象，再分别使用 `resources/read`、`prompts/get` 或 `tools/call`；Resource 没有通用的 `resources/get` 方法。\n\n一次任务中，工具描述和输入 Schema 会影响模型的选择，但真正的权限判断必须在 Client 和 Server 中再次执行。工具描述应说明输入格式、数据范围、副作用和失败语义；返回结果则应带有稳定的内容类型和错误标记，避免把原始堆栈或无界的大对象直接送进上下文。\n\n工具的副作用可以按三个层次管理：指标和日志查询是只读动作，创建工单或修改单个资源是可恢复写操作，删除资源、批量变更和发布回滚属于高风险操作。只读能力可以在策略允许时自动执行，写操作要先展示目标和差异，高风险操作还需要审批、幂等设计和回滚路径。\n\n资源适合提供相对稳定的上下文，例如指标命名约定、服务目录或数据库 Schema；工具适合执行需要实时结果或副作用的动作；提示则把这些能力编排成面向任务的提问方式。一个事故分析流程可以先读取服务目录 Resource，再调用日志和指标 Tools，最后使用 Prompt 约束结论必须引用时间范围和证据。三者的边界清晰，模型才不容易把静态说明误当成实时状态。\n\n一个工具包揽几十种不相关动作，会让模型难以选择，也让权限和审计变得模糊。工具名称应表达稳定职责，参数应优先使用结构化字段，错误应区分输入无效、权限不足、下游失败和未知状态。不要在工具描述中承诺 Server 实际没有的能力，也不要把“请谨慎操作”当作对破坏性动作的控制措施。", "subs": []}, {"title": "1.3 MCP 的边界如何转化为 SRE 职责", "content": "<!-- src: 1.txt; 2.txt -->\n\n协议规范、语言 SDK、开发工具和参考 Server 解决的是互操作性问题。Server 运行在哪里、凭据由谁保存、哪些用户可以调用、下游是否允许访问内网地址，这些都属于部署和安全设计。即使 MCP 请求通过了 TLS，仍然可能发生令牌受众错误、工具组合越权、SSRF 或本地进程被恶意利用。\n\n因此，运维应把 MCP Server 纳入已有的服务生命周期。发布时要锁定版本和依赖，运行时要提供健康检查、日志、指标、限流和超时，变更时要有灰度与回滚，事件处理中要能根据 request id 还原调用者、工具、下游和结果状态。协议的“可连接”只是上线条件的一部分，不是安全或可用性的结论。\n\nServer 开发者负责工具契约、输入校验、下游调用和结果语义；Host 或 Client 开发者负责连接生命周期、用户确认、工具注册和模型上下文；平台运维负责网络、密钥、部署、容量和日志；安全团队负责威胁建模、授权策略和事件响应。职责可以由同一团队承担，但边界必须显式写在设计和运行手册中。\n\n至少需要区分连接成功率、能力发现成功率、工具调用成功率、下游错误率、超时率、结果截断率和高风险操作审批率。单看 MCP endpoint 的 HTTP 200 会掩盖工具内部返回的 `isError` 或业务错误。指标应带 Server、工具和版本维度，但不能把原始查询、令牌和敏感业务内容直接作为标签。", "subs": []}]}, {"title": "第 2 章 · 建立 MCP 协议和运行架构的心智模型", "sections": [{"title": "2.1 Host、Client 和 Server 怎样分工", "content": "<!-- src: 2.txt -->\n\nHost 是协调 AI 对话和一个或多个连接的应用，例如桌面助手、IDE 或自建 Agent。Host 为每个 Server 建立一个独立的 MCP Client；Client 保存连接、能力和工具注册表，把上下文提供给 Host；Server 则实现工具、资源和提示，并负责访问文件、数据库或远程 API。\n\n本地 stdio Server 通常由 Host 在本机启动，服务一个 Client；远程 Streamable HTTP Server 可以接受多个 Client。排查问题时要沿着边界判断：配置是否被 Host 加载，Client 是否完成握手和发现，Server 进程或 HTTP endpoint 是否存活，下游请求是否成功。看到某一层正常，不能推断后续层也正常。\n\nClient 不是全局工具池，而是与某个 Server 对应的连接和状态容器。Host 连接文件系统、Prometheus 和工单系统时，应分别维护三个 Client，这样认证上下文、工具命名空间和失败状态不会混在一起。Host 可以把它们的工具聚合给模型，但在真正调用时必须保留来源映射。\n\n先确认配置是否被加载，再确认 transport 建立，随后确认发现和工具注册，最后确认 Server 能否访问下游。每一步都要有一个最小证据：配置快照、进程或 HTTP 健康状态、`server/discover` 响应、`tools/list` 结果和一次只读调用。这样可以把“没有工具”“工具不能调用”和“下游返回错误”分开处理。\n\n```mermaid\ngraph TD\n    H[MCP Host] --> C1[Client for local server]\n    H --> C2[Client for remote server]\n    C1 --> S1[Local MCP Server]\n    C2 --> S2[Remote MCP Server]\n    S1 --> L[Local resources]\n    S2 --> R[Remote APIs]\n```", "subs": []}, {"title": "2.2 数据层和传输层如何协作", "content": "<!-- src: 2.txt -->\n\n数据层使用 JSON-RPC 2.0 定义请求、响应和通知的结构，也规定能力发现、工具、资源、提示和进度等语义。传输层负责连接建立、消息分帧、通道和认证。两层使用同一套 JSON-RPC 消息，因此工具从 stdio 迁移到 Streamable HTTP 时，工具契约可以保持不变，变化主要集中在进程、网络和凭据管理。\n\nstdio 直接使用同机进程的标准输入输出，延迟低，也不会额外暴露网络端口；普通日志必须写 stderr，否则会污染协议流。Streamable HTTP 用 HTTP POST 传递消息，可以配合 Server-Sent Events 流式返回，并使用 Bearer Token、API Key 或 OAuth。远程部署还要处理 TLS、连接超时、重试、限流和租户隔离。\n\n可以用三个问题判断故障属于哪一层：JSON-RPC 方法和参数是否符合协议，连接是否建立并持续，认证和网络策略是否允许请求到达目标。方法不存在或 Schema 校验失败是数据层问题；进程退出、HTTP 401、分帧或超时通常先查传输层，但最终仍需继续确认 Server 和下游状态。\n\nstdio 把一条 JSON-RPC 消息写入子进程 stdin，再从 stdout 读回响应；HTTP 则把消息放进 POST 请求，并根据响应头判断是否有流式事件。数据层不应依赖某个 transport 的特有行为，例如不能假设每次调用都能保持长连接，也不能把 stderr 日志当作协议结果。抽象 transport 的好处是工具调用代码可以复用，连接和故障策略则按 transport 分开实现。\n\n记录 request id、RPC method、工具名、Server 版本、耗时、结果类型和错误类别，足以还原大多数协议问题。参数和结果只记录字段摘要或长度；访问令牌、密码、完整日志和用户数据不应出现在 stdout、普通日志或错误消息中。需要调试原始消息时，也应在受控环境临时采样并设置自动过期。", "subs": []}, {"title": "2.3 Client 如何发现能力并确定请求上下文", "content": "<!-- src: 2.txt -->\n\nMCP 请求在 `_meta` 中携带协议版本、客户端身份和客户端能力。Client 可以先发送 `server/discover`，读取 Server 支持的版本和能力，再执行 `tools/list`、`resources/list` 或 `prompts/list`。发现结果通常可以缓存，但权限上下文、Server 版本和能力变化会使旧结果失效。\n\n```json\n{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"server/discover\",\n  \"params\": {\n    \"_meta\": {\n      \"io.modelcontextprotocol/protocolVersion\": \"2026-07-28\",\n      \"io.modelcontextprotocol/clientInfo\": {\n        \"name\": \"sre-client\",\n        \"version\": \"1.0.0\"\n      },\n      \"io.modelcontextprotocol/clientCapabilities\": {}\n    }\n  }\n}\n```\n\n发现响应把版本、协议能力和软件身份分开返回。下面沿用材料中的结构，声明支持工具及列表变更通知；缓存时间是示意值，不是协议默认值。\n\n```json\n{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"result\": {\n    \"resultType\": \"complete\",\n    \"supportedVersions\": [\"2026-07-28\"],\n    \"capabilities\": {\"tools\": {\"listChanged\": true}, \"resources\": {}},\n    \"_meta\": {\n      \"io.modelcontextprotocol/serverInfo\": {\"name\": \"example-server\", \"version\": \"1.0.0\"}\n    },\n    \"ttlMs\": 3600000,\n    \"cacheScope\": \"public\"\n  }\n}\n```\n\n`capabilities.tools` 表示 Server 提供工具原语，具体有哪些工具仍要从 `tools/list` 获取；发现响应不能替代工具目录。`resources` 同理，也不表示所有资源内容已经加载到模型上下文。\n\n建立连接的验收顺序应固定下来：进程或 HTTP endpoint 存活，协议版本兼容，能力发现成功，工具目录可读，最后用一个低风险调用确认业务链路。只有“进程还在”而没有工具目录或业务结果时，应标记为部分可用，不能把依赖该 Server 的工具调用继续交给模型。\n\n如果 Server 不支持 Client 请求的协议版本，材料中的 `UnsupportedProtocolVersionError` 会列出 Server 支持的版本。Client 可以选择双方共同支持且自身已实现的版本重新请求；没有共同版本时停止调用并报告兼容性错误。重试需要同时使用该版本的元数据和消息语义，不能只改日期、继续发送另一版本的方法。Server 能力决定 Client 能否订阅列表变化或读取资源；Client 声明的 elicitation 能力决定 Server 能否请求其收集用户输入。`clientInfo/serverInfo` 是软件身份与版本信息，不是用户登录凭证；`capabilities` 表示能够处理什么协议功能，不表示被授权访问什么数据。升级时应保留协议版本、Server 版本和能力快照，方便解释某个工具为何在新版本中消失。\n\n发现结果可以按 TTL 缓存，但权限变化、Server 版本变化、工具列表通知和重新认证都会提前使缓存失效。缓存命中时仍要确认当前调用者和授权范围与缓存键一致。不能因为“上一次看见过工具”就跳过当前会话的权限检查。\n\n工具发现返回名称、描述和输入 Schema，调用时的业务参数是工具名和结构化输入，外层还带逐请求元数据。下面以假设的指标查询工具展示最小链路；实际使用 SDK 时通常由 SDK 构造 `_meta` 字段。\n\n```json\n{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"prometheus_query\",\n    \"arguments\": {\"query\": \"up\"},\n    \"_meta\": {\n      \"io.modelcontextprotocol/protocolVersion\": \"2026-07-28\",\n      \"io.modelcontextprotocol/clientInfo\": {\"name\": \"sre-client\", \"version\": \"1.0.0\"},\n      \"io.modelcontextprotocol/clientCapabilities\": {}\n    }\n  }\n}\n```\n\n`id` 用于把响应和请求对应起来，通知则没有 `id` 也不期待响应。Client 应记录 RPC id 与内部 request id 的映射，收到响应后再关联工具、调用者和下游耗时。不要把模型生成的自然语言直接拼到 `arguments` 中绕过 Schema 校验。\n\nJSON-RPC 响应有 `result` 或 `error`，工具本身的业务失败还可能在结果中带 `isError`。因此，Client 不能只看 HTTP 状态码或 RPC 是否返回成功：HTTP 200 可能包含工具错误，传输断开才表示响应没有可靠到达。建议在内部把 transport error、protocol error 和 tool error 分成三类，再决定重连、修正输入还是把结果交给模型解释。\n\n```json\n{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"result\": {\n    \"resultType\": \"complete\",\n    \"isError\": false,\n    \"content\": [\n      {\"type\": \"text\", \"text\": \"{\\\"status\\\":\\\"success\\\"}\"}\n    ]\n  }\n}\n```\n\nMCP 的数据层强调请求自带处理所需的信息，Server 不应依赖上一次调用留下的隐式状态。需要跨请求保存的工作流状态，要由 Server 生成句柄并在每次请求中验证用户和权限；句柄本身不能成为认证凭据。\n\nResource 适合稳定或可定位的上下文，例如 `prometheus://rules/api`、服务目录和数据库 Schema；Prompt 适合把这些上下文组织成事故排查或发布检查模板。Client 读取 Resource 时要限制 URI、大小和权限，读取 Prompt 时要保留参数和来源。两者都可能包含提示注入或过期信息，进入模型前要标记来源和时间。\n\n#### 协议版本变化怎样影响握手和结果解析\n\n| 行为 | 2025-11-25 及相应旧实现 | 本文 2026-07-28 |\n| --- | --- | --- |\n| 建立协议上下文 | `initialize` 与初始化通知 | 逐请求 `_meta`；可先 `server/discover` |\n| HTTP 通知入口 | 可使用独立 GET SSE 流 | POST `subscriptions/listen` 的响应流 |\n| 协议级会话 | 可能使用 `Mcp-Session-Id` | 已移除；业务状态使用显式句柄 |\n| Server 请求补充信息 | Server 主动发送请求 | 原请求返回 `input_required`，Client 收集输入后重发 |\n| Python 主入口 | v1 的 `ClientSession`、`FastMCP` | 材料中 v2 的 `Client`、`MCPServer` |\n\n`server/discover` 对 Server 是必须实现的方法，对 Client 是可选的预先探测；Host 可以把发现设为自己的就绪门禁，但不能称为协议强制握手。自动兼容旧 Server 应由 SDK 按版本协商执行，不能手工把两套消息交错发送。新版本不代表所有旧能力已经被物理删除：弃用、兼容处理和新建实现的选型要分别说明。\n\n结果的判断顺序是 HTTP/连接状态、JSON-RPC `error`、协议 `resultType`、工具 `isError`，最后才是业务 `status`。`resultType=\"complete\"` 表示本轮请求已完成，工具仍可能 `isError=true`；`input_required` 表示还需输入，不能当成最终工具结果。Client 对旧响应缺失 `resultType` 可按 `complete` 兼容，但新 Server 应显式提供。Prometheus 数据内部的 `data.resultType=\"vector\"` 或 `\"matrix\"` 只描述时序结果形态，与上述协议字段无关。\n\n依据：[基础结果类型](https://modelcontextprotocol.io/specification/2026-07-28/basic)、[HTTP 版本变化](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http)。", "subs": ["协议版本变化怎样影响握手和结果解析"]}, {"title": "2.4 通知和动态能力更新什么时候需要", "content": "<!-- src: 2.txt -->\n\nServer 的工具列表可能随配置、插件或权限变化而变化。Client 可以通过 `subscriptions/listen` 订阅 `toolsListChanged`，收到无响应的 JSON-RPC 通知后重新执行 `tools/list`。通知是加速刷新的一种机制，断线时可能丢失，所以仍需要 TTL、定期轮询和重连后的全量发现。\n\n收到变更通知后，Host 应让旧 Schema 失效，并把新版本重新加入权限过滤和搜索索引。缓存键至少应包含 Server 身份、协议版本、工具版本和权限上下文；如果工具被撤销，旧目录不能继续作为调用依据。观测时要记录通知时间、刷新结果和刷新失败原因，才能解释模型为何看到了旧工具或暂时没有候选能力。\n\n#### 订阅请求、确认和变更通知怎样关联\n\nServer 在发现结果中声明 `tools.listChanged=true`，只说明它能提供工具列表变化通知；Client 还要主动订阅。以下请求沿用第 2.3 节的逐请求元数据，选择 `toolsListChanged` 过滤项：\n\n```json\n{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"subscriptions/listen\",\n  \"params\": {\n    \"_meta\": {\n      \"io.modelcontextprotocol/protocolVersion\": \"2026-07-28\",\n      \"io.modelcontextprotocol/clientInfo\": {\"name\": \"sre-client\", \"version\": \"1.0.0\"},\n      \"io.modelcontextprotocol/clientCapabilities\": {}\n    },\n    \"notifications\": {\"toolsListChanged\": true}\n  }\n}\n```\n\nServer 先发送订阅确认。它仍是没有 JSON-RPC `id` 的通知，不是普通 RPC 的最终结果；确认中的过滤项是 Server 实际接受的子集，不支持的项会被省略。\n\n```json\n{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"notifications/subscriptions/acknowledged\",\n  \"params\": {\n    \"_meta\": {\"io.modelcontextprotocol/subscriptionId\": 4},\n    \"notifications\": {\"toolsListChanged\": true}\n  }\n}\n```\n\n该订阅的后续事件同样携带 `subscriptionId=4`，值对应发起订阅的请求 ID。它帮助 Client 区分不同订阅的消息，不是认证令牌或业务状态句柄。\n\n```json\n{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"notifications/tools/list_changed\",\n  \"params\": {\n    \"_meta\": {\"io.modelcontextprotocol/subscriptionId\": 4}\n  }\n}\n```\n\n所以应区分三个事实：Server 声明支持、Client 请求订阅、Server 确认接受。收到列表变化通知也不等于拿到了新列表，Client 仍需使旧缓存失效并重新发现。\n\n通知没有响应，也不保证断线后仍然存在。重连时要先清理旧的临时状态，再完整执行发现；长时间运行的 Host 还要安排低频全量轮询作为兜底。轮询频率应结合工具变化速度和下游压力选择，不能用极短周期掩盖通知实现不稳定的问题。\n\n保存协议版本、Server 身份、能力位、工具名称和 Schema 摘要即可，不必把每次完整结果复制到普通日志。快照用于比较变更：工具新增、描述改变、输入字段变严或权限范围缩小，都应产生可追踪的版本差异。快照过期或权限改变时，先删除不可用工具，再加载新定义，避免短时间内同时保留新旧版本。\n\n在测试 Server 中先返回初始工具列表，再模拟增加、修改和撤销工具，观察 Client 是否收到通知、刷新列表并停止调用已撤销工具。断开连接后重复一次变更，确认重连和轮询仍能恢复正确状态。验证重点是最终注册表和调用结果，而不是只看某条“收到通知”的日志。\n\nElicitation 允许 Server 在需要补充信息或确认高风险操作时请求用户输入。Client 应明确显示请求来源、字段、用途和副作用，拒绝后要让 Server 得到可处理的取消结果。Elicitation 是交互机制，不是绕过权限的快捷方式；Server 仍需在收到输入后执行服务端校验。\n\n协议版本中已标记弃用的 Sampling 和 Logging 不应作为新实现的基础。需要调用模型时，Server 可以直接使用 LLM 提供商 API；stdio 日志写 stderr，远程服务使用统一日志和 OpenTelemetry。这样能减少 Client 对过时原语的特殊处理。\n\n#### 用三段报文理解 MRTR，而不是把输入请求当工具结果\n\n多轮请求（MRTR）让 Server 在一个请求结果中声明缺少的信息。下面以 `error_rate_review` 排查模板作报文示意：用户没有指定时间窗口时要求补充。若实现这一交互，应先确认 Client 声明 `elicitation.form` 能力，再返回输入请求；不能拿表单收集密码或 API Key。\n\n```json\n{\n  \"jsonrpc\": \"2.0\", \"id\": 20, \"method\": \"prompts/get\",\n  \"params\": {\n    \"name\": \"error_rate_review\", \"arguments\": {\"service\": \"demo\"},\n    \"_meta\": {\n      \"io.modelcontextprotocol/protocolVersion\": \"2026-07-28\",\n      \"io.modelcontextprotocol/clientInfo\": {\"name\": \"sre-client\", \"version\": \"1.0.0\"},\n      \"io.modelcontextprotocol/clientCapabilities\": {\"elicitation\": {\"form\": {}}}\n    }\n  }\n}\n```\n\n```json\n{\n  \"jsonrpc\": \"2.0\", \"id\": 20,\n  \"result\": {\n    \"resultType\": \"input_required\",\n    \"requestState\": \"opaque-server-issued-state\",\n    \"inputRequests\": {\n      \"window\": {\n        \"method\": \"elicitation/create\",\n        \"params\": {\n          \"mode\": \"form\", \"message\": \"请选择排查时间窗口\",\n          \"requestedSchema\": {\n            \"type\": \"object\", \"properties\": {\"window\": {\"type\": \"string\", \"enum\": [\"5m\", \"1h\"]}},\n            \"required\": [\"window\"]\n          }\n        }\n      }\n    }\n  }\n}\n```\n\nClient 展示来源并收集用户选择后，重发同一方法和业务参数，使用新的 JSON-RPC id；`inputResponses` 的键必须对应 `inputRequests` 的键。\n\n```json\n{\n  \"jsonrpc\": \"2.0\", \"id\": 21, \"method\": \"prompts/get\",\n  \"params\": {\n    \"name\": \"error_rate_review\", \"arguments\": {\"service\": \"demo\"},\n    \"requestState\": \"opaque-server-issued-state\",\n    \"inputResponses\": {\"window\": {\"action\": \"accept\", \"content\": {\"window\": \"1h\"}}},\n    \"_meta\": {\n      \"io.modelcontextprotocol/protocolVersion\": \"2026-07-28\",\n      \"io.modelcontextprotocol/clientInfo\": {\"name\": \"sre-client\", \"version\": \"1.0.0\"},\n      \"io.modelcontextprotocol/clientCapabilities\": {\"elicitation\": {\"form\": {}}}\n    }\n  }\n}\n```\n\n最终响应应为 `resultType=\"complete\"` 并携带 Prompt 的 `messages`。拒绝和取消分别使用 `action=\"decline\"`、`action=\"cancel\"`；Host 不应替用户自动改成接受。Client 原样传回 `requestState`，不解析或修改；Server 若用它影响业务或授权，就要验证完整性、用户、有效期和原请求绑定。拒绝输入时停止相关操作，重复要求输入时受轮次预算约束，取消不保证此前副作用已回滚。\n\nMRTR 与 LLM 工具循环是两层不同循环：前者解决 MCP 操作缺信息，后者解决模型是否继续调用其他工具。两层都应有取消点和预算。`input_required` 中间结果及携带 `requestState/inputResponses` 的重发结果不能进入通用缓存。规范允许 MRTR 用于 `tools/call`、`resources/read`、`prompts/get`，不能在 `tools/list` 任意触发。[MRTR 规范](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr)。", "subs": ["订阅请求、确认和变更通知怎样关联", "用三段报文理解 MRTR"]}, {"title": "2.5 进度、补充输入和长任务分别解决什么问题", "content": "<!-- src: 2.txt -->\n\n一次 MCP 操作没有立即返回最终结果，可能是仍在计算、需要用户补充信息，也可能适合交给后台长任务处理。这三种情况需要不同机制；只把 HTTP 连接保持更久，不能同时解决交互和持久化问题。\n\n| 机制 | 解决的问题 | Client 如何继续 | 不能据此推断 |\n| --- | --- | --- | --- |\n| 进度通知 | 操作正在进行，需要显示阶段或进展 | 接收通知并等待最终结果 | 有进度不代表成功，也不保证可在断线后恢复 |\n| MRTR / Elicitation | 当前操作缺少用户输入 | 收集输入后携带请求状态重发 | 用户填写表单不等于获得新的业务权限 |\n| Tasks 扩展 | 耗时操作需要在之后查询状态、取得结果 | 保存持久任务句柄，随后轮询和取回结果 | 普通 Server 和 Client 不一定支持该扩展 |\n\n源材料在架构概览中介绍了可选的 [Tasks 扩展](https://modelcontextprotocol.io/extensions/tasks/overview)：Server 为长时间运行的请求返回持久句柄，Client 之后查询状态并获取结果。例如生成巡检报告时，客户端可以先保存任务引用，稍后再取得报告，而不必把一次模型等待与后台工作的全部耗时绑定在一起。\n\nTasks 扩展的任务不是 JSON-RPC 请求本身。请求 ID 关联一次报文往返，任务句柄关联持续运行的工作；重新建立网络连接并不意味着必须重新提交工作。需要区分“查询已有任务”和“再次创建任务”，尤其要避免重复启动昂贵计算或写操作。\n\n无状态是每次请求携带处理所需的上下文，不是禁止 Server 保存业务数据。Client 带任务句柄查询时，Server 仍要验证当前身份及其是否有权访问该任务。不能因为句柄难以猜测，就把持有句柄当成已认证。\n\n原材料没有展开 Tasks 的方法、状态枚举、保留时间或恢复保证，因此本节只建立概念区分。具体使用前应核对双方支持的扩展版本及生命周期语义；不能把任务句柄、MRTR 的 `requestState` 和订阅 ID 互换使用。", "subs": []}]}, {"title": "第 3 章 · 接入本地和远程 MCP Server", "sections": [{"title": "3.1 本地 stdio Server 的运行模型", "content": "<!-- src: 5.txt; 6.txt -->\n\n本地接入通常由客户端启动一个子进程，Client 通过 stdin 和 stdout 与它通信。进程继承启动用户的权限，因此 Server 能看到什么文件、使用什么环境变量、访问什么网络，首先取决于启动账户和宿主机策略。SRE 应尽量使用低权限账户、固定版本依赖和明确的允许目录。\n\n```mermaid\ngraph TD\n    A[AI Host] -->|spawn| B[stdio MCP Server]\n    B -->|stdout JSON RPC| A\n    B -->|stderr logs| L[Server log]\n    B --> F[Allowed directories]\n```\n\n接入前先用同一个用户在终端运行命令，确认运行时、工作目录、环境变量和包版本都能解析。stdout 只能输出协议消息，调试信息写 stderr。客户端能加载 Server 并完成 `tools/list` 后，再用一个无敏感数据的只读请求验证实际链路；本地命令能运行而客户端不显示时，优先比较 PATH、绝对路径和启动环境。\n\n开发阶段可以用 `npx` 或脚本快速试验，交付阶段应固定包版本或指向编译产物，避免每次启动重新解析依赖。工作目录和环境变量应通过配置显式传入，不能依赖图形客户端启动时恰好继承了某个交互式 Shell 的 PATH。若 Server 需要网络或本地目录，应把这两个前提写进部署说明并在启动前检查。\n\nServer 与客户端运行在同一用户下时，Server 可能读取该用户能读取的文件，甚至访问环境变量中的凭据。允许目录、网络和子进程权限应由宿主或沙箱限制；工具描述里的“只读”只说明业务意图，不能阻止恶意依赖或漏洞代码执行其他动作。新增一个本地 Server 前，应展示完整命令、参数和权限范围并要求明确同意。", "subs": []}, {"title": "3.2 如何配置本地 Filesystem Server 并验证权限", "content": "<!-- src: 5.txt; 6.txt -->\n\nFilesystem Server 的配置需要给出启动命令和允许访问的目录。目录参数定义该 Server 实现的允许访问范围，目录越大，误操作和数据外泄的影响面越大。它不是操作系统沙箱，也不会自动把目录变成只读；读写限制还需要实际工具策略、文件权限或只读挂载。下面是配置结构示例，路径应指向专门授权的目录：\n\n```json\n{\n  \"mcpServers\": {\n    \"filesystem\": {\n      \"command\": \"npx\",\n      \"args\": [\n        \"-y\",\n        \"@modelcontextprotocol/server-filesystem\",\n        \"/path/to/allowed-directory\"\n      ]\n    }\n  }\n}\n```\n\n验证时按“列目录、读取已知文件、访问目录外路径、按需写入临时文件”的顺序推进。前两步应成功，第三步应被拒绝，第四步只在明确需要写权限时执行。审批时核对完整路径、动作、是否覆盖已有文件和预期结果；不要因为模型说“整理文件”就跳过实际移动或删除动作的确认。\n\n客户端完全重启后，先观察 Server 是否出现在连接列表，再执行列目录和读取已知文件。目录外访问应该返回明确的拒绝，而不是空结果；写入测试应使用临时文件并在验证后删除。若 Server 不显示，优先检查 JSON 语法、绝对路径和终端手工启动结果；若工具调用失败，继续查看客户端日志和 Server stderr。\n\n```bash\ntail -n 20 -f ~/Library/Logs/Claude/mcp*.log\n```\n\n“Server 没出现”通常发生在配置解析或进程启动之前；“Server 出现但没有工具”通常发生在握手、能力协商或注册阶段；“工具存在但调用失败”则要继续区分参数校验、权限、下游和结果处理。按这棵失败树收集证据，可以避免一遇到路径错误就扩大目录权限，或一遇到下游超时就反复重启客户端。\n\n不同 Host 的配置路径和字段名称可能不同，学习时应先确认客户端版本和官方示例，再写入本机配置。配置文件中的命令、参数、工作目录和环境变量要逐项核对，路径优先使用绝对路径。修改后完全退出客户端再启动，并在日志中确认它加载的是目标配置，而不是旧进程保留的内存状态。\n\n```json\n{\n  \"mcpServers\": {\n    \"diagnostics\": {\n      \"command\": \"node\",\n      \"args\": [\"/opt/mcp/diagnostics/dist/index.js\"],\n      \"env\": {\"LOG_LEVEL\": \"info\"}\n    }\n  }\n}\n```", "subs": []}, {"title": "3.3 远程 Server 和 Custom Connector 怎样运维", "content": "<!-- src: 5.txt; 6.txt -->\n\n远程 Server 通过 HTTP 暴露能力，优点是集中部署、跨设备访问和服务端处理，代价是网络、认证、租户和可用性都变成运行依赖。Custom Connector 保存远程地址、认证关系和工具授权，但界面上的工具开关不等于上游业务授权，Server 仍需按调用者重新检查权限。\n\n连接时先确认域名和 Server 来源，再完成 OAuth、API Key 或其他认证。TLS 建立、认证完成、`server/discover` 成功、工具列表可读，这四个信号应分别记录。任何一个环节失败都要单独定位，避免把“网络能连通”误判为“业务已可用”。\n\n生产环境至少观察 DNS 和 TLS 错误、认证失败率、请求延迟、下游限流、重试次数和审计日志。Connector 应按项目或用途命名，定期删除不再使用的连接；远程 Server 默认只能访问完成任务所需的数据和 API。\n\nCustom Connector 是材料中 Claude 产品的连接管理入口，不是 MCP 协议里的新角色。其他 Host 可以使用不同的界面或配置方式，底层仍由 Client 与远程 Server 通信。MCP 也不强制所有 Host 采用同一份 `mcpServers` 配置格式。\n\nConnector 保存入口和授权关系，Server 仍需在每个请求上验证令牌的签发者、受众、过期时间和操作权限。OAuth 适合需要用户同意和刷新令牌的服务，API Key 适合受控的服务间场景，但二者都不能代替工具级 ACL。认证成功后还要重新执行能力发现，因为不同用户可能看到不同的工具和资源。\n\n连接多个 Server 时，为每个 Connector 记录用途、管理员、数据范围和最后使用时间。闲置连接应有关闭或重新认证策略，工具列表变化要触发刷新。出现认证过期时，先暂停该 Connector 的工具，不要用另一个 Server 的凭据重试；出现下游限流时，按 Server 设置并发和退避，避免多个连接共同放大流量。\n\n先用浏览器或命令行确认域名、证书和健康 endpoint，再在 Client 中建立 Connector。连接后记录发现响应和工具目录，使用一条只读请求验证调用者身份确实传到了 Server。最后测试认证过期、撤销工具、下游 429 和网络断开，确认 Client 会暂停或重试到正确的边界。\n\n```text\nDNS and TLS -> authentication -> server/discover -> tools/list -> read-only call\n```\n\n多个用户共享一个远程 Server 时，Server 不能把“连接已认证”当成所有工具都可用。工具列表、Resource 内容和下游查询都可能依赖租户；缓存键、日志字段和连接池也要保留租户或调用者上下文。管理员停用一个 Connector 后，应立即阻止新请求，并让正在执行的请求按照既定撤销策略结束或取消。\n\n#### OAuth 连接的操作顺序\n\nClient 先向远程 Server 获取授权元数据，再将用户送到经过校验的授权 URL；回调时校验 `state`、issuer、redirect URI 和 token 受众，最后用令牌完成发现和工具列表。认证成功不意味着所有工具都可以调用，Server 仍需做工具级 ACL。刷新令牌、撤销授权和用户切换都应让旧的工具注册表失效。\n\n```mermaid\nsequenceDiagram\n    participant U as User\n    participant C as Client\n    participant A as Authorization server\n    participant S as Remote MCP Server\n    U->>C: Start connector\n    C->>S: Read authorization metadata\n    S-->>C: Protected resource metadata\n    C->>A: Read authorization server metadata\n    A-->>C: Issuer and endpoint information\n    C->>A: User authorization\n    A-->>C: Code with state and issuer\n    C->>A: Exchange code for token\n    C->>S: server/discover with token\n    S-->>C: Supported versions and capabilities\n    C->>S: tools/list\n    S-->>C: Tool definitions\n```\n\n#### Streamable HTTP 中的流式传输意味着什么\n\nStreamable HTTP 使用 HTTP POST 传递 Client 消息，响应可以是普通 JSON，也可以通过 Server-Sent Events（SSE）流式返回。SSE 是承载事件的编码方式，JSON-RPC 则定义事件里消息的含义；“流式”不意味着 Server 正在逐字生成模型回答，也不意味着一条事件就是最终工具结果。\n\n```text\n普通 JSON 响应：HTTP 响应体 -> JSON-RPC 响应 -> 结果\nSSE 响应流：多个事件 -> 识别通知或响应 -> 等待对应请求的结果\n```\n\nClient 应按实际响应类型处理数据，区分进度、订阅确认、变更通知与最终响应。协议版本还会影响通知入口：本笔记基线通过 `subscriptions/listen` 显式订阅变化，不能把旧版独立 GET SSE 流的实现直接套用到新版本。\n\n反向代理缓冲可能让已经发送的事件延迟到最后才被 Client 看见，网络超时也可能在 Server 仍处理请求时先关闭连接。判断时需分别观察 Server 是否产生事件、代理是否及时转发、Client 是否正确解帧，而不是只看最后有没有 HTTP 200。\n\n远程连接中至少有三组概念不能混用：TLS 保护通信通道，访问令牌证明请求具备某个认证和授权上下文，工具级检查决定该调用者能否对具体目标执行操作。API Key、Bearer Token 和 OAuth 也不处于同一层：API Key 是凭据形式，Bearer 描述持有令牌即可使用的方式，OAuth 负责授权和获取令牌的流程，OAuth 得到的访问令牌可以通过 Bearer 方式发送。\n\n这些层次决定了可以从响应中得出什么结论。TLS 成功只证明通道可用，能读工具目录只证明完成了发现，HTTP 200 还需要继续检查工具结果。收到 401 时也不能直接判断为密码错误，它可能是授权元数据发现或重新认证流程的入口。\n\n认证失败的处置还依赖失败类别：令牌过期可以进入受控的重新认证流程，受众或签发者不匹配则必须停止使用该令牌。不能将所有 401/403 都交给模型反复重试，也不能把上游返回的任意授权 URL 当成可信地址；第 8 章会继续解释这一信任边界。", "subs": ["OAuth 连接的操作顺序", "Streamable HTTP 中的流式传输意味着什么"]}]}, {"title": "第 4 章 · 从需求访谈到部署设计", "sections": [{"title": "4.1 Agent Skills 如何帮助规划 MCP Server", "content": "<!-- src: 7.txt -->\n\nAgent Skill 是可移植的指令集，帮助编码 Agent 在写代码前澄清连接对象、用户范围、工具模式、交互需求和认证方式。原材料介绍的参考插件是 [`mcp-server-dev`](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/mcp-server-dev)，由 `build-mcp-server` 入口、`build-mcp-app` 交互扩展和 `build-mcpb` 打包技能组合而成。入口先分析需求，再按需选择后两者，而不是每次都生成所有组件。\n\nSkill 不是运行时协议，也不是安全边界。它可以减少重复解释，却不能代替代码审查、权限审批、容量评估或真实环境测试。技能文件、引用资料和脚手架版本应进入版本控制；当工具契约或认证策略改变时，示例、测试和部署配置也要一起更新。\n\n入口技能适合询问连接对象、使用者、操作面、交互方式和上游认证，再把答案路由到 Server、MCP App 或 MCPB 的专用设计。工具命名、输入 Schema、错误契约、超时和副作用分级属于 Server 设计；启动命令、权限和密钥来源属于部署设计。把这些决定写成问题和验收条件，比直接让 Agent 生成一套“看起来完整”的代码更容易复核。\n\n脚手架生成后，先检查目录和依赖，再检查工具契约和权限，最后用真实下游或可控替身做联调。Skill 的版本、引用的模板和生成时间应进入变更记录，便于追踪某次代码为何采用某种 transport。若生成结果需要大量人工修补，应该把重复修补的原因反馈回 Skill，而不是在每次项目中单独修补。\n\n可以把访谈记录成一页设计输入：\n\n```text\n连接对象: Prometheus / 日志平台 / CMDB\n使用者: 个人 / 团队 / 多租户用户\n操作面: 只读查询 / 可恢复写入 / 破坏性变更\n交互方式: 文本结果 / elicitation / MCP App\n认证方式: 无 / API Key / OAuth\n数据边界: 允许的域名、租户、目录和结果字段\n成功证据: 工具列表、请求日志、结果 Schema、回滚演练\n```\n\n记录这些答案可以让后续的部署选择、权限设计和测试用例保持一致。若某个字段未知，应明确标记为待确认，而不是让脚手架替用户猜测。", "subs": []}, {"title": "4.2 怎样组合传输方式、打包方式和交互界面", "content": "<!-- src: 7.txt -->\n\n部署选择首先取决于数据在哪里、谁会使用，以及交互需要做到什么程度。stdio 与 Streamable HTTP 是传输方式，MCPB 是本地分发方式，MCP Apps 是交互扩展；它们解决不同问题，可以组合使用。\n\n需要访问用户本地文件、桌面应用或 localhost 服务时，Server 通常需要在本机运行。原型阶段可以由 Host 直接启动 stdio 进程；准备分发时，MCPB 将 Server 与运行时组织成 `.mcpb` 归档，减少用户安装 Node 或 Python 的前提。打包改善了安装体验，但程序仍在用户电脑上执行，发布者仍需考虑依赖来源、升级和宿主权限。\n\n主要访问云 API、需要多人共享的能力更适合远程 Streamable HTTP。它把运行时管理集中到服务端，同时引入 TLS、认证、租户、并发和可用性问题。第 5 章的 Prometheus 查询可以作为这种组合的例子：插件负责工具逻辑，外层应用通过 HTTP 挂载，Client 使用远程 endpoint 访问。\n\nMCP Apps 适合需要图表、选择器或面板的场景，尤其是在文本结果和 elicitation 的简单平面表单难以表达交互时。例如指标查询可以在支持 Apps 的 Host 中配合趋势图，但提供查询 Tool 不会自动生成这样的界面，当前参考插件也没有实现该扩展。是否渲染取决于 Host 的支持，不能把 UI 当成所有 MCP Client 的共同能力。\n\n迁移时尽量保持工具名称、Schema 和结果语义稳定，把变化集中在传输、部署或界面层。从 stdio 迁移到 HTTP，需要重新考虑认证和多用户边界；从裸进程分发迁移到 MCPB，需要处理运行时打包和升级；增加 Apps，则要检查界面操作是否仍经过相同的工具权限控制。", "subs": []}, {"title": "4.3 SRE 如何把脚手架变成可交付服务", "content": "<!-- src: 7.txt -->\n\n脚手架交付前要补上健康检查、结构化日志、request id、超时、限流、重试预算、幂等键、密钥轮换和回滚。工具应按只读、可恢复写操作和高风险操作分级，并为每个参数提供 JSON Schema、默认值和清晰错误。\n\n验收不能只看“工具出现在客户端”。应使用 Inspector 或自动化测试验证工具目录、非法输入、下游 4xx/5xx、超时、取消和权限拒绝；再用一次端到端调用确认日志能够串起 Host、Client、Server 和下游。没有证据的勾选项不能作为上线结论。\n\n每个工具至少要有名称和描述、输入 Schema、成功结果示例、输入错误示例、下游失败示例以及副作用说明。只读工具要证明不会修改目标，写工具要证明幂等键、审批和回滚。证据可以来自 Inspector、单元测试、集成测试和一次故障演练，但必须能回到具体版本和 request id。\n\n运行准备还包括禁用高风险工具、撤销令牌和回滚版本的步骤。发生事件时，需要从记录中还原调用者、目标和结果，判断是否存在未知状态；这部分能力不能由一次成功的功能调用证明。\n\n先部署只读工具并验证发现，再打开一个可恢复写工具，模拟参数错误、下游超时、认证过期和进程退出，最后执行禁用工具和版本回滚。演练记录应包含开始时间、版本、request id、告警、人工决策和恢复时间。高风险工具即使没有真实生产数据，也应使用隔离租户或模拟 Server 演练完整流程。", "subs": []}]}, {"title": "第 5 章 · 从 Prometheus 查询理解 MCP Server 的工作原理", "sections": [{"title": "5.1 Server 怎样把外部 API 转成模型可用的工具", "content": "<!-- src: 8.txt; 2.txt; personal-mcp/src/plugins/prometheus/index.ts; personal-mcp/src/plugins/prometheus/client.ts -->\n\nPrometheus 插件提供 `prometheus_query` 和 `prometheus_query_range` 两个工具，分别执行即时查询和区间查询。模型选择工具并填写 PromQL 与时间参数，插件再访问配置好的 Prometheus HTTP API。模型不需要自行构造请求 URL，Prometheus 地址也不是工具参数，而是由管理员配置。\n\n这里有两份契约。MCP 契约面向 Client，说明工具的名称、参数和结果；Prometheus API 契约面向插件，规定查询如何提交以及时序数据如何返回。`index.ts` 负责注册工具和整理 MCP 返回值，`client.ts` 负责访问 Prometheus。这样的分工让模型使用统一的工具调用方式，同时保留 Prometheus 的查询语义。\n\n| 工具 | 输入参数 | 下游接口 | 适合回答的问题 |\n| --- | --- | --- | --- |\n| `prometheus_query` | `query`，可选 `time` | `GET /api/v1/query` | 某个求值时刻，表达式的结果是什么 |\n| `prometheus_query_range` | `query`、`start`、`end`、`step` | `GET /api/v1/query_range` | 表达式在一段时间内如何变化 |\n\n即时查询中的“即时”指在一个时刻对表达式求值，不表示表达式只能读取单个原始样本。例如 `rate(http_requests_total[5m])` 仍然需要过去五分钟的数据，但即时查询只返回指定时刻的计算结果。区间查询则按 `step` 在多个时刻重复求值，适合观察趋势；它不是简单地把时间范围内所有原始样本下载下来。\n\n表达式中的 `[5m]` 是每次计算速率时使用的数据窗口，`step=\"60s\"` 则表示相邻求值时刻间隔一分钟，两者也不同于 Prometheus 自身的抓取间隔。较小的 step 会产生更密集的求值点，但不会凭空增加原始观测的精度，还可能放大结果体积和查询成本。\n\n如果用户问“过去一小时请求速率有没有上升”，Host 可以引导模型使用区间查询。下面只展示 `tools/call` 的业务参数，省略外层 JSON-RPC 和第 2 章介绍的逐请求元数据；指标名和时间是说明用的示例，真实查询需要先确认目标环境存在该指标。\n\n```json\n{\n  \"name\": \"prometheus_query_range\",\n  \"arguments\": {\n    \"query\": \"rate(http_requests_total[5m])\",\n    \"start\": \"2026-09-07T09:00:00Z\",\n    \"end\": \"2026-09-07T10:00:00Z\",\n    \"step\": \"60s\"\n  }\n}\n```\n\n```mermaid\nsequenceDiagram\n    participant C as MCP Client\n    participant S as Prometheus Plugin\n    participant P as Prometheus API\n    C->>S: tools/call prometheus_query_range\n    S->>S: Validate schema and configuration\n    S->>S: Encode query and time parameters\n    S->>P: GET /api/v1/query_range\n    P-->>S: Native query data or error\n    S->>S: Build text and structured result\n    S-->>C: content structuredContent isError\n```\n\n插件使用 `URLSearchParams` 编码查询参数，因此 PromQL 中的大括号、引号和 `&` 会作为参数值的一部分传递。它还保留配置 URL 中的路径前缀。对于模型，这是一次 MCP 工具调用；对于下游，这是一次 Prometheus HTTP 请求。MCP 并不要求两者永远一一对应，只是当前插件采用了这种直接适配方式。", "subs": []}, {"title": "5.2 工具名称、描述与 Schema 怎样构成调用契约", "content": "<!-- src: 8.txt; 2.txt; personal-mcp/src/plugins/prometheus/index.ts -->\n\n`tools/list` 返回的是工具定义，不会执行 PromQL。`name` 是调用标识，`title` 面向用户展示，`description` 帮助模型选择能力，`inputSchema` 则描述参数结构。即时查询与区间查询必须有不同的名称和清晰的描述，否则模型可能把“某个时刻的值”误当成“一段时间的趋势”。\n\n这个插件使用 TypeScript 和 Zod 定义参数。`query` 会先去除两端空白，长度要求为 1 到 16,384 个字符；即时查询的 `time` 可省略，提供时可以是非空字符串或有限数值。区间查询的 `start`、`end` 和 `step` 都必填，也接受非空字符串或有限数值。时间描述使用 Unix 秒或 RFC3339，步长描述则允许 `15s`、`5m` 等持续时间字符串或秒数。\n\n这些结构约束不等于完整的业务校验。当前插件没有在本地完整解析 RFC3339，也没有检查 `start <= end` 或 `step > 0`；是否满足 Prometheus 的时间与查询语义，仍依赖下游处理。工具描述中的格式约定帮助模型生成参数，但不能代替运行时检查。JSON Schema 的 `default` 同样不会自动实现默认行为，默认值最终要由实际处理代码或下游接口决定。\n\n插件通过 `server.registerTool()` 绑定名称、Schema 和处理函数，并用 `outputSchema` 声明共同的结果对象。结果包含 `query`、`status`、`data`、`errorType`、`error` 和 `durationMs`。其中 `data` 的 Schema 是允许空值的未知结构，插件主要透传 Prometheus 的原生数据，而没有逐项校验每个标签和样本。这使适配层较薄，也意味着后续代码仍需根据实际 `data.resultType` 解析结果。\n\n两项工具都声明了 `readOnlyHint=true`、`destructiveHint=false`、`idempotentHint=true` 和 `openWorldHint=true`。这些注解告诉 Host 它们是读取外部系统的查询能力，重复调用不应增加写入副作用；它们不证明查询成本低，也不保证不同时间得到同样结果。权限仍由 Host、Server 和下游的实际策略执行，不能由一条只读注解代替。", "subs": []}, {"title": "5.3 插件配置、Server 与传输怎样分离", "content": "<!-- src: 8.txt; 7.txt; personal-mcp/src/plugins/prometheus/config.ts; personal-mcp/src/plugins/prometheus/config-manager.ts; personal-mcp/src/apps/prometheus-standalone.ts -->\n\n`createPrometheusPlugin()` 返回插件标识、展示信息、工具目录、配置字段和创建 MCP Server 的工厂。这里的“插件”是 personal-mcp 自身的组织方式，不是 MCP 规定的目录结构。创建 Server 时注册查询工具，而监听地址、HTTP 路由和服务启动由外层应用负责。\n\n管理员用 `PROMETHEUS_MCP_URL` 指定下游地址，用 `PROMETHEUS_MCP_QUERY_TIMEOUT` 指定查询超时。超时默认 30 秒，查询执行前要求它是 1 到 300 之间的安全整数；下游地址未配置时返回配置错误。加载器还兼容 `PROMETHEUS_URL` 及旧的超时变量名称，但这是项目的兼容策略，不是 MCP 通用环境变量约定。\n\n配置读取与配置校验也分属不同入口。`config.ts` 主要读取并转换环境变量；`config-manager.ts` 在更新或重载时进一步限制 URL 必须使用 HTTP(S)，不得包含查询串、fragment 或嵌入式凭据。不能因为管理入口有这些检查，就认为所有直接加载配置的路径都执行了相同校验。管理员选择访问哪个 Prometheus，与模型选择执行哪个 PromQL，属于两个不同权限边界。\n\n配置管理器会生成新的插件实例并交给上层应用更新，管理操作也不是模型可调用的查询工具。理解热更新时，需要同时看配置存储、插件替换和请求如何取得当前实例，不能把一个配置函数直接等同于 MCP 的动态能力通知。\n\n这个项目的独立 Prometheus 入口默认监听 `127.0.0.1:3102`，将插件挂载到 `/prometheus/mcp`；网关入口也可以挂载同一个插件。因此，“查询工具是什么”和“从哪个地址访问它”可以分别变化。当前所读的入口使用 Streamable HTTP，不能据此称该插件已经提供了独立 stdio 启动方式。若将来迁移到 stdio，可以复用工具逻辑，但需要另行处理 transport 与进程生命周期。", "subs": []}, {"title": "5.4 怎样从返回值判断查询成功、失败和证据范围", "content": "<!-- src: 8.txt; 9.txt; personal-mcp/src/plugins/prometheus/client.ts; personal-mcp/src/plugins/prometheus/index.ts -->\n\n查询适配器把 Prometheus 的返回值整理为一个结果对象，工具层再将同一对象序列化为 `content` 中的文本，并放入 `structuredContent`。如果对象中的 `status` 为 `error`，工具层设置 `isError=true`。文本便于模型阅读，结构化内容便于 Host 做解析和计算；两者来自同一对象，可以减少不同表示之间的语义偏差。\n\n下面是 `query=\"up\"` 成功时的结构化结果示意，数值与时间仅用于说明格式，并非真实采集结果。它是 `structuredContent` 的内容，不是完整 JSON-RPC 响应。\n\n```json\n{\n  \"query\": \"up\",\n  \"status\": \"success\",\n  \"data\": {\n    \"resultType\": \"vector\",\n    \"result\": [\n      {\n        \"metric\": {\"__name__\": \"up\", \"job\": \"api\", \"instance\": \"api-1:9090\"},\n        \"value\": [1788775200, \"1\"]\n      }\n    ]\n  },\n  \"errorType\": null,\n  \"error\": null,\n  \"durationMs\": 12\n}\n```\n\n`data.resultType` 属于 Prometheus 的领域数据，`vector` 表示即时向量，区间查询通常返回带多个时间点的 `matrix`。它与第 2 章 MCP 协议层的 `resultType` 不同。适配器的 `durationMs` 衡量本次下游访问与处理的耗时，不包含模型推理，也不能当作整项用户任务的耗时。\n\n当 Prometheus 成功返回空的 `result` 数组时，含义是本次表达式在指定时刻或范围没有结果，不能解释成数值为零或系统正常。即使 `up=1`，也只能说明对应目标最近一次抓取成功，并不直接证明业务请求成功率正常。模型最终回答要保留表达式、求值时间、标签范围和数据完整性，避免把有限观测推广成整体健康结论。\n\n适配器同时检查 HTTP 状态和响应体的 `status`。下游 HTTP 失败时优先保留 Prometheus 的 `errorType` 与 `error`，没有错误类型时再使用 `http_状态码`；HTTP 成功但响应体没有 `status=\"success\"` 时，也按业务失败处理。配置问题、网络异常和超时走各自的错误分支。由此可见，HTTP 200、收到 JSON-RPC 结果和工具业务成功是三件不同的事。\n\n超时由 `AbortController` 和定时器实现，定时器在发出 HTTP 请求前设置，并在处理结束时清理，意图覆盖 HTTP 请求及响应体读取。当前实现没有自动重试，也没有向 Prometheus 追加服务端的 `timeout` 查询参数。客户端中止等待不证明下游计算已经全部停止；此外，JSON 解析失败会被转换成空值，所以某些读体或解析异常可能表现为通用的不成功响应，不能仅依赖 `errorType` 推断全部故障细节。\n\n这个案例展示的是查询适配，而不是完整的生产防护方案。插件没有限制响应字节数、时间跨度或总样本数，也没有在请求中显式禁止重定向或附加下游认证头；下游错误文本会进入工具结果。需要面向真实用户提供服务时，结果预算、敏感信息处理、网络边界和认证应结合部署环境设计，不能把这些能力归因于 MCP SDK 或当前工具注解。", "subs": []}, {"title": "5.5 Resources、Prompts 与查询工具怎样共同支持分析", "content": "<!-- src: 2.txt; 8.txt; personal-mcp/src/plugins/prometheus/index.ts -->\n\n当前 Prometheus 插件只注册了两个 Tool，没有注册 Resource 或 Prompt。先把这一点说清楚，才能区分已有查询能力和可考虑的扩展：下面的资源与提示设计用于解释三类原语的协作，并不是该目录已经实现的功能。\n\n如果将来为指标分析增加 Resource，可以提供指标命名约定、标签含义或服务目录，由 Host 根据当前任务选择读取。Resource 用 URI 标识上下文，通过 MCP 获取，不一定对应一个浏览器可直接打开的 HTTP 地址。它也不必永久静态，内容变化后仍需要依据权限和新鲜度刷新。\n\nPrompt 可以把“分析错误率是否升高”组织成带参数的消息模板，例如要求提供服务、时间窗口和对照范围。用户选择模板后，Host 获取提示消息，模型再判断需要哪些查询。Prompt 中写了“读取指标约定”或“查询请求量”，不代表 Server 已经执行这些动作，也不会授予额外权限。\n\n| 原语 | 在指标分析中提供什么 | 通常由谁决定使用 |\n| --- | --- | --- |\n| Resource | 指标与标签约定、服务目录等上下文 | Host 根据任务选择读取 |\n| Prompt | 带服务和时间参数的分析框架 | 用户选择模板 |\n| Tool | 执行即时或区间 PromQL 查询 | 模型提出调用，Host 执行策略 |\n\n一次分析可以从用户选择模板开始，Host 按需加载指标约定，模型据此构造 PromQL，再通过现有工具查询，最后形成引用时间范围和表达式的解释。模板负责组织问题，Resource 提供背景，Tool 获取实际观测。即使它们最终都产生文本，也不能因此忽略来源和权限差异。\n\n[MCP Inspector](https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector) 可以用于观察工具定义、参数和返回内容。对于当前插件，应首先确认两项查询工具；只有真正扩展并注册 Resource、Prompt 后，才有对应的发现和使用对象。直接查询成功说明这组输入下通信与下游访问成立，模型能否选择正确表达式、如何解释结果，则需要由 Host 的编排和上下文处理继续保障。", "subs": []}]}, {"title": "第 6 章 · 理解由 LLM 驱动的 MCP Client", "sections": [{"title": "6.1 连接管理与模型调用循环为什么是两件事", "content": "<!-- src: 9.txt; 2.txt -->\n\n源材料 `9.txt` 的聊天程序同时包含 MCP Client 和模型 API Client。前者负责连接 Server、发现工具和发送 MCP 请求，后者负责把对话发送给模型并接收文本或工具调用意图。本章借用其编排方式说明如何使用 Prometheus 工具，模型侧消息示例不属于 Prometheus 插件源码中的已有功能。教程常把整个程序叫作“Client”，但从架构上看，模型编排、对话和用户交互属于 Host 的职责。\n\nMCP Server 不需要知道 Host 使用哪个模型。Prometheus 插件访问的是配置好的指标服务，模型 API Key 则用于 Host 向模型服务发请求；两者的身份和凭据边界应分别处理。仅通过协议列出和调用工具，并不天然需要一次模型推理。\n\nPython 教程中的 `StdioServerParameters` 只描述命令和参数，`stdio_client()` 将配置转换为 transport，`Client` 在进入异步上下文时管理连接。离开上下文后释放连接和子进程。HTTP 模式则连接已经运行的远程服务，不需要为它创建本地业务进程。\n\n理解其生命周期时，可以用下面的概念链路，而不依赖具体 SDK 方法名：\n\n```text\n配置 -> 建立 transport -> 确认版本与能力 -> 发现可用工具\n     -> 执行一次或多次任务 -> 关闭连接并释放本地资源\n```\n\n同一连接可以服务多轮模型调用，不能机械地每轮都重新启动 Server。相反，连接对象存在也不保证目录仍新鲜，权限、工具或 Server 状态改变后仍需要重新发现。\n\nMCP 的 `inputSchema` 与模型供应商工具接口中的输入 Schema 含义相关，但字段名称、内容类型和消息格式未必相同。Host 负责把当前用户可以使用的工具定义映射成模型接口，模型返回调用意图后，再映射回 Server 和工具名。\n\n| 数据 | MCP 一侧 | 模型接口一侧 |\n| --- | --- | --- |\n| 工具定义 | 名称、描述、`inputSchema` | 供应商支持的工具定义结构 |\n| 调用意图 | 尚未发送 MCP 请求 | 模型给出的调用 ID、名称和参数 |\n| 工具执行 | `tools/call` 与 JSON-RPC ID | 等待 Host 回传结果 |\n| 调用结果 | `content`、`structuredContent`、`isError` | 对应原模型调用 ID 的 tool result |\n\nJSON-RPC ID 关联 MCP 请求与响应，模型调用 ID 关联对话中的工具意图与结果。它们处于不同链路，Host 要保存映射，不能只凭工具名称匹配：同一轮模型可能以不同参数调用同一个工具多次。\n\n以材料采用的 Anthropic 消息形式为例，模型先返回 `tool_use`，Host 保存该 assistant 内容，再添加带相同 `tool_use_id` 的结果。下面只展示模型侧的两条消息，工具结果经过 Host 摘要以便阅读；插件实际返回的是第 5 章介绍的 JSON 文本。这不是 MCP JSON-RPC 报文：\n\n```json\n[\n  {\n    \"role\": \"assistant\",\n    \"content\": [\n      {\"type\": \"tool_use\", \"id\": \"call_query_1\", \"name\": \"prometheus_query\", \"input\": {\"query\": \"up\"}}\n    ]\n  },\n  {\n    \"role\": \"user\",\n    \"content\": [\n      {\n        \"type\": \"tool_result\",\n        \"tool_use_id\": \"call_query_1\",\n        \"content\": \"本次 up 查询返回 job=api、instance=api-1:9090 的样本，值为 1。这说明该目标最近一次抓取成功，不代表业务可用性。\",\n        \"is_error\": false\n      }\n    ]\n  }\n]\n```\n\n如果只把结果文本当作普通用户消息塞回去，就失去了“这是哪次工具调用的返回值”这一显式关联。不同模型 API 的角色和字段可能不同，但必须保留调用关系、错误状态和必要内容。原材料各语言版本简化程度不同，应学习共同机制，不把某一段省略处理的代码当作完整通用 Host。\n\n模型收到当前指标值后可能继续查询过去一小时的趋势，收到日志后也可能再查指标。源材料的入门示例主要演示一次工具结果回传；通用 Host 要持续检查后续响应，直到模型给出最终回答、用户取消、发生无法恢复的错误或达到预算。\n\n```text\n发送当前对话和候选工具\n    -> 模型是否提出工具调用\n        -> 否：处理最终回答或其他停止原因\n        -> 是：保留模型消息\n              校验每次调用的来源、参数、权限和确认范围\n              执行 MCP 请求并收集对应结果\n              将带调用 ID 和错误状态的结果加入对话\n              在预算内开始下一轮\n```\n\n有工具循环不等于应该无限循环。Host 需要限制轮次、工具数量、累计耗时和结果体积；输出被截断时不能执行不完整参数。预算耗尽时说明已取得哪些证据、还有哪些步骤未完成，不能把强制停止当成任务成功。\n\n对话历史也由 Host 管理。教程中每次处理问题都新建 `messages` 的写法，只保存该次问题内部的工具上下文，不自动实现跨问题记忆；保留长期历史时，还要考虑用户切换、权限变化和敏感内容的存续范围。", "subs": []}, {"title": "6.2 模型如何发现、调用并接收工具结果", "content": "<!-- src: 9.txt; 2.txt -->\n\n典型闭环是 Client 调用 `tools/list`，把名称、描述和输入 Schema 转换为模型可用的工具定义；模型返回工具调用意图；Client 检查工具仍在当前注册表、参数符合 Schema、用户拥有权限，并根据副作用决定是否需要确认；Server 执行后返回文本、图片或资源内容；Client 把结果作为 tool result 放回对话，模型再生成最终回答。\n\n```mermaid\ngraph TD\n    U[User request] --> L[LLM]\n    L --> T[Tool choice]\n    T --> C[Client validates]\n    C --> S[MCP Server]\n    S --> X[External system]\n    X --> S\n    S --> C\n    C --> L\n    L --> R[Final response]\n```\n\n工具名冲突时要使用带 Server 命名空间的内部标识，并保存内部标识到真实 Server 和工具名的映射。大结果应分页、摘要或落到 Resource，避免每一条日志和每一个时序点都重复进入模型上下文。协议或 SDK 返回的错误标记要原样保留，让模型知道这是一次工具失败而不是传输断开。\n\n实际执行前，Host 要确认工具仍在当前授权范围内，参数符合 Schema 和业务限制，并且目标 Server 对应用户希望访问的系统。副作用等级决定是否还需要用户确认，旧缓存中的工具定义不能代替当前判断。对于 Prometheus 区间查询，还要检查时间窗口和步长是否会产生过大结果；对于写操作，则要在调用前展示目标、差异和幂等键。\n\nClient 应保留文本、图片和 Resource 的内容类型，限制单次结果大小，并为大结果提供分页或摘要。工具失败时，把用户可以修正的字段和可恢复动作返回给模型；内部诊断信息放在日志或受控元数据中。模型的最终回答要区分“没有数据”“工具失败”和“调用尚未完成”，不能把三者都改写成肯定结论。\n\n多个互不依赖的只读工具可以并行，减少端到端延迟；依赖同一结果的调用必须按顺序执行，并在每一步检查结果状态。Prometheus 的多个查询可以并行，但如果都访问同一高负载 Prometheus，就应通过并发上限和合并查询控制压力。写操作默认顺序执行，并在每一步保留审批和幂等信息。\n\n从选择工具到返回结果，每个阶段都应保留必要的观察记录和取消点。尤其在多次调用中，中间结果的体积和敏感程度会影响后续能否继续执行，不能只检查最终回答是否足够简短。", "subs": []}, {"title": "6.3 Client 怎样处理错误和多个 Server", "content": "<!-- src: 9.txt; 2.txt -->\n\n参数错误应直接反馈并要求修正，权限错误不能靠重试解决，临时下游错误可以在预算内重试，传输错误才适合重连。写操作超时或连接断开时属于未知状态，应先查询幂等状态或交给人工确认，不能立即重复提交。错误消息要说明下一步能做什么，同时保留内部诊断字段。\n\n每个 Server 都应有独立的超时、并发上限、熔断状态和健康记录。一个 Server 不可用时，Host 只隔离它的工具，并在模型上下文中标记原因；恢复后重新执行发现。上线前应注入进程退出、网络断开、认证过期和下游 5xx，确认 Client 能返回可理解的错误、停止无效重试并在恢复后重新建立注册表。\n\n对于连接重置、短暂 503 或限流，可以考虑在任务预算内退避重试；Schema 不兼容则应先修正契约。熔断器打开后，Host 应从候选工具中暂时移除该 Server，并向用户说明恢复条件，避免模型不断重复同一调用。\n\n为每个 Server 设置并发上限、单请求超时、连接或活动任务上限和结果大小上限。全局还要限制单个用户或单个任务的工具调用次数，避免模型循环调用占满连接池。容量测试应包含多个 Server 同时刷新工具列表、一个 Server 持续超时和大结果返回，观察其他连接是否仍能正常服务。\n\nPython 教程常用异步上下文管理连接，TypeScript 示例则显式保存 transport 和 `Client` 实例。实现细节可以不同，但几个不变量应保持一致：工具名称和 Schema 映射稳定，工具错误不会被误判为 transport 错误，关闭连接会释放本地资源，API Key 不进入代码和日志。跨语言迁移时先对齐这些行为，再处理 SDK 方法名差异。\n\n材料中的 Python 聊天循环把阻塞的终端输入放到工作线程，以便事件循环继续维护 MCP 连接。同样，模型 API 请求和下游调用如果在事件循环里使用长时间阻塞的同步接口，也可能让其他连接、通知和取消处理一起停住。应使用相应的异步接口，或把阻塞操作放到受控执行器中；函数声明成 `async` 并不会自动让内部同步调用变成非阻塞。\n\n等待用户输入、等待模型、等待 MCP 工具和释放连接是不同阶段，超时与取消策略应覆盖各自边界。一个请求失败可以向用户报告后继续接收下一条问题，但已经损坏的连接需要恢复，不能仅捕获异常后继续复用旧状态。\n\n退出聊天循环、收到 EOF、用户取消请求或 Server 断开时，都要释放子进程、stdio 管道、HTTP 连接和后台定时器。清理操作本身也要有超时，避免关闭一个失控的 Server 把 Host 一起卡住。重新启动前删除旧的工具注册表，防止模型继续选择已经不可用的工具。", "subs": []}]}, {"title": "第 7 章 · 在大规模 Host 中控制上下文和执行成本", "sections": [{"title": "7.1 为什么要渐进式发现工具", "content": "<!-- src: 10.txt -->\n\n当 Host 连接几十个 Server、拥有数百或数千个工具时，把全部定义放进每一轮上下文会浪费输入 Token、增加延迟并降低模型选择质量。连续工具调用产生的大型中间结果还会挤占真正用于推理的空间。\n\n渐进式发现先向模型提供 Server 和工具的轻量目录，再按任务加载完整 Schema。可以按 Server、工具组、关键词或任务分类搜索；常见的三层是目录、单工具详情和执行。工具定义仍由 Host 通过 `tools/list` 获取，只是延迟注入模型上下文。\n\n动态 Server 管理也遵循同一原则：维护可用 Server 注册表，按需连接，任务结束后断开闲置连接，权限变化或 `list_changed` 到来时重新发现。阈值可以按工具定义占上下文的比例设定，材料以 1%—5% 作为可参考的阈值示例，并非协议规定或普适最优值。实际切换前应通过代表性任务比较 Token、延迟和选择准确率。\n\n三层对应“目录搜索—查看详情—执行”：目录搜索返回候选工具名和简短说明，详情层按需返回完整 Schema 和文档，执行层再调用选中的工具。Host 内部还可以先按 Server 或工具组组织目录，但那是目录层的索引方式，不是额外的协议步骤。Host 可以提供 `search_tools` 和 `get_tool_details` 这样的元工具，也可以使用模型供应商提供的工具搜索能力。无论采用哪种实现，搜索结果都必须经过当前用户的权限过滤。\n\nServer 只有在任务需要时才连接，任务完成、用户切换租户或权限撤销时可以断开。断开前要取消未完成请求、清理工具注册表，并保留最后一次健康和失败原因。把所有 Server 永久保持连接会增加进程、socket、认证刷新和上下文管理成本；完全按每轮连接则会增加握手和发现延迟，需要按任务边界折中。\n\n关键词搜索适合工具名称和描述明确的场景，Embedding 适合同义词和自然语言，子代理搜索可以用小模型做二次筛选。可以组合关键词和向量检索，或让小模型对候选做二次筛选。权限过滤必须在结果暴露之前执行，不能仅把越权工具的排名降低；随后再根据可用性、新鲜度和任务相关性排序。搜索结果先返回简短摘要，模型选择候选后再取得完整 Schema，避免让检索本身重新制造上下文膨胀。\n\n```typescript\nsearch_tools({ query: \"查询过去一小时 API 错误率\" })\n// -> [{ name: \"prometheus_query_range\", description: \"PromQL 区间查询\" }]\nget_tool_details({ name: \"prometheus_query_range\" })\n```", "subs": []}, {"title": "7.2 如何组合工具缓存和 Prompt Caching", "content": "<!-- src: 10.txt -->\n\n在 2026-07-28 中，`server/discover`、各类 list（含 `resources/templates/list`）和 `resources/read` 的 `complete` 结果必须携带 `ttlMs` 与 `cacheScope`；不要把旧 Server 的兼容行为写成新 Server 可以省略字段。Host 可以缓存规范化 Schema、搜索索引和认证元数据，但缓存键必须包含 Server 身份、协议版本、权限上下文和工具版本。收到工具变更通知后，即使 TTL 未到，也要让相关条目失效。\n\nPrompt Caching 通常缓存稳定的系统指令和工具目录前缀。动态用户数据、短 TTL 结果和权限相关内容不能错误地进入共享缓存；工具数组中途排序或增删也可能使缓存失效。应观察命中率、过期刷新、错误命中和敏感数据泄露，不能只用命中率判断缓存策略是否正确。\n\n协议缓存减少 Host 到 Server 的发现往返，Prompt Caching 减少模型输入前缀的重复计费和处理。前者可以缓存完整 Schema，后者关心注入模型的顺序和断点；发现缓存命中不代表模型前缀仍然命中。设计缓存时应分别记录 TTL、命中率和失效原因，不要用一个“缓存有效”字段掩盖两层状态。\n\n用户角色变化、令牌刷新、Connector 禁用、Server 版本升级和 `list_changed` 都可能改变可见工具。缓存键需要包含权限上下文或其稳定摘要，命中后还要检查当前授权；不能把一个管理员会话的工具 Schema 直接复用给普通用户。缓存淘汰和重建过程也要避免把敏感结果写入共享存储。\n\n记录缓存键的 Server 和版本摘要、命中或未命中、命中时的年龄、失效原因和刷新耗时。不要把完整权限令牌或用户数据写进缓存指标。发现缓存连续命中旧版本、通知到刷新延迟过长或刷新失败率升高时，应暂时降低缓存 TTL 或退回实时发现，而不是继续使用可能错误的 Schema。\n\n`ttlMs` 表示从接收时刻计算的新鲜期，单位是毫秒。值为 0 表示立即过期，不是要求后台不停轮询；对于旧实现缺失 TTL 或提供非法值的情况，保守做法是不复用旧结果。即使 TTL 尚未到期，收到对应的 `list_changed` 通知也应使相关列表各页失效。\n\n`cacheScope=public` 表示结果可以跨用户共享，因此 Server 必须确保内容不随用户权限而变化；`private` 则只能在相同授权上下文中复用，不能将一个令牌下取得的私有数据交给另一个令牌的调用者。是否允许共享由数据含义决定，而不是由命中率决定。\n\nMRTR 的 `input_required` 是交互过程中的中间结果，不应当作普通结果缓存。携带 `requestState/inputResponses` 的重发即使最终完成，也不应进入通用结果缓存，因为它依赖特定请求与用户交互。\n\n缓存键的基础是 Server 身份、协议版本、方法、影响结果的参数；private 再加入 Host 验证后的授权上下文，包括租户与令牌代次。不要让用户在工具参数里自报 `tenant=admin` 来决定缓存分区，也不要把原始 token 写进可导出的缓存键。public 是可共享的声明，不是跳过工具实际授权的许可。\n\n列表分页分别计时，规范不保证跨页快照一致。需要一致目录时从无 cursor 的第一页重新获取；cursor 失效时丢弃本轮部分结果并重新开始，不能带着半份目录让模型继续调用。并发刷新宜合并请求，避免同一 TTL 到期时所有任务同时发起发现。主动轮询属于实现选择，需要 jitter、退避和并发上限。\n\n材料说明 `tools/list` 可以接受分页参数 `cursor`。第一页只代表一部分目录，Host 需要根据 `nextCursor` 继续获取，直到没有下一页。cursor 应被当作不透明值传回，不应自行猜测或用页号拼接。\n\n```text\n无 cursor 请求第一页\n    -> 收集工具定义\n    -> 有 nextCursor：原样带入下一次请求\n    -> 无 nextCursor：本轮目录获取结束\n```\n\n分页还需要防止无限循环和半份目录被当成完整目录。重复 cursor、持续出现下一页或中途读取失败时，应限制本轮获取并标明刷新失败。去重只能消除重复名称，不能证明跨页数据来自同一时刻；如果期间收到列表变化通知，就需要使相关页面失效并重新评估目录。\n\n“Host 已经缓存了完整定义”和“模型已经看到了这些定义”也不是一回事。Host 可以复用目录缓存，同时只把本轮需要的少量 Schema 放进模型上下文，这是发现缓存与渐进式加载配合的关键。\n\n协议目录刷新后不要随意重新排序模型的完整工具数组。可以将新发现定义追加到稳定前缀之后，或始终向模型暴露固定的 `call_tool` 元工具，由 Host 在内部路由；两种方式都必须保留逐工具授权与 Schema 校验。是否支持缓存断点、如何计费取决于模型供应商，不应把某一家前缀缓存行为当成 MCP 保证。记录目录缓存命中和模型前缀命中两个指标，分别解释节省了哪一段成本。\n\n依据：[缓存与分页规则](https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/caching)，本地 `10.txt` 的 Caching / Interaction with Prompt Caching。", "subs": []}, {"title": "7.3 Code Mode 怎样把多次调用变成一次受控执行", "content": "<!-- src: 10.txt -->\n\n程序化工具调用让模型生成一段代码，由沙箱中的类型化函数批量调用 MCP 工具、过滤结果和完成中间计算，最后只把摘要返回给模型。比如读取一小时错误日志、去重后为每类错误创建工单，日志条目和工单结果可以在沙箱与 Server 之间流转，不必逐条经过模型上下文。\n\nHost Broker 负责把沙箱函数映射到真实 Server，并保存令牌和连接凭据。沙箱不能直接访问网络、文件、进程或宿主环境变量，跨 Server 的结果要当作不可信输入；每次写工具调用仍要经过权限和确认策略。CPU、内存、执行时间和输出大小都要有上限，脚本 id、工具次数、拒绝原因和总耗时要能审计。\n\nHost 先依据工具 Schema 生成函数桩，模型再写一段调用这些函数的代码。沙箱拦截函数调用，通过 Broker 发送真实的 `tools/call`；结果回到沙箱后由代码过滤、聚合和去重，模型通常只看到最终返回值或 `console.log` 摘要。这样可以把大量中间数据留在执行环境，但不会自动降低工具本身的权限。\n\nServer 没有声明 `outputSchema` 时，Host 可以先把结果当作通用文本或不透明对象，再由代码做有限处理；也可以由 Host 提供受控的提取入口，调用一个快速模型做一次类型提取，但不应放进高频循环，并且必须在进入后续工具前再次校验，防止字段丢失或幻觉。即使需要模型提取，网络调用也由 Host 完成，不能为此给沙箱开放模型 API 凭据。不能因为生成了 TypeScript 类型就认为结果一定符合类型，真正的约束仍在运行时。\n\n沙箱隔离的是模型生成代码和宿主资源，Broker 授权的是代码发起的每一次工具调用。批准一次脚本不应默认批准它未来所有循环迭代；可以按工具和本次运行授予类别性批准，但仍要检查目标、参数和数据流。跨 Server 的结果属于不可信输入，输出截断也不能代替数据外泄检测。\n\nJavaScript 可以使用带权限控制的 V8 或 Deno 运行时，Python 可以选择无 I/O 的受限解释器，Wasm 则提供能力型隔离。选择时看语言、启动成本、是否需要文件或网络、隔离强度和维护成熟度。无论运行时是什么，网络访问都应通过 Broker，凭据由 Host 在向 Server 转发请求时附加，不能注入沙箱变量或暴露给生成的代码；资源上限和审计字段保持一致。\n\n#### 工具失败怎样变成脚本可以处理的异常\n\nMCP 工具可能以成功的 JSON-RPC 响应携带 `isError=true`。如果生成的函数包装层直接把它作为普通返回值，脚本可能继续用错误文本计算或创建工单。因此材料建议包装层将工具错误转成异常，让模型生成的代码可以使用 `try/catch`。transport 和协议错误也需要明确暴露，但应保留与工具业务失败的区别。\n\n```text\n收到 MCP 响应\n    -> transport 或协议失败：报告对应异常\n    -> 工具 isError=true：转成可捕获的工具异常\n    -> 工具成功：转换并校验返回值，再交给脚本\n未捕获的异常 -> 结束本次脚本 -> 将失败信息作为执行结果送回模型\n```\n\n例如脚本计划为三类错误创建工单，前两次成功，第三次失败。执行结果应说明已创建的两张工单、失败的步骤以及尚未执行的部分，不能只说“脚本失败”让模型重跑全部操作。跨工具脚本不是自动具备回滚能力的数据库事务；已提交副作用仍然存在。\n\n只读步骤在预算内可能重新执行，写步骤则要结合幂等标识或已完成记录决定是否继续。模型负责向用户解释部分完成情况，Host 和 Broker 的调用记录提供事实依据，不能让模型凭记忆推断外部系统是否已经发生变更。", "subs": ["工具失败怎样变成脚本可以处理的异常"]}, {"title": "7.4 怎样判断组合模式是否值得引入", "content": "<!-- src: 10.txt -->\n\n工具少、任务简单且结果较小时，直接调用更容易审计。工具目录或中间数据明显超过上下文预算时，可以先渐进发现，再在沙箱中程序化执行。连接 Server 的启停应尽量按会话或任务边界管理，频繁在每轮切换会增加发现开销并破坏 Prompt Cache。\n\n验证时用同一组任务比较直接调用、渐进发现和组合模式，记录上下文 Token、首字节延迟、工具选择错误、沙箱拒绝率、失败恢复时间和单位任务成本。目标是端到端任务成功与可恢复性，而不是单独追求更少 RPC 或更高缓存命中。\n\n准备三类任务：单次只读查询、需要多工具串联的分析、包含写操作的受控变更。每类任务固定输入和权限，分别运行直接调用、渐进发现和组合模式，记录工具目录大小、发现耗时、模型轮次、结果字节数、失败类型和人工确认次数。重复多轮后再比较平均值和异常值，避免用一次偶然的缓存命中得出结论。\n\n如果 Code Mode 的沙箱启动、策略配置和调试成本超过节省的 Token，或者任务本身只有一次查询，就退回直接调用。性能优化不能牺牲可审计性；当工具目录变小、上游结果变短或模型供应商已经提供原生搜索时，也应重新评估自建的发现和执行层。\n\n除了输入 Token，还要记录中间工具结果字节数、模型轮次、沙箱执行时间、下游请求数和人工确认次数。一个方案可能减少 Token，却因为查询次数翻倍或失败重试增多而更贵。用单位任务成本和成功率一起判断，才能区分“上下文变小”和“系统真的变好”。", "subs": []}]}, {"title": "第 8 章 · MCP 安全和运维落地", "sections": [{"title": "8.1 怎样画出 MCP 的信任边界", "content": "<!-- src: 12.txt -->\n\n安全设计要明确用户是谁、哪个组件代表用户访问上游、谁保存令牌、Server 能访问哪些资源，以及哪些结果会进入模型和日志。用户、Host、Client、Server、身份提供商、外部 API 和受保护数据之间的每条边，都要标记身份、目标、权限和数据流。\n\n本地 stdio 主要受启动用户、依赖来源、文件目录和宿主网络影响；远程 HTTP 还要加入 TLS、租户隔离、出站策略和令牌受众。一个服务账号同时代表多个用户时，Server 必须按验证后的调用者绑定授权，不能把服务账号的能力直接当成用户权限。\n\n每个工具都要明确谁可以调用、它能访问什么、它会改变什么，以及结果会流向哪里。用户身份、Server 身份和上游资源身份是三件不同的事，不能用 TLS 证书或工具描述代替授权。设计评审应把答案落到 ACL、令牌校验、出站策略、日志字段和演练用例上。\n\n本地 Server 的主要风险来自下载依赖、启动命令、宿主权限和本地 IPC；远程 Server 还面临跨租户请求、OAuth 重定向、SSRF 和多用户令牌混淆。安全控制要跟 transport 一起设计，不能把本地 stdio 的“没有网络端口”误认为代码已经被沙箱隔离，也不能把远程 HTTPS 误认为上游授权已经完成。\n\n从用户输入开始，画出它经过 Host、Client、Server、授权服务器、下游 API、缓存和日志的路径。每跨过一个边界，都标记身份是否变化、数据是否变得更敏感、动作是否产生副作用。这样能发现“看起来只是查询”的工具其实把凭据或完整日志转发给另一个 Server，也能发现日志和 Prompt 可能成为新的数据出口。", "subs": []}, {"title": "8.2 如何防止 Confused Deputy 和 Token Passthrough", "content": "<!-- src: 12.txt -->\n\nConfused Deputy 是高权限组件被低权限请求诱导执行未授权动作。MCP 代理可能用一个静态上游 OAuth 客户端代表多个用户，如果没有为每个客户端和用户保留同意关系，就可能跳过用户授权。Token Passthrough 则是把客户端收到的令牌原样转发给不应接收它的下游，导致受众、签发者和权限边界失控。\n\n防护时，Server 应验证令牌的 issuer、audience、资源绑定和调用者身份，不接受任意用户令牌，也不能只凭“持有令牌”就允许访问另一个资源。每次代理转发都要重新进行资源和操作授权；令牌不能进入日志、错误消息、通用业务结果缓存或工具结果；OAuth 客户端确有需要保存的令牌应进入专用受保护凭据存储。检测上应记录调用者、目标资源、授权结果和拒绝原因，而不是记录完整令牌。\n\n一个 MCP 代理可能使用静态客户端标识访问第三方 OAuth 服务，同时为不同 MCP Client 动态注册入口。如果第三方授权服务器只依赖已有的同意 Cookie，恶意 Client 可能借助代理绕过用户确认。防护重点是把 MCP Client、用户和第三方资源的同意关系分别保存，并在代理转发前重新确认调用者和目标。\n\n收到令牌时先检查签发者、受众、作用域和过期时间，再决定是否为目标资源换取新的令牌或使用服务端凭据。不要把“客户端已经验证过”当作下游可以信任的理由；不同资源服务器的令牌即使格式相同，也不能互换。事件排查时可根据 token hash、调用者和目标资源关联，而不记录令牌原文。\n\n```mermaid\ngraph TD\n    U[User token] --> C[Client validation]\n    C --> S[MCP Server authorization]\n    S --> A[Target resource token]\n    S --> D[Reject wrong audience]\n    A --> X[External API]\n```\n\n考虑一个代理用固定上游 `client_id` 访问第三方，用户此前已经在第三方同意过该代理。攻击者注册新的 MCP Client，让用户打开代理授权入口；如果代理只检查第三方的登录 Cookie，就可能把“同意过代理”误当成“同意这个新 Client”，最终将授权码重定向给攻击者注册的地址。\n\n防护顺序必须明确：验证已注册的 Client 和 redirect URI；按“用户 + MCP Client + 资源 + scopes”检查同意；缺少同意则显示代理自己控制的授权页面；用户接受后再跳转到第三方。第三方同意、MCP 代理同意、某次工具调用确认是三个不同记录，不能互相替代。\n\n```mermaid\nsequenceDiagram\n    participant C as MCP Client\n    participant U as User Browser\n    participant P as MCP Proxy\n    participant A as Upstream Authorization\n    C->>U: Open proxy authorization URL\n    U->>P: Registered client and redirect\n    P->>P: Check user client resource scopes\n    P-->>U: Proxy owned consent page\n    U->>P: Accept or decline\n    P->>A: Start upstream authorization only after accept\n    A-->>P: Code for proxy\n    P-->>U: Redirect only to registered client URI\n```\n\n在隔离 OAuth 测试环境准备同一用户、已批准 Client A、未批准 Client B，并让上游保持已有登录态。B 发起授权时必须停在代理同意页面；拒绝后应没有上游 token exchange、没有授权码发往 B。再用 A 请求新增 scope，确认旧的低权限同意不会自动覆盖新增范围。回调还要校验 state、issuer、PKCE 和精确 redirect URI，不能把“页面出现过”当成整个 OAuth 流程安全。\n\n#### 同意页面、Cookie 与 state 怎样共同阻止绕过\n\n只出现过一个同意页面仍不够，回调必须能证明当前授权流程已经经过该用户对该 Client 的同意。源材料对 MCP 代理场景给出了以下保护要求：\n\n同意记录应按用户保存已批准的 `client_id`，并在开始第三方授权前检查。同意页面要明确展示 Client、具体 scope 和已注册的 redirect URI，使用 CSRF 防护，并通过 `frame-ancestors` 或 `X-Frame-Options: DENY` 防止点击劫持。重定向地址必须与注册值精确匹配，不能用通配符把授权码送到未登记的目标。\n\n如果使用同意 Cookie，材料要求采用 `__Host-` 前缀、`Secure`、`HttpOnly` 和 `SameSite=Lax` 属性，并使用签名或服务端状态保护其完整性。第三方授权的 `state` 则应安全随机、单次使用、短期有效，并在回调时精确匹配。Cookie 保护浏览器保存的状态，state 关联一次授权流程，两者承担不同职责。\n\n在这条代理流程中，跟踪第三方授权 `state` 的 Cookie 或会话应在用户明确同意之后、重定向到第三方之前建立；缺失或不匹配的回调必须拒绝。若先建立可接受回调的状态，再让用户看到同意页面，攻击者可能绕过页面直接完成回调。这个时序针对材料描述的代理授权流程；不要将用于保护同意表单的 CSRF 状态与第三方授权状态混为一谈。\n\n这些检查分别约束页面、浏览器状态、回调和 Client 身份，互相不能替代。保存审计信息时记录同意对象、scope 和结果，不记录授权码或令牌原文。", "subs": ["同意页面、Cookie 与 state 怎样共同阻止绕过"]}, {"title": "8.3 SSRF、状态句柄和本地 Server 风险怎样形成", "content": "<!-- src: 12.txt -->\n\nSSRF 的关键不是某个组件名字中有“Server”，而是攻击者能否诱导一个拥有网络权限的组件请求非预期地址。源材料重点讨论 MCP Client 获取 OAuth 元数据时的 SSRF；此外，授权服务器获取客户端元数据、MCP Server 抓取外部 URL，也可能成为相同攻击的入口。\n\n#### OAuth 元数据为什么会让 Client 成为攻击跳板\n\nClient 连接陌生的 MCP Server 后，可能按照 `WWW-Authenticate` 中的 `resource_metadata` URL 读取受保护资源元数据，再读取 `authorization_servers` 指向的授权服务器元数据，最后使用其中的 `authorization_endpoint` 或 `token_endpoint`。每一步都引入了新的 URL，不能因为最初 MCP endpoint 使用 HTTPS，就信任后续所有目标。\n\n```mermaid\nsequenceDiagram\n    participant C as MCP Client\n    participant M as Malicious MCP Server\n    participant I as Internal Service\n    C->>M: Connect\n    M-->>C: 401 with untrusted resource_metadata URL\n    C->>C: Missing URL and IP checks\n    C->>I: Fetch attacker selected internal URL\n    I-->>C: Internal data or service response\n    C-->>M: Possible leakage through later requests or errors\n```\n\n这个攻击可能在第一次 `tools/call` 之前就发生。风险包括读取云元数据凭据、探测内网服务，以及把内部响应放进错误消息泄露给攻击者。限制工具参数中的 URL 不能替代 Client 自身的 OAuth 出站校验。\n\n| 请求由谁发出 | 不可信地址来自哪里 | 主要防护责任 |\n| --- | --- | --- |\n| MCP Client | 认证 challenge、受保护资源及授权服务器元数据 | 校验 OAuth 发现链路中的每个目标 |\n| 授权服务器 | CIMD 形式的客户端元数据 URL | 限制未知 Client 诱导的出站请求 |\n| MCP Server | 工具参数或下游返回的后续 URL | 限定业务访问目标，校验跳转和派生地址 |\n\n生产 OAuth URL 应使用 HTTPS，并对不可信抓取目标限制私网、回环、链路本地、云元数据和保留地址；开发例外必须显式设置。HTTPS 只保护传输，不能阻止访问一个本就不该访问的地址。重定向的每一跳也要执行相同检查，或禁用自动跟随再逐跳处理。\n\nDNS 首次解析为公网、真正建立连接时变成内网，就是检查与使用之间的 TOCTOU 问题。只做一次域名检查不足以防止 DNS rebinding，应让连接使用经过校验的解析结果，或通过带地址限制的出站代理落实策略。IPv4 映射 IPv6、八进制、十六进制等表示法也会绕过简单字符串判断，优先使用成熟解析库。\n\n管理员明确配置的内部 Prometheus 与陌生 Server 提供的任意 URL 属于不同信任条件。前者可以按业务需要授权特定地址和端口，后者不能继承这项例外。判断一次防护是否有效，要确认请求是否真的到达非授权目标，不能只依据最终工具返回了错误。\n\n#### 状态句柄被猜到为什么不应造成越权\n\nMCP 无状态并不禁止 Server 保存购物车、工作流或任务。Server 可以把句柄返回给 Client，之后每次请求由 Client 带回。但若 Server 只按句柄查找数据，而不检查它属于谁，攻击者获得句柄后就能读写别人的状态。\n\n正确边界是每次验证请求身份，再检查句柄归属。例如状态按“经过验证的 user_id + handle”关联，不能接受调用者自报的 `user_id` 决定权限。高熵随机值、短期有效和撤销机制减少句柄泄露的影响，但不能代替归属校验。协议没有隐式会话，不代表应用可以省略授权。\n\n#### 本地进程的权限从哪里来\n\n本地 Server 是实际运行的程序，权限来自启动用户、宿主策略和沙箱。依赖包、启动命令或程序本身被替换后，即使工具描述宣称只读，代码仍可能读取凭据、执行子进程或发起网络请求。允许目录参数只是 Server 实现的一项限制，不是对恶意代码的隔离证明。\n\n材料要求支持一键添加本地 Server 的 Client 在执行前展示完整命令及参数，说明本地代码执行风险，并允许用户拒绝。进程应使用最小文件和网络权限。直接 stdio 可以避免额外开放 HTTP 端口，但不是沙箱；若本地 Server 使用 HTTP，还需要认证或受权限限制的 IPC，不能把 localhost 当作只有当前应用可以访问。\n\nSSRF 关注目标摘要、DNS 结果、跳转和出站策略；句柄越权关注认证用户、句柄归属和访问结果；本地进程事件关注启动命令、依赖版本、进程树与文件访问。它们分别回答“请求去了哪里”“状态属于谁”“什么代码拥有宿主权限”。保存这些信息时仍需脱敏，不能在排障日志中再次泄露凭据。", "subs": ["OAuth 元数据为什么会让 Client 成为攻击跳板", "状态句柄被猜到为什么不应造成越权", "本地进程的权限从哪里来"]}, {"title": "8.4 OAuth URL、Mix-Up、localhost 和 CIMD 有哪些边界", "content": "<!-- src: 12.txt -->\n\n客户端收到 OAuth 授权 URL 后，必须只允许 `http` 或 `https`，生产授权服务使用 HTTPS，loopback 开发地址才可例外使用 HTTP。不能通过 shell 打开 URL，也不能接受 `javascript:`、`data:`、`file:` 或任意跳转。stdio 代理场景还要固定可执行文件、参数模板和环境变量，防止浏览器侧问题升级为本地命令执行。\n\nMix-Up 攻击利用客户端在多个授权 Server 之间混淆响应。客户端要把授权响应绑定到发起请求时记录的 Server，校验 `state`、`issuer`、redirect URI 和 token 受众；PKCE 单独使用不能解决把 code verifier 发送给错误 token endpoint 的问题。localhost 重定向不能仅凭端口识别进程，授权页面应显示明确的主机和重定向目标。接受 Client ID Metadata Documents 时，授权 Server 还应按受信域名、HTTPS、信誉和证书策略决定是否信任。\n\n授权 URL 只允许 `http` 和 `https`，生产授权服务使用 HTTPS，loopback 开发地址才例外使用 HTTP。打开 URL 时使用平台提供的非 Shell API，拒绝 `javascript:`、`data:`、`file:` 和包含命令注入语义的输入。代理层固定可执行文件、参数模板和环境变量，不能把 URL 或远程参数拼成任意本地命令。\n\n#### 浏览器漏洞为什么可能升级为本地代码执行\n\n材料中的 stdio 代理攻击有特定前提：一个独立代理能够接收请求并启动本地 Server，而客户端浏览器环境受到 XSS 等攻击。攻击者窃取 Client 到代理的认证令牌后，可能调用代理的进程启动功能，使代理以自己的系统权限运行恶意命令。\n\n这条链路不是“stdio 本身导致远程代码执行”。它依赖受攻击的客户端、可访问的代理控制面和过宽的进程启动权限。防护既要阻止不可信脚本执行，也要限制代理能启动的命令、隔离代理通信上下文，并约束代理和子进程权限。代理令牌有效不代表任意启动命令都应获准。\n\n#### Mix-Up 与 localhost 冒充各自混淆了什么\n\nMix-Up 混淆的是授权响应来自哪个授权服务器。Client 要在跳转前记录目标授权服务器，回调时验证 `iss` 与记录一致，再使用正确的 token endpoint。PKCE 无法单独补救“把 code verifier 一起发给攻击者 endpoint”的错误；材料还指出，依赖 `iss` 的防护需要合法授权服务器实际返回该字段，缺失时不能假定已经完成来源验证。\n\nlocalhost 冒充混淆的是客户端元数据所代表的应用与实际监听回调端口的本地进程。攻击者可以使用合法 Client 的 CIMD URL 作为 `client_id`，再在自己的本地端口等待授权码。授权页面显示了熟悉的应用名字，并不能证明回调接收者就是该应用。\n\n因此，CIMD 的 HTTPS 域名信任、redirect URI 校验和本地回调风险提示需要分别处理。元数据证明某个域名提供了什么声明，不证明谁控制某个 localhost 端口。\n\n接受 Client ID Metadata Documents 可以减少预注册成本，但授权服务器要决定哪些域名和证书来源值得信任。受保护服务可以使用域名 allowlist，开放服务可以接受 HTTPS 后再结合信誉、域名年龄和用户展示做判断。无论选择哪种策略，都要在授权页面清楚展示客户端元数据和重定向主机，降低钓鱼和误授权风险。\n\nissuer、redirect URI、state 或 audience 校验失败属于确定性安全失败，应立即停止流程并记录原因；网络暂时不可用可以有限重试，但每次重试都要使用新的授权请求状态。认证过期时清理旧的工具注册表和缓存，不能让旧令牌继续调用已发现的工具。", "subs": ["浏览器漏洞为什么可能升级为本地代码执行", "Mix-Up 与 localhost 冒充各自混淆了什么"]}, {"title": "8.5 数据外泄和权限提升如何通过最小权限控制", "content": "<!-- src: 12.txt -->\n\n数据可能从工具参数、工具结果、错误消息、日志、缓存、Prompt 或模型上下文泄露。脱敏要在数据离开受保护边界前完成，缓存要绑定权限范围，结果大小和内容类型要受限。权限提升常见于工具组合，例如一个工具读取凭据，另一个工具执行高权限动作，因此高风险工具应拆分权限并设置二次确认。\n\n范围设计应从低风险只读能力开始，在确实需要时通过精确的 `WWW-Authenticate` challenge 逐步提升。客户端分别记录申请与实际授予的范围，并在重新授权时合并历史申请与新的挑战，Server 则继续在每次工具调用时做授权判断。测试不应只验证单个工具，还要覆盖“读取凭据后调用写操作”、跨租户访问和缓存复用等组合路径。\n\n最小权限设计应争取让初始令牌只包含发现和只读所需范围，高风险操作在首次使用时触发精确的 step-up 授权。Server 可以把相关工具分成不同 ACL，避免一个“全能”范围同时允许读凭据、写配置和删除资源。工具结果还要按用户权限过滤，不能因为调用者拥有某个工具就返回该资源的全部字段。\n\n授权服务器可能只授予申请范围的一个子集。Client 应按实际结果判断能力，Server 应接受足以完成当前操作的较小权限令牌，而不是要求每个令牌都覆盖整个工具目录。用户拒绝某个高权限 scope 后，已获准的低风险任务仍可以继续，不能把拒绝解释为对整个服务的授权。\n\n材料建议 Client 在重新授权时计算“此前申请的 scope 与新 challenge scope 的并集”，以免提权时无意丢失历史范围。这是构造授权请求的规则，不是说并集必然会被授予；用户同意和授权服务器的最终裁决仍然有效。近期被拒绝的提权应有抑制机制，避免同一任务反复弹出授权页面。\n\nscope 还可能存在层级关系，例如某个较广范围包含一个较窄范围。Server 判断操作是否允许时，要依据授权语义，而不只是比较字符串是否相同。Client 合并申请范围时不必自行推导所有层级关系，但必须尊重最终授予的结果。\n\n#### 初始 challenge 没有 scope 时为什么容易扩大权限\n\n`12.txt` 说明：初始 `WWW-Authenticate` 没有 `scope` 时，材料引用的策略让通用 Client 回退到申请 `scopes_supported` 中列出的范围。通用 Client 往往没有业务知识，不能自行猜测哪几项已经足够；这也意味着 Server 发布的元数据会直接影响默认申请范围。\n\n所以“最小权限”需要 Server、Client、授权服务器和用户共同落实。Server 应给出精确 challenge，避免每次都返回整个 scope 目录；也应谨慎设计 `scopes_supported`，避免把无关或全能权限打包在一起。确需减少交互次数时可以组合紧密相关的权限，但要说明用途，不应以“以后也许会用到”为由申请全部能力。\n\n日志记录调用者、工具、目标、结果状态和耗时即可；PromQL、SQL 或文件内容可用哈希、长度和安全摘要关联。缓存键必须绑定权限上下文和 Server 版本，权限变化或工具撤销时立即失效。排查外泄事件时，先确认数据离开了哪个边界，再决定撤销令牌、清理缓存还是禁用工具，避免只修改最终回答格式。\n\n除了“角色 A 能否调用工具 X”之外，还要测试“角色 A 先读取什么，再调用工具 Y”是否会形成越权路径。把工具、Resource、用户角色、租户和副作用列成矩阵，明确哪些组合需要二次确认或禁止。矩阵版本应与工具 Schema 一起发布，避免权限策略落后于新增工具。\n\n攻击不一定要调用越权工具。若管理员 A 的 `resources/read` 结果以 URI 为唯一键保存，普通用户 B 读取相同 URI 时可能直接拿到 A 的数据，Server 的工具 ACL 根本没有被再次执行。相同 username 但不同令牌代次也不能无条件复用 private 结果，撤权后尤其如此。\n\n准备 A、B 两个不同授权上下文，让 A 缓存带唯一标记的 private 数据。B 用相同 Server、method、URI 访问时应 miss；A 换令牌也应 miss；只有明确不含用户差异的 public 结果才可共享。再发 `list_changed`，确认所有分页缓存失效，而非仅删除首页。\n\n这个例子需要同时检查三层缓存：Host 的协议结果缓存、可能存在的网关缓存，以及模型上下文中已经加载的内容。Server 端 ACL 正确也无法修复已经错误共享的结果；仅让缓存过期，也不会自动从现有对话历史中移除敏感数据。\n\n理解缓存隔离时，应沿“结果是否依赖身份—缓存键是否包含该身份边界—权限变化后如何失效”逐步判断。审计只记录上下文摘要和命中原因，不应为了证明隔离而把另一个用户的数据正文写进日志。", "subs": ["初始 challenge 没有 scope 时为什么容易扩大权限"]}, {"title": "8.6 如何建立可定位、可撤销的运行闭环", "content": "<!-- src: 12.txt -->\n\n统一观测字段应包含 Server 名称和版本、协议版本、transport、request id、方法、工具名、调用者、耗时、结果大小、错误类型、重试次数和审批结果。以 request id 为主键，可以把 Host 请求、Client 的 `tools/call`、Server 业务日志和下游 HTTP 请求串起来；参数和结果只保存脱敏摘要。\n\n故障定位按层次推进：先确认 Host 配置，再确认 Client 连接和发现，再确认权限上下文和参数校验，随后检查 Server 到下游的请求，最后判断结果是否被超时、大小限制、缓存或安全策略截断。发现令牌泄露、越权组合或异常出站时，先撤销令牌并禁用相关工具，保留事件时间线和版本信息，恢复前重新执行正反向权限测试和回滚演练。\n\n观测记录应能还原请求顺序与权限判断，而不必保存完整参数。敏感字段可以通过脱敏摘要或受控哈希关联，不能为了复盘把令牌和完整业务数据再次写入日志。\n\n先暂停高风险工具或整个 Connector，再撤销可能泄露的令牌和会话；随后保存日志、配置、依赖版本、进程和网络证据，最后修复并重新部署。恢复前要用失败用例证明 SSRF、越权、重定向和令牌泄露路径已被阻断，并检查缓存和模型上下文中没有残留敏感数据。只重启进程而不撤销凭据，通常不能结束事件。\n\n“只读工具没有风险”忽略了数据外泄和昂贵查询；“客户端已经确认过”忽略了 Server 端必须重新授权；“localhost 只有本机可访问”忽略了恶意进程、DNS rebinding 和代理暴露；“PKCE 足够安全”忽略了 Mix-Up；“日志只在内部使用”忽略了日志聚合、缓存和调试导出。把这些假设写进评审模板，有助于在设计阶段主动反证。", "subs": []}]}, {"title": "第 9 章 · 串联 MCP 知识与运维判断", "sections": [{"title": "9.1 怎样建立从协议到系统的学习路径", "content": "<!-- src: 1.txt; 2.txt; 5.txt; 6.txt; 7.txt; 8.txt; 9.txt; 10.txt; 12.txt -->\n\n学习 MCP 可以沿着“定位—通信—能力—编排—边界”逐层推进。前一层帮助解释后一层：先知道 Host、Client 与 Server 谁负责什么，再理解报文如何流动，随后讨论模型为什么会调用工具、结果如何进入上下文，最后分析规模和安全问题。\n\n第 1、2 章先解释 MCP 标准化什么，以及参与者、请求和能力之间的关系；第 3、4 章再把通信方式放进接入与部署场景。理解这些之后，第 5 章的插件就可以看成一个具体实例：它用工具契约接收查询，用下游客户端取得指标，再把结果交回协议层。\n\n第 6 章继续解释模型怎样参与这条链路。第 7、8 章则分别考察能力增多后的成本和跨越信任边界时的风险。学习顺序从“如何工作”走向“什么时候会失效”，最后才能判断一种优化或安全措施究竟约束了哪一层。\n\n以“查询过去一小时的请求速率”为例：Host 把用户问题和可用工具定义送给模型；模型选择 `prometheus_query_range` 并给出 PromQL、起止时间与步长；Client 发送 MCP 请求；插件检查参数结构与配置，访问 Prometheus 并整理结果；Host 保留调用关联，把结果交给模型形成解释。\n\n换成“分析过去一小时的服务异常”，链路不变，但数据边界、查询成本与权限可能更复杂。工具协议相同不意味着授权可以复用，也不意味着最终结论同样可靠；结论必须受查询范围、结果完整性和下游状态约束。\n\n“工具列表可读但调用被拒绝”说明发现与具体操作授权不同；“HTTP 200 但工具失败”说明传输成功与业务成功不同；“有进度但没有最终结果”说明通知与完成状态不同；“Server 已撤销权限但模型仍记得旧数据”说明服务端权限与已加载上下文不同。\n\n这些反例可以直接通过正文中的报文和数据流分析，不以搭建完整工程为前提。需要进一步实践时，再将某个反例转换成有明确预期的操作场景，而不是为了学习协议先承担整套生产部署。\n\n协议知识回答消息、方法、能力与结果怎样解释；实现选择回答使用何种 SDK、怎样缓存、是否采用 Code Mode；业务约束回答谁可以访问什么、结果有效范围是什么、操作是否有副作用。三者应分别记录，不能把 Prometheus 插件的超时设置、某个 SDK 的字段写法或一项团队审批策略当成所有 MCP 实现的统一规则。", "subs": []}, {"title": "9.2 上线评审如何判断一个 MCP Server 是否可交付", "content": "<!-- src: 1.txt; 5.txt; 6.txt; 7.txt; 8.txt; 9.txt; 10.txt; 12.txt -->\n\n评审先确认服务对象、数据范围和副作用，再确认部署路径和认证；随后检查工具 Schema、超时、幂等、限流和错误契约，最后看上下文成本、沙箱隔离、OAuth、SSRF 和本地执行风险。这样的顺序可以先排除不该暴露的能力，再讨论性能和体验。\n\n评审材料应包括配置和权限矩阵、一次成功与一次拒绝调用的日志、超时或下游 5xx 演练、工具目录或缓存策略、OAuth 与 SSRF 测试结果，以及禁用工具和回滚步骤。高风险工具缺少调用者、审批、幂等或回滚证据时，应暂停上线；日志无法串联 request id 或令牌会进入模型上下文时，也应先修复缺口。\n\n如果只有“endpoint 返回 200”而没有工具调用和拒绝调用证据，不能判定上线；如果失败只能靠人工重启、日志无法串联 request id，或令牌会进入模型上下文，应先修复运维和安全缺口。高风险能力还要有禁用、撤销和回滚的明确负责人，避免事件发生后临时寻找操作路径。\n\n```text\n发布前: 版本冻结 -> 权限矩阵 -> 正反向调用 -> 故障演练\n上线后: 健康检查 -> 指标告警 -> 审计抽查 -> 定期复演\n事件中: 禁用工具 -> 撤销令牌 -> 保存证据 -> 修复回滚\n```\n\n工具、依赖、上游认证和数据边界任何一项变化，都应触发一次小范围复查；新增高风险工具或更换 transport 时，重新执行完整演练。即使没有代码变化，也要定期验证令牌撤销、缓存失效、下游限流和回滚路径仍然有效，因为这些能力依赖外部系统状态。", "subs": []}, {"title": "9.3 MCP 学习和运行中最值得保留的判断问题", "content": "<!-- src: 1.txt; 5.txt; 6.txt; 7.txt; 8.txt; 9.txt; 10.txt; 12.txt -->\n\n遇到任何工具，先问它读取了什么、改变了什么、代表谁访问上游、失败后能否安全重试。遇到任何连接，先问 Host 是否加载配置、Client 是否完成发现、Server 是否验证权限、下游是否返回了可解释结果。遇到任何优化，先用代表性任务比较 Token、延迟、成功率、拒绝率和单位成本。\n\n这些问题把 MCP 从“模型可以调用的工具集合”还原成一条可观察、可审计、可恢复的服务链。只要每次变更都能回答谁能调用、调用经过哪些策略、失败怎样恢复、事后如何证明发生了什么，MCP 才真正适合进入运维系统。\n\n先画出 Host、Client、Server、身份提供商和下游资源，再列出每个工具的输入、输出、副作用和权限；随后为正常、错误、超时、取消和撤销各准备一个测试；最后把 request id、版本、调用者、结果状态和恢复动作写进运行手册。这样学习笔记就不只是协议说明，而能成为设计评审和故障演练的起点。\n\n把 Prometheus 查询方式迁移到日志或 CMDB 时，先说明外部系统的数据模型，再定义工具输入、结果语义和授权范围。指标查询的“没有样本”、日志检索的“没有匹配记录”和 CMDB 查询的“没有资源”都属于有范围的查询结论，不能被替换成“系统正常”。保留这种区分，再考虑超时、缓存、调用组合与部署方式，才能把协议知识迁移到自己的场景。", "subs": []}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

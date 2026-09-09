@@ -59,6 +59,9 @@ flowchart LR
   root --> aiAgent[AI Agent]
   aiAgent --> deepAgent[DeepAgent]
   aiAgent --> claudeAgentSdk[Claude Agent SDK]
+  aiAgent --> agentExtensions[Agent 扩展工程]
+  agentExtensions --> agentSkills[Agent Skills]
+  agentExtensions --> mcp[MCP]
 
   classDef rootNode fill:#1d4ed8,stroke:#1e3a8a,color:#ffffff,stroke-width:3px
   classDef categoryNode fill:#dbeafe,stroke:#3b82f6,color:#172554,stroke-width:2px

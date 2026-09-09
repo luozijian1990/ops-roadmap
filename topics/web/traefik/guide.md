@@ -1,0 +1,3727 @@
+# Traefik 系统学习笔记
+
+## 第 01 章 · Getting-Started · 入门与配置模型
+
+### Traefik 和 Nginx 的代理职责如何对应
+<!-- src: temp/new-traefik/01-Getting-Started.md; temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/22-Routing.md -->
+
+学习 Traefik 的入口是“如何把一个客户端请求交给正确后端”。它与 Nginx 都能承担反向代理、TLS 终止和负载均衡，但 Traefik 把服务发现纳入了配置更新流程。容器地址、标签或 Kubernetes 对象发生变化时，Provider 将基础设施状态转换为路由配置。应用发布与代理配置因此可以协同变化。
+
+本笔记以采集的 Traefik 3.6 文档为基线，使用 v3 规则语法。材料中夹杂旧版本示例，涉及字段冲突时以迁移说明和对应字段页交叉核对。实验中的预期结果是学习验收标准；实际执行版本和验证状态见本主题 README，不能把文中的预期当作已运行记录。
+
+#### 从 Nginx 对象迁移，而不是逐行翻译指令
+
+| 熟悉的 Nginx 概念 | Traefik 中的近似职责 | 不能照搬的地方 |
+| --- | --- | --- |
+| `listen` | EntryPoint 监听地址与协议 | EntryPoint 是启动配置，Router 是动态配置 |
+| `server_name` | Router 的 `Host` 匹配器 | 不使用 Nginx 的 server_name 选择优先级 |
+| `location` 条件 | Router 的 `Path`、`PathPrefix` 等规则 | 路径改写后不自动按 Nginx 的 rewrite/location 阶段重新匹配 |
+| `upstream` | Service 后端和负载均衡 | Provider 负责发现配置，并不是 upstream |
+| 访问控制、重写指令 | Router 引用的 Middleware | 配置显式有序链，需理解提前返回行为 |
+| 配置生成与 reload 流程 | Provider 发现与路由热更新 | 静态端口变化仍需要进程重启 |
+
+例如一个 Nginx 站点把 `/api` 代理到两台应用，Traefik 中应先设计监听入口，再声明匹配条件、路径处理与后端服务器列表。不能把一个 `server` 块机械改名成一个 Router，因为原块里可能同时包含监听、TLS、认证和多个 location 的职责。
+
+#### 能力边界和迁移判断
+
+Traefik 不负责替应用提供所有 Web 内容服务。Nginx 的文件服务、缓存与模块行为不能因两者都能反向代理就认为一一对应。对静态文件或缓存有要求时，要先确定由哪个后端或专门组件承担，再配置 Traefik 路由。
+
+练习时拿一个现有站点，列出域名、端口、路径、改写、认证和后端地址六项契约。把每项放入上表对应对象，并标记哪些依赖应用逻辑。能解释这些归属，再开始写 YAML，能避免把启动字段放入动态文件的常见错误。
+
+### 一次请求如何经过监听、匹配、策略和后端
+<!-- src: temp/new-traefik/01-Getting-Started.md; temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/22-Routing.md -->
+
+EntryPoint 先接收连接。HTTP Router 根据请求内容判断是否匹配；匹配后依序进入 Middleware，最后由 Service 选择后端。Middleware 可以修改请求，也可以直接拒绝或返回重定向，此时不会继续访问业务后端。TLS 握手发生在能够读取 HTTP 路径之前，因此 TLS 选证书失败不能靠 Path 规则修复。
+
+```mermaid
+graph TD
+  P[Provider] -. 配置事件 .-> T[Traefik 路由对象]
+  C[客户端] --> E[EntryPoint]
+  E --> R[Router 匹配]
+  T -. 构建 .-> R
+  R --> M[Middleware 有序链]
+  M --> S[Service 选择后端]
+  S --> B[应用实例]
+  M --> X[提前拒绝或重定向]
+```
+
+图中虚线表示配置发现，实线表示请求处理。Provider 不处在每次请求必须经过的代理链路中；Docker API 暂时不可达和后端连接失败，是两种不同的故障。
+
+#### 用证据判断请求停在哪里
+
+| 观察 | 能证明的事 | 仍需确认的事 |
+| --- | --- | --- |
+| TCP 端口连接成功 | 某个进程正在接收连接 | 是否为目标 Traefik、正确协议 |
+| API 出现 Router | 对象已进入运行配置 | 规则是否命中、对象是否报告错误 |
+| Access Log 有 RouterName | 请求有路由关联信息 | Middleware 是否提前返回 |
+| 后端日志有同次请求 | 请求实际到达后端 | 后端响应是否又被代理修改 |
+
+没有 Router 命中通常会看到 Traefik 的 404，但后端也能返回 404。只凭状态码不够，应结合 Router、Service、OriginStatus 与 DownstreamStatus。第06章把这一判断扩展成完整的分层排障流程。
+
+#### 如何验证这一模型
+
+第02章环境提供一个 `app.localhost` Router 和两个可辨认后端。先请求正确 Host，再请求不存在的 Host，最后停止一个后端；三个操作分别改变匹配条件和可用目标。观察路由对象是否仍在、访问日志是否记录后端状态，能把“配置存在”“请求匹配”和“转发成功”区分开。
+
+## 第 02 章 · Quick-Start · 快速开始
+
+### 用 Compose 建立可重复的代理和后端环境
+<!-- src: temp/new-traefik/02-Quick-Start.md; temp/new-traefik/03-Setup.md -->
+
+本章建立后续 HTTP 实验的共同环境：Traefik、两个 whoami 后端、一个 File Provider 动态目录。先不用 Docker API 发现，便于看清 Router 与 Service 配置；第11章再增加 Docker Provider。这样即使没有 Socket 权限，也不会误把发现失败当成普通代理失败。
+
+#### 文件、端口与依赖
+
+在自行选择的空实验目录创建下列文件。需要 Docker Compose v2、curl 和 `htpasswd`；后者可由 Apache 工具包提供。实验只绑定宿主 loopback，HTTP BasicAuth 也仅用于这一隔离环境；跨主机管理入口应使用 TLS。
+
+```text
+traefik-lab/
+├── compose.yaml
+├── traefik.yml
+├── dynamic/
+│   └── routes.yml
+└── secrets/
+    └── users
+```
+
+创建凭据文件时交互输入专用实验密码，不把密码写入 shell 历史。`-c` 只在第一次新建文件时使用，否则会覆盖已有用户。
+
+```bash
+mkdir -p dynamic secrets
+htpasswd -cB secrets/users admin
+chmod 600 secrets/users
+```
+
+`compose.yaml` 完整内容：
+
+```yaml
+name: traefik-notes-lab
+services:
+  traefik:
+    image: traefik:v3.6
+    command: ["--configFile=/etc/traefik/traefik.yml"]
+    ports:
+      - "127.0.0.1:18080:80"
+      - "127.0.0.1:19000:9000"
+      - "127.0.0.1:18082:8082"
+    volumes:
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - ./secrets:/etc/traefik/secrets:ro
+  backend-a:
+    image: traefik/whoami:v1.11.0
+    hostname: backend-a
+  backend-b:
+    image: traefik/whoami:v1.11.0
+    hostname: backend-b
+```
+
+两个后端不发布宿主端口，通过 Compose 默认网络的 DNS 名互相可达。`http://backend-a:80` 是容器网络地址，不是宿主机地址。Traefik 3.6 的标签可用于学习基线，复现记录还应保存实际拉取镜像的 digest 和 `version` 输出，以免移动标签导致行为变化。
+
+`traefik.yml` 完整内容：
+
+```yaml
+entryPoints:
+  web:
+    address: ":80"
+  admin:
+    address: ":9000"
+  health:
+    address: ":8082"
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+api:
+  dashboard: true
+  insecure: false
+ping:
+  entryPoint: health
+log:
+  level: INFO
+  format: json
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: drop
+      names:
+        X-Request-ID: keep
+```
+
+`dynamic/routes.yml` 完整内容：
+
+```yaml
+http:
+  routers:
+    app:
+      entryPoints: [web]
+      rule: Host(`app.localhost`)
+      service: app
+    dashboard:
+      entryPoints: [admin]
+      rule: Host(`admin.localhost`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+      middlewares: [admin-auth]
+      service: api@internal
+  middlewares:
+    admin-auth:
+      basicAuth:
+        usersFile: /etc/traefik/secrets/users
+  services:
+    app:
+      loadBalancer:
+        servers:
+          - url: http://backend-a:80
+          - url: http://backend-b:80
+```
+
+#### 启动与业务验收
+
+```bash
+docker compose config --quiet
+docker compose up -d
+docker compose exec traefik traefik version
+curl -i -H 'Host: app.localhost' http://127.0.0.1:18080/
+curl -i -H 'Host: missing.localhost' http://127.0.0.1:18080/
+```
+
+正确 Host 应返回 whoami 信息，包含 `backend-a` 或 `backend-b` 的 Hostname；错误 Host 应得到未匹配路由的响应。连续请求用于观察两个实例，不把恰好一次 A/B 顺序当作严格轮询测试。`docker compose config` 只验证 Compose 结构和插值，不代表 Traefik 路由字段已被接受；继续看 `docker compose logs --tail=100 traefik` 与管理 API。
+
+若正确 Host 为 502，先确认后端容器运行和 DNS 名/端口；若全部 404，先看 File Provider 路径和 Router 错误。退出实验使用 `docker compose down`，它只删除本实验项目资源，凭据和配置仍保留在目录中。
+
+### Kubernetes 快速验证应保持多小的闭环
+<!-- src: temp/new-traefik/02-Quick-Start.md; temp/new-traefik/03-Setup.md -->
+
+Docker 快速开始验证了请求模型，Kubernetes 快速开始则验证 Controller、Service 和资源发现链路。需要已有独立测试集群、Helm 与 kubectl；首先检查 context，避免把学习清单应用到生产集群。
+
+| 步骤 | 最小产物 | 成功证据 |
+| --- | --- | --- |
+| 安装入口 | Traefik Controller 与入口 Service | Pod 正常且 Provider 无权限错误 |
+| 部署后端 | whoami Deployment 与 Service | Pod 就绪，EndpointSlice 有地址 |
+| 声明路由 | 一条 Host 路由 | 运行配置接受对象 |
+| 发起请求 | 正确 Host 到入口 | 返回实际后端标识 |
+
+第03章给出固定 Chart/渲染与安装流程，第31章提供完整应用和标准 Ingress/Gateway 清单。按顺序执行时，先用 HTTP 和 port-forward 形成闭环，再增加 TLS 和多租户；不要同时引入外部 DNS、ACME 和复杂认证，导致首次失败无法定位。
+
+`kubectl get pods` 显示 Running 只能证明容器进程状态。标准 Ingress 未声明正确 class、Service selector 不匹配、CRD 未安装或 RBAC 无权 watch，都能让入口无法工作。用上述四段证据识别停点，比重复重启 Controller 更适合作为入门练习。
+
+#### 统一实验包与依赖入口
+
+后续补强实验统一放在 [lab/README.md](lab/README.md)，包含固定镜像、A/B 可控后端、证书生成、Prometheus、Collector、前置代理和 Consul。它使用独立项目 `traefik-review-39` 和 28xxx 等端口，不与本章 18xxx 基础实验混用。先完成 `lab/README.md` 的启动步骤，再选一项实验；公开教学密码只用于该 loopback 环境。
+
+| 实验 | 前置与点击入口 | 验收入口 |
+| --- | --- | --- |
+| 第06章故障归因 | [第23章健康与失败](#第-23-章--load-balancing--http-负载均衡)、[第25章认证](#第-25-章--middlewares--http-中间件) | `client /checks.py core`，再运行 metrics |
+| 第07/10/22章路径 | [路径配置](lab/dynamic/routes.yml)；curl 支持 `--path-as-is` | 发送路径、命中 Router、后端 URI 三者对照 |
+| 第17章 ACME | [DNS 挑战操作](lab/README.md#dns-01-与续期)；真实域名与 Cloudflare Token | 权威 TXT、续期日志、实际握手 |
+| 第24章 mTLS | [证书脚本](lab/init-certs.sh)、[后端源码](lab/app/server.py) | 双腿认证和四种负向样本 |
+| 第18/23/25章 | 完整 Compose 基线 | metrics/core，摘除恢复与镜像日志 |
+| 第26–30/39章协议 | [proto](lab/app/echo.proto)及同一后端镜像 | `client /checks.py protocols` |
+| 第13/36章 Catalog | Compose 中 Consul；无需 Docker Socket | `client /checks.py catalog` |
+| 第31/33–35章 CRD | [集群操作](lab/README.md#kubernetes-复用端点)；测试集群及固定 CRD | schema、EndpointSlice、协议请求 |
+
+`client /checks.py` 是 `docker compose run --rm client /checks.py` 的简写。先运行 core/protocols/catalog，最后单独运行 metrics；无流量阶段不能同时做业务探测。路线图抽屉中的 Markdown 章节锚点适合在源笔记使用，页面内也可通过章节搜索定位。
+
+## 第 03 章 · Setup · 部署与运行环境
+
+### Kubernetes 与 Swarm 部署怎样验证权限和网络
+<!-- src: temp/new-traefik/03-Setup.md; temp/new-traefik/10-Install-Configuration.md -->
+
+Kubernetes 和 Swarm 的安装都需要先解决两个问题：控制器能否读取配置源，以及入口网络能否接收业务流量。Pod 或 Task 处于 Running 只回答进程状态；RBAC、入口 Service 和跨节点网络仍可能阻断业务。
+
+#### Kubernetes：先固定 Chart，再渲染配置
+
+以下是已有独立测试集群的部署流程，不会帮你创建集群。先由 `helm search repo traefik/traefik --versions` 选择与目标 Traefik/Gateway API 兼容的 Chart，把版本写入 `TRAEFIK_CHART_VERSION`；不要直接在生产 context 上执行教学部署。
+
+```bash
+kubectl config current-context
+helm repo add traefik https://traefik.github.io/charts
+helm repo update
+helm search repo traefik/traefik --versions
+```
+
+准备 `k8s-values.yaml`，这是 Chart values 而不是 File Provider 文件：
+
+```yaml
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+service:
+  type: ClusterIP
+```
+
+选择版本并确认 context 后执行；`${...:?}` 使缺失版本时停止，避免默默使用最新 Chart。
+
+```bash
+helm template traefik traefik/traefik --namespace traefik \
+  --version "${TRAEFIK_CHART_VERSION:?先设置已选择的 Chart 版本}" \
+  -f k8s-values.yaml > rendered.yaml
+helm upgrade --install traefik traefik/traefik --namespace traefik \
+  --create-namespace --version "$TRAEFIK_CHART_VERSION" -f k8s-values.yaml
+kubectl -n traefik get pods,svc
+kubectl -n traefik logs deploy/traefik --tail=100
+```
+
+实际 Deployment/ServiceAccount 名称以渲染文件为准。出现 `forbidden` 时核对该 ServiceAccount 的资源权限；没有 forbidden 也不能证明业务路由成功。第31章提供完整应用与路由清单，并用 port-forward 建立本地访问入口；ClusterIP 本身不会提供公网地址。
+
+#### Swarm：服务标签和 overlay 网络
+
+Swarm Provider 读取服务级标签，因此路由放在 `deploy.labels`。普通 Compose 的容器 labels 不应原样当作 Swarm 服务配置。下面是已有 Swarm 实验集群中业务服务的片段，前提是 Traefik 已启用 Swarm Provider 并加入同一 `proxy` overlay 网络。
+
+```yaml
+services:
+  app:
+    image: traefik/whoami:v1.11.0
+    networks: [proxy]
+    deploy:
+      replicas: 2
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.app.rule: Host(`app.localhost`)
+        traefik.http.routers.app.entrypoints: web
+        traefik.http.services.app.loadbalancer.server.port: "80"
+networks:
+  proxy:
+    external: true
+```
+
+Traefik 服务的 Socket 访问一般需要位于 manager，业务服务所在节点不必是 manager。若采用 `traefik.swarm.lbswarm=true`，由 Swarm VIP 参与后端均衡；不再使用旧的 `traefik.docker.lbswarm` 拼写。观察 `docker service ps` 的调度结果和目标网络，随后请求 whoami 验证应用响应，不能只看副本数等于二就宣告路由完成。
+
+### 将最小实验变成可重复部署环境需要补什么
+<!-- src: temp/new-traefik/03-Setup.md; temp/new-traefik/10-Install-Configuration.md -->
+
+Quick Start 优先理解请求，Setup 需要把镜像、配置、网络、证书和生命周期固化。第02章的三份文件是起点；部署时还要明确谁生成凭据、哪些目录持久化、如何检查启动和怎样清理实验资源。
+
+| 部署项 | Docker/Compose | Kubernetes/Swarm |
+| --- | --- | --- |
+| 版本 | 固定镜像并记录 digest | 同时固定 Chart/清单和 CRD |
+| 网络 | 明确项目网络、宿主与容器端口 | 明确 overlay/Pod 网络与入口 Service |
+| 凭据 | 受限文件挂载 | Secret 或受控凭据机制 |
+| 证书 | 手工/外部/ACME 的职责清楚 | 证书控制器或单一签发责任 |
+| 日志 | stdout 或可轮转文件 | 日志采集和保留策略 |
+| 停机 | 只清理本实验项目 | 协调摘除、终止与客户端重连 |
+
+安装后先核对实际启动参数和配置来源，不混用文件、CLI 与环境变量作为一套未定义的覆盖系统。Helm values 只是渲染输入，需查看生成的 Deployment，尤其是内部端口与 Service 公开端口不同的情况。
+
+持久化不是所有目录一律放共享磁盘。ACME 账户文件的多写者问题、Docker Socket 的强权限和管理 API 的访问范围都要分别处理。扩容副本前，先确认这些状态和权限是否适合共享，而不是从一个单机示例直接复制出三个副本。
+
+#### Swarm 完整 stack 的网络与回滚
+
+[swarm-stack.yml](lab/swarm-stack.yml) 提供 Traefik、两个 whoami 副本、manager 调度约束、Swarm Provider 和 service labels。先在独立测试 Swarm manager 创建 `review39-edge` overlay，再部署；这里的端口使用 host 发布，需连接运行 Traefik task 的 manager，且端口会监听该节点接口，节点防火墙应限制实验来源。
+
+```bash
+cd topics/web/traefik/lab
+docker info --format '{{.Swarm.LocalNodeState}}'
+docker network create --driver overlay --attachable review39-edge
+docker stack config -c swarm-stack.yml
+docker stack deploy -c swarm-stack.yml review39
+docker stack services review39
+docker service ps review39_traefik
+curl -H 'Host: swarm.localhost' http://MANAGER_IP:38080/
+docker service logs review39_traefik
+docker stack rm review39
+# 等待 task 删除后才移除本实验创建的网络
+docker network rm review39-edge
+```
+
+Swarm 不推断应用端口，`loadbalancer.server.port=80` 必须显式给出；`deploy.labels` 属于 service，容器 `labels` 不能替代。该示例将 Docker Socket 交给可信实验控制器，`:ro` 挂载并不会把 Docker API 变成只读；生产应设计 API 访问边界。只做 `stack config` 不能宣称 overlay 连通已验收。
+
+## 第 04 章 · Expose · 发布应用服务
+
+### 从运行一个容器到发布一个服务还缺什么
+<!-- src: temp/new-traefik/04-Expose.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/25-Middlewares.md -->
+
+Setup 解决代理如何运行，Expose 解决外部请求如何到达应用。发布需要入口、Router、Service、后端网络及域名五个条件同时成立。第02章的 app.localhost 是最小闭环，本章将其扩展为可迁移的发布流程；TLS 和策略的字段细节分别见第24、25章。
+
+```mermaid
+graph TD
+  D[域名与外部地址] --> E[EntryPoint 接收连接]
+  E --> R[Router 选择应用]
+  R --> M[Middleware 执行策略]
+  M --> S[Service 选择后端]
+  S --> B[应用返回结果]
+```
+
+域名解析只影响客户端选择入口地址，不决定后端地址。Docker 的 Service 可使用容器网络地址，Kubernetes 可使用发现的 Pod endpoints。把公网域名和后端 IP 写在同一行配置里不意味着链路就闭合了。
+
+| 阶段 | 先做的检查 | 未通过时处理 |
+| --- | --- | --- |
+| 入口 | TCP 连接或 TLS 握手 | 端口发布、防火墙、证书 |
+| 匹配 | 带正确 Host 的真实路径 | rule、EntryPoint、优先级 |
+| 后端 | 应用可辨认响应 | Service port、scheme、网络 |
+| 策略 | 拒绝和允许两种请求 | 认证、限流、重定向顺序 |
+
+测试时保留一个错误 Host 和一个错误路径作为反例；只有成功请求无法证明路由没有过度匹配。对生产入口，外层 LB/CDN 也要纳入地址和信任链检查。
+
+### 用路径分流发布前端和 API
+<!-- src: temp/new-traefik/04-Expose.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/25-Middlewares.md -->
+
+以下是第02章 Compose 的新增动态文件 `dynamic/expose.yml`，用两个 whoami 模拟前端和 API。它们实际监听根路径，所以 API Router 使用 StripPrefix，将外部 `/api/users` 转为后端 `/users`。
+
+```yaml
+http:
+  routers:
+    website:
+      rule: Host(`site.localhost`)
+      entryPoints: [web]
+      priority: 10
+      service: frontend
+    site-api:
+      rule: Host(`site.localhost`) && (Path(`/api`) || PathPrefix(`/api/`))
+      entryPoints: [web]
+      priority: 100
+      middlewares: [drop-api]
+      service: site-api
+  middlewares:
+    drop-api:
+      stripPrefix:
+        prefixes: [/api]
+  services:
+    frontend:
+      loadBalancer:
+        servers:
+          - url: http://backend-a:80
+    site-api:
+      loadBalancer:
+        servers:
+          - url: http://backend-b:80
+```
+
+请求 `/` 应显示 backend-a，请求 `/api/users` 应显示 backend-b 和 `/users`。再测 `/apix`，它应由前端接管，因为严格路径边界排除了它。查询参数应随请求保留，不应被误当作路径正则的一部分。
+
+```bash
+curl -H 'Host: site.localhost' http://127.0.0.1:18080/
+curl -H 'Host: site.localhost' http://127.0.0.1:18080/api/users
+curl -H 'Host: site.localhost' http://127.0.0.1:18080/apix
+```
+
+把同样设计转成 Kubernetes 时，用 Service port 与路由对象表达后端；转成 Swarm 时，标签放在 deploy.labels。不要保留 Docker 内部 DNS 名却期待它在另一个集群自动可达。
+
+### HTTPS、粘性与发布验收应怎样组合
+<!-- src: temp/new-traefik/04-Expose.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/25-Middlewares.md -->
+
+HTTPS 解决传输与服务身份，认证解决访问者身份，粘性解决重复请求选择同一后端。三者分别验证：证书可信不代表用户有权限，用户有权限不代表 Cookie 会正确回传，Cookie 固定后端也不代表应用状态已复制。
+
+| 发布能力 | 验证样本 | 失败边界 |
+| --- | --- | --- |
+| HTTPS | 正确域名、错误域名、受信 CA | 不能用 curl -k 代替信任验证 |
+| 认证 | 无凭据、有效凭据、过期凭据 | 管理面不应因发布业务而被顺带公开 |
+| 粘性 | 保存 Cookie 后重复访问，再停止原实例 | 应用本地 Session 可能丢失 |
+| 路径改写 | 主页面、资源 URL、接口文档 | 后端生成绝对 URL 不会自动全部修正 |
+
+首个发布只建立最小链路，然后逐项加能力，记录每一步新增字段及响应差异。最终验收要确认失败请求也正确失败，例如未授权请求没有抵达后端，而不仅是正确用户“能打开页面”。
+
+## 第 05 章 · Secure · 应用入口安全
+
+### JWT 验签与业务授权分别保证什么
+<!-- src: temp/new-traefik/05-Secure.md -->
+
+本章源材料的 JWT、OIDC 和 WAF 示例带有 Traefik Hub 专属标识。以下解释其工作模型和验收方法，不能把对应 Hub 字段直接放入第02章的 OSS Proxy 镜像。OSS 环境可用第25章 ForwardAuth 接外部身份服务，但它不是内置 JWT 中间件的同名替代。
+
+JWT 是携带声明的签名令牌。验签说明令牌由持有相应密钥的一方签发且未被篡改，不自动说明当前用户对目标资源有权限。还需要根据身份系统契约核对 issuer、audience、有效期和业务权限；不要假设默认配置已经替你验证所有声明。
+
+```mermaid
+graph TD
+  C[携带令牌的请求] --> P[解析令牌与算法]
+  P --> K[选择密钥并验证签名]
+  K --> T[验证时间与约定声明]
+  T --> A[判断资源权限]
+  A --> B[允许访问后端]
+  P --> R[拒绝非法请求]
+  K --> R
+  T --> R
+  A --> R
+```
+
+| 检查 | 有效样本 | 负向样本 |
+| --- | --- | --- |
+| 签名 | 正确签名与算法 | 篡改 payload、未知 kid |
+| 时间 | 当前有效 | 过期、尚未生效 |
+| 身份边界 | 正确发行方和受众 | 其他业务签发的合法 token |
+| 权限 | 当前资源所需 scope/role | 已认证但权限不足 |
+
+使用共享 secret 时要控制发放范围；使用 JWKS 时要处理 key id、缓存和轮换。撤销与登出也不能仅依赖“token 原先验签成功”，尤其是有效期很长的令牌。运维应区分令牌无效与 JWKS 服务不可达，避免把身份基础设施故障统称为用户密码错误。
+
+### OIDC 登录流程为何不能简化成检查一个 Header
+<!-- src: temp/new-traefik/05-Secure.md -->
+
+OIDC 建立在 OAuth 2.0 之上，增加用户身份信息。浏览器未登录时通常会重定向到身份提供方，回调后建立会话；调用 API 的机器客户端则可能直接提交 access token。这两种入口的错误处理、重定向和 Cookie 需求不同，不能共用一个“401 就跳登录页”的简单规则。
+
+```mermaid
+graph TD
+  B[浏览器请求应用] --> G[网关检查会话]
+  G --> I[身份提供方登录]
+  I --> C[返回授权码到回调地址]
+  C --> V[校验流程绑定并交换令牌]
+  V --> S[建立受保护会话]
+  S --> A[访问原始应用路径]
+```
+
+回调地址必须与实际公网 scheme、域名和路径一致。外层代理未正确传递可信 Forwarded 信息时，可能出现回调地址错误或重定向循环。会话 Cookie 需要匹配 domain/path、Secure 与 SameSite 约束，跨站流程尤其要确认浏览器实际是否保存并回传 Cookie。
+
+验收至少包含首次登录、已有会话、回调失败、会话过期和退出后再次访问。保留请求链、Location 与 Cookie 属性即可定位多数配置问题，不要把完整 token 和会话值写入日志。只有前端最终收到页面，并不能证明 nonce/state 等流程绑定机制配置正确；需结合产品能力和身份系统要求核对。
+
+### WAF 应如何从规则上线走到可运营
+<!-- src: temp/new-traefik/05-Secure.md -->
+
+WAF 检查请求内容和行为，能拦截某些注入、异常协议或已知攻击模式，但不能替代业务授权、输入校验和依赖补丁。材料的 WAF 方案属于 Hub 能力，OWASP Core Rule Set 是规则集合；真正的生产工作还包括规则版本、检测模式、误报调查和例外管理。
+
+| 上线阶段 | 应收集的证据 | 决策 |
+| --- | --- | --- |
+| 检测观察 | 命中的规则 ID、路径、请求形态 | 区分正常业务与异常输入 |
+| 小范围拦截 | 拒绝量、关键业务成功率 | 确认不会阻断合法上传或 API |
+| 例外调整 | 特定路径/参数的误报样本 | 使用最小范围例外而非全局关规则 |
+| 持续维护 | 规则升级后的差异与资源成本 | 回归正常与恶意样本 |
+
+为每个合法样本准备对应的异常版本，观察是否按规则拒绝且后端未收到。大请求体、JSON/多段表单、压缩内容和流式请求都有解析边界，应明确检查范围与大小限制。WAF 故障的 fail-open/fail-close 选择影响可用性和安全性，需要按入口业务风险制定，不能写成无条件的统一默认。
+
+## 第 06 章 · Observe · 观测方法与排障实践
+
+### 怎样从四种观测信号形成诊断问题
+<!-- src: temp/new-traefik/06-Observe.md; temp/new-traefik/18-Observability.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/25-Middlewares.md -->
+
+Observe 是面向操作的入门章节：先学会提出可由证据回答的问题，再在第18章配置具体日志、指标和 Trace。排障不从“重启一下”开始，而是确认请求到了哪里、哪个组件作了决定，以及失败发生在请求生命周期的哪个阶段。
+
+| 信号 | 最适合回答的问题 | 不足之处 |
+| --- | --- | --- |
+| 运行日志 | 进程为何启动失败、Provider 是否读取更新 | 不逐条解释所有业务请求 |
+| Access Log | 某请求匹配了谁、耗时和状态是什么 | 没启用或被过滤时会缺证据 |
+| Metrics | 错误率、吞吐和延迟是否偏离基线 | 聚合信息通常不能复原单个请求 |
+| Trace | 代理与下游调用的时间关系 | 依赖传播、埋点、采样和 exporter |
+
+先用一个有固定请求 ID 的成功样本验证证据链，再制造错误 Host、应用404和后端延迟。对照样本比只在事故时打开 DEBUG 更容易判断异常。请求 ID 与 Trace ID 是不同概念，前者可关联日志，后者依赖完整的分布式追踪上下文。
+
+本章后续提供隔离故障后端和判断路径；字段开关与 Collector 配置在第18章。未启用某种信号时要保留未知，不能因为没有看到日志就宣称请求没到代理。
+
+### 入口和配置发现失败怎样定位
+<!-- src: temp/new-traefik/06-Observe.md; temp/new-traefik/18-Observability.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/25-Middlewares.md -->
+
+排障先定位故障发生在请求前还是请求后。DNS/端口不通时根本没有 HTTP Router 可匹配；Provider 没有生成对象时，后端即使健康也无法被目标路由选择。重复重启会丢失现场并掩盖状态变化，不应作为第一步。
+
+| 层 | 具体证据 | 下一步 |
+| --- | --- | --- |
+| 入口 | DNS、目标 IP、端口映射、TLS 握手 | 地址不符先修网络/证书 |
+| Provider | 文件挂载/API watch/RBAC、加载日志 | 对象未生成先修配置来源 |
+| Router | rule、entryPoints、priority、错误状态 | 匹配失败用最小请求隔离条件 |
+| Middleware | 拒绝响应与鉴权/限流证据 | 查顺序、身份、来源与阈值 |
+| Service | 后端地址、scheme、transport、健康 | 查连接与端口/TLS |
+| 应用 | 实际收到的路径、响应状态和处理耗时 | 转入应用内部诊断 |
+
+Docker 用 `docker compose ps` 与日志，Kubernetes 用资源状态和 EndpointSlice；两者工具不同，证据逻辑相同。容器或 Pod Running 不能跳过后面的层。
+
+演练时先把 Host 写错，再移走动态配置，再停止后端。每次恢复原状态后才做下一次故障，避免多个错误同时存在。分别记录 Router 是否存在、下游状态与 OriginStatus，就能把三种现象分开解释。
+
+### 路由未命中与应用 404 怎样区分
+<!-- src: temp/new-traefik/06-Observe.md; temp/new-traefik/18-Observability.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/25-Middlewares.md -->
+
+“404 就查 Router”只是排查入口，不能直接当根因。后端应用也能返回 404，路径改写可能让后端访问不存在资源，Errors 中间件还可能替换响应。要把客户端状态码和后端是否实际收到请求关联起来。
+
+#### 一个可控的实验后端
+
+在第02章目录新增 `fault.py`，它提供正常响应、应用 404/500 和延迟响应。只绑定实验容器网络，不替代生产应用。请求 ID 用于把后台记录与访问日志联系起来。
+
+```python
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit, parse_qs
+import time
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        url = urlsplit(self.path)
+        delay = min(float(parse_qs(url.query).get('delay', ['0'])[0]), 10)
+        print(self.path, self.headers.get('X-Request-ID', ''), flush=True)
+        time.sleep(max(delay, 0))
+        code = {'/missing': 404, '/error': 500}.get(url.path, 200)
+        body = ('backend status=' + str(code) + '\n').encode()
+        self.send_response(code)
+        self.send_header('Content-Type', 'text/plain')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        try:
+            self.wfile.write(body)
+        except BrokenPipeError:
+            pass
+
+ThreadingHTTPServer(('0.0.0.0', 8080), Handler).serve_forever()
+```
+
+Compose 的 services 下新增：
+
+```yaml
+fault:
+  image: python:3.12-alpine
+  command: [python, -u, /lab/fault.py]
+  volumes:
+    - ./fault.py:/lab/fault.py:ro
+```
+
+新建 `dynamic/fault.yml`，与第02章 app 独立：
+
+```yaml
+http:
+  routers:
+    fault:
+      entryPoints: [web]
+      rule: Host(`fault.localhost`)
+      service: fault
+  services:
+    fault:
+      loadBalancer:
+        servers:
+          - url: http://fault:8080
+```
+
+启动 fault 后先请求其 `/` 得到 200，再请求 `/missing` 与错误 Host。同为客户端 404，前者应有应用日志和 OriginStatus=404，后者在无兜底路由时没有业务后端响应。记录 RouterName 与 ServiceAddr，避免以错误页文本作为唯一判断。
+
+### 认证拒绝、连接失败和超时怎样归因
+<!-- src: temp/new-traefik/06-Observe.md; temp/new-traefik/18-Observability.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/25-Middlewares.md -->
+
+401/403 可能来自鉴权服务或业务后端；502/504 可能由代理生成，也可能由下游另一个网关返回。归因需要看 OriginStatus、DownstreamStatus、实际目标和应用日志，不能从状态码直接指定负责人。
+
+#### 使用同一故障后端作对照
+
+| 注入动作 | 应收集的证据 | 可以排除什么 |
+| --- | --- | --- |
+| `/error` 返回 500 | fault 接收次数、OriginStatus、RetryAttempts | 有响应不应因 Retry 自动重发 |
+| stop fault 容器 | 连接拒绝/连接错误、无本次应用日志 | 与应用主动 500 分开 |
+| 后端延迟头超过 1s | 客户端耗时、超时日志、后端已收到 | 不是 Router 未命中 |
+| 停止第25章 auth 服务 | 鉴权外呼错误，业务后端未收到 | 与应用拒绝分开 |
+
+为了观察响应头超时，在 `http.serversTransports` 加入以下对象，并让 `fault.loadBalancer.serversTransport` 引用 `short-wait`：
+
+```yaml
+short-wait:
+  forwardingTimeouts:
+    dialTimeout: 1s
+    responseHeaderTimeout: 1s
+```
+
+```bash
+curl -i -H 'Host: fault.localhost' -H 'X-Request-ID: slow-001' \
+  'http://127.0.0.1:18080/?delay=3'
+docker compose logs --tail=30 fault traefik
+```
+
+后端应已记录 slow-001，而代理可能在后端发头前返回超时。去掉 delay 后应恢复；不必重启所有服务。此前隔离实验中的 Traefik 3.6.25 的响应头超时实验中，OriginStatus 和 DownstreamStatus 都记录了 504，因此 OriginStatus 非零也不能单独证明后端主动返回该状态。应联合后端已接收请求的日志、延迟注入和代理超时信息；实际后端网关也可能自己返回 504，需要继续沿调用链核对。
+
+#### 重试与重复执行的未知窗口
+
+开启第23章 Retry 后再次请求 `/error`，检查后端接收次数；连接失败实验则查看 RetryAttempts 和耗时。连接断开不证明后端从未执行，因此写请求失败后的业务结果必须通过幂等键或查询确认。不要让代理层成功重试掩盖潜在重复订单。
+
+### 配置更新、端点变化与资源饱和怎样复现
+<!-- src: temp/new-traefik/06-Observe.md; temp/new-traefik/18-Observability.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/25-Middlewares.md -->
+
+配置频繁变更、端点就绪震荡和资源饱和都可能表现为间歇错误，但修复入口不同。前者先查事件来源，后者先查应用 readiness 或资源压力。把所有问题描述为“Traefik 不稳定”会失去可执行方向。
+
+#### 让实验一次只改变一个变量
+
+| 实验 | 记录 | 结论边界 |
+| --- | --- | --- |
+| File 合法→语法错→恢复 | 文件版本、加载日志、rawdata、请求 | 只证明该版本此类错误行为 |
+| Kubernetes 一个 Pod not ready | EndpointSlice、服务目标、请求实例 | 不代表所有 Provider 健康逻辑相同 |
+| 慢请求并发增加 | Duration、活动请求、资源、429/5xx | 区分后端慢与策略主动拒绝 |
+| 增大请求体并开启 Buffering | 413、代理内存/磁盘、后端接收记录 | 代理全量缓冲本身有资源成本 |
+
+配置抖动时，确认是控制器反复写对象还是文件发布不原子。节流减少更新频率，却不能修复不断变化的错误源。Content-Length 与实际流长度不符也有独立校验行为，不能用无限放大 Buffering 阈值处理所有请求体异常。
+
+#### Trace 只解释实际收到的 Span
+
+先通过第18章确认 Collector 收到当前请求。默认 Span 只能区分代理接收与对后端外呼；若需要 Middleware 细节，启用目标版本支持的 detailed 粒度再核对。后端无应用 Span 时，只能得出“外呼段较慢”，不能声称慢在某个数据库查询。修复完成后重复同一请求样本，记录错误率、延迟与资源恢复，保留之前的故障证据。
+
+## 第 07 章 · Migrate · 版本迁移策略
+
+### 镜像、Chart、CRD 兼容矩阵怎样制定
+<!-- src: temp/new-traefik/07-Migrate.md; temp/new-traefik/08-Traefik-v2-to-v3.md; temp/new-traefik/38-Deprecation-Notices.md -->
+
+镜像版本、Chart 模板、Kubernetes API 和 CRD schema 是不同层。Chart 升级不保证自动完成所有 CRD 更新；Controller 能启动也不保证能够理解全部对象字段。必须根据所选版本发行说明确定兼容组合，而不是给所有版本规定“永远先 CRD 后镜像”的单一顺序。
+
+| 项目 | 当前值 | 目标值 | 需确认 |
+| --- | --- | --- | --- |
+| Traefik 镜像 | 记录 version/digest | 指定版本/digest | 字段与默认行为 |
+| Helm Chart | release 元数据 | 明确 Chart 版本 | values 变化、CRD 管理方式 |
+| Kubernetes | 实际 server version | 兼容范围 | 移除 API、RBAC |
+| Gateway API/Traefik CRD | 已安装 schema | 目标 schema | 新旧 Controller 读取与回滚能力 |
+
+```bash
+helm list -n traefik
+helm get values traefik -n traefik -a
+kubectl version -o yaml
+kubectl get crd ingressroutes.traefik.io -o yaml
+```
+
+输出用于内部变更记录，检查凭据内容再共享。新增字段若旧 Controller 不认识，镜像回滚仍可能失败；CRD 降级也可能造成字段丢失。先渲染、核对 schema 与实际资源，再演练双向兼容。版本支持日期来自采集快照，制定生产计划时还需核对目标版本的实际支持公告。
+
+### 灰度、回滚与证书状态怎样分别保护
+<!-- src: temp/new-traefik/07-Migrate.md; temp/new-traefik/08-Traefik-v2-to-v3.md; temp/new-traefik/38-Deprecation-Notices.md -->
+
+入口升级既影响新请求，也影响正在进行的流式响应或 WebSocket。应先给旧实例停止接收新流量的时间，再允许存量请求结束；上游 LB 摘除延迟、Traefik graceTimeOut 和编排系统终止窗口要协调。不能因为路由配置可热更新就宣称进程重启无连接损失。
+
+#### 分离回滚对象
+
+| 对象 | 回滚原则 |
+| --- | --- |
+| 镜像与启动配置 | 使用已验证的配对版本，不单独替换一个 |
+| 动态路由 | 恢复明确版本，检查 Provider 加载与业务响应 |
+| CRD schema | 先验证兼容，不强制套旧 schema 丢失字段 |
+| 证书/ACME 状态 | 核对有效期与签发状态，不无条件覆盖最新私钥材料 |
+
+先在小流量入口验证 Host/Path、认证、Cookie、证书、长连接与 metrics，再扩大范围。记录变化前后的成功率、延迟分位数和后端分布，避免只观察 Pod 副本数。
+
+#### 可审计的回滚实验
+
+在第02章隔离项目保存 Compose、静态和动态配置版本，先制造一条合法但错误 Host 路由，再恢复原文件。检查运行 API、正确 Host 响应和错误 Host 拒绝，能证明业务回滚。进程版本回滚另做一轮，检查实际 `traefik version`。证书实验使用第24章的公开 serial/dates 对比，不把整个证书存储回滚当作普通配置动作。
+
+任何测试命令都先在目标二进制的 `--help` 核验存在；本文不提供未经验证的 `check-config`。Compose 解析、Controller 加载、对象状态和真实请求分别记录，不能合并成一个笼统的“配置检查通过”。
+
+#### 小版本变更必须落到具体配置和查询
+
+来源定位：`07-Migrate.md` 的 `v3.2.1`、`v3.2 to v3.3`、`v3.3.4`、`v3.3.6`、`v3.3 to v3.4`、`v3.4.1`、`v3.5.4`、`v3.6.0` 小节。下表是跨过对应版本边界时的检查矩阵；升级从当前确切 patch 到目标确切 patch，要合并中间全部变化，不把 v3.6 标签当作不可变版本。
+
+| 当前版本 → 目标边界 | 配置或观测变化 | 升级前后要保存的证据 |
+| --- | --- | --- |
+| <3.1 → 3.1+ | 发现端点转 EndpointSlice；NodePort 依赖 Nodes 权限 | RBAC list/watch EndpointSlices、get/list/watch Nodes，实际后端地址 |
+| <3.2.1 → 3.2.1+ | 不可信来源的 X-Forwarded-Prefix 被清除 | 直连伪造和可信上一跳对照，第25章实验 |
+| <3.2.2 → 3.2.2+ | `traefik.docker.network/lbswarm` → `traefik.swarm.network/lbswarm` | service labels、overlay 目标和业务响应 |
+| 3.2 → 3.3+ | DNS `delayBeforeCheck` → `propagation.delayBeforeChecks`；`disablePropagationCheck` → `propagation.disableChecks` | staging 挑战时间、TXT 传播和 resolver 日志；保持检查开启 |
+| 3.2 → 3.3+ | `tracing.globalAttributes` → `tracing.resourceAttributes` | Collector 中 Resource attributes，不能只检查 Span attributes |
+| <3.3.4 → 3.3.4+ | OTEL 请求耗时从毫秒改为秒 | 固定 300 ms 后端，对比约 0.3 s；调整 histogram 边界/仪表盘阈值 |
+| <3.3.6 → 3.3.6+ | 默认清理点路径、重复斜杠 | `/foo/../bar`、`/foo//bar` 的命中与 URI |
+| 3.3 → 3.4+ | CRD CA 改用 `rootCAs` Secret/ConfigMap，旧字段弃用 | HTTP `spec.rootCAs`，TCP `spec.tls.rootCAs`；第33/34章资源及 schema |
+| <3.4.1 → 3.4.1+ | 先 normalize 再 sanitize；保留字符编码参与匹配 | `%2E%2E`、`%2F` 的差异，第22章逐条请求 |
+| <3.5 → 3.5+ | Trace 默认 minimal，detailed 才增加中间件 Span；读取 Pod 的 RBAC | 实收 Span 数和资源属性；不能以旧数量判定丢失 |
+| <3.5.2 → 3.5.2+ | TCP loadBalancer 的 proxyProtocol 弃用，迁入 transport | 更新 CRD 后验证 PROXY v1/v2 后端解析 |
+| <3.5.4 → 3.5.4+ | OTEL `traefik_tls_certs_not_after_milliseconds` → `..._seconds` | 此项是名称纠正，旧值本来就是秒，不能再除以1000 |
+| 3.5 → 3.6+ | Gateway API 要求 v1.4.0；leasttime 需更新 Traefik CRD | 固定 Controller/CRD/RBAC/Gateway API 组合，检查 Accepted/ResolvedRefs |
+
+v3.3.6 路径清理与 v3.4.1 规范化是两个边界。后续安全 patch 还可能直接拒绝某些编码输入；第22章保留实际 400/匹配结果，而不是保证所有 3.x 小补丁均与这张历史表相同。普通 Router priority 无法改变已经在入口处理或拒绝的路径。
+
+## 第 08 章 · Traefik-v2-to-v3 · 从 v2 迁移到 v3
+
+### 旧版本规则与 Provider 怎样逐项迁移
+<!-- src: temp/new-traefik/08-Traefik-v2-to-v3.md -->
+
+大版本迁移包含配置结构和行为变化，不能只换镜像。v1 的 frontend/backend 模型需要重新归入 Router、Middleware、Service；v2→v3 则应把启动字段、规则语法和 Provider 变化分别列出。迁移支持的兼容规则是过渡手段，不是新笔记继续使用旧语法的理由。
+
+| 迁移项 | 新模型或处理 | 验证 |
+| --- | --- | --- |
+| v1 frontend/backend | 按匹配、策略、服务拆分 | 原请求矩阵与后端归属 |
+| `Headers`/`HeadersRegexp` | v3 `Header`/`HeaderRegexp` | 正确头、错误头、缺失头 |
+| Docker Swarm 旧配置 | 独立 Swarm Provider 与对应标签 | 服务级发现、端口、VIP/Task |
+| 旧 Ingress API | `networking.k8s.io/v1` | pathType、Service 端口与 Controller 接管 |
+| 旧规则兼容模式 | 分批迁移后移除 | 不再依赖兼容开关仍正常 |
+
+对于包含正则的 Host/Path，保留捕获组、边界和大小写请求样本。不同字符串能被解析，不代表匹配集合相同。不能用“无启动错误”作为唯一迁移证据。
+
+准备阶段先读目标版本迁移页，逐条标记已使用字段；测试环境完成后再安排灰度。包含安全默认值或路径规范化变化时，增加恶意/异常输入样本，避免新旧行为差异被普通 happy path 掩盖。
+
+### 从兼容运行迁移到纯 v3 规则需要哪些步骤
+<!-- src: temp/new-traefik/08-Traefik-v2-to-v3.md -->
+
+v2→v3 可以分阶段调整安装字段和路由语法，但兼容模式应有明确退出条件。首先在测试环境保持原业务请求集合，再逐个迁移 Router；全部规则已改为 v3 后移除兼容配置，防止新旧写法长期混杂。
+
+| 阶段 | 主要动作 | 验收 |
+| --- | --- | --- |
+| 配置盘点 | 统计使用的 Provider、规则、弃用字段 | 每项有来源和目标写法 |
+| 启动适配 | 修改不兼容安装参数 | Controller 正常启动与发现 |
+| 规则迁移 | Header/HostRegexp 等逐条重写 | 正/负请求集合一致 |
+| 清理兼容 | 移除过渡 ruleSyntax 依赖 | 无兼容开关仍正确 |
+| 灰度上线 | 观察流量和回滚路径 | 证书、延迟、错误及长连接稳定 |
+
+HostRegexp 从旧命名模板语法转换为 v3 正则时，不能只去掉花括号；要重新确认匹配范围、锚点和子域名层级。Headers 更名为 Header 不改变所有业务输入的可信性，认证仍需独立实现。
+
+对每个规则记录原样本和拒绝样本，尤其包含大小写、尾斜杠、空值 query 与可伪造 Header。升级后“所有常用首页能打开”不足以证明管理路径、默认后端、TLSOptions 和错误分支未回归。第07章的回滚计划应保留具体版本配对，而不是只保留一个旧镜像名。
+
+#### v2 到 v3 的安装与观测迁移表
+
+来源定位：`08-Traefik-v2-to-v3.md` 的 Configuration changes 与 Migration guide；之后继续执行第07章的小版本矩阵。
+
+| v2 对象 | v3 目标 | 可执行回归 |
+| --- | --- | --- |
+| `providers.docker.swarmMode` | 独立 `providers.swarm`，按 service labels 发现 | 用第03章 stack 请求 whoami，对照 `@swarm` |
+| `HostRegexp` 的命名占位符、`Headers`/`HeadersRegexp` | v3 正则、`Header`/`HeaderRegexp` | 正常 Host、错误 Host、Header 缺失与大小写样本 |
+| `core.defaultRuleSyntax: v2` / Router `ruleSyntax: v2` 临时兼容 | 全部迁为 v3 后删除兼容字段（3.4 起弃用） | 逐 Router 验证，不以进程启动成功替代规则验收 |
+| 旧 Kubernetes API group / CRD / RBAC | `traefik.io/v1alpha1` 与目标 Controller 的整套 schema | server dry-run、EndpointSlice、真实请求；备份原对象 |
+| 旧追踪后端配置 | 目标支持的 OTLP exporter 与实际 Collector | 明确 traceparent 请求，接收 server/client Span |
+| 原延迟与证书告警 | 按 exporter 区分单位、名称，再跨07章版本边界 | 300 ms 慢请求与本地七天证书；同一查询的前后值 |
+
+保存当前镜像 digest、原始安装配置、动态文件、CRD schema 和告警规则。先在独立入口回放相同样本，再切业务流量；CRD 与证书状态的回滚按第07章分别处理，不假定降级镜像能撤销集群 schema 的变更。
+
+## 第 09 章 · Reference · 参考文档导航
+
+### 面对一个配置问题应先查哪类参考
+<!-- src: temp/new-traefik/09-Reference.md; temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/19-Routing-Configuration.md; temp/new-traefik/37-Security.md; temp/new-traefik/38-Deprecation-Notices.md -->
+
+Reference 是索引，不是另一个运行组件。它把安装配置、路由配置、安全限制和弃用信息放在一起，目的是让读者能从问题定位到正确的配置层。本章保留原材料的导航职责，不把后续章节的参数表重复搬过来。
+
+| 问题 | 优先章节 | 判断依据 |
+| --- | --- | --- |
+| 监听端口、Provider 开关、API/Ping | 10–18 安装配置 | 影响进程启动能力 |
+| Host/路径匹配、后端选择和中间件 | 19–30 路由配置 | 影响已接入请求如何处理 |
+| Ingress、Gateway、CRD、标签 | 31–36 平台表达 | 同一对象模型在不同来源中的写法 |
+| 消息边界、租户 TLS 隔离 | 37 安全 | 能力限制不是某个普通参数 |
+| 字段删除、兼容 API 与支持期限 | 38 弃用 | 行为受版本约束 |
+
+例如业务返回 404，先确定请求有没有命中 Router。若没有对象，转到配置发现；若对象存在但条件不匹配，查 HTTP Routing；若后端实际返回 404，查改写与应用。导航的价值是缩小问题空间，不能从错误码直接跳到一个万能配置项。
+
+### 如何把字段说明转成可执行的变更记录
+<!-- src: temp/new-traefik/09-Reference.md; temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/19-Routing-Configuration.md; temp/new-traefik/37-Security.md; temp/new-traefik/38-Deprecation-Notices.md -->
+
+查到字段后还要确定配置位置、默认行为、支持 Provider 与生效方式。字段名相同或相近不代表作用层相同，例如入口 TLSOptions 与后端 ServersTransport、Docker 容器标签与 Swarm 服务标签各自有边界。
+
+```text
+问题：后端尚未返回响应头，客户端等待过久
+对象：HTTP Service 引用的 ServersTransport
+字段：forwardingTimeouts.responseHeaderTimeout
+生效：动态配置更新后检查实际传输对象
+验证：延迟响应头与正常响应各一组
+边界：不是整个响应体的最长下载时间
+```
+
+这个记录将“我查到一个 timeout 参数”转成可审查的因果关系。若材料中出现损坏代码块、版本不一致或互相矛盾的默认值，先保留疑点，再用目标版本字段页和实际 `--help`/运行配置核对。不要为保持笔记整齐而删除证据边界，也不要把文档页里的示例地址当作你的环境地址。
+
+## 第 10 章 · Install-Configuration · 安装配置
+
+### 安装配置、路由配置与运行时状态怎样分工
+<!-- src: temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/18-Observability.md -->
+
+安装配置也称静态配置，决定监听端口、启用哪些 Provider、日志和 API 能力。路由配置也称动态配置，描述 Router、Middleware、Service 和证书等对象。运行时状态则是 Traefik 读取配置后形成的对象、错误信息与健康状态，不能用磁盘文件的存在来替代它。
+
+#### 配置归属表
+
+| 内容 | 配置类型 | 更改后的处理 |
+| --- | --- | --- |
+| `entryPoints.web.address` | 安装配置 | 重新启动进程并确认端口映射 |
+| `providers.file.directory` | 安装配置 | 重新启动后改变监听来源 |
+| `http.routers.app.rule` | 路由配置 | File Provider 发现变化后加载 |
+| `http.services.app.loadBalancer` | 路由配置 | 更新可用后端配置 |
+| `tls.certificates` | 路由配置 | 读取更新证书，验证实际握手结果 |
+| `api.dashboard`、`ping` | 安装配置 | 重新启动并检查对应路由/端口 |
+
+安装配置的文件、CLI、环境变量是不同表达方式，材料明确不支持把三者当作通用的覆盖合并系统。全文主实验用 `traefik.yml`，CLI 仅用 `--configFile` 指向该文件。Helm values 是 Chart 的输入，最终还需查看其生成的启动参数，不能把 Helm 与进程配置混为一层。
+
+#### 用一次变更对比热更新和重启
+
+完成第02章后，将 `dynamic/routes.yml` 中 `app` Router 的 Host 临时改为 `other.localhost`，保存后用两个 Host 分别请求。原 Host 应不再匹配，新 Host 应能转发；同时观察容器的启动时间是否保持不变。随后恢复原文件，确认访问恢复。
+
+若要改变 `traefik.yml` 中监听的容器端口，则同时检查 Compose 的端口映射，执行 `docker compose restart traefik` 后再测。不要把“动态文件能热更新”推导为“所有字段都可不重启生效”。原子写入、防抖和解析失败将在第11章深入说明。
+
+### 管理 API、Dashboard 与 Ping 怎样分别启用和保护
+<!-- src: temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/18-Observability.md -->
+
+`api.dashboard` 启用界面能力，`api@internal` 是可被 Router 引用的内部服务，`api.insecure` 则是另一种直接暴露方式。本实验关闭 insecure，显式创建 admin Router 并添加认证，因此业务端口不会因为启用 Dashboard 自动出现无认证 API。
+
+#### 三条地址代表三种证据
+
+| 地址 | 预期 | 证明范围 |
+| --- | --- | --- |
+| `127.0.0.1:18082/ping` | 200 和 `OK` | Traefik 进程可以回应探活 |
+| admin Host 的 `/dashboard/`，不带认证 | 401 | 管理 Router 的 BasicAuth 在执行 |
+| admin Host 的 `/api/http/routers`，认证成功 | JSON | 当前运行 Router 可查询 |
+
+```bash
+curl -i http://127.0.0.1:18082/ping
+curl -i -H 'Host: admin.localhost' http://127.0.0.1:19000/dashboard/
+curl -u admin -H 'Host: admin.localhost' http://127.0.0.1:19000/api/http/routers
+```
+
+`curl -u admin` 会提示输入前面设置的密码。Dashboard 路径保留尾部 `/`，并且规则需要允许它调用 `/api`；只开放页面路径会出现页面外壳可见而数据加载失败。
+
+#### 不用探活替代业务检查
+
+停止两个后端后，Ping 仍可能返回 200，因为它不检测每个应用。它适合进程存活检查，业务可用性应使用带正确 Host 的请求或后端健康指标。生产中管理路由还要限制网络访问，HTTP 上的 BasicAuth 不提供传输加密。检查配置用运行时 API 与启动日志，不使用未经证实的 `traefik check-config` 命令。
+
+### 监听端口、重定向与真实客户端地址如何设置
+<!-- src: temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/18-Observability.md -->
+
+EntryPoint 是本机监听器，不是 DNS 记录，也不等于云负载均衡器的公网端口。容器监听 443、宿主发布 18443、外层 LB 公网暴露 443，可以同时成立；重定向却必须告诉客户端它实际能访问的端口。每次设计入口时，都要把这三层写出来。
+
+#### TCP、UDP 与 HTTPS 的区别
+
+`address: ":80"` 默认监听 TCP，HTTP Router 在这个入口处理 HTTP；`address: ":5353/udp"` 明确为 UDP。HTTPS 还需要 TLS Router 或 EntryPoint 的 TLS 默认配置，单纯监听 443 不会自动得到可信证书。HTTP/3 使用 UDP，应检查相应 UDP 端口发布与冲突，不能因为 TCP 443 可达就认定 HTTP/3 工作正常。
+
+下面是普通公网 80/443 入口的静态片段；它不是第02章高端口实验的直接替换文件。只有外部 HTTPS 443 已配置好证书和网络可达性时才启用重定向。
+
+```yaml
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+```
+
+先用 `curl -I http://域名/` 检查 Location，再对 Location 地址执行证书校验请求。若开发环境 HTTPS 发布在 18443，应明确重定向目标端口或采用路由级重定向；不要让浏览器跳向没有监听的 443。
+
+#### 信任代理头要从上一跳开始
+
+客户端可自行提交 `X-Forwarded-For`，所以它不是天然可信的客户端 IP。`forwardedHeaders.trustedIPs` 表示哪些上一跳代理可信，不是允许访问业务的用户 IP 白名单；后者属于 IPAllowList。PROXY protocol 是另一种在连接层传递地址的机制，需要发送端和接收端一致配置。
+
+| 场景 | 应采取的方式 | 验证重点 |
+| --- | --- | --- |
+| 客户端直连 Traefik | 使用连接来源，不信任任意伪造转发头 | 伪造 XFF 不应得到信任 |
+| 固定 LB/CDN 位于前面 | 仅信任实际代理的地址范围 | 代理更新 IP 范围后同步策略 |
+| LB 使用 PROXY protocol | 配置 `proxyProtocol.trustedIPs` | 实际连接来源和传递地址分别核对 |
+
+把 `forwardedHeaders.insecure=true` 当成真实 IP 修复方案会扩大伪造空间。第25章按 IP 限流前，先完成这一条来源信任链，否则共享出口下所有用户可能被当成一个限流主体。
+
+### 生命周期、连接参数和 Options List 怎样按用途阅读
+<!-- src: temp/new-traefik/10-Install-Configuration.md; temp/new-traefik/18-Observability.md -->
+
+安装配置的 Options List 涉及大量开关，不适合按字母顺序死记。先分为启动、监听、发现、管理、TLS 和观测六类，再把每个字段归入它影响的生命周期阶段。表中可选与默认值是查阅线索，不意味着所有默认值都适合生产。
+
+| 选项族 | 要解决的问题 | 验证方式 |
+| --- | --- | --- |
+| lifeCycle.requestAcceptGraceTimeout | 上游摘除前仍接收请求的窗口 | 对比 LB 摘除时间 |
+| lifeCycle.graceTimeOut | 停止接收后等待存量请求结束 | 长请求和滚动终止 |
+| respondingTimeouts | 入口读请求、写响应与空闲连接约束 | 慢上传、慢响应、空闲连接 |
+| keepAliveMaxRequests/Time | 连接使用达到边界时提示关闭 | HTTP/1.1 Close 与 HTTP/2 GOAWAY |
+| forwardedHeaders/proxyProtocol | 从可信上游取得原始信息 | 伪造头与可信代理对照 |
+| HTTP/2、HTTP/3 选项 | 多流、协议协商及端口行为 | 真实协议客户端与网络发布 |
+
+后端 responseHeaderTimeout 位于 HTTP ServersTransport，不应被入口 respondingTimeouts 替代。HTTP/2 一个连接可以有多个流，UDP 则没有相同的 HTTP 响应语义；字段名出现 timeout 并不说明它们控制同一种等待。
+
+将准备修改的参数写成“触发条件→作用对象→预期观察”，只调整与当前问题有关的项。退出时还需协调编排系统 terminationGracePeriod、上游 LB 和应用重连；一个优雅终止参数不能独自保证任何长连接永不中断。
+
+#### 路径处理阶段不能与中间件改写混为一谈
+
+来源定位：`07-Migrate.md / v3.3.6 / v3.4.1`。进入 HTTP 路由前先做规范化 normalize：解码非保留字符（例如 `%2E`），统一百分号编码的字母大小写；再由 sanitize 清理 `.`、`..` 和重复斜杠；随后匹配 Router，最后才执行 StripPrefix 等 Middleware。保留字符 `%2F` 不应被提前当成普通路径分隔符匹配。规范化不可关闭，`sanitizePath` 是启动配置，修改需要重启。
+
+```yaml
+entryPoints:
+  web:
+    address: ':80'
+    asDefault: true
+    http:
+      sanitizePath: true
+  admin:
+    address: ':9000'
+    asDefault: false
+```
+
+`asDefault` 控制未显式填写 entryPoints 的 HTTP/TCP Router 的默认入口集合；安全相关 Router 仍显式列出入口。不要为了旧客户端把 sanitize 关闭后就称为迁移完成；应先确定客户端编码契约、后端 URI 解释与拒绝样本。第22章的原始路径请求能区分客户端清理、代理匹配和后端解码。
+
+## 第 11 章 · Configuration-Discovery · 配置发现
+
+### Docker 和 Swarm 如何发现端口与网络
+<!-- src: temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/12-Kubernetes.md; temp/new-traefik/13-Hashicorp.md; temp/new-traefik/14-KV-Stores.md; temp/new-traefik/15-Others.md; temp/new-traefik/36-Label-&-Tag-Providers.md -->
+
+Docker Provider 通过 Docker API 得到容器地址、标签和端口，然后生成 Router/Service。默认端口检测是便捷规则：单端口直接选择，多端口可能选到非业务端口。因此教学与生产都建议明确 `loadbalancer.server.port`，不要让镜像新增 metrics 端口改变代理行为。
+
+#### 在第02章环境中增加发现能力
+
+这是对第02章文件的增量修改：在 Traefik volumes 增加 Docker Socket 挂载，在已有 `providers` 下增加以下对象，再给 `backend-a` 增加 labels。不要重复创建第二个 YAML 顶层 `providers` 或覆盖已有 File Provider。
+
+```yaml
+providers:
+  docker:
+    endpoint: unix:///var/run/docker.sock
+    exposedByDefault: false
+```
+
+```yaml
+# 合入 compose.yaml 的 traefik.volumes
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+
+```yaml
+# 合入 compose.yaml 的 backend-a 服务
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.discovered.rule: Host(`discovered.localhost`)
+  traefik.http.routers.discovered.entrypoints: web
+  traefik.http.routers.discovered.service: discovered
+  traefik.http.services.discovered.loadbalancer.server.port: "80"
+```
+
+执行 `docker compose up -d` 使新挂载、静态配置与标签都生效，然后请求 `discovered.localhost:18080`。运行 API 应出现 Docker Provider 的对象；原 `app@file` 仍存在，两种来源可以共存。
+
+Socket 的 `:ro` 是挂载属性，不等于 Docker API 的只读权限。API 连接仍可能拥有强权限。生产应通过受限 Socket 代理、权限控制和网络边界减少暴露，不能仅靠 `:ro` 宣称安全。
+
+#### 多网络和 Swarm 的特有边界
+
+当后端加入多个网络，`traefik.docker.network` 必须指向 Traefik 实际可达的 Docker 网络名；Compose/Stack 可能给名称加项目/stack 前缀。检查 `docker inspect` 的 NetworkSettings，而不是只看 YAML 中短名称。
+
+Swarm 使用 `providers.swarm`，标签置于 `deploy.labels`，明确服务端口。`traefik.swarm.network` 选择网络；`traefik.swarm.lbswarm=true` 选择 Swarm VIP，让请求均衡交给 Swarm。比较 API 中的后端地址与 Task 地址/VIP，就能确认谁承担了均衡。Provider 正常发现不意味着那个地址一定能从 Traefik 网络连接成功。
+
+### File、HTTP、KV 和其他发现源如何选择
+<!-- src: temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/12-Kubernetes.md; temp/new-traefik/13-Hashicorp.md; temp/new-traefik/14-KV-Stores.md; temp/new-traefik/15-Others.md; temp/new-traefik/36-Label-&-Tag-Providers.md -->
+
+选择 Provider 要回答“谁拥有路由事实，谁负责更新”。容器平台已有地址和标签时不必再人工维护 IP；平台统一中间件适合 File；已有配置服务可以通过 HTTP 输出路由模型。多个 Provider 的价值在于分工，不在于数量。
+
+| 来源 | 适合持有的事实 | 需要运营的依赖 |
+| --- | --- | --- |
+| File | 共享中间件、人工管理的稳定后端、证书引用 | 文件发布、权限、变更事件 |
+| Docker/Swarm | 容器或服务标签及实例地址 | Docker API、网络、标签权限 |
+| Kubernetes | Ingress、CRD、Gateway API 与 Service | API watch、RBAC、版本支持 |
+| HTTP | 配置中心生成的路由配置 | 拉取超时、认证、返回格式 |
+| KV | 按路径组织的配置项 | KV 可用性、ACL、批量更新一致性 |
+| Consul Catalog、Nomad、ECS | 各平台服务注册与编排状态 | 对应 API 凭据、发现范围和健康语义 |
+
+#### HTTP 拉取和 File 监听不是同一种更新机制
+
+HTTP Provider 拉取 YAML/JSON 路由模型，`pollInterval` 决定检查频率，`pollTimeout` 限制单次拉取耗时。以下静态片段依赖实际存在的配置服务，不能把它加入第02章就期待凭空生成路由。
+
+```yaml
+providers:
+  http:
+    endpoint: https://config.example.internal/traefik
+    pollInterval: 10s
+    pollTimeout: 3s
+```
+
+输出端必须提供合法动态结构、正确证书和权限。若配置源响应慢，先看 Provider 拉取错误；业务 502 应另查后端。材料有把 File/HTTP 返回内容称为 install configuration 的措辞，但其路由示例与总体模型表明它们提供动态配置，不能据此通过 HTTP 热改 EntryPoint。
+
+KV 把配置拆为多个 key，多个写入未必构成原子发布。要设计版本化或一致性策略，并用运行时对象检查中间状态；不应把“数据存储有副本”自动等同于“路由配置不会出现半成品”。
+
+## 第 12 章 · Kubernetes · Kubernetes 配置发现
+
+### 五种 Kubernetes Provider 的发现对象有何区别
+<!-- src: temp/new-traefik/12-Kubernetes.md -->
+
+本章讲安装配置中的 Kubernetes 发现能力；第31章讲已经发现的路由对象怎样表达业务流量，第32–35章讲 CRD schema。先区分 Provider，才能判断某个对象为什么没有生成 Router。
+
+| Provider | 主要发现对象 | 使用动机 |
+| --- | --- | --- |
+| kubernetesIngress | 标准 Ingress 和关联 Service | 通用 HTTP 入口 |
+| kubernetesCRD | IngressRoute、Middleware 等 | Traefik 专属组合能力 |
+| kubernetesGateway | Gateway API 资源 | 平台与应用职责分离 |
+| kubernetesIngressNGINX | 带 NGINX 约定的 Ingress | 兼容迁移，支持范围有限 |
+| knative | Knative 网络相关资源 | 与 Knative Serving 的服务发布协作 |
+
+开启一个 Provider 不会自动开启其他 Provider。反过来，多个 Provider 发现同一业务对象也可能产生重复路由；兼容 NGINX 和标准 Ingress 并存时，应明确 class 与 namespace 范围。Knative 服务没有路由，不应先去修改普通 Ingress YAML，要检查其实际 Provider 和上游资源状态。
+
+### Watch 范围、RBAC 与状态地址怎样配合
+<!-- src: temp/new-traefik/12-Kubernetes.md -->
+
+namespace 过滤决定控制器打算处理的范围，RBAC 决定它实际能读取的资源。labelSelector 通常只作用于特定路由类资源，并不必然过滤关联 Service、Secret 和 EndpointSlice。不能把设置 selector 等同于形成完整的权限隔离。
+
+以下是安装配置片段，适用于明确采用该文件作为静态配置的部署；Helm 环境要转成对应 Chart values，不直接把它粘进 IngressRoute：
+
+```yaml
+providers:
+  kubernetesCRD:
+    namespaces: [traefik-notes]
+    allowCrossNamespace: false
+    allowExternalNameServices: false
+  kubernetesIngress:
+    namespaces: [traefik-notes]
+```
+
+检查 Controller ServiceAccount 是否可 list/watch 需要的资源，再看日志是否出现 forbidden。`allowEmptyServices` 影响没有端点时是否仍创建路由并应用策略，不能替代应用 readiness。`nativeLBByDefault` 改变后端地址构造，不改变对象发现权限。
+
+状态中发布的 IP/hostname 与数据面监听又是两件事。publishedService/statusAddress 通常把一个入口 Service 的地址复制到状态，便于其他控制器消费；状态有公网 IP 并不证明防火墙、端口或证书可用，仍需从客户端发请求。
+
+### Gateway API 与 Knative 的版本依赖怎样核验
+<!-- src: temp/new-traefik/12-Kubernetes.md -->
+
+Gateway API 的 Standard/Experimental channel 决定哪些资源可用。材料标记的版本支持不能跨所有 Traefik patch、Chart 和 Kubernetes 版本套用；TCPRoute/TLSRoute 等资源还需检查 experimentalChannel。CRD 安装、RBAC 和 Controller 开关必须相互匹配。
+
+```bash
+kubectl api-resources | rg 'gateway|httproute|ingressroute|knative'
+kubectl -n traefik logs deploy/traefik --tail=100
+kubectl get gatewayclass
+```
+
+上面命令只是检查，不证明对象已经接管流量。后续还应查看 Gateway/Route 的 conditions，或 Knative Service、Route、Revision 的就绪状态。Knative 的版本流量拆分与激活链路由其控制系统参与，不能假设所有请求都绕过 activator 直接连接某个固定 Pod。
+
+限制集群级资源查询时，要检查 class 查找与 NodePortLB 等功能是否受影响。遇到权限收紧后的发现变化，先确认哪些 API 查询被禁止，再调整职责边界，不要把管理员凭据直接塞给控制器解决所有问题。
+
+#### 标准 Prefix 与 Traefik 实现选项的区别
+
+来源定位：`12-Kubernetes.md / Kubernetes Ingress / strictPrefixMatching`。Ingress `pathType: Prefix` 按路径段匹配：`/foo` 接受 `/foo`、`/foo/`、`/foo/bar`，拒绝 `/foobar`。材料中的 `providers.kubernetesIngress.strictPrefixMatching` 默认 false，启用后遵循这项严格语义；这不是 File Provider 的 `PathPrefix` 自动改变了含义。
+
+```yaml
+providers:
+  kubernetesIngress:
+    strictPrefixMatching: true
+```
+
+在目标版本验证 `/api`、`/api/v1`、`/apix`，并补第22章编码路径请求。Gateway API 的 PathPrefix 也有自己的规范语义，不能用 Ingress Provider 开关去控制 Gateway。Controller 3.6.25 的学习组合使用 Gateway API v1.4.0；升级 Helm Chart 时记录所带 CRD 与 RBAC，不把 Chart 版本号等同于 Traefik 二进制版本。
+
+## 第 13 章 · Hashicorp · HashiCorp 服务发现
+
+### Consul KV 与 Consul Catalog 为什么是两种 Provider
+<!-- src: temp/new-traefik/13-Hashicorp.md -->
+
+Consul 可以保存任意 KV，也能维护服务目录和健康检查。这两个能力在 Traefik 中分别对应 `consul` 与 `consulCatalog`：前者读配置树，后者从注册服务、地址、端口和 tags 生成配置。打开 consul Provider 不会自动把 Catalog 里的服务全部发布出去。
+
+| 项目 | Consul KV | Consul Catalog |
+| --- | --- | --- |
+| 事实来源 | 显式写入的配置 key | 服务注册与健康状态 |
+| 谁维护后端 | 配置发布程序 | 服务注册方和健康检查系统 |
+| 主要配置边界 | rootKey 与 ACL | datacenter、服务范围、tags、checks |
+| 典型错误 | key 路径缺失或发布不完整 | 服务地址不可达、健康状态不被接纳 |
+
+如果已有完整注册中心，Catalog 能跟随实例变化；如果只是希望多个代理共用受控动态配置，KV 更直接。避免用同一个名称在两套来源重复声明对象；运行 API 的 `@consul` 与 `@consulcatalog` 后缀能帮助识别来源。
+
+下面为只读发现片段，依赖可达 Consul、所需 ACL 和正确 TLS。不要把地址替换后忽略鉴权和证书要求：
+
+```yaml
+providers:
+  consulCatalog:
+    endpoint:
+      address: consul.internal:8501
+      scheme: https
+    exposedByDefault: false
+    strictChecks: [passing]
+```
+
+strictChecks 决定哪些健康状态允许承载流量。默认可能接纳 warning，若组织要求仅 passing，需要显式表达并验证；但收紧条件也可能同时摘除大量实例。先观察目录状态和后端地址，再进行允许状态的变更。
+
+### Nomad 服务发现如何随分配实例变化
+<!-- src: temp/new-traefik/13-Hashicorp.md -->
+
+Nomad Provider 查询 Nomad 服务信息，服务 tags 描述路由。`refreshInterval` 用于轮询，watch 模式使用事件触发并可节流；两者不是同时保证每个中间事件都被应用。namespace 范围与 ACL token 限制可发现服务，和应用网络连通性是两层条件。
+
+```yaml
+providers:
+  nomad:
+    endpoint:
+      address: https://nomad.internal:4646
+    exposedByDefault: false
+    watch: true
+    throttleDuration: 1s
+```
+
+这是已有 Nomad 集群的安装片段，不包含集群部署和凭据。应用服务还需添加 `traefik.enable=true` 及 Router/Service tags。关闭 exposedByDefault 后，一个服务“已在 Nomad 注册但没出现在 Traefik”可能只是未显式启用，不一定是 API 故障。
+
+用新增实例、注销实例和变更服务端口三个实验观察更新；对比 Nomad 注册地址、Traefik 运行目标和实际响应。容器端口、宿主映射端口以及分配实例地址需要按网络模式核对，不能假定所有 Nomad 服务都监听同一节点端口。
+
+### 一致性、健康和发现延迟如何共同影响故障转移
+<!-- src: temp/new-traefik/13-Hashicorp.md -->
+
+强一致读取有助于观察最新状态，但可能增加延迟或对 leader 可用性的依赖；stale 读取可能降低读取成本，却允许观察到旧注册信息。`requireConsistent` 和各 Provider 的 stale/watch 选项应按其字段定义配置，不跨 Nomad/Consul 混用。
+
+```mermaid
+graph TD
+  A[实例发生故障] --> H[注册中心检查状态]
+  H --> Q[Provider 读取目录]
+  Q --> U[生成新后端列表]
+  U --> R[新请求选择可用实例]
+```
+
+这条链包含检查周期、读取/事件延迟和配置节流，因此不能承诺发现更新瞬时完成。原来的连接也可能在服务注销后继续存在，需要协议或应用层处理。验收应记录故障时刻、注册状态变更、配置变化及新请求落点，而不是仅比较两次 API 返回值。
+
+ACL 只需给予所需目录读取能力。不要把管理员 token 放进服务 tags，tags 可能被目录读取者和运行配置查看者看到。修改一致性策略前，应确认实际故障场景和恢复目标，否则只是用更高开销换取并未需要的保证。
+
+#### Consul Catalog 注册、健康摘除、恢复与注销
+
+来源定位：`13-Hashicorp.md / Consul Catalog` 与 `36-Label-&-Tag-Providers.md / Consul Catalog`。统一实验的 Traefik 只显式启用带 `traefik.enable=true` 的注册对象；Consul 用 `/health` 主动检查应用，Catalog Provider 每2秒刷新一次。注册地址 `172.30.39.21:8080` 必须同时被 Consul 和 Traefik 到达。
+
+```bash
+cd topics/web/traefik/lab
+docker compose run --rm client /checks.py catalog
+docker compose logs traefik | rg 'catalog.*@consulcatalog'
+```
+
+[checks.py 的 catalog 函数](lab/checks.py) 给出完整注册 JSON：ID、Name、Address、Port、Tags、HTTP Check；调用 `PUT /v1/agent/service/register` 后轮询真实 Host 请求至200，最后 `PUT /v1/agent/service/deregister/review-a` 并轮询至404。失败不是无条件重试：看注册 JSON、`/v1/health/service/catalog-app?passing=true` 的地址，再看代理日志中的 `catalog@consulcatalog`。
+
+健康实验与注销实验应分开：保留注册，`docker compose exec backend-a touch /tmp/unhealthy`，等待 Consul 检查变为 critical，再看 Catalog 路由已无可用目标；恢复用 `rm /tmp/unhealthy`，等待 passing 与200回归。注销删除的是发现对象，健康失败改变的是对象可用性。具体健康实验命令见实验包；Consul dev 模式仅为本地教学，重建容器会丢失注册。
+
+## 第 14 章 · KV-Stores · KV 存储发现
+
+### KV Provider 如何把一棵配置树变成路由
+<!-- src: temp/new-traefik/14-KV-Stores.md -->
+
+Redis、Consul、etcd 和 ZooKeeper Provider 的共同任务是读取指定根路径下的配置，而不是把存储服务本身当成业务后端。安装配置负责连接与 rootKey，动态 key 表达 Router、Service、Middleware 等对象。第36章说明具体 key 的字段映射，本章先解决发现与运营边界。
+
+| 配置层 | 例子 | 验证 |
+| --- | --- | --- |
+| 存储连接 | endpoints、认证、TLS | Provider 能否连接并读取 |
+| 命名隔离 | rootKey | 是否读取了正确环境 |
+| 路由对象 | http/routers、services 路径 | 是否生成完整对象 |
+| 数据面 | 后端地址与端口 | 真实请求能否转发 |
+
+比如 Redis 返回 PONG 只能证明 Redis 存活，不证明配置树存在。只有 Router 与 Service 都生成且引用正确，才能进入后端连通性验证；避免把“存储连通”和“应用路由可用”合成一个检查。
+
+### 四种存储连接需要哪些显式约束
+<!-- src: temp/new-traefik/14-KV-Stores.md -->
+
+以下 etcd 安装片段假设已有内部 TLS endpoint 和 CA 文件。它没有部署 etcd，也不应复用 Kubernetes 控制平面的管理凭据作为普通代理配置权限。
+
+```yaml
+providers:
+  etcd:
+    endpoints:
+      - etcd-config.internal:2379
+    rootKey: traefik-notes
+    tls:
+      ca: /etc/traefik/pki/config-ca.crt
+```
+
+| Provider | 需要特别核对的能力 |
+| --- | --- |
+| Redis | db、ACL 用户、TLS；Sentinel 的 masterName 和认证另有边界 |
+| Consul | KV ACL、rootKey；Enterprise namespace 能力不能当作社区默认 |
+| etcd | endpoint、TLS、身份、根路径权限；不要影响集群自身数据 |
+| ZooKeeper | endpoint、认证/ACL、路径层级、版本支持的 TLS 配置 |
+
+Redis Sentinel 支持故障发现不意味着命令读到的配置永远最新，副本策略会影响一致性。对其他存储也应把服务本身的 HA 与配置发布原子性分开，不能把有三个副本当作所有更新都有事务语义。
+
+验证时先读非敏感的已知 key，再检查 Traefik 原始运行配置。日志中若出现证书错误，修复服务名称、CA 和时间；关闭验证会扩大配置源被冒充的风险。
+
+### 多 key 更新怎样避免半份配置
+<!-- src: temp/new-traefik/14-KV-Stores.md -->
+
+一个 Router 可能同时依赖 Service、Middleware、TLS 参数。把这些 key 分别写入，读者可能在中途看到不存在的依赖。删除同样存在顺序问题：先删 Service 而 Router 还在，会产生过渡错误。
+
+```mermaid
+graph TD
+  V[准备完整版本] --> C[核对 key 与引用]
+  C --> P[按存储能力发布]
+  P --> O[检查运行对象]
+  O --> T[发起业务请求]
+  T --> K[确认版本与结果]
+```
+
+根据存储和发布系统能力使用事务、版本化根路径或受控更新，不编造一个适用于所有 Provider 的“原子切换命令”。切换 rootKey 本身是安装配置变化，若通过它实现版本切换，要计入重启和可用性安排。
+
+备份应包含完整路由树和必要元数据，恢复后检查对象引用以及后端地址。演练中故意漏写一个 Middleware key，观察错误归属，再恢复完整配置；这个实验比简单统计 key 数量更能说明一致性风险。
+
+## 第 15 章 · Others · File、ECS 与 HTTP 发现
+
+### 热更新、节流、对象引用和失效配置怎样诊断
+<!-- src: temp/new-traefik/15-Others.md -->
+
+File Provider 监听文件系统事件；原子替换可以减少读取到半份 YAML 的机会，但前提是 Traefik 仍能收到目录事件。只挂载单个文件时，宿主改名替换可能断开绑定关系，因此第02章挂载整个 `dynamic` 父目录。
+
+#### 一次更新要观察三个状态
+
+先保留原文件，在被监听目录之外准备新的完整文件，再在同一文件系统中移动替换；不要把 `.bak.yml` 留在扫描目录，否则备份也可能被读取。
+
+```bash
+cp dynamic/routes.yml routes.before.yml
+cp dynamic/routes.yml routes.next
+# 编辑 routes.next，保留 dashboard 和 Service，修改 app.rule
+mv routes.next dynamic/routes.yml
+curl -u admin -H 'Host: admin.localhost' \
+  http://127.0.0.1:19000/api/rawdata
+```
+
+观察文件内容、Provider 日志和运行时对象三者是否一致。`providersThrottleDuration` 对每个 Provider 独立节流，时间窗内可能只采用最新事件，不能要求每次磁盘保存都有一条可见中间路由。恢复也使用完整原文件，重新验证业务请求。
+
+#### 名称不是全局字符串
+
+`app@file` 与 `app@docker` 是不同对象。跨 Provider 引用要写后缀；Kubernetes Namespace 又是另一套隔离维度，Ingress 注解常用 `<namespace>-<middleware>@kubernetescrd`，不等于随意增加一个 `namespace` 字段就能授权跨源访问。
+
+| 错误类别 | 如何区分 | 修复入口 |
+| --- | --- | --- |
+| 未收到更新 | 容器内文件仍旧或无 Provider 事件 | 挂载父目录、watch、文件系统通知 |
+| YAML 无法解析 | 日志有解析位置，运行对象未按期变化 | 修复语法，再原子发布 |
+| 对象引用缺失 | rawdata 有依赖错误 | 名称、Provider 后缀、对象定义 |
+| 对象完整但后端失败 | Router 在，业务日志显示连接失败 | 网络、端口、后端状态 |
+
+不要承诺所有错误都一定保留上一份有效路由。语法错误、对象依赖错误、服务发现为空是不同阶段的结果，应分别演练并记录目标版本行为。上一份文件是恢复材料，运行请求才是恢复成功的证据。
+
+### ECS 发现如何同时受 IAM、集群范围和任务网络影响
+<!-- src: temp/new-traefik/15-Others.md -->
+
+ECS Provider 从指定 region/cluster 获取服务和 task 信息，标签描述 Router 与 Service。首先应限定 clusters 和 exposedByDefault，避免发现账户中所有可见服务；autoDiscoverClusters 便利但扩大范围，不能与显式列表一起被理解为更严格的限制。
+
+```yaml
+providers:
+  ecs:
+    region: ap-southeast-1
+    clusters: [traefik-notes]
+    exposedByDefault: false
+    healthyTasksOnly: true
+```
+
+片段依赖具备所需 ECS 查询权限的运行身份。优先使用平台角色和凭据链，避免把长期 access key 写在公开文件或 task labels。`healthyTasksOnly` 依赖任务实际健康状态；未定义应用健康检查时，不能假设它会提供与应用 readiness 相同的过滤效果。
+
+```mermaid
+graph TD
+  I[IAM 身份] --> A[ECS API 查询]
+  A --> F[集群与标签过滤]
+  F --> N[解析任务地址和端口]
+  N --> R[生成 Router 与 Service]
+  R --> B[Traefik 网络访问任务]
+```
+
+任务使用不同网络模式时，Traefik 到达的是任务 ENI 或对应宿主映射地址。即使 API 查询完全成功，安全组、路由表或端口映射也可能令数据面失败。先对照发现地址和任务实际监听，再改网络规则，不要用加大 API 超时处理应用端口不通。
+
+### HTTP Provider 的返回值怎样成为可控发布接口
+<!-- src: temp/new-traefik/15-Others.md -->
+
+HTTP Provider 轮询 endpoint 获取动态配置，返回 YAML/JSON 中的 Router、Service 等对象。它不提供 HTTP 热修改启动端口的通道。配置服务必须明确内容版本、认证和错误处理，避免某次请求返回登录页或 HTML 异常页却被当成路由配置。
+
+```yaml
+providers:
+  http:
+    endpoint: https://config.internal/traefik/routes
+    pollInterval: 10s
+    pollTimeout: 3s
+```
+
+上面只声明获取方式，配置服务仍需返回完整合法对象。选择 File 还是 HTTP 取决于发布责任：File 由本机挂载与事件机制驱动，HTTP 由配置服务和网络可用性驱动。HTTP 的 headers/tls 字段用于访问配置源，不是给业务请求添加 Header。
+
+测试成功响应、鉴权拒绝、超时和非法 YAML 四种情况，记录 Provider 日志与运行对象变化。不要无证据承诺每种错误都保持旧配置；实际行为须以目标版本和错误阶段为准。配置源本身的监控、证书续期与访问权限应进入运维清单，因为其失效可能阻止服务变更生效。
+
+#### ECS 的最小读取操作集与两类目标地址
+
+来源定位：`15-Others.md / ECS / IAM`。可从 [ecs-read-policy.json](lab/ecs-read-policy.json) 的读取操作集开始：ListClusters、DescribeClusters、ListTasks、DescribeTasks、DescribeTaskDefinition、DescribeContainerInstances、EC2 DescribeInstances，不包含修改集群或运行任务权限。示例兼容发现流程而使用 `Resource: "*"`；部署时对支持资源级授权的 Describe 类动作按目标 cluster/task/task-definition ARN 拆分收窄，List/EC2 Describe 等按服务支持情况保留星号。这是读取动作基线，不能称为所有环境都适用的最终最小权限策略。
+
+| taskDefinition.networkMode | 应检查的任务信息 | Traefik 真正连接的地址 |
+| --- | --- | --- |
+| awsvpc / Fargate | task attachment 的 ENI 私网 IP、容器端口、安全组 | task 私网 IP:containerPort |
+| bridge / EC2 | containerInstance 对应 EC2 私网 IP、networkBindings.hostPort | EC2 私网 IP:hostPort（可能动态） |
+| host / EC2 | 实例地址、固定主机端口与冲突 | EC2 私网 IP:容器绑定端口 |
+
+从 `aws ecs describe-tasks` → taskDefinition.networkMode → ENI 或 containerInstance/networkBindings → 路由表与安全组 → ServiceURL 逐跳判断。IAM 允许读取任务不代表 Traefik 到 ENI 的网络可达；不要把本机 loopback 或 awsvpc 不存在的动态 hostPort 填进配置。本次选择 Catalog 完成云外闭环，ECS 清单保留真实 AWS 前提。
+
+## 第 16 章 · TLS · TLS 基础设施
+
+### TLS 基础设施与路由上的 TLS 配置怎样分工
+<!-- src: temp/new-traefik/16-TLS.md; temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md -->
+
+本章位于安装配置部分，关注证书获取能力、工作负载身份与 OCSP；第17章详细讲 Resolver，第24章讲 Router、TLSOptions 和证书选择。这种分层解释了为什么只声明 ACME Resolver 不会自动让所有入口变成 HTTPS。
+
+| 对象 | 所在层 | 负责的工作 |
+| --- | --- | --- |
+| Certificate Resolver | 安装能力 | 配置 CA、挑战与存储 |
+| Router tls/certResolver | 动态路由 | 选择 HTTPS 与解析器 |
+| TLS certificates/options | 动态安全参数 | 证书、最低版本、客户端认证 |
+| SPIFFE Workload API | 安装基础设施 | 获取工作负载身份 |
+| ServersTransport SPIFFE | 后端连接策略 | 对哪些后端使用身份与信任规则 |
+
+排查 HTTPS 时沿“能力启用→路由引用→证书取得→握手选中→后端处理”检查，不能只看某个 Secret 或 acme.json 存在。源材料中引用与定义分离的规则对 Tailscale 和 SPIFFE 同样适用。
+
+### SPIFFE 如何保护 Traefik 到后端的连接
+<!-- src: temp/new-traefik/16-TLS.md; temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md -->
+
+SPIFFE 使用工作负载身份而不是长期手工分发证书。Traefik 连接 Workload API 取得 X509-SVID，再由对应 ServersTransport 决定允许哪个 SPIFFE ID 或 trust domain。只启用全局 Workload API，不会使所有后端连接自动采用 SPIFFE。
+
+```mermaid
+graph TD
+  W[工作负载注册] --> A[Workload API]
+  A --> S[Traefik 获取 SVID]
+  S --> T[ServersTransport 选择身份策略]
+  T --> B[与受信后端建立连接]
+```
+
+材料说明首次 SVID 交付前 Traefik 可能等待，表现为进程没有进入预期工作状态。此时先检查 workload 注册、API socket/网络权限和身份交付，而不是把问题归因于 Router 不存在。
+
+访问测试应包含允许的 ID、错误 trust domain 与未获身份三类情况。SPIFFE 解决身份与信任，不替应用做细粒度业务授权；后端仍需根据身份定义允许操作。实际启用字段与 socket 地址依赖你的 SPIFFE 基础设施，不在笔记里伪造一个可通用运行的地址。
+
+### OCSP Stapling 能证明什么，不能证明什么
+<!-- src: temp/new-traefik/16-TLS.md; temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md -->
+
+OCSP Stapling 让服务端在握手中附带证书撤销状态响应，减少客户端自己查询 responder 的依赖。Traefik 需要证书带有适用 responder 信息，或使用明确配置的覆盖地址；不是每个自签名实验 CA 都具备完整 OCSP 服务。
+
+```bash
+openssl s_client -connect example.com:443 -servername example.com -status </dev/null
+```
+
+检查输出中的 OCSP response、有效时间与状态，同时验证证书链。没有 stapled response 不自动等于证书已撤销，需要继续判断证书是否支持、是否启用、responder 是否可达以及客户端策略。
+
+材料中的缓存位于内存，重启后需要重新获取；它不是持久化证书仓库，也不负责重新签发证书。监控 responder 错误和证书到期属于两个不同指标。不要用“OCSP 已开启”代替证书续期、CA 信任与域名校验。
+
+## 第 17 章 · Certificate-Resolvers · 证书解析器
+
+### 手动证书和三种 ACME 挑战如何选择
+<!-- src: temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+手动证书适合已有企业 CA/证书平台的环境；ACME Resolver 可以自动申请与续期。Resolver 定义属于启动配置，Router 的 `tls.certResolver` 是动态引用，声明 Resolver 不会自动替所有 Router 申请证书。
+
+| 挑战 | 必要条件 | 适合场景 |
+| --- | --- | --- |
+| HTTP-01 | CA 可通过公网 80 访问挑战路径 | 普通公开域名，入口直达 |
+| TLS-ALPN-01 | 公网 443 到达执行挑战的 TLS 入口 | 能控制 TLS 握手的入口 |
+| DNS-01 | 能修改域名验证 TXT 记录并完成传播 | 通配符、无公开 HTTP 的服务 |
+
+DNS-01 验证的是域名控制权，不要求业务 A/AAAA 一定指向 Traefik。HTTP-01 则不能因为宿主发布了 18080 就期待公网 CA 在 80 上验证成功。外层 CDN/LB 终止 TLS 时也要核对 TLS-ALPN 是否真的到达 Traefik。
+
+#### 用 staging 区分配置问题和生产限额
+
+以下是有真实域名、公网入口和持久化目录时的静态片段，不用于 `.localhost`。邮箱换成运营邮箱，`/data` 必须挂载可写持久化存储。
+
+```yaml
+certificatesResolvers:
+  le-staging:
+    acme:
+      email: ops@example.com
+      storage: /data/acme-staging.json
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      httpChallenge:
+        entryPoint: web
+```
+
+Router 引用 `tls.certResolver: le-staging` 并设置真实 Host。先看申请日志中的域名、挑战类型和失败原因，再查证书结果。staging 证书不会被普通客户端信任，属于预期行为；切生产 CA 时使用清晰的独立存储与配置，不通过删除账户文件反复重试。
+
+DNS Provider 凭据应使用专用最小权限身份，避免把整个域名账户密钥写入标签或公开仓库。传播失败先查 TXT 权威与递归解析，不能简单关闭所有 propagation checks 让验证“看起来继续”。
+
+### 续期、存储、多副本和证书管理器怎样协调
+<!-- src: temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+自动续期依赖持续可用的挑战路径、账户材料和写入权限。证书已存在只证明过去申请成功；未来 DNS 权限失效、磁盘满或外部端口变更都可能让续期失败。材料还提示不再使用的证书可能继续续期，因此删 Router 不等于清除所有证书生命周期责任。
+
+#### 单写者与多副本
+
+ACME 文件包含账户和证书私钥，应持久化并限制权限，但共享 NFS/PVC 不提供多进程写协调。不要让多个 Proxy 实例同时修改同一 acme.json 并称之为证书高可用。严格 HA 需要明确签发责任，例如独立证书控制器把证书交给 Traefik，或每个证书生命周期由可协调的系统管理。
+
+| 环境 | 推荐说明的责任链 | 验收 |
+| --- | --- | --- |
+| 单实例 ACME | Traefik 申请、存储、续期 | 写权限、到期监控、重建后证书仍在 |
+| Kubernetes Secret 证书 | 证书管理器更新 Secret，Traefik 消费 | Secret 更新与真实握手证书一致 |
+| 企业证书平台 | 外部签发，受控发布到文件/Secret | 版本、回滚策略和私钥访问范围 |
+
+证书状态不能跟业务配置一起无条件回滚。用旧备份覆盖新证书，可能恢复已过期证书或丢失账户状态；回滚前先核对有效期、信任链和签发记录。
+
+#### 补齐 Gateway HTTPS 的完整引用
+
+第24章生成的 server.crt 包含 gateway.localhost，可用于第31章的隔离集群。创建同 namespace Secret：
+
+```bash
+kubectl -n traefik-notes create secret tls gateway-cert \
+  --cert=certs/server.crt --key=certs/server.key \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+在既有 Gateway `public` 中添加以下 listener；`8443` 需与 Chart 的实际 websecure 内部端口一致。HTTPRoute 的 parentRefs 可改用 `sectionName: websecure`，或同时声明两个 parent listener。
+
+```yaml
+- name: websecure
+  protocol: HTTPS
+  port: 8443
+  hostname: gateway.localhost
+  tls:
+    mode: Terminate
+    certificateRefs:
+      - kind: Secret
+        name: gateway-cert
+  allowedRoutes:
+    namespaces:
+      from: Same
+```
+
+通过 `kubectl -n traefik port-forward svc/traefik 18443:443` 访问，再用 `--cacert` 和 `--resolve gateway.localhost:18443:127.0.0.1` 请求。先确认 listener 证书引用 Resolved，再核对客户端握手。
+
+轮换时发布新证书到同名 Secret或新文件引用，比较实际握手 serial 和 dates。只查看 Secret 更新时间不够，也不需要为了证书轮换无条件重启业务 Pod。
+
+### Tailscale 解析器为什么需要明确域名与引用
+<!-- src: temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+Tailscale Resolver 从 Tailscale daemon 取得相应服务的证书，域名应满足其机器与 tailnet 的 ts.net 命名要求。它不是任意公网域名的通用 ACME DNS Provider，也不会因为 Traefik 主机加入 tailnet 就自动替所有 Router 配置证书。
+
+| 依赖 | 需要确认 |
+| --- | --- |
+| Tailscale daemon | Traefik 能访问所需接口与权限 |
+| 域名 | 是当前机器/网络支持的 ts.net 名称 |
+| Resolver 定义 | 安装配置里已启用解析器 |
+| Router 引用 | 目标 TLS Router 或 EntryPoint 显式使用 |
+| 续期 | daemon 和 Traefik 的证书获取链路持续正常 |
+
+按顺序检查域名、daemon 状态、解析器引用和实际握手证书，避免将“设备网络互通”当作“证书已经签发和选中”。材料描述 Traefik 会跟踪证书有效期并按 Tailscale 的节奏提前更新；业务侧仍应监控到期与失败日志。
+
+验证正确域名和不受支持的普通公网域名两种输入，后者不应被误认为可自动签发。变更机器名或网络配置后，确认 Router 域名与客户端访问名同步，避免客户端因旧名称或 SAN 不匹配而失败。
+
+#### DNS-01 的凭据、传播、通配符与续期证据
+
+来源定位：`17-Certificate-Resolvers.md / ACME / DNSChallenge / CertificatesDuration`，第07章 propagation 字段迁移。实验包提供 [Cloudflare 静态配置](lab/dns-acme.yml) 与 [独立 Compose](lab/dns-acme-compose.yaml)。Token 用 `CF_DNS_API_TOKEN_FILE` 从 Compose secret 注入，限定为待验证 zone 的 DNS Edit 和 Zone Read，不写入 YAML、Git 或日志。完整启动和 TXT 排查见 [DNS 实验步骤](lab/README.md#dns-01-与续期)。
+
+| 阶段 | 操作证据 | 常见失败及恢复 |
+| --- | --- | --- |
+| 申请 | Router 引用 cloudflare-staging，tls.domains 指定主域和 `*.域名` | 未引用 resolver 就不会触发；通配符需 DNS-01 |
+| 写 TXT | 查询 `_acme-challenge.域名` 的权威 NS 与公共 resolver | Token zone 不符、CNAME 委派错误；修权限/委派后重试 |
+| 等传播 | `propagation.delayBeforeChecks: 10s` 后查询权威和递归结果 | negative cache/TTL 未过；等待传播，不关检查掩盖问题 |
+| 续期 | 保存证书 serial、NotAfter、resolver 续期/错误日志 | CA 限额、DNS API 错误；修原因，保留可用证书及 acme.json |
+| 轮换验证 | 新连接读取 serial 与 NotAfter，并与原值比较 | 只换磁盘文件或旧 keep-alive 成功不证明新握手证书已换 |
+
+ACME 常见默认有效期配置为2160小时，默认约到期前30天进入续期窗口；`certificatesDuration` 是 Traefik 续期计算参数，不能迫使 CA 签出指定期限。应以实际 NotAfter 为准，尤其使用非默认 CA 时。staging 链不被系统默认信任，成功签发和浏览器可信是两个验收点。生产切换使用独立 storage，避免 staging 证书残留；不要删除仍服务中的 acme.json 来强制重签。单实例写入的 ACME 文件不能作为多副本并发证书仓库。
+
+本地 `rotate-cert.sh` 能验证 File Provider 证书重载与真实握手变化；它不等价于完成公网 ACME 自动续期。没有真实域名、受限 Token 和等待续期窗口时，公网签发/续期状态保持未实测。
+
+## 第 18 章 · Observability · 可观测性配置
+
+### 运行日志和访问日志怎样共同解释请求
+<!-- src: temp/new-traefik/18-Observability.md; temp/new-traefik/06-Observe.md -->
+
+前面的功能章节建立了代理、策略和协议模型，本章用证据回答“为什么这次请求失败或变慢”。运行日志记录 Traefik 启动、Provider 更新和错误；Access Log 记录单次请求处理。两者都可能写到 stdout，但字段和用途不同，不能直接把整段容器日志当作纯访问日志 JSON 数组。
+
+第02章已经启用 JSON Access Log，并只保留 `X-Request-ID` 请求头。默认请求头丢弃时，客户端随便加一个 ID 并不会自动在日志中出现；访问日志过滤和异步缓冲也可能影响排查时的可见性。
+
+#### 用真实字段区分后端与代理响应
+
+| JSON 字段 | 回答的问题 | 边界 |
+| --- | --- | --- |
+| `RouterName`、`ServiceName` | 哪个路由和服务参与处理 | 无匹配或内部响应时字段可能缺失 |
+| `ServiceURL`、`ServiceAddr` | 选中了哪个后端 | 健康检查与业务请求不是同一条记录 |
+| `OriginStatus` | 后端返回了什么 | 代理自行响应时可能为 0/缺失 |
+| `DownstreamStatus` | 客户端收到什么 | 可被中间件修改，不一定等于 origin |
+| `Duration`、`OriginDuration`、`Overhead` | 总体、后端与代理处理时间 | 单位为纳秒，不要直接当毫秒 |
+| `RetryAttempts` | 是否出现代理重试 | 不代表后端业务只执行一次 |
+
+```bash
+curl -H 'Host: app.localhost' -H 'X-Request-ID: notes-001' \
+  http://127.0.0.1:18080/
+docker compose logs --no-log-prefix traefik | \
+  jq -R 'fromjson? | select(.RequestPath != null) | {RouterName,ServiceName,OriginStatus,DownstreamStatus,Duration}'
+```
+
+`jq -R 'fromjson?'` 避开混入的非 JSON 行；保留 header 后具体键名以实际输出为准。只针对本次 ID 过滤原始记录，可避免把健康检查或其他业务误认为同一请求。Authorization、Cookie 和私钥不应作为排障便利而写进日志。
+
+#### 日志缺失也需要解释
+
+设置仅记录 5xx 时，404 和成功基线不会出现在日志里；异步缓冲尚未刷出、文件挂载目录错误也会造成“没看到请求”。先确认日志格式、输出位置、过滤和写入权限，再判断请求是否未到达。运行日志 DEBUG 可临时帮助观察配置，不宜无限期保留大量敏感细节。
+
+### 指标标签、延迟分位数和容量怎样关联
+<!-- src: temp/new-traefik/18-Observability.md; temp/new-traefik/06-Observe.md -->
+
+指标用于观察一段时间内的分布和趋势。Router/Service/EntryPoint 是有业务意义的聚合维度，用户 ID、完整 URI 和任意 Query 却会制造高基数。并非标签越多越能定位问题；无法长期存储或稳定聚合的指标反而妨碍判断。
+
+#### 在本地实验开放独立 metrics 入口
+
+这是第02章的静态增量：增加 metrics EntryPoint 并启用 Prometheus。Compose 增加 `127.0.0.1:19100:9100` 发布，更新容器后访问 `/metrics`。不依赖自动开放 insecure API。
+
+```yaml
+entryPoints:
+  metrics:
+    address: ":9100"
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+```
+
+先生成业务请求，再从 `curl http://127.0.0.1:19100/metrics` 查看实际名称、标签和值。内部资源信号还受 `addInternals` 控制，不能因为开启 Router metrics 就期待 Ping/API 指标一定存在。Prometheus 抓取目标必须位于可达网络；容器内的 localhost 并不是宿主。
+
+#### 容量要联系输入、等待和资源
+
+| 观察组合 | 优先假设 | 验证方式 |
+| --- | --- | --- |
+| QPS 上升、后端延迟上升、活动请求增加 | 后端吞吐不足 | 同时查看后端资源和应用指标 |
+| 压缩开启后 CPU 上升、带宽下降 | CPU 换带宽的代价 | 固定响应体对比开关前后 |
+| Buffering 开启后内存/磁盘增长 | 并发体积放大 | 记录请求体大小乘并发及落盘阈值 |
+| RetryAttempts 上升且后端负载更高 | 重试放大 | 比较入口请求数与后端尝试数 |
+
+在稳定条件下，用并发约等于吞吐率乘平均耗时理解请求积压；这不是可直接决定生产限制的容量公式。压测应固定后端、请求体、TLS/压缩设置，逐步增加并发，每档记录吞吐、错误率、P95/P99、CPU/内存。P95 不能直接跨实例取平均，应合并原始直方图 bucket 后计算。分位数是 bucket 内插值估计；本实验300 ms请求可能略超过默认bucket边界而显示明显更高的P95，精细分析需统一调整各实例的buckets，不能把估计值当成精确单次耗时。没有 Go 源码或剖析证据时，不编造 CPU 调度或内部锁竞争结论。
+
+### OTLP、采样与上下文传播怎样组成 Trace
+<!-- src: temp/new-traefik/18-Observability.md; temp/new-traefik/06-Observe.md -->
+
+Trace 需要传播上下文、产生 Span、导出和接收存储几个环节。`X-Request-ID` 是可用于日志检索的业务标记，不等于 W3C traceparent，也不会让未埋点后端自动产生应用 Span。没有 Span 时只能保留未知，不能声称已经看清某个 Middleware 或数据库耗时。
+
+#### 给 exporter 一个真正的接收端
+
+在第02章目录新增 `otel.yaml`，使用 Collector 的 OTLP gRPC receiver 和 debug exporter 验证传输链路；这是隔离实验配置，生产应使用受保护的接收端与存储 exporter。
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+exporters:
+  debug:
+    verbosity: detailed
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug]
+```
+
+Compose 增加 collector 服务，使用已选定并记录版本的镜像，不发布公网端口：
+
+```yaml
+otel:
+  image: otel/opentelemetry-collector:0.123.0
+  command: ["--config=/etc/otel.yaml"]
+  volumes:
+    - ./otel.yaml:/etc/otel.yaml:ro
+```
+
+Traefik 静态配置增加：
+
+```yaml
+tracing:
+  serviceName: traefik-notes
+  sampleRate: 1.0
+  otlp:
+    grpc:
+      endpoint: otel:4317
+      insecure: true
+```
+
+先启动 otel，再更新 Traefik 并发送 app 请求，检查 Collector 日志是否收到 serviceName、trace ID 和 Span。`insecure: true` 仅用于这个内部明文实验；不要把它当成对任意网络禁用 TLS 的建议。发送端成功不代表后端存储/查询已经配置完成。
+
+#### Span 粒度与诊断限度
+
+材料的默认 `minimal` 主要产生 server/client Span；需要 Middleware 粒度时，目标版本支持 `observability.traceVerbosity: detailed`，还应核对实际收到的 Span。采样、内部资源开关和 Router 覆盖都会影响数量。后端没有 OpenTelemetry 埋点时，可看到代理外呼耗时，却不能据此拆解应用函数和数据库耗时。
+
+高流量环境评估采样比例和属性内容，敏感 query 默认脱敏。遇到“trace 断了”，依次确认传播头、后端埋点、采样与 collector 网络，而不是只把 sampleRate 调成 1。
+
+### Dashboard、API、Ping 怎样作为观测入口
+<!-- src: temp/new-traefik/18-Observability.md; temp/new-traefik/06-Observe.md -->
+
+第02章的受保护 admin Router 可继续使用，不重复建设另一套无认证 8080。Dashboard 是可视化对象状态，API 便于精确检索错误与引用，Ping 是进程探活；三者都不能替代业务请求。
+
+```bash
+curl -u admin -H 'Host: admin.localhost' \
+  http://127.0.0.1:19000/api/rawdata
+curl -u admin -H 'Host: admin.localhost' \
+  http://127.0.0.1:19000/api/http/services
+curl -i http://127.0.0.1:18082/ping
+```
+
+rawdata 有错误时沿依赖查 Router→Middleware/Service，Service 中列出目标后再检查网络与健康。API/日志可能包含内部域名、路由和证书引用信息，应受认证与网络边界保护。调试 profiling 端点另受 api.debug 控制，不能因需要 Dashboard 就无差别开启调试面。
+
+Ping 的 200 在后端全挂时仍可能正常；优雅终止期间的状态变化可帮助上游 LB 摘除实例。内部资源的访问日志、指标和 Trace 默认可能关闭，观察不到 Ping Span 不等于探活没有执行。应先确认观测开关，再根据实际调用结果判断。
+
+#### 从采集、查询到告警的四种样本
+
+来源定位：`18-Observability.md / Metrics / Prometheus / Labels` 与 `07-Migrate.md / v3.3.4 / v3.5.4`。[prometheus.yml](lab/prometheus.yml) 与 Traefik 在同一 Compose 网络，目标为 `traefik:9100`，不是 Prometheus 容器自身的 localhost。静态标签 `job="traefik-lab"`、`env="lab"`，Traefik 自动给出 `service="a@file"` 等标签。完整采集配置：
+
+```yaml
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+rule_files: [/etc/prometheus/alerts.yml]
+scrape_configs:
+  - job_name: traefik-lab
+    static_configs:
+      - targets: [traefik:9100]
+        labels: {env: lab}
+```
+
+5xx 比例先按相同 service 聚合分子分母；没有流量时分母为0，已存在的序列得到 NaN，未出现过的序列可能为空。不能用 `clamp_min(...,1)` 偷换低 QPS 的比例，告警单独增加最低流量条件。以下窗口1分钟专用于短实验，生产应结合流量与误报风险选更长窗口。
+
+```promql
+sum by(service) (rate(traefik_service_requests_total{job="traefik-lab",code=~"5.."}[1m]))
+/
+sum by(service) (rate(traefik_service_requests_total{job="traefik-lab"}[1m]))
+```
+
+```promql
+histogram_quantile(0.95,
+  sum by(service, le) (rate(traefik_service_request_duration_seconds_bucket{job="traefik-lab"}[1m])))
+# P99 将 0.95 改为 0.99；必须先合并实例 bucket，再求分位数。
+min by(cn) (traefik_tls_certs_not_after{job="traefik-lab"} - time()) / 86400
+# 检查单个服务的序列数量与响应码等维度；完整 URI/用户 ID 不应成为标签。
+count by(service) (traefik_service_requests_total{job="traefik-lab"})
+```
+
+`cn` 等标签以实际 `/metrics` 输出为准；证书是 Unix 到期秒数，减 `time()` 才是剩余秒。上述名称针对原生 Prometheus exporter。OTEL 请求耗时在3.3.4之前可能是毫秒；3.5.4证书旧名称的 milliseconds 实际值已是秒，改名无需缩放值。Collector 的 Prometheus 转换也可能加单位后缀，先检查接收指标名称和 unit，不能照搬上述查询给所有 exporter。
+
+[alerts.yml](lab/alerts.yml) 的可执行规则将5xx比例大于5%、总请求速率大于0.1/s同时满足20秒才置 firing，附 service 标签。运行前用同版本 promtool 校验，再执行四种流量样本：
+
+```bash
+cd topics/web/traefik/lab
+docker compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+docker compose exec prometheus promtool check rules /etc/prometheus/alerts.yml
+docker compose run --rm client /checks.py metrics
+```
+
+脚本先发正常200，再交错500和300 ms慢请求，查询真实5xx比例、P95/P99和证书剩余天数，等待告警 firing；最后停止业务流量70秒，验证1分钟窗口的 NaN 与告警解除。此时 Prometheus 仍采集，健康检查仍运行，但不产生业务 service 请求计数；不要在静默阶段并行跑其他实验。`up=0` 是采集失败，不能当成正常无流量。
+
+#### 真实 Trace 接收与断链判断
+
+统一实验使用 `sampleRate: 1.0` 与 Collector debug exporter。给请求一个合法 traceparent，再从 Collector 日志查同一 Trace ID：
+
+```bash
+curl -H 'Host: observe.localhost' \
+  -H 'traceparent: 00-11111111111111111111111111111111-2222222222222222-01' \
+  http://127.0.0.1:28080/
+docker compose logs otel | rg -A 18 '11111111111111111111111111111111'
+```
+
+验收保存实际输出中的 Trace ID、Span ID、Parent ID、Kind、service.name、时间戳；不要把虚构 JSON 当实收 Span。server Span 应延续客户端 Trace ID，外呼 client Span 与其相连。后端源码未做 OpenTelemetry 埋点，因此没有应用内部 Span 是明确边界；出现 header 却无后端 Span 时先检查埋点与采样，再检查 exporter/Collector。接收日志摘录保存在本次整改证据中。
+
+## 第 19 章 · Routing-Configuration · 路由配置总览
+
+### 从业务需求拆出路由配置对象
+<!-- src: temp/new-traefik/19-Routing-Configuration.md; temp/new-traefik/20-Common-Configuration.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md -->
+
+Routing Configuration 是运行期处理流量的模型：Router 选择请求、Middleware 修改或拒绝请求、Service 选择目标、ServersTransport 约束后端连接。HTTP、TCP 和 UDP 各有自己的对象域，不能因为名字都叫 Service 就跨协议引用。
+
+| 业务问题 | 应归属对象 | 例如 |
+| --- | --- | --- |
+| 哪些请求属于这个应用 | Router | 域名与路径组合 |
+| 转发前要做什么 | Middleware | 认证、改写、限流 |
+| 应用有哪些实例 | Service | 地址、端口、权重 |
+| 如何连接这些实例 | ServersTransport | CA、SNI、建连超时 |
+| 入口监听在哪里 | 安装配置 EntryPoint | 不属于路由文件 |
+
+原材料中的 File 大表展示了大量可选字段，它适合作为 schema 线索，不适合一次全部复制到一个配置文件。先写最小对象图，再根据需求增加策略，能避免同时启用互斥 Service 类型或引用不存在对象。
+
+### File、Kubernetes 和标签如何表达同一个设计
+<!-- src: temp/new-traefik/19-Routing-Configuration.md; temp/new-traefik/20-Common-Configuration.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md -->
+
+同一个“app.localhost 路由到后端80端口”的设计，在 File 中给 URL，在 Docker 中读取容器网络和 server.port，在 Kubernetes 中引用 Service 与其端口。设计语义相近，地址和身份的来源却不同。
+
+```mermaid
+graph TD
+  F[File 配置] --> O[Router 和 Service 模型]
+  L[Labels 或 Tags] --> O
+  K[Kubernetes API 对象] --> O
+  O --> H[HTTP 数据面]
+  O --> T[TCP 数据面]
+  O --> U[UDP 数据面]
+```
+
+Provider 后缀用于定位动态对象来源，Kubernetes namespace 则限定资源位置，两者不能混淆。迁移表达方式后检查完整对象名、实际服务器地址和协议，不仅比较字段拼写。第31–36章提供各平台的细化方式。
+
+对平台共享配置，可以在 File 定义公共 Middleware，再由其他 Provider 的 Router 引用。所有依赖仍要在运行配置中可解析；“已经写过一个同名 Middleware”不等于当前 Provider 可以省略来源直接找到它。
+
+### 如何识别配置不完整与不支持的字段
+<!-- src: temp/new-traefik/19-Routing-Configuration.md; temp/new-traefik/20-Common-Configuration.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md -->
+
+File 示例常包含部分片段：只声明 Router，没有 Service；只声明 transport，没有对应后端 URL。这些片段可以说明某个功能，但不能直接作为完整实验。阅读时要补齐引用，并辨认它属于安装文件还是动态文件。
+
+```text
+对象名：api@file
+入口：web
+依赖：auth@file → app@file → backend-a:80
+证据：rawdata 中对象无依赖错误
+请求：正确 Host 成功，错误 Host 未匹配
+回滚：恢复该动态文件的完整上一版本
+```
+
+把这张依赖清单用于变更审查，能发现“字段正确但依赖缺失”。目标版本不支持的字段应由日志、API/schema 或测试实例证明，不要从抓取文档里损坏的示例推断其可用性。后续章节的配置默认都是明确片段或给出前置环境，不能跨小节随意拼接重复顶层键。
+
+## 第 20 章 · Common-Configuration · 通用配置表达
+
+### 结构化文件如何保持对象关系清晰
+<!-- src: temp/new-traefik/20-Common-Configuration.md; temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/36-Label-&-Tag-Providers.md -->
+
+Common Configuration 讲不同来源如何表达通用路由对象。第19章确定对象职责，本章关注具体表达：YAML/TOML 保留嵌套结构，labels/tags 使用扁平键，KV 使用层次路径，Kubernetes 使用 schema 约束的资源。
+
+下面的动态 File 示例依赖第02章已启动的 backend-a。文件应位于已监听目录，不包含 EntryPoint 或 Provider 启动配置：
+
+```yaml
+http:
+  routers:
+    common-demo:
+      entryPoints: [web]
+      rule: Host(`common.localhost`)
+      service: common-demo
+  services:
+    common-demo:
+      loadBalancer:
+        servers:
+          - url: http://backend-a:80
+```
+
+请求 `common.localhost` 应到 backend-a；若对象根本没出现，先看 File Provider 挂载/事件；若 Router 报引用错误，检查 Service 名称。YAML 解析成功只能证明语法层合法，不能证明 Traefik 接受字段或网络可达。
+
+### 扁平键与资源对象不能逐字互相替换
+<!-- src: temp/new-traefik/20-Common-Configuration.md; temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/36-Label-&-Tag-Providers.md -->
+
+| 表达形式 | 对象来源 | 关键差异 |
+| --- | --- | --- |
+| Docker labels | 容器 | 地址通常由发现得到，显式选择端口和网络 |
+| Swarm deploy.labels | 服务 | 标签层级不同，使用 Swarm Provider |
+| Consul/Nomad tags | 注册服务 | tags 是字符串，地址来自注册信息 |
+| KV paths | 存储树 | 数组以序号路径表达，更新有一致性问题 |
+| Ingress/CRD | Kubernetes API | 字段受 schema 约束，Service 名称和端口可独立于 Pod |
+
+因此不能把 File 的 `servers: [{url: ...}]` 直接当作 Docker 的标签字段，也不能在标准 Ingress 的 backend.service 随意加入 namespace。源材料里类似的残留示例需要按 Kubernetes schema 修正；跨 namespace 行为应通过相应 API 的授权机制表达。
+
+迁移时使用第19章对象图作为中间模型，把每条关系翻译到目标格式，再检查生成对象与真实请求。配置来源不同并不保证所有功能都支持，特别是复合 Service、TLSOptions 与商业中间件，要明确目标 Provider 的能力范围。
+
+## 第 21 章 · HTTP · HTTP 处理模型
+
+### HTTP 与 HTTPS 的监听、匹配和重定向如何分工
+<!-- src: temp/new-traefik/21-HTTP.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/25-Middlewares.md -->
+
+Router 带 `tls` 后处理 HTTPS；HTTP 请求并不会因为同一个 Host 存在就自动进入它。第02章只建立了 HTTP 实验，完整 HTTPS 的证书生成、挂载和端口发布在第24章；本节先建立请求顺序，避免把路径 404 与证书错误混为一谈。
+
+```mermaid
+graph TD
+  C[客户端 ClientHello 与 SNI] --> E[入口选择证书并握手]
+  E --> H[读取 HTTP Host 和 Path]
+  H --> R[Router 选择后端]
+  R --> B[应用处理]
+  B --> O[代理返回响应]
+```
+
+握手发生时尚未读取 HTTP Path，因此同一个域名下 `/admin` 和 `/api` 的 Router 不能靠路径修复证书域名错误。SNI 与 Host 不一致还会引入 TLS options 选择问题，正常业务应保持目标 URL、SNI 和 Host 一致。
+
+| 检查步骤 | 看到什么 | 解释 |
+| --- | --- | --- |
+| HTTP `curl -I` | 30x 和 Location | 重定向成立，未证明 HTTPS 可用 |
+| HTTPS 不带 `-k` | 证书校验成功或失败 | 域名、有效期与信任链 |
+| HTTPS 带真实路径 | 响应与 RouterName | TLS 后的路由是否匹配 |
+
+第24章环境建立后使用 `--resolve` 固定测试地址，而不是只改 HTTPS 的 Host 头。`curl -k` 可辅助区分证书与业务问题，但不能作为证书验收。重定向目标还需使用客户端可达的外部端口，尤其是本地高端口映射环境。
+
+### HTTP 的路由、服务、TLS 和 Middleware 如何构成一条链
+<!-- src: temp/new-traefik/21-HTTP.md; temp/new-traefik/22-Routing.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/25-Middlewares.md -->
+
+HTTP 章节在源材料中是导航页，其核心是四类对象的关系。Routing 选择请求，Load Balancing 选择后端，TLS 处理安全连接与证书，Middleware 处理转发前后的策略。后续22–25章依次讲具体机制，本章用于让读者知道一次请求横跨哪些配置。
+
+```mermaid
+graph TD
+  C[客户端连接] --> T[TLS 或明文入口]
+  T --> R[HTTP Router 匹配]
+  R --> M[Middleware 有序处理]
+  M --> S[HTTP Service 选择实例]
+  S --> B[后端传输与应用]
+```
+
+例如请求 `/api` 返回401，应先判断 Router 是否匹配以及哪一层认证返回；后端根本未收到请求时，不应先改应用路由。若握手失败，则 HTTP Path 规则尚未参与，不能用提高 priority 修复证书。
+
+阅读后续参数时，把每个字段归入这张图的位置，并分别记录生效方式和观察信号。一个代码块没有同时出现所有对象并不一定错，但它必须明确依赖前文哪些对象；没有依赖说明的片段不应被当作完整发布方案。
+
+## 第 22 章 · Routing · HTTP 路由
+
+### Host、路径、方法与 Header 怎样组合匹配
+<!-- src: temp/new-traefik/22-Routing.md -->
+
+本章承接第02章的 Compose 环境：宿主 HTTP 地址是 `127.0.0.1:18080`，业务 Host 为 `app.localhost`，后端是 `backend-a` 和 `backend-b`。每个配置片段都说明修改位置；不要把多个带 `http:` 的片段简单粘到同一 YAML 文件形成重复键。
+
+Router 规则对当前请求作布尔判断。`Host` 看域名，`Path` 看精确路径，`Method` 看请求方法，`Header` 和 `Query` 则检查头与查询参数。v3 规则用单数 `Header`、`HeaderRegexp`；`Headers()` 是旧规则拼写，不能与 Middleware 的 `headers` 字段混淆。
+
+#### 先定义允许集合，再写表达式
+
+假设只允许带 `X-Env: prod` 的 GET 请求访问 `/api` 及其子路径，把第02章 `http.routers.app.rule` 替换为：
+
+```yaml
+rule: Host(`app.localhost`) && (Path(`/api`) || PathPrefix(`/api/`)) && Method(`GET`) && Header(`X-Env`, `prod`)
+```
+
+括号明确路径的 OR 关系，外层其他条件仍需全部满足。仅写 `PathPrefix(`/api`)` 会把 `/apix` 也收入，因为这是字符串前缀匹配，不是目录边界匹配。规则参数使用反引号或转义双引号；外层 YAML 引号与规则字符串是两层语法。
+
+```bash
+curl -i -H 'Host: app.localhost' -H 'X-Env: prod' http://127.0.0.1:18080/api
+curl -i -H 'Host: app.localhost' -H 'X-Env: prod' http://127.0.0.1:18080/api/users
+curl -i -H 'Host: app.localhost' -H 'X-Env: prod' http://127.0.0.1:18080/apix
+curl -i -X POST -H 'Host: app.localhost' -H 'X-Env: prod' http://127.0.0.1:18080/api
+```
+
+前两个应进入 whoami；后两个不应命中该 Router。在本实验没有兜底 Router 时，它们预期为 Traefik 404。若仍返回业务响应，先检查是否有其他 Router 接管，不要先认定布尔表达式无效。
+
+#### 正则、大小写与安全边界
+
+| 条件 | 使用方式 | 容易误解的地方 |
+| --- | --- | --- |
+| Host | `Host(`app.localhost`)` | Host 匹配规范化为小写，路径并非同样处理 |
+| 路径正则 | `PathRegexp(`^/api/[0-9]+$`)` | Go 风格正则，不能直接复制 PCRE 特有语法 |
+| 精确查询 | `Query(`mode`, `read`)` | 查询条件不是鉴权，客户端可任意提交 |
+| Header | `Header(`X-Env`, `prod`)` | 头名称匹配不等于值可信 |
+| 来源连接 IP | `ClientIP(`10.0.0.0/8`)` | 不使用 X-Forwarded-For 作为匹配输入 |
+
+灰度 Header 和 Query 是分流信号，不应单独成为管理员权限凭据。完成这一节后恢复 `Host(`app.localhost`)`，避免后续实验因旧条件残留而无法到达中间件。
+
+### 重叠规则如何使用优先级和明确的路径边界
+<!-- src: temp/new-traefik/22-Routing.md -->
+
+Traefik 默认按规则字符串长度计算优先级，更长规则优先。它不执行 Nginx 的精确 location、前缀与正则优先级算法，也不会自动理解哪个表达式在业务上“更具体”。`priority: 0` 表示继续使用默认计算，不是最低优先级。
+
+#### 用可识别响应验证胜出的 Router
+
+新增文件 `dynamic/priority.yml`，复用第02章的两个后端网络地址；实验使用独立 Host，不与 `app` Router 冲突。
+
+```yaml
+http:
+  routers:
+    fallback:
+      entryPoints: [web]
+      rule: Host(`priority.localhost`)
+      priority: 10
+      service: front
+    api-path:
+      entryPoints: [web]
+      rule: Host(`priority.localhost`) && (Path(`/api`) || PathPrefix(`/api/`))
+      priority: 100
+      service: api-only
+  services:
+    front:
+      loadBalancer:
+        servers:
+          - url: http://backend-a:80
+    api-only:
+      loadBalancer:
+        servers:
+          - url: http://backend-b:80
+```
+
+| 请求路径 | 预期后端 | 为什么 |
+| --- | --- | --- |
+| `/` | backend-a | 只有通用 Host 规则成立 |
+| `/api`、`/api/` | backend-b | 两条成立，100 高于 10 |
+| `/apix` | backend-a | 严格目录边界排除 apix |
+| `/API` | backend-a | 路径条件大小写不同 |
+
+用 `curl -H 'Host: priority.localhost' http://127.0.0.1:18080/api` 读取 Hostname，并结合 Access Log 的 RouterName 证实选择。交换两条 priority 后重复请求，可看到“更具体路径”仍被更高优先级的兜底遮蔽。
+
+#### 优先级必须可维护
+
+给不同业务预留明确的小范围，比把所有路由写成超大数更容易管理。内部重定向 Router 也有优先级，不能只比较应用 Router。修改规则时同时测试已有路径，避免新增一个长表达式意外接管旧流量。实验结束删除 `priority.yml`，原业务环境不受影响。
+
+### 路由级观测与多层路由什么时候值得使用
+<!-- src: temp/new-traefik/22-Routing.md -->
+
+Router 可选择是否产生 Access Log、Metrics 和 Tracing，并在支持版本下控制 traceVerbosity。全局 exporter 和标签维度没启用时，单个 Router 的开关不会凭空创建观测链路；内部资源还受 addInternals 等独立选项影响。排查某个路由“没有指标”时应先检查这些层次。
+
+多层路由把共同处理放在父层，子层再根据处理后的上下文选择目标。例如父层完成统一鉴权，子层依据已验证身份信息继续分流。它不同于普通 Middleware 路径改写后重新匹配所有 Router，也不是任意版本都可以默认使用的通用配置模式。
+
+```mermaid
+graph TD
+  I[入口请求] --> P[父路由匹配]
+  P --> A[共同策略或鉴权]
+  A --> C[子路由判断处理后的条件]
+  C --> S1[服务一]
+  C --> S2[服务二]
+```
+
+材料中使用 parentRefs 表达父子关系。实施前先核对目标版本的字段支持和依赖规则，避免循环引用、父层不存在或子层可绕过授权。普通简单站点直接使用平面 Router 更易理解，不必为了减少几行 YAML 增加路由层级。
+
+验收至少包含父条件不匹配、鉴权拒绝、不同子条件、没有任何子路由匹配四类请求；观察每一步的路由状态和后端访问记录。材料部分子路由示例仍有旧 HeadersRegexp 拼写，v3 默认规则应核对 HeaderRegexp，不能因示例在文档中出现就放弃版本校验。
+
+#### 原始路径回放与后端 URI 对照
+
+来源定位：`07-Migrate.md / v3.4.1 / Request Path Matching Examples`。统一实验将 `/bar` 与 `/foo/bar` 前缀路由给 B，默认路由给 A，所有 Router 都要求 `Host: path.localhost`。默认优先级1，两个精确业务前缀优先级100；没有 StripPrefix，后端 JSON 的 uri 能直接显示转发结果。
+
+```bash
+for request_path in /bar /foo/bar /foo/../bar /foo/%2E%2E/bar /foo//bar /foo%2Fbar; do
+  printf '\nrequest=%s\n' "$request_path"
+  curl --path-as-is -i -H 'Host: path.localhost' "http://127.0.0.1:28080$request_path"
+done
+docker compose logs traefik | rg 'path-(bar|foo-bar|default)@file'
+```
+
+| 输入 | v3.4.1 材料预期 | 验收解释 |
+| --- | --- | --- |
+| `/bar`、`/foo/bar` | B | 普通路径对照 |
+| `/foo/../bar` | B，后端 `/bar` | sanitize 清理父路径 |
+| `/foo/%2E%2E/bar` | B，后端 `/bar` | 非保留字符 normalize 后再 sanitize |
+| `/foo//bar` | B，后端 `/foo/bar` | 重复斜杠清理 |
+| `/foo%2Fbar` | 不匹配 `/foo/bar`，走默认 A | 保留编码参与匹配；后续 patch 可能在入口直接拒绝 |
+
+`curl --path-as-is` 防止客户端先消除 `..`。保存 exact patch、状态码、Access Log RouterName/RequestPath 和后端 uri；被入口400拒绝时没有后端记录就是证据，不伪造 URI。后端框架可能再次解码，路由看到的编码路径与业务框架解释不一定一致。对照旧版本只能在隔离入口，升级准入以业务允许集合与安全边界为准。
+
+## 第 23 章 · Load-Balancing · HTTP 负载均衡
+
+### 服务器选择、粘性和高级服务组合怎样工作
+<!-- src: temp/new-traefik/23-Load-Balancing.md -->
+
+Service 描述把已经匹配的请求发到哪里。单个 loadBalancer Service 列出实例；复合 Service 可以组合多个子服务做加权、镜像或故障转移。一次请求命中哪个 Router，与它在 Service 中选中哪个后端，是两个独立判断。
+
+#### 先区分均衡与粘性
+
+第02章 `app` 的服务器列表已有 A/B 两个后端。无粘性请求用于观察分布；若在 `app.loadBalancer` 内增加下列片段，客户端应保存并回传 Cookie 才能观察粘性。
+
+```yaml
+sticky:
+  cookie:
+    name: lab_backend
+    httpOnly: true
+    sameSite: lax
+```
+
+```bash
+curl -c /tmp/traefik-lab-cookie -H 'Host: app.localhost' http://127.0.0.1:18080/
+curl -b /tmp/traefik-lab-cookie -H 'Host: app.localhost' http://127.0.0.1:18080/
+```
+
+观察两次 Hostname 和第一次 Set-Cookie。HTTP 实验不能把 Cookie 的 `secure: true` 打开后仍期待浏览器通过 HTTP 回传；生产 HTTPS 可设置 Secure。粘性不是 Session 数据复制，原实例退出后转向其他实例，应用本地状态仍可能丢失。健康检查认定实例不可用时，粘性可转移并更新 Cookie，而不是永远锁死在故障实例。
+
+#### 多层 Service 的取舍
+
+| 组合方式 | 解决的问题 | 操作边界 |
+| --- | --- | --- |
+| 服务器权重/服务权重 | 不同容量、灰度比例 | 小样本不保证精确百分比；请求耗时也影响负载 |
+| 多层粘性 | 子服务与实例都保持选择 | 必须在需要粘性的每一层配置 |
+| Mirroring | 将请求副本交给验证服务 | 客户端仍使用主响应；副本可能产生写入副作用 |
+| Failover | 主服务健康失效后使用备用 | 依赖健康状态传播，不是“任何业务 500 自动切换” |
+
+采集材料的 HTTP Service 页还介绍 P2C 与 least-time 策略；采用时应核对目标版本的字段支持并比较请求延迟、活动连接和后端容量。不要把“列出两台服务器”误当成“所有算法都已验证可用”。镜像和复合服务支持受 Provider 约束，File 与 IngressRoute 的能力也不完全相同。
+
+对于影子流量，先使用只读路径、设置比例和请求体上限，确认副本后端不调用真实支付/写库。以真实后端日志统计副本请求，而不是把主站成功当成镜像成功的证据。
+
+### 健康检查与平台就绪信号怎样取舍
+<!-- src: temp/new-traefik/23-Load-Balancing.md -->
+
+主动健康检查定期发请求，决定实例是否参加负载均衡；它与 Docker/Kubernetes 的健康或就绪状态不是同一个信号。在 Kubernetes 中，Provider 会依据端点和就绪变化更新目标，不能假设 File Provider 的主动检查字段能原样适用于所有 Kubernetes Service。
+
+#### 在 File 环境观察摘除与恢复
+
+把第02章 `app.loadBalancer` 的配置补成以下形态，服务器列表保留两个实例：
+
+```yaml
+loadBalancer:
+  servers:
+    - url: http://backend-a:80
+    - url: http://backend-b:80
+  healthCheck:
+    path: /
+    interval: 2s
+    timeout: 1s
+    status: 200
+```
+
+这里用 whoami 的 `/` 只是实验选择，业务应用应有快速、无副作用、状态含义明确的检查端点。材料默认可接受 2xx/3xx；显式 `status: 200` 防止登录跳转也被当作就绪。若需要特定虚拟主机或检查端口，用 `hostname`、`port` 区分检查地址与业务地址。
+
+```bash
+docker compose stop backend-a
+curl -H 'Host: app.localhost' http://127.0.0.1:18080/
+docker compose start backend-a
+```
+
+不要在停止后的第一毫秒就要求只剩 B。等待检查周期，通过管理 API 和请求分布观察 A 摘除，再观察 A 恢复。无主动检查时，File 中 A 的地址仍在，部分请求可能连接失败；有主动检查时，失败应在检测后从轮转中移除。
+
+#### 防止健康检查扩大故障
+
+| 检查设计 | 可能结果 | 更合适的处理 |
+| --- | --- | --- |
+| 检查任一外部依赖，依赖抖动即失败 | 所有实例同时摘除 | 明确核心依赖与降级能力 |
+| 用要求认证的业务页面 | 401/302 与就绪状态混淆 | 独立就绪端点或明确检查头与状态 |
+| 层层复合 Service 只检查叶子 | 父级不知道全量失效 | 核对健康状态向父级传播条件 |
+
+全量不可用通常会产生无可用服务器响应，具体要看 Provider 是否保留空 Service。记录 Service 与 Router 状态，不能从一个 503 推导所有端点已退出。
+
+### 连接池、建连与响应头超时怎样设置
+<!-- src: temp/new-traefik/23-Load-Balancing.md -->
+
+Traefik 与客户端、Traefik 与后端是两段连接。EntryPoint 的 respondingTimeouts 约束前一段；HTTP ServersTransport 控制后一段。混淆两者会导致调整配置后现象不变，或意外截断其他服务的长请求。
+
+#### 在已有 Service 上绑定传输参数
+
+下面是增量动态配置：把 `api-transport` 加入 `http.serversTransports`，并在原 `app.loadBalancer` 内设置 `serversTransport: api-transport`，保留服务器列表。
+
+```yaml
+http:
+  serversTransports:
+    api-transport:
+      maxIdleConnsPerHost: 32
+      forwardingTimeouts:
+        dialTimeout: 2s
+        responseHeaderTimeout: 3s
+        idleConnTimeout: 30s
+```
+
+| 参数 | 计时或计数对象 | 不代表什么 |
+| --- | --- | --- |
+| `dialTimeout` | 与后端建立连接的等待 | 整个业务响应总超时 |
+| `responseHeaderTimeout` | 完整发出请求后等待响应头 | 流式响应体最长传输时间 |
+| `idleConnTimeout` | 空闲后端 keep-alive 连接 | 正在工作的 WebSocket 会话上限 |
+| `maxIdleConnsPerHost` | 每主机保留的空闲连接数 | 后端所有活动连接的并发硬上限 |
+
+参数需要与应用 SLA 和调用方总预算协调。假设调用方最多等 5 秒，设置建连 4 秒、响应头 4 秒再加多次 Retry，显然可能超过整体预算。HTTP/2 还支持同一连接上的多流，因此连接数不能直接等同于请求并发数。
+
+#### 用两种失败证明参数作用域
+
+把实验 Service 端口改为未监听端口可产生快速连接拒绝，它不一定消耗完整 dialTimeout。要观察响应头超时，需要后端接受连接后延迟发送响应头；第06章给出可控后端，设置延迟大于 3 秒后比较日志和客户端耗时。TLS 后端的 `serverName`、`rootCAs` 和客户端证书在第24章演示，不能用提高超时修复证书验证失败。
+
+### Retry、熔断与故障转移怎样划清边界
+<!-- src: temp/new-traefik/23-Load-Balancing.md -->
+
+Retry 针对后端没有回应的失败重新尝试；一旦后端给出响应，就停止重试，即使状态码为 500。CircuitBreaker 则统计链中其后方的请求结果，异常条件成立时暂时快速失败。Failover 是服务组合，由主服务健康失效通知触发备用服务。这三个机制不能合称为“错误就自动重试另一台”。
+
+#### 配置与状态
+
+下列对象可添加到第02章动态文件的 `http.middlewares`。通过 Router 的 `middlewares` 引用才会执行；先单独测试 Retry，再单独测试 breaker，最后才组合。
+
+```yaml
+retry-network:
+  retry:
+    attempts: 2
+    initialInterval: 100ms
+breaker:
+  circuitBreaker:
+    expression: ResponseCodeRatio(500, 600, 0, 600) > 0.5
+    checkPeriod: 100ms
+    fallbackDuration: 5s
+    recoveryDuration: 5s
+```
+
+```mermaid
+graph TD
+  C[Closed 正常转发] -->|异常达到阈值| O[Open 快速失败]
+  O -->|等待窗口结束| R[Recovering 逐步恢复]
+  R -->|保持正常| C
+  R -->|再次失败| O
+```
+
+breaker 默认打开时返回 503，并逐步尝试恢复。相同 Middleware 被两个 Router 引用，不代表共享同一熔断状态；每个 Router 有自己的实例。Retry 放在 breaker 前后也会改变 breaker 观察到的结果，必须用实际调用计数验证。
+
+#### 三个对照实验
+
+| 故障 | 应观察什么 | 不能据此推导什么 |
+| --- | --- | --- |
+| 后端直接返回 500 | 应用接收计数、下游状态 | 不应期待 Retry 因状态码再次请求 |
+| 连接拒绝或没有响应 | 代理尝试/错误、总体耗时 | 网络失败不保证请求从未被后端执行 |
+| 主服务健康失效 | 主/备健康状态与实际响应实例 | 单个 500 不等于主服务被健康检查摘除 |
+
+即使 HTTP 方法看起来幂等，业务实现也可能有副作用；支付或创建操作必须通过应用幂等键、去重等机制处理未知结果。重试还会放大故障期间负载，次数和时间预算应一起设计，而不是无限提高 attempts。
+
+### 权重、P2C、Least-Time 与被动健康检查怎样选择
+<!-- src: temp/new-traefik/23-Load-Balancing.md -->
+
+不同均衡策略依赖不同信号。服务级 WRR 按预设权重分配给子服务，适合版本流量比例；P2C 随机选两个后端，选择活动请求更少的一个，避免仅按历史比例继续压向繁忙实例；Least-Time 将响应时间、活动连接与权重结合，适合性能不一致的后端。目标版本支持的策略字段必须单独核对，不能把服务级 weighted 对象与服务器级 strategy 混为一项。
+
+| 选择依据 | 适合的策略 | 需要防止的误判 |
+| --- | --- | --- |
+| 明确发布流量比例 | 加权服务组合 | 小样本不严格等于比例 |
+| 活动请求差异较大 | P2C | 活动数量不等于每请求 CPU 成本 |
+| 后端响应性能不同 | Least-Time | 慢源可能来自网络或业务类型差异 |
+| 需要固定会话落点 | sticky 或相应一致性策略 | 状态固定不代表应用会话可迁移 |
+
+在固定请求类型和后端条件下，比较吞吐、P95/P99、活动请求和各后端资源。不要只看 A/B 请求数是否相等；负载均衡的目标是利用容量和维持服务质量，而非永远让每台计数完全相同。
+
+被动健康检查使用真实流量观察失败，failureWindow 同时涉及失败统计和暂时不可用窗口，maxFailedAttempts 控制阈值。它无需额外探测请求，但在无流量时无法提前发现故障，也可能受少量样本影响。与主动检查组合时明确各自摘除和恢复信号，通过应用错误、连接失败和窗口结束三个实验核对，不把某次业务拒绝无条件当成机器失效。
+
+#### A/B 组合服务的完整依赖与三组实验
+
+来源定位：`23-Load-Balancing.md / Weighted Round Robin / Mirroring / Failover`。[完整动态文件](lab/dynamic/routes.yml) 已包含 A/B Service、三个 Router 和健康检查；[后端源码](lab/app/server.py) 返回 backend 与原始 uri，并逐请求输出日志。核心组合如下，合入动态文件的 `http.services`：
+
+```yaml
+weighted:
+  weighted:
+    services:
+      - {name: a, weight: 3}
+      - {name: b, weight: 1}
+mirror:
+  mirroring:
+    service: a
+    mirrorBody: false
+    mirrors:
+      - {name: b, percent: 100}
+failover:
+  failover:
+    service: a
+    fallback: b
+```
+
+A/B 的 `loadBalancer.healthCheck` 为 `/health`、1秒间隔、500 ms超时。WRR实验不启用 sticky，80次请求统计 A/B；3:1是权重目标，不能从一次返回推断分布，也不要把连接级TCP分布混入HTTP请求统计。
+
+```bash
+docker compose run --rm client /checks.py core
+docker compose logs backend-a backend-b | rg 'mirror-39'
+curl -i -H 'Host: failover.localhost' http://127.0.0.1:28080/error
+docker compose exec backend-a touch /tmp/unhealthy
+# 等健康检查记录 A DOWN 后请求；应由 B 返回。
+curl -H 'Host: failover.localhost' http://127.0.0.1:28080/
+docker compose exec backend-a rm /tmp/unhealthy
+# 等 A UP 后新请求回到 A。
+curl -H 'Host: failover.localhost' http://127.0.0.1:28080/
+```
+
+镜像 Router 只匹配 GET，教学后端不执行业务写入；主响应200之外，必须查到 A 和 B 的同一 `mirror-39` 请求记录。`mirrorBody: false` 并不保证任意生产 GET 无副作用，也不等于匿名化，真实影子服务需隔离数据与外部依赖。镜像失败不应改变主响应，日志/指标独立监控。
+
+Failover根据健康状态选备用；`/error` 返回500但 `/health` 仍200时应继续由 A 返回500，不做“每次500立刻重放B”。只有健康检查失败传播后才切B，健康恢复再回A。把这个差异与 Retry 区分清楚，才能避免重复写入和虚假的可用性判断。
+
+## 第 24 章 · TLS · HTTP TLS 配置
+
+### SNI 选证书、TLSOptions 和 TLSStore 怎样配合
+<!-- src: temp/new-traefik/24-TLS.md -->
+
+TLS 握手用 SNI 选择证书与适用参数，随后才读取 HTTP Host/Path 进行路由。TLSOptions 约束协议与客户端证书要求，TLSStore 承载证书和默认选择。它们不是每个 Router 独立复制的一套私有证书仓库。
+
+材料明确传统 TLS Store 只有全局 `default` 有效；没有匹配证书时可能使用默认或自动生成的证书。启用 strict SNI 会拒绝没有匹配 SNI 的连接，不能再期待默认自签名证书兜底。TLS 1.3 的 cipher suites 也不能用 TLS 1.2 的配置列表任意控制。
+
+#### 先建立可校验证书的本地实验
+
+回到第02章 Compose 目录，使用 OpenSSL 3 创建仅用于实验的自签名证书，包含两个实际测试域名 SAN。命令生成私钥到文件，不打印其内容。
+
+```bash
+mkdir -p certs
+openssl req -x509 -newkey rsa:2048 -nodes -days 7 \
+  -keyout certs/server.key -out certs/server.crt \
+  -subj '/CN=app.localhost' \
+  -addext 'subjectAltName=DNS:app.localhost,DNS:gateway.localhost'
+chmod 600 certs/server.key
+```
+
+给 Compose 的 traefik 增加 `127.0.0.1:18443:443` 端口映射与 `./certs:/etc/traefik/certs:ro` 挂载。在已有静态 `entryPoints` 中增加 `websecure: {address: ":443"}`，然后新建 `dynamic/tls.yml`：
+
+```yaml
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/server.crt
+      keyFile: /etc/traefik/certs/server.key
+  options:
+    modern:
+      minVersion: VersionTLS12
+http:
+  routers:
+    app-tls:
+      entryPoints: [websecure]
+      rule: Host(`app.localhost`)
+      service: app@file
+      tls:
+        options: modern
+```
+
+保留第02章 `routes.yml` 中 app Service。执行 `docker compose up -d` 使新端口/挂载生效，再测试：
+
+```bash
+curl --cacert certs/server.crt \
+  --resolve app.localhost:18443:127.0.0.1 https://app.localhost:18443/
+openssl s_client -connect 127.0.0.1:18443 -servername app.localhost \
+  -CAfile certs/server.crt -verify_return_error </dev/null
+```
+
+这才验证了证书信任、域名、TLS Router 和后端。错误域名或不提供实验信任材料应校验失败。换成 `-k` 只能观察握手之后的业务，不能作为正确证书的证明。
+
+#### 从握手信息判断证书选择
+
+查看公开证书的 subject、issuer、SAN、serial 和有效期，不导出整个 Kubernetes Secret 或 acme.json。若同一个 Host 被不同 Router 映射到冲突 TLSOptions，需要消除域名级冲突；路径不同不意味着握手时可以用不同 TLS 参数。
+
+### 入口 mTLS 与后端 mTLS 怎样独立验证
+<!-- src: temp/new-traefik/24-TLS.md -->
+
+入口 mTLS 中，Traefik 验证客户端；后端 mTLS 中，Traefik 成为客户端并向后端出示证书。两边可以使用不同 CA 和身份，入口成功并不证明后端信任成功。错误发生的位置也不同：入口失败可能没有 HTTP 状态码，后端握手失败则可能由 Traefik 返回 502。
+
+#### 明确材料和文件前提
+
+以下片段依赖实际由测试 CA 签发的证书，不使用第24章自签名 server.crt 冒充一套完整 PKI。准备 `client-ca.crt`、客户端证书/密钥，和单独后端 CA、后端证书及 Traefik 使用的客户端证书；对应文件挂载到 `/etc/traefik/certs`。证书的 EKU、SAN、链和私钥必须相符。
+
+入口在 `tls.options` 下新增 `require-client`：
+
+```yaml
+require-client:
+  minVersion: VersionTLS12
+  clientAuth:
+    caFiles:
+      - /etc/traefik/certs/client-ca.crt
+    clientAuthType: RequireAndVerifyClientCert
+```
+
+将目标 HTTPS Router 的 options 指向它。`RequireAnyClientCert` 只要求出示证书，和“必须由指定 CA 签发”并不相同；需要验证时使用 RequireAndVerifyClientCert。
+
+后端在 `http.serversTransports` 下声明以下对象，并让实际 HTTPS 后端 Service 的 `loadBalancer.serversTransport` 引用它：
+
+```yaml
+backend-mtls:
+  serverName: backend.internal
+  rootCAs:
+    - /etc/traefik/certs/backend-ca.crt
+  certificates:
+    - certFile: /etc/traefik/certs/proxy-client.crt
+      keyFile: /etc/traefik/certs/proxy-client.key
+```
+
+配置 schema 和证书文件结构以目标版本实际加载为准，采集页个别简写示例不完整。Service 的 URL 必须使用 `https://`，后端真正要求客户端证书，否则仅配置 certificates 无法证明双向认证。
+
+#### 正负测试矩阵
+
+| 测试 | 预期判断 |
+| --- | --- |
+| 入口不带客户端证书 | 握手拒绝，不进入业务后端 |
+| 入口使用受信证书 | `curl --cert ... --key ... --cacert ...` 可继续请求 |
+| 后端 CA 或 serverName 错误 | 入口仍可握手，后端传输日志出现验证错误 |
+| 后端要求证书，移除 proxy-client | 后端握手拒绝，代理记录连接错误 |
+
+观察证书公开元数据、Traefik 传输日志与后端 TLS 日志，不打印私钥。`insecureSkipVerify` 会掩盖信任链和名称问题，应修复 CA/SAN/SNI，而不是把关闭验证当成 mTLS 完成步骤。
+
+#### 本地 CA、双端证书与 mTLS 后端
+
+统一实验的 [init-certs.sh](lab/init-certs.sh) 生成30天测试CA、7天入口证书、后端证书、客户端证书和未知CA签发的客户端。serverAuth/clientAuth扩展分开，入口 SAN 包含 app.localhost/mtls.localhost/tcp.localhost，后端 SAN 包含 backend-a/backend-b；文件由 umask 077保护，私钥目录已忽略，不输出私钥。所需 OpenSSL 要支持 `-addext`。
+
+后端8443由 Python SSLContext 加载 backend 证书并设 `CERT_REQUIRED`；Traefik的 `backend-mtls` HTTP transport指定 serverName、CA和客户端证书。入口 `mtls.localhost` 使用 RequireAndVerifyClientCert；公网入口认证与Traefik到后端的认证是独立的两次握手，完整关系见 [routes.yml](lab/dynamic/routes.yml)。
+
+```bash
+cd topics/web/traefik/lab
+./init-certs.sh
+curl --resolve mtls.localhost:28443:127.0.0.1 --cacert certs/ca.crt \
+  --cert certs/client.crt --key certs/client.key https://mtls.localhost:28443/
+docker compose run --rm client /checks.py core
+```
+
+core 的负向样本包括缺客户端证书、未知CA客户端、错误入口SAN、客户端不信任服务器CA；成功样本必须返回后端JSON，证明双腿均完成，而非只完成入口握手。额外在 transport 依次去掉客户端证书、改错 serverName、改用未知CA，再请求入口，应得到后端握手错误和代理5xx（本次固定版本可返回500，不能只预设502）；每次只改一项并恢复，不能用 insecureSkipVerify 作为修复。
+
+```bash
+openssl s_client -connect 127.0.0.1:28443 -servername app.localhost </dev/null 2>/dev/null \
+  | openssl x509 -noout -serial -enddate
+./rotate-cert.sh
+# 等 File Provider 重载后再次运行上面的新握手命令，serial/NotAfter 应改变。
+```
+
+轮换时原子替换证书并触发 File Provider动态文件更新，存量连接可能仍使用旧握手结果。此实验验证手动证书轮换，ACME续期的额外前提见第17章。
+
+## 第 25 章 · Middlewares · HTTP 中间件
+
+### Chain 顺序和提前返回怎样影响后续策略
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+Chain 将多个 Middleware 组合成可复用序列。Router 先匹配，再执行链；Middleware 可以直接返回认证拒绝、CORS 预检响应或重定向，后面的策略和 Service 因而不再执行。响应回程也会经过已进入的包装逻辑，这使“安全响应头是否出现在认证失败响应里”成为顺序测试的重要观察点。
+
+#### 一个有明确意图的顺序
+
+平台可以先清除不可信身份头，再做鉴权，然后按可信身份限流，最后改写路径。若鉴权服务需要看到外部原始 URI，改写就应放在鉴权之后；若它按内部 URI 授权，必须明确约定并调整顺序。
+
+```mermaid
+graph TD
+  R[Router 命中] --> H[清理伪造身份头]
+  H --> A[外部鉴权]
+  A --> L[按认证身份限流]
+  L --> P[路径处理]
+  P --> S[Service]
+  A --> D[拒绝则返回]
+```
+
+这里不是所有系统的固定模板。浏览器 CORS 预检一般不携带业务认证，若需要由 Traefik 直接处理预检，CORS Headers 应位于会拒绝它的鉴权之前，同时只允许明确 origin。允许预检不代表允许实际业务请求。
+
+#### 在后端日志中验证顺序
+
+用 whoami 观察改写后的路径和头，鉴权服务记录看到的 `X-Forwarded-Uri`，客户端记录拒绝响应的安全头。三者组合才能证明顺序符合约定。不要只查看 Chain YAML 的排列。跨 Provider 复用通常让 Router 引用 `chain@file`，而组成 Chain 的本地对象保持在同一 Provider 范围，减少依赖错误。
+
+### 路径重写、重定向、安全头与 CORS 怎样验证
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+路径改写影响后端接收到的 URI；重定向返回给客户端一个新 URL，让客户端重新请求。前者通常不会让浏览器地址变化，后者会增加一次往返。改写不应被理解为触发 Nginx 式 location 重选；应用生成的绝对资源 URL 也不会自动因改写而全部正确。
+
+#### 用 whoami 验证路径和原始信息
+
+在第02章动态文件 `http.middlewares` 下加入 `strip-api`，并给 `app` Router 添加 `middlewares: [strip-api]`，其规则改为 Host 加严格 `/api` 边界。
+
+```yaml
+strip-api:
+  stripPrefix:
+    prefixes: [/api]
+```
+
+请求 `/api/users?active=true`，whoami 应看到 `/users?active=true` 和 `X-Forwarded-Prefix`。StripPrefix 适合后端按 `/` 提供服务的情况；静态资源链接还需应用理解前缀。若需要用捕获组重排路径，可选 ReplacePathRegex：
+
+```yaml
+rewrite-version:
+  replacePathRegex:
+    regex: '^/v1/(.*)'
+    replacement: '/api/${1}'
+```
+
+这是另一个独立中间件，不要求与 strip-api 同时启用。File YAML 中 `${1}` 原样保留；写进 Compose 标签还需要处理 `$` 插值。替换后查看 `X-Replaced-Path`，确认客户端原始路径没有丢失。查询参数不是路径正则的一部分。
+
+#### CORS 要同时验证浏览器预检和实际请求
+
+以下对象可添加到同一 `http.middlewares`，通过 Router 引用后执行。它只允许实验 origin，不使用任意 `*` 来掩盖问题。
+
+```yaml
+browser-policy:
+  headers:
+    accessControlAllowOriginList: [https://console.example.test]
+    accessControlAllowMethods: [GET, POST, OPTIONS]
+    accessControlAllowHeaders: [Authorization, Content-Type]
+    addVaryHeader: true
+    contentTypeNosniff: true
+```
+
+```bash
+curl -i -X OPTIONS -H 'Host: app.localhost' \
+  -H 'Origin: https://console.example.test' \
+  -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: Authorization' \
+  http://127.0.0.1:18080/api
+```
+
+检查 Allow-Origin、Allow-Methods、Allow-Headers 和 Vary，而不只看 2xx。配置 CORS 后 Traefik 可自行回应预检，不必到后端；换成不允许的 Origin，应不再得到允许共享的头。curl 不执行浏览器的 CORS 拦截，所以响应 200 不能说明浏览器一定允许访问。
+
+HSTS 告诉浏览器以后使用 HTTPS，不代替服务端 HTTP→HTTPS 重定向；启用长时间 HSTS 或 includeSubDomains 前，要确认覆盖域名都支持 HTTPS。RedirectScheme 在外层代理之后依赖可信转发头，否则会错误判断原始 scheme。
+
+### BasicAuth、ForwardAuth 和 IPAllowList 怎样划定信任
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+BasicAuth 适合少量内部管理用户，凭据文件可复用第02章的 bcrypt 用户列表；公开业务通常把认证交给专门服务。ForwardAuth 发出鉴权子请求，返回 2xx 才继续，其他响应交给客户端。IPAllowList 则按选定来源地址放行，不能代替用户身份授权。
+
+#### 完整的教学鉴权依赖
+
+下面的鉴权服务只用于演示成功、拒绝和可信身份头，硬编码教学 token 不是生产认证实现。在第02章实验目录新增 `auth.py`，Compose 增加一个 `auth` 服务，监听内部 8080、不发布宿主端口。
+
+```python
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+class Auth(BaseHTTPRequestHandler):
+    def do_GET(self):
+        allowed = self.headers.get('Authorization') == 'Bearer lab-token'
+        self.send_response(200 if allowed else 401)
+        if allowed:
+            self.send_header('X-User', 'learner')
+        self.end_headers()
+        self.wfile.write(b'allowed' if allowed else b'denied')
+
+ThreadingHTTPServer(('0.0.0.0', 8080), Auth).serve_forever()
+```
+
+```yaml
+# 合入已有 compose.yaml 的 services
+auth:
+  image: python:3.12-alpine
+  command: [python, /lab/auth.py]
+  volumes:
+    - ./auth.py:/lab/auth.py:ro
+```
+
+动态对象加在已有 `http.middlewares`，`app` Router 用 `middlewares: [clear-user, auth-check]`。若已完成第24章，必须给 `dynamic/tls.yml` 中的 `app-tls` Router 同样添加该列表，同时保留它的 rule、entryPoints、service 和 tls 字段。Middleware 绑定在 Router 上，共用 `app@file` Service 不会继承另一条 Router 的认证；只保护 HTTP 会留下未认证的 HTTPS 入口。先恢复 app 的 Host-only 规则，避免前面 API 路径实验影响结果。
+
+```yaml
+clear-user:
+  headers:
+    customRequestHeaders:
+      X-User: ""
+auth-check:
+  forwardAuth:
+    address: http://auth:8080/verify
+    trustForwardHeader: false
+    authRequestHeaders: [Authorization]
+    authResponseHeaders: [X-User]
+```
+
+```bash
+docker compose up -d auth
+curl -i -H 'Host: app.localhost' -H 'X-User: admin' http://127.0.0.1:18080/
+curl -i -H 'Host: app.localhost' -H 'Authorization: Bearer lab-token' \
+  -H 'X-User: admin' http://127.0.0.1:18080/
+```
+
+第一条应拒绝；第二条进入 whoami，后端应看到 `X-User: learner`，而不是客户端伪造的 admin。再停止 auth 服务，观察连接失败与 token 无效的不同日志。不要给 ForwardAuth 套用其他商业 Middleware 的缓存或超时字段；需要何种超时必须从对应版本的 ForwardAuth 字段页核对。
+
+#### HTTP 与 HTTPS 都应验证拒绝和允许
+
+第24章 HTTPS 已启用时，下面两条请求也必须纳入本节验收。第一条预期401，第二条预期进入 whoami 并显示受信的 X-User；不能只验证 HTTP。若同一应用还有其他 Router 或直接对外的后端端口，也应核对是否绕过认证。
+
+```bash
+curl -i --cacert certs/server.crt \
+  --resolve app.localhost:18443:127.0.0.1 https://app.localhost:18443/
+curl -i --cacert certs/server.crt \
+  --resolve app.localhost:18443:127.0.0.1 \
+  -H 'Authorization: Bearer lab-token' https://app.localhost:18443/
+```
+
+#### 地址白名单与多层代理
+
+IPAllowList 的 `sourceRange` 是允许客户端地址范围；选择 XFF 中哪一个地址由 `ipStrategy` 决定。`depth` 从右计数，超过头中地址数可能得到空地址；指定 depth 时 excludedIPs 的处理存在优先关系。上游代理的 trustedIPs 和此处的用户白名单分别配置，不能相互替代。
+
+在 Docker Desktop/NAT 后，Traefik 看到的来源可能是桥接地址而非宿主 127.0.0.1。先查看连接来源与转发头，再构造允许/拒绝样本。不要为了让实验过关直接放行 `0.0.0.0/0`；这会失去白名单意义。
+
+### 令牌桶、并发限制和 Buffering 怎样保护后端
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+RateLimit 用令牌桶控制平均速率与突发容量，不是固定时间窗口计数。`average/period` 决定补充速率，`burst` 决定桶容量。InFlightReq 限制同时尚未结束的请求，能约束慢请求堆积；Buffering 则读取请求体并限制大小，必要时使用磁盘，它们保护的是不同资源。
+
+#### 在已认证请求上测试限流
+
+在上一节基础上添加 `per-user`，把它放在 auth-check 之后。只有可信鉴权服务写入的 X-User 才能成为可靠用户维度；若客户端可自行选择该头，就能换 key 绕过限流。
+
+```yaml
+per-user:
+  rateLimit:
+    average: 2
+    period: 1s
+    burst: 2
+    sourceCriterion:
+      requestHeaderName: X-User
+```
+
+分别将 app 和已启用的 app-tls Router 顺序更新为 `[clear-user, auth-check, per-user]`，连续发送带有效 token 的请求，预期成功与 429 的分布受发送速度及令牌补充影响。不要用无认证请求测试限流，它们会在前面的鉴权阶段结束。单实例令牌桶也不能被当作跨副本统一配额。
+
+#### 并发与体积限制需要不同实验
+
+```yaml
+concurrency:
+  inFlightReq:
+    amount: 4
+    sourceCriterion:
+      requestHost: true
+upload-size:
+  buffering:
+    maxRequestBodyBytes: 1048576
+    memRequestBodyBytes: 262144
+```
+
+这些是可独立引用的对象，不要求全塞进同一链。用慢响应后端并发发五个以上请求观察 InFlightReq；用大于 1 MiB 请求体观察 Buffering 的 413，并检查后端未收到该请求。第06章的可控后端适合这种实验。
+
+| 限制 | 直接保护 | 代价与误区 |
+| --- | --- | --- |
+| RateLimit | 平均到达速率 | 同一个 NAT 出口可能共享配额 |
+| InFlightReq | 同时处理数量 | 长连接会长期占用名额 |
+| Buffering | 后端接收体积与上传节奏 | 代理自己消耗内存/磁盘；不适合盲目用于流式协议 |
+
+响应体上限与请求体上限也不同：材料说明超出响应体限制可能由代理返回 500，而请求过大是 413。容量推导应同时考虑“每请求缓冲 × 并发”，不能只设置单请求大小后就认为内存安全。
+
+### 压缩、错误页、内容类型和 Hub 扩展有什么边界
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+响应治理的重点是保持客户端契约。Compress 根据 Accept-Encoding、Content-Type、已有 Content-Encoding 与响应大小决定是否压缩；Errors 用指定服务提供替代错误页；ContentType 仅在适用时补充 MIME 类型。它们不应掩盖真实状态和协议行为。
+
+#### 压缩为什么没有触发
+
+在动态中间件里增加 `text-compress`，挂到实验 Router 后用 `curl --compressed -i` 比较响应头。测试需使用足够大的文本响应，whoami 的小响应可能达不到默认阈值。
+
+```yaml
+text-compress:
+  compress:
+    encodings: [gzip]
+    minResponseBodyBytes: 1024
+    excludedContentTypes: [image/png, image/jpeg]
+```
+
+不含 Accept-Encoding、响应已压缩、体积太小或类型被排除，都可能导致没有 Content-Encoding；这不一定是配置错误。`application/grpc` 不按普通 HTTP 压缩处理。压缩减少带宽但增加 CPU，容量测试要同时观察资源消耗。
+
+#### 错误页需要实际存在的后端
+
+Errors 的 `service` 必须指向已定义且能返回页面的 Service，`query` 可以包含 `{status}`。应先直连验证错误页路径，再挂到业务 Router，确认最终状态码、Content-Type 和响应体。错误服务若只认自己的 Host，核对其 `passHostHeader`；否则可能把业务 Host 传过去导致二次 404。
+
+| 场景 | 正确决策 |
+| --- | --- |
+| 浏览器页面希望友好错误页 | 提供 HTML 错误服务，保留准确状态 |
+| API 调用期待 JSON 错误结构 | 不随意替换成 HTML；与调用方约定 schema |
+| 缺 Content-Type | 优先修复应用；仅在确认检测行为后补中间件 |
+| 需要 JWT/OIDC/WAF 等产品能力 | 先检查页面的 Hub 标记、版本与授权，不按 OSS 默认能力配置 |
+
+Proxy 可以用 ForwardAuth 接外部身份系统，不意味着内置了 Hub 的 JWT Middleware。社区插件、商业中间件与内置 Proxy 功能要分开记录。不能复制一个产品页中的字段让实验“看起来具备”实际上不可用的能力。
+
+### 前缀、正则改写与重定向该怎样选
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+几个名字相近的中间件改变的是不同对象。AddPrefix 在路径前面加固定前缀，StripPrefix 去掉已知前缀，StripPrefixRegex 用模式识别要去除的前缀，ReplacePath 将路径整体替换，ReplacePathRegex 按捕获组重组。它们通常不改变浏览器地址；RedirectRegex 和 RedirectScheme 则返回 Location 让客户端再次请求。
+
+| 请求目标 | 选择 | 需要观察 |
+| --- | --- | --- |
+| 后端固定使用 /internal 前缀 | AddPrefix | 后端最终 URI |
+| 对外 /api，后端从 / 提供服务 | StripPrefix | URI 与 X-Forwarded-Prefix |
+| 对外多租户前缀需按模式去除 | StripPrefixRegex | 正则边界，避免误删合法路径 |
+| 所有命中请求交给单一内部路径 | ReplacePath | X-Replaced-Path 与查询参数 |
+| 版本路径重组 | ReplacePathRegex | 捕获组展开与 YAML/Compose 转义 |
+| 域名或 URL 规范化 | RedirectRegex | 状态码、Location、是否循环 |
+
+规则匹配先于普通 Middleware 改写，不能把改写理解为重新按所有 Router 搜索。要在原始请求、代理修改和后端接收三个位置记录 URI，才能解释为什么“客户端访问正常，但应用静态资源404”。
+
+正则替换使用 `${1}` 一类明确捕获组写法，避免 `$1x` 被解释成另一个组名；在 Compose labels 中还要处理 `$` 插值。匹配域名时锚定范围，避免宽泛正则把不属于该应用的 Host 重定向过去。永久跳转会被客户端缓存，首次验证宜使用可回退策略，确认后再切永久状态。
+
+### BasicAuth、DigestAuth 与 APIKey 的身份模型有何区别
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+BasicAuth 以请求携带用户名/密码，必须依赖安全传输；DigestAuth 使用挑战/响应，并不意味着它天然适合现代统一身份或可以不用 TLS。两者都需要管理用户资料、轮换和后端收到的身份信息。APIKey 则常用于识别调用应用，需要独立处理密钥失效、配额和权限；采集的 APIKey 页面属于 Hub 专属能力。
+
+| 机制 | 适合的问题 | 不应承担的假设 |
+| --- | --- | --- |
+| BasicAuth | 少量内部管理用户 | 哈希存储不等于网络传输已加密 |
+| DigestAuth | 特定遗留客户端兼容 | 不等于 OIDC 会话或现代多因素登录 |
+| APIKey | 应用调用方标识 | 持有 key 不自动具有全部资源权限 |
+| ForwardAuth | 对接外部认证/授权服务 | 需要明确传递头、失败行为与服务可用性 |
+
+测试凭据正确、错误、撤销和缺失四条路径，再看后端是否只在授权后收到请求。不要只做浏览器弹出密码框的截图就认为鉴权链完整。凭据放在专用文件或 Secret，且日志避免记录 Authorization。APIKey 的存放位置可能影响代理、浏览器历史和日志泄露面，不能为了方便而默认放入 query。
+
+### JWT、OIDC 与其他 Hub 身份中间件怎样分工
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+这些能力在采集材料中明确标记为 Hub 专属，应按产品和版本评估。它们不是可以随意组合的同义认证开关：有的验证令牌，有的建立用户会话，有的主动取得客户端凭据，还有的调用外部策略决策。
+
+| 中间件 | 核心作用 | 需要运营的依赖 |
+| --- | --- | --- |
+| JWT | 校验签名和约定声明 | 密钥/JWKS、发行方、受众、时间 |
+| OIDC | 浏览器身份流程和会话 | IdP、回调、Cookie、退出行为 |
+| Token Introspection | 向授权服务器确认令牌状态 | 网络、认证、响应/缓存语义 |
+| Client Credentials | 按客户端凭据取得访问令牌 | client secret、scope、令牌续取 |
+| LDAP | 对接目录身份验证 | 目录地址、连接加密、查询范围 |
+| HMAC | 校验请求签名 | 规范化输入、时间窗和防重放约定 |
+| OPA | 外部策略授权判断 | 策略版本、输入上下文、决策服务 |
+
+例如合法 JWT 可以因权限不足被 OPA 拒绝；取得一个机器 access token 也不代表建立了人的浏览器登录会话。需要画清谁签发、谁验证、谁决策和哪一方承担失败，避免多套认证互相覆盖。
+
+测试除了有效/无效令牌，还应包括密钥轮换、外部服务不可达和缓存失效。允许缓存时需明确撤销延迟；要求实时撤销时则要评估依赖可用性和延迟。OSS 方案使用外部身份系统配合 ForwardAuth 时，应记录该系统的行为，不冒称复刻了所有 Hub 内置实现。
+
+### PassTLSClientCert 传递身份时怎样防止伪造
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+PassTLSClientCert 把选定的 TLS 客户端证书信息放入转发头，方便后端读取证书身份。它不替代入口 mTLS 验证，也不是“只要后端看到证书头就可信”。如果入口允许未验证的客户端证书，或后端可被绕过直接访问，同名头可能被伪造。
+
+```mermaid
+graph TD
+  C[客户端证书] --> V[入口验证证书与信任链]
+  V --> P[提取允许传递的证书信息]
+  P --> B[通过受保护链路交给后端]
+  B --> A[应用按身份授权]
+```
+
+先配置 TLSOption 的正确 clientAuth 策略，再选择是否传递 PEM 或部分证书信息，限制数据量和隐私范围。后端应只信任来自受控代理的身份头，业务网络需要阻止客户端直接绕过。传递证书不意味着后端具备替用户执行所有操作的权限。
+
+负向实验包含无客户端证书、错误 CA、直接伪造身份头和尝试绕过代理四类。记录握手失败与应用拒绝各发生在哪一层，不能只统计 HTTP 401。需要根据身份访问资源时，应用仍应独立做授权判断。
+
+### 分布式限流与 WAF 的策略状态怎样运营
+<!-- src: temp/new-traefik/25-Middlewares.md; temp/new-traefik/05-Secure.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md -->
+
+普通 RateLimit 的令牌桶状态与代理实例范围有关；Hub 的 Distributed RateLimit 旨在跨实例协调配额，具体存储和行为需按产品配置核对。把同一条限流规则复制到三个 Proxy 不会自动形成全局总额，客户端分散到各实例时可观察到更大的总吞吐。
+
+| 运营问题 | 需要做的验证 |
+| --- | --- |
+| 多副本共享额度 | 同时向多个实例发同一身份请求 |
+| 状态存储不可达 | 明确拒绝还是放行，以及恢复后的额度行为 |
+| 动态调整配额 | 老连接/旧状态是否保留，何时生效 |
+| WAF 误报 | 从 rule ID 和具体参数构建最小样本 |
+| WAF 规则更新 | 正常与异常请求的前后对比 |
+
+这类策略直接影响入口可用性，必须明确降级行为、性能预算和状态一致性。WAF 的详细上线过程见第05章；不把“有规则集”当成“所有攻击会被阻断”。分布式限流和 WAF 都应以可辨认的合法及拒绝请求验收，而不是通过增加通用“安全很重要”说明来代替机制。
+
+#### 客户端、可信前置代理与 Traefik 的真实 IP 实验
+
+来源定位：`10-Install-Configuration.md / forwardedHeaders`、`25-Middlewares.md / IPAllowList / ipStrategy / RateLimit`。统一实验固定网段172.30.39.0/24（若冲突按实验README同时修改地址与策略），只有前置Nginx的 `.11/32` 被入口 trustedIPs信任。Nginx用 `$remote_addr` 覆盖外来XFF，从边界建立来源链。
+
+| 到达位置 | TCP RemoteAddr | 本实验 XFF |
+| --- | --- | --- |
+| client .30 → front .11 | .30 | 客户端可伪造；front覆盖为 `.30` |
+| front .11 → Traefik .10 | .11 | `.30`，trustedIPs核验上一跳 `.11` |
+| IPAllowList执行时 | .11 | `.30`，depth=1从右取出`.30` |
+| Traefik → backend .21 | .10 | `.30, .11`；最后一跳加入发生在转发阶段 |
+| client .30 直连Traefik | .30 | 来自不可信跳的伪造XFF先清理，depth=1取不到来源 |
+
+`trustedIPs` 允许谁声明转发头；`sourceRange` 允许谁使用业务路由；二者对象不同。`depth` 从XFF最右侧按1计数，超出长度得到空IP；depth大于0时 `excludedIPs` 不参与选择，未设置depth时可从右侧跳过 excludedIPs 找到第一个非排除IP。不要把到达后端才追加的 `.11` 算入 Middleware 的 depth。
+
+```bash
+# 直连伪造不能满足 depth=1 白名单，应403。
+curl -i -H 'Host: ip.localhost' -H 'X-Forwarded-For: 172.30.39.30' http://127.0.0.1:28080/
+# 固定地址的实验客户端经front应200；完整伪造/允许/共享出口测试：
+docker compose run --rm client /checks.py core
+```
+
+核心脚本还检查 `X-Forwarded-Prefix` 直连被清除、经front变为 `/trusted-edge`，用backend JSON与访问日志证明信任链。宿主经Docker端口进入front的地址可能是NAT网关，不保证等于`.30`，所以允许样本使用固定容器客户端。多个用户共享同一NAT出口时，以IP为key的限流共享令牌桶；脚本改变X-User但保持同一来源，应出现429。需要用户维度时，先完成可信认证，再选不能由客户端伪造的身份key。
+
+PROXY protocol处于TCP前导信息层，不能把XFF配置直接替代它；只有明确支持PROXY协议的上一跳才配置 `proxyProtocol.trustedIPs`，后端也要支持对应版本。普通数据库STARTTLS流程也不能当作直接TLS ClientHello。
+
+## 第 26 章 · TCP · TCP 服务与传输
+
+### TCP Service 为什么按连接而不是 HTTP 请求分配
+<!-- src: temp/new-traefik/26-TCP.md; temp/new-traefik/27-Routing.md; temp/new-traefik/28-Middlewares.md -->
+
+TCP 代理面对有状态字节流。一个连接选定后端后，其上的数据库会话或长连接消息持续送往该后端，不能把每条应用命令当作独立 HTTP 请求重新均衡。因此连接数均匀不代表业务负载均匀，某个长连接可能承担大部分数据量。
+
+以下动态 Service 片段假设两个测试 TCP 服务在给定地址监听，Router 和 EntryPoint 见第27章：
+
+```yaml
+tcp:
+  services:
+    database:
+      loadBalancer:
+        servers:
+          - address: db-a.internal:5432
+          - address: db-b.internal:5432
+```
+
+| HTTP 与 TCP 的差异 | 运维含义 |
+| --- | --- |
+| TCP 后端用 address，而非 HTTP URL 路径 | 校验端口与协议握手，不能配置 /health URL 代替协议探测 |
+| 均衡单位是连接 | 用多个新连接观察分布 |
+| 长连接携带应用状态 | 后端退出后需要客户端重连和状态恢复 |
+
+材料还提供 Weighted Service 组合，在支持的 Provider 下可将连接按权重分配到子服务。短时间几个连接不应被要求严格符合比例，更不能保证旧连接随权重调整迁移。
+
+### TCP ServersTransport 如何控制拨号、半关闭与后端 TLS
+<!-- src: temp/new-traefik/26-TCP.md; temp/new-traefik/27-Routing.md; temp/new-traefik/28-Middlewares.md -->
+
+入口 TLS 与后端 TLS 是两段连接。TCP Router 是否终止 TLS，不自动决定后端是否加密；后端 transport 需要匹配证书、SNI 和信任要求。流式协议还可能依赖半关闭行为，关闭单向写入不必然代表整个会话可以立即销毁。
+
+```text
+客户端 → TCP Router → 选定后端
+                    → 拨号等待
+                    → 可选后端 TLS 握手
+                    → 双向转发与连接关闭
+```
+
+建连失败先看 dial timeout、地址和端口，握手失败再看 CA/SNI/客户端证书。不同版本 TCP transport 的字段不能与 HTTP ServersTransport 混用；设置 HTTP 的 responseHeaderTimeout 也不能控制一个没有 HTTP 响应头的数据库协议。
+
+验收使用真实协议客户端，测试建连、命令/响应、长时间空闲、客户端主动关闭和后端重启。仅 `nc -vz` 成功只能证明端口接受连接，不能证明数据库登录、TLS 或半关闭行为正确。
+
+### TCP 健康检查怎样避免只测到开放端口
+<!-- src: temp/new-traefik/26-TCP.md; temp/new-traefik/27-Routing.md; temp/new-traefik/28-Middlewares.md -->
+
+材料的 TCP Service 支持连接探测，以及在支持版本下用 send/expect 做协议级检查。空探测能发现拒绝连接，但进程接受连接后卡死时可能仍被认为健康；发送固定 PING 又要求后端真的支持该协议，不能给任意数据库直接发送字符串。
+
+| 检查策略 | 能发现什么 | 边界 |
+| --- | --- | --- |
+| 建连成功 | 监听器存在、网络可达 | 不证明应用可处理业务 |
+| send/expect | 简单协议请求和响应 | 必须确认字节内容、换行与响应格式 |
+| 实际客户端只读检查 | 登录与业务依赖 | 需控制成本和凭据范围 |
+
+停止一个测试后端，观察新连接目标是否摘除；原有连接如何失败则由连接与应用语义决定。若组合多层 Service，还要核对健康变化是否向父级传播。不要用 HTTP 的状态码术语描述纯 TCP 拒绝，客户端往往看到关闭、复位或超时。
+
+#### 固定协议端点与 send/expect
+
+来源定位：`26-TCP.md / HealthCheck`。统一实验后端7000提供行协议 `PING\n → PONG\n` 和其他字节原样echo，不是Redis实现；镜像与源码固定，可辨别业务响应。专用EntryPoint echo绑定7000，TCP Router为HostSNI(`*`)，不启用TLS。
+
+```yaml
+tcp:
+  services:
+    echo:
+      loadBalancer:
+        servers:
+          - address: backend-a:7000
+        healthCheck:
+          send: "PING\n"
+          expect: PONG
+          interval: 2s
+          timeout: 1s
+```
+
+send/expect必须与实际协议一致，本例不能拿去检查PostgreSQL。后端4秒读空闲关闭连接，客户端验证PING、原样echo、空闲EOF、半关闭及重连；TCP健康检查日志中的周期PING不能误算成业务调用。运行 `docker compose run --rm client /checks.py protocols`，完整端点源码见 [server.py](lab/app/server.py)。
+
+## 第 27 章 · Routing · TCP 路由
+
+### TCP 优先级、HostSNI 与透传怎样选择
+<!-- src: temp/new-traefik/27-Routing.md -->
+
+TCP Router 在连接层工作。TLS 流量可通过 HostSNI 选择目标；透传模式保留 TLS 给后端，Traefik 无法读取加密后的 HTTP Path 和 Header。非 TLS 协议没有可供匹配的域名 SNI，通常用专用端口与通配 HostSNI 规则。
+
+以下动态片段依赖 `database` EntryPoint、可达的 TLS 数据库 `db.internal:5432`，以及直接使用 TLS 握手的协议客户端；不是部署了 YAML 就能凭空创建数据库。
+
+```yaml
+tcp:
+  routers:
+    db:
+      entryPoints: [database]
+      rule: HostSNI(`db.example.test`)
+      service: db
+      tls:
+        passthrough: true
+  services:
+    db:
+      loadBalancer:
+        servers:
+          - address: db.internal:5432
+```
+
+协议可能有 STARTTLS 或特定握手前奏，不能把 `openssl s_client` 直接发出的 TLS 流当作所有数据库客户端的等价物。真实验收应执行无副作用的数据库查询并验证后端证书。
+
+共享 EntryPoint 时，TCP 路由优先于 HTTP 处理；一个范围过宽的 TCP Router 可能接管原本想交给 HTTP 的流量。专用端口、明确 SNI 与拒绝样本更便于判断。TCP 的 InFlightConn/IPAllowList 针对连接，不适用 HTTP Headers 中间件。
+
+### TCP 规则、优先级和协议握手怎样共同决定路由
+<!-- src: temp/new-traefik/27-Routing.md -->
+
+TCP 没有 HTTP 的 Path 和 Header 匹配，但 TLS ClientHello 可以提供 SNI、ALPN 等协商信息，连接也有来源 IP。是否能够使用某个匹配器取决于协议和版本，不能把 Host() 从 HTTP Router 复制过来。无 TLS 的连接没有域名 SNI，通常使用专用入口和 `HostSNI(`*`)`。
+
+| 条件 | 能观察的信息 | 设计边界 |
+| --- | --- | --- |
+| HostSNI | TLS 握手服务名 | 后端数据库协议若使用升级握手需单独核对 |
+| ClientIP | 连接来源地址 | 代理/NAT 后需要确认真实上一跳 |
+| ALPN | TLS 应用协议协商 | 必须使用客户端实际发送的信息 |
+| priority | 多条 TCP 规则的选择顺序 | 不等于应用权限或后端健康 |
+
+同一端口同时承载 HTTP 与 TCP 时，TCP Router 优先处理。过宽的 TCP 通配规则可能把原本的 HTTPS 流量截走，表现为 HTTP Router 存在但从不命中。优先级只在对应匹配流程中解决选择，不能使错误协议自动变成正确协议。
+
+准备正确 SNI、错误 SNI、无 SNI、非 TLS 连接四组请求，查看真正选中的后端。协议需要服务端先发送数据，或先用明文协商再升级 TLS 时，不能默认 Traefik 总能从连接开始就得到 SNI；必须参考该协议的 Traefik 支持和真实客户端验证。
+
+#### 正确与错误 SNI 的可重复请求
+
+统一实验echotls入口7443由Traefik终止TLS，规则只接受 `tcp.localhost`，然后转明文echo后端7000。`checks.py protocols` 使用测试CA完成握手，发送PING并验证PONG；将server_hostname改成wrong.localhost必须失败。没有应用层消息往返的 `nc -z` 不算协议验收。
+
+```bash
+printf 'PING\n' | openssl s_client -connect 127.0.0.1:27443 \
+  -servername tcp.localhost -CAfile certs/ca.crt -verify_return_error -quiet
+```
+
+这个例子是直接TLS连接，不代表数据库STARTTLS或PostgreSQL SSLRequest已经测试。透传路由需要后端自己持有证书并处理ClientHello；不能在本例明文7000上加passthrough后仍期待成功。
+
+## 第 28 章 · Middlewares · TCP 中间件
+
+### TCP IPAllowList 如何在连接入口拒绝来源
+<!-- src: temp/new-traefik/28-Middlewares.md; temp/new-traefik/27-Routing.md; temp/new-traefik/34-TCP.md -->
+
+TCP 中间件处理连接，没有可读取的 HTTP Host、路径或 Authorization。IPAllowList 根据来源地址决定是否让连接继续。源材料的某些示例混入 HTTP `Host()`，应使用第27章的 TCP 规则，不能原样复制。
+
+下面是已有 `database` EntryPoint 和 TCP 后端的完整动态对象组合；CIDR 是实验示例，需替换为真实允许来源：
+
+```yaml
+tcp:
+  routers:
+    guarded-db:
+      entryPoints: [database]
+      rule: HostSNI(`*`)
+      middlewares: [trusted-network, connection-budget]
+      service: db
+  middlewares:
+    trusted-network:
+      ipAllowList:
+        sourceRange: [10.20.0.0/16]
+    connection-budget:
+      inFlightConn:
+        amount: 10
+  services:
+    db:
+      loadBalancer:
+        servers:
+          - address: db.internal:5432
+```
+
+这是非 TLS 通配路由示例；若使用 TLS SNI 分流，还需相应 TLS 配置。允许和拒绝测试要从不同来源网络执行，在 NAT/LB 后核对 Traefik 实际看到的地址。纯 TCP 没有 X-Forwarded-For，若上游传递 PROXY protocol，需要按第10章的可信上一跳配置处理。
+
+### InFlightConn 的容量上限怎样影响长连接
+<!-- src: temp/new-traefik/28-Middlewares.md; temp/new-traefik/27-Routing.md; temp/new-traefik/34-TCP.md -->
+
+InFlightConn 限制尚未结束的 TCP 连接，达到上限时关闭新连接，不返回 HTTP 429 页面。它适合防止连接资源耗尽，但慢连接、数据库连接池和大量正常客户端也会占用额度，所以 amount 要与应用连接预算一起设计。
+
+| 实验 | 应观察到的结果 |
+| --- | --- |
+| 保持若干允许连接不关闭 | 已占用连接数持续存在 |
+| 超过设置的连接额度再连接 | 新连接被关闭或客户端连接失败 |
+| 释放一个原有连接后重试 | 新连接有机会成功 |
+| 改变 NAT/代理路径 | 来源归并方式可能改变，应重新核对 |
+
+用真实客户端保持连接并执行无副作用查询，避免只在一条 shell 命令里快速连断，根本没有形成并发。链中先做地址过滤再做连接预算通常便于解释，但不要把 TCP 多中间件列表当作 HTTP Chain 资源的同义物；协议和支持类型都要一致。
+
+Kubernetes 中对应 MiddlewareTCP，字段放在 spec 下并由 IngressRouteTCP 引用，详见第34章。HTTP 中间件名称恰好相同也不能跨协议引用。
+
+#### 来源拒绝与并发连接的独立验证
+
+完整动态文件给echo入口挂载 `.30/32` IPAllowList和 `inFlightConn.amount: 2`。`checks.py protocols` 从client `.30` 建立两条有PING/PONG的连接，第三条应被关闭；释放后可重新连接。后端4秒空闲超时是单独的应用参数，不能误认为Traefik并发限额释放了仍活跃连接。
+
+```bash
+# backend-b 的 .22 不在白名单；此命令若收到PONG即为策略失败。
+docker compose exec backend-b python -c 'import socket; s=socket.create_connection(("traefik",7000)); s.settimeout(3); s.sendall(b"PING\n"); print(repr(s.recv(100)))'
+```
+
+拒绝可表现为EOF或ConnectionResetError，应同时查Traefik日志；端口建立后被关闭仍可能是正确拒绝。HTTP的XFF、ipStrategy.depth不适用于这个TCP来源判断。
+
+## 第 29 章 · UDP · UDP 服务
+
+### UDP Service 描述什么，为什么没有 HTTP 路径
+<!-- src: temp/new-traefik/29-UDP.md; temp/new-traefik/30-Routing.md -->
+
+UDP Service 保存后端地址与端口，由 UDP Router 选择它。源材料这一章很短，只定义 UDP loadBalancer 的服务器列表；不应为了补成大章而虚构路径匹配、HTTP 重试或证书中间件。
+
+```yaml
+udp:
+  services:
+    resolver:
+      loadBalancer:
+        servers:
+          - address: dns-a.internal:53
+          - address: dns-b.internal:53
+```
+
+片段依赖已部署的 UDP 后端；第30章补 Router、UDP EntryPoint 和验证方式。一个后端地址可达不代表协议服务正常，客户端应收到具有正确事务语义的响应，比如 DNS 的 answer 与 rcode。
+
+| 属性 | 解释 | 校验 |
+| --- | --- | --- |
+| address | UDP 目标 IP/DNS 和端口 | 解析、路由、安全组、应用监听 |
+| 多后端 | 可供流量分配的目标集合 | 多客户端/会话及服务响应 |
+| Router 引用 | UDP Router 只引用 UDP Service | 不能跨到 HTTP/TCP Service |
+
+Traefik 为回程数据维护会话状态；不要假设同一个客户端每个包都随机选一个新后端。应用自身如需有状态协商，要验证会话超时和后端选择是否相容。DNS over TCP 与 DNS over UDP 则是两个入口，不能靠一个 UDP Service 同时实现两者。
+
+### UDP 容量怎样从包和会话判断
+<!-- src: temp/new-traefik/29-UDP.md; temp/new-traefik/30-Routing.md -->
+
+HTTP 常看请求数和状态码，UDP 应关注包速率、字节数、丢包、响应时延和会话数量。大量小包与少量大包可能造成不同瓶颈；内核缓冲、MTU 和客户端重试会影响最终观测。
+
+```mermaid
+graph TD
+  C[客户端 UDP 包] --> E[UDP 入口]
+  E --> S[会话与后端选择]
+  S --> B[协议服务]
+  B --> R[按会话映射返回响应]
+  R --> C
+```
+
+逐步增加并发客户端并观察响应完整率，确认丢包开始于入口、代理发送还是后端；必要时在两侧抓包比较事务 ID。不要以某个 UDP 端口扫描“未报错”判定服务健康，也不要把第23章 HTTP 健康检查字段直接放入本章 Service。
+
+材料未覆盖某个高级 UDP 均衡或探测能力时，应核对实际版本再决定使用。本章的目标是把有限的对象模型讲清楚，使后续 Routing 和 Kubernetes UDP CRD 的配置有可靠基础。
+
+#### 与第30章共用的真实 DNS 后端
+
+统一后端5353/UDP解析DNS报文，对 `lab.test. A` 回答 `192.0.2.42`、TTL30；其他名字不伪造同一A记录。DNS名称来自payload，Traefik UDP Router本身不根据查询名分流。
+
+```bash
+dig @127.0.0.1 -p 25353 lab.test A +notcp +noall +answer
+```
+
+完整Service与Router在 [routes.yml](lab/dynamic/routes.yml)，入口发布显式标记 `/udp`。dig若尝试TCP会落到另一协议，不能用TCP成功证明UDP回包。第35章复用同一后端镜像和Kubernetes UDP Service。
+
+## 第 30 章 · Routing · UDP 路由
+
+### UDP 转发和会话超时怎样验证
+<!-- src: temp/new-traefik/30-Routing.md -->
+
+UDP 没有 HTTP Host/Path，也没有连接握手或状态码。Traefik 根据 UDP EntryPoint 将数据报送到 Service，并维护转发所需会话状态；EntryPoint 的 `udp.timeout` 决定空闲资源何时释放。改变超时影响会话持续与资源占用，不修复应用协议本身的丢包。
+
+已有测试 DNS 服务 `dns.internal:53` 时，可使用以下动态配置。静态配置还需 `entryPoints.dns.address: ":5353/udp"`，容器/Service 发布也需显式 UDP。
+
+```yaml
+udp:
+  routers:
+    dns:
+      entryPoints: [dns]
+      service: dns
+  services:
+    dns:
+      loadBalancer:
+        servers:
+          - address: dns.internal:53
+```
+
+用 `dig @目标地址 -p 5353 测试域名 A` 检查 DNS 事务和 answer；TCP `nc -vz` 无法证明 UDP 代理正确。抓包时比较客户端、Traefik 入/出方向与后端响应的事务 ID，定位是没收到、没转发还是回程丢失。
+
+| 现象 | 应检查的协议证据 |
+| --- | --- |
+| 小查询正常，大响应失败 | EDNS 大小、MTU、分片和客户端 TCP 回退 |
+| 间隔较久后行为改变 | UDP session timeout 与应用重试 |
+| 压力增大时丢包 | 内核接收缓冲、后端容量、包速率 |
+
+不要用“端口不报错”当作成功，必须有协议级请求与响应。UDP Router 的能力边界与 HTTP 限流、Header、重试完全不同。
+
+### UDP 为什么没有 HTTP 式的 Rules 与 Priority
+<!-- src: temp/new-traefik/30-Routing.md -->
+
+源材料保留了 Rules & Priority 的栏目名，但正文明确 UDP 没有 URL Path 和 HostSNI 可用于通用分流。在这里应理解能力边界，而不是为了让表格整齐给 UDP Router 编造 rule、Header、Middleware 或 TLS 字段。
+
+每个 UDP Router 引用一个 UDP Service，显式 entryPoints 限定它接收哪个端口的包。未声明入口时可能覆盖所有 UDP EntryPoint；在多协议主机上这会使配置意图不清，因此应明确绑定。
+
+```yaml
+udp:
+  routers:
+    dns-only:
+      entryPoints: [dns]
+      service: resolver
+```
+
+片段依赖第29章的 resolver Service 和实际 DNS 后端。验证不同 UDP 端口的请求是否分别进入预期服务，避免只测试一个端口就遗漏过度暴露。协议需要根据包内容或租户标识分流时，要确认专用协议组件或实现是否支持，不从通用 UDP Router 能力中推导出来。
+
+会话超时清理回程映射，与应用重试间隔共同影响间歇通信。调大 timeout 会保留更多状态，也可能占用更多资源；调小则可能在应用还认为会话有效时失去原映射。使用有间隔的查询和响应观察，才能把这个取舍具体化。
+
+#### 固定客户端 socket 跨过会话空闲窗口
+
+实验的 `entryPoints.dns.udp.timeout: 3s`。协议脚本用同一个客户端UDP socket发送DNS查询，等4秒后再次发送，两个响应都必须包含A记录；后端日志保存 source_port，用于对照代理会话是否重建。源端口可能被系统复用，单靠数字相同不能证明会话未过期。
+
+```bash
+docker compose run --rm client /checks.py protocols
+docker compose logs backend-a | rg '"protocol": "dns"'
+```
+
+UDP没有FIN/关闭握手，客户端close只释放本地socket，不能立即通知代理删除会话。静默超过超时后下一包仍可建立新会话；验证请求和回包双方，不以“没有报错”作为成功。
+
+## 第 31 章 · Kubernetes · Kubernetes 路由配置
+
+### IngressClass 和标准 Ingress 怎样选择控制器
+<!-- src: temp/new-traefik/31-Kubernetes.md; temp/new-traefik/12-Kubernetes.md; temp/new-traefik/33-HTTP.md -->
+
+前面的入门章节用 File YAML 展示代理模型，本章将同样职责映射到 Kubernetes 对象。部署前提是第03章准备的独立测试集群、已安装并能正常访问 API 的 Traefik，以及与其版本匹配的 CRD。不要把存在 `kind` 的 YAML 当成已经安装了该类资源。
+
+标准 Ingress 描述 Host、Path 和后端 Service；IngressClass 指定哪个控制器负责。多个 Ingress Controller 共存时，省略 class 可能导致无人处理或被非预期控制器接管。本文使用独立名称 `traefik-notes`，先确认 Controller 配置没有限制为其他 class。
+
+#### 一套后端供三种路由复用
+
+保存为 `app.yaml`，创建独立 namespace、两个副本和 Service。selector、容器标签、命名端口与 targetPort 一致，readinessProbe 用 whoami 的 `/`。
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik-notes
+  labels:
+    expose: notes
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo
+  namespace: traefik-notes
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: echo}
+  template:
+    metadata:
+      labels: {app: echo}
+    spec:
+      containers:
+        - name: echo
+          image: traefik/whoami:v1.11.0
+          ports:
+            - {name: http, containerPort: 80}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo
+  namespace: traefik-notes
+spec:
+  selector: {app: echo}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+```
+
+`ingress.yaml` 完整路由对象：
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: traefik-notes
+spec:
+  controller: traefik.io/ingress-controller
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echo
+  namespace: traefik-notes
+spec:
+  ingressClassName: traefik-notes
+  rules:
+    - host: ingress.localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port: {number: 80}
+```
+
+```bash
+kubectl apply -f app.yaml -f ingress.yaml
+kubectl -n traefik-notes rollout status deploy/echo
+kubectl -n traefik port-forward svc/traefik 18080:80
+```
+
+最后一条在单独终端保持运行；若宿主 18080 被第02章实验占用，先停止该实验或选择其他本地端口。另开终端执行 `curl -H 'Host: ingress.localhost' http://127.0.0.1:18080/`，应看到 echo Pod 的 Hostname。port-forward 仅用于测试访问，并不代表生产 LB/Ingress 公网链路已验收。
+
+#### 资源存在却未生成 Router
+
+依次检查 IngressClass 的 controller、Traefik 的 class 过滤、watch namespace、Service port、EndpointSlice 和日志。改变 IngressClass 后旧对象是否还受其他控制器管理也应核对；不要为了“能工作”让所有 Controller 都无条件接管无 class 对象。
+
+### GatewayClass、Gateway 和 HTTPRoute 怎样分担职责
+<!-- src: temp/new-traefik/31-Kubernetes.md; temp/new-traefik/12-Kubernetes.md; temp/new-traefik/33-HTTP.md -->
+
+Gateway API 把“谁实现网关”“监听什么”和“应用流量去哪里”拆成 GatewayClass、Gateway、HTTPRoute。平台维护前两者，应用维护 Route。材料的 Provider 页标记支持 Gateway API Standard v1.4.0；使用前仍需核对实际 Chart 和 Controller 版本，不把 TCPRoute 等 Experimental 资源默认当作已启用。
+
+#### 完整的 HTTP 路由依赖
+
+先按 Chart 版本的 CRD 安装说明准备 Gateway API CRD，并在已有 Chart values 启用 `providers.kubernetesGateway.enabled: true`；渲染确认 RBAC 和启动参数。下列清单依赖本章的 `traefik-notes/echo` 后端，使用标准 HTTP listener。HTTPS Gateway 的 listener/Secret 增量在第17章，生成实验证书的步骤在第24章；需要先完成这两项前置条件。
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik-notes
+spec:
+  controllerName: traefik.io/gateway-controller
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public
+  namespace: traefik-notes
+spec:
+  gatewayClassName: traefik-notes
+  listeners:
+    - name: web
+      protocol: HTTP
+      port: 8000
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: echo
+  namespace: traefik-notes
+spec:
+  parentRefs:
+    - name: public
+      sectionName: web
+  hostnames: [gateway.localhost]
+  rules:
+    - matches:
+        - path: {type: PathPrefix, value: /}
+      backendRefs:
+        - name: echo
+          port: 80
+```
+
+listener 的 `port: 8000` 对应常见 Chart 的内部 web EntryPoint；第03章渲染文件若显示其他内部端口，必须同步修改。它不是 Service 暴露的外部 80。应用后通过本章 Ingress 小节的 port-forward 请求 `gateway.localhost`。
+
+#### 用状态解释接受与拒绝
+
+```bash
+kubectl -n traefik-notes get gateway public -o yaml
+kubectl -n traefik-notes get httproute echo -o yaml
+```
+
+查看 Gateway 与 listener 的 Conditions，以及 HTTPRoute `status.parents` 中对应 parent 的 Accepted、ResolvedRefs 等状态。Programmed 的具体呈现取决于 Controller 与版本；条件的 reason/message 比单个布尔值更能说明不接受原因。Route 已 Accepted 仍需真实请求验证后端，CRD 创建成功仅表示 API Server 存储了对象。
+
+### Route 挂载与跨 namespace 资源引用怎样授权
+<!-- src: temp/new-traefik/31-Kubernetes.md; temp/new-traefik/12-Kubernetes.md; temp/new-traefik/33-HTTP.md -->
+
+多租户入口有三种常被混淆的边界：Route 能否挂载 Gateway、Route 能否引用另一个 namespace 的后端，以及 Traefik CRD 能否跨 namespace 引用 Middleware/Service。它们不是由一个 allowedRoutes 开关统一控制。
+
+| 跨边界动作 | 主要控制位置 | 验收证据 |
+| --- | --- | --- |
+| HTTPRoute 挂到别的 namespace 的 Gateway | listener `allowedRoutes` 与 Route `parentRefs` | 对应 parent 的 Accepted |
+| Route 引用其他 namespace 后端 | Gateway API 的 ReferenceGrant 等授权模型 | ResolvedRefs、拒绝原因、实际后端 |
+| IngressRoute 跨 namespace 引用 | `allowCrossNamespace`、对象引用与 RBAC | Controller 日志、生成对象与实际请求 |
+
+ReferenceGrant 与扩展引用必须核验目标版本支持，不能把标准模型当作所有 Traefik 版本的实现保证。主实验采用同 namespace，不依赖跨 namespace 授权。
+
+#### 限制可挂载的应用 namespace
+
+将 Gateway 的 `allowedRoutes` 改成下面片段，可允许带 `expose: notes` 标签的 namespace。平台应控制标签写权限，否则租户可能自行给自己授权。
+
+```yaml
+allowedRoutes:
+  namespaces:
+    from: Selector
+    selector:
+      matchLabels:
+        expose: notes
+```
+
+创建另一个不带标签的应用 namespace，其 HTTPRoute 在 parentRefs 指向 `traefik-notes/public` 并标明 namespace；观察拒绝条件。添加经平台授权的标签后再观察接受。这个实验仅证明 Route 挂载授权，不证明它可以读取任意 namespace 的 Secret。
+
+### NGINX 注解兼容迁移怎样逐项核对
+<!-- src: temp/new-traefik/31-Kubernetes.md; temp/new-traefik/12-Kubernetes.md; temp/new-traefik/33-HTTP.md -->
+
+NGINX annotation 兼容 Provider 是迁移入口，不是完整 Nginx 执行器。材料列出了 ForwardAuth、会话粘性、CORS、后端协议等差异，也列出大量不支持的注解。标准 Kubernetes Ingress Provider 与兼容 Provider 还可能同时发现对象，应通过 class 和 namespace 范围避免重复接管。
+
+#### 用行为表迁移，而不是只改 ingressClass
+
+| 原需求 | 需确认的实现 | 对照请求 |
+| --- | --- | --- |
+| rewrite-target | 兼容支持或显式 Middleware | 原路径、改写路径、查询参数、尾斜杠 |
+| auth-url 与缓存 | 鉴权转发与响应头，缓存能力另核对 | 允许、拒绝、鉴权失联 |
+| affinity | 支持的粘性模式 | 带 Cookie、无 Cookie、后端摘除 |
+| proxy-read-timeout | 对应连接参数及作用域 | 延迟头、慢响应体、长连接 |
+| snippet 或 EWMA/IP hash | 不假设支持 | 明确替代设计或保留原入口 |
+
+建立第二入口，用同一组只读请求对比两边响应与后端记录，再安排切流。涉及写入的镜像或重复请求必须处理副作用。配置创建成功而没有逐项行为对照，不能作为注解迁移完成的依据。
+
+兼容 Provider 的支持列表随版本变化，旧材料中的“支持”不应替代目标版本检查。对于未覆盖项，把它记录为显式迁移缺口，不能靠通用段落或忽略注解让清单看起来全部完成。
+
+### Knative 路由为何需要观察上游资源状态
+<!-- src: temp/new-traefik/31-Kubernetes.md; temp/new-traefik/12-Kubernetes.md; temp/new-traefik/33-HTTP.md -->
+
+Knative Serving 的服务、版本、流量分配和激活过程由 Knative 控制器参与，Traefik Provider 消费相应网络资源并生成路由。普通 Kubernetes Ingress、Knative 内部 Ingress 和应用的 Knative Service 不是同一种对象，名称相同也不能用同一套排查命令替代。
+
+```mermaid
+graph TD
+  S[Knative Service 与流量策略] --> K[Knative 控制器]
+  K --> N[网络路由资源]
+  N --> T[Traefik Knative Provider]
+  T --> B[对应版本或激活链路]
+```
+
+先确认 Knative Service/Revision 就绪以及目标 traffic 分配，再检查网络资源、Provider 日志和实际后端。零副本后的首次请求可能涉及激活和冷启动，不能看到首请求慢就直接调高 Traefik 所有超时。
+
+本章不把开启 Knative Provider 当作安装完整 Knative 平台。验收需有已运行的 Serving 控制面与匹配的网络配置，并使用不同版本响应标识验证流量。测试缩容、首次激活和回滚分配时，保留各资源状态变化，区分平台激活时间与稳定请求的代理耗时。
+
+#### Prefix 实验与协议后端的复用入口
+
+第12章的strictPrefixMatching只作用于KubernetesIngress。对pathType Prefix的同一Ingress请求 `/api`、`/api/x`、`/apix` 并对照Router，严格模式最后一项应不命中；File规则需要显式 `Path(`/api`) || PathPrefix(`/api/`)`，不能靠Provider开关替代。
+
+| 扩展依赖 | 完整文件或前置 | 验收 |
+| --- | --- | --- |
+| A/B、HTTP/TCP/UDP/gRPC/WS后端 | [backends.yml](lab/kubernetes/backends.yml)、本地镜像导入 | Pod Ready、EndpointSlice、协议响应 |
+| HTTP与TCP后端mTLS | [routes.yml](lab/kubernetes/routes.yml)、CA与客户端Secret | 第33/34章schema层级、后端JSON |
+| Gateway HTTPS | 第17章listener/Secret引用、第24章生成证书 | Gateway状态与正确SAN握手 |
+
+集群清单不是直接拼进Compose配置；安装入口的EntryPoint及Service端口也要开放，完整操作见实验包。默认不启用跨namespace引用；开启时另建限定from/to的ReferenceGrant或相应CRD授权，不能把宽泛通配授权当实验捷径。
+
+## 第 32 章 · Kubernetes-CRD · Kubernetes CRD 资源总览
+
+### CRD 是对象模型的 Kubernetes 表达，不是另一套代理
+<!-- src: temp/new-traefik/32-Kubernetes-CRD.md; temp/new-traefik/33-HTTP.md; temp/new-traefik/34-TCP.md; temp/new-traefik/35-UDP.md -->
+
+Kubernetes CRD 让 API Server 存储并校验 Traefik 专属资源，Controller 读取它们后仍生成 Router、Service、Middleware 和 transport。安装 CRD 不会单独转发请求；Controller 未启用、权限不足或对象不在观察范围时，YAML 创建成功也可能没有任何数据面效果。
+
+| 对象族 | 资源 | 对应职责 |
+| --- | --- | --- |
+| HTTP | IngressRoute、Middleware、TraefikService、ServersTransport | 路由、处理策略、服务组合、后端连接 |
+| TCP | IngressRouteTCP、MiddlewareTCP、ServersTransportTCP | 连接路由、连接策略、传输 |
+| TLS | TLSOption、TLSStore | 握手参数与证书存储配置 |
+| UDP | IngressRouteUDP | UDP 入口与服务引用 |
+
+源文件这一章是索引，具体字段在33–35章。本章用来建立对象归属，不把这些字段重复列成第二份参数手册。名字相同并不等于类型相同，引用 TraefikService 时应明确 kind，避免误引用同名 Kubernetes Service。
+
+### 资源存在、Controller 接受和业务成功怎样分别验证
+<!-- src: temp/new-traefik/32-Kubernetes-CRD.md; temp/new-traefik/33-HTTP.md; temp/new-traefik/34-TCP.md; temp/new-traefik/35-UDP.md -->
+
+```mermaid
+graph TD
+  Y[提交资源 YAML] --> A[API Server schema 校验]
+  A --> W[Controller watch 事件]
+  W --> D[解析依赖并构建配置]
+  D --> R[运行时路由]
+  R --> B[实际后端响应]
+```
+
+第一步验证资源和 API 版本是否安装，第二步检查日志、对象条件和运行配置是否接受引用，第三步用真实协议请求验证。`kubectl apply` 的成功输出只覆盖第一段，不证明网络路径正常。
+
+```bash
+kubectl api-resources | rg 'ingressroute|middleware|serverstransport|tlsstore'
+kubectl -n traefik-notes get ingressroute,middleware,traefikservice
+kubectl -n traefik logs deploy/traefik --tail=100
+```
+
+更新 CRD 时确认 Controller 与 schema 的兼容关系，不能把 CRD 定义升级和业务对象迁移当作同一操作。删除旧 CRD 可能连同实例资源一起删除，不应作为普通字段升级的步骤。具体跨 namespace 引用由权限与 Provider 策略约束，见第12和31章。
+
+## 第 33 章 · HTTP · HTTP CRD
+
+### IngressRoute、Middleware 与 TraefikService 怎样引用
+<!-- src: temp/new-traefik/33-HTTP.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+IngressRoute 是 Traefik Router 的 CRD 表达，Middleware 表达处理策略，TraefikService 表达更高层服务组合。普通 Kubernetes Service 仍然负责服务端口、selector 和端点发现。`kind: Service` 与 `kind: TraefikService` 区分名称引用的是哪一种对象，不能只凭相同 name 推断。
+
+#### 用同一后端验证 CRD 路由
+
+此清单依赖第31章的 `app.yaml`，以及已安装的 Traefik CRD、kubernetesCRD Provider 和匹配的读取权限。保存 `ingressroute.yaml`：
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-api
+  namespace: traefik-notes
+spec:
+  stripPrefix:
+    prefixes: [/api]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: echo
+  namespace: traefik-notes
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`crd.localhost`) && (Path(`/api`) || PathPrefix(`/api/`))
+      kind: Rule
+      middlewares:
+        - name: strip-api
+      services:
+        - name: echo
+          kind: Service
+          port: 80
+```
+
+应用后请求 `crd.localhost/api/users`，whoami 应显示 `/users`，而不是 `/api/users`。这同时验证 Router、Middleware 和 Service。若出现 `no matches for kind`，问题是 CRD 尚未安装或 API 版本不匹配，不是后端端口错误。
+
+#### 高级组合不改变 Service 端口含义
+
+需要主版本/灰度版本加权时，先分别建立两个 Kubernetes Service，再用 TraefikService 引用它们；IngressRoute 指向组合对象。多层健康与 sticky 参数的作用域仍需逐层确认。普通 Service 的 port 是 Service 端口，targetPort 由其对象解析到 Pod；把容器端口直接写到引用处可能恰巧在实验相等，但不是通用规则。
+
+同 namespace 引用省略 namespace 最清楚；跨 namespace 的权限问题在后面单独处理。Provider 可以读 Secret 并不意味着任何应用都应该允许引用平台凭据。
+
+### EndpointSlice、就绪和 nativeLB 怎样决定数据路径
+<!-- src: temp/new-traefik/33-HTTP.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+控制面通过 Kubernetes Service、EndpointSlice 和路由对象生成目标地址；数据面默认可以直接连接 Pod endpoint，并不要求每个请求先过 ClusterIP。启用 nativeLB 后，Traefik 以 Service ClusterIP 为目标，把实例选择交给 Kubernetes Service 数据面。
+
+```mermaid
+graph TD
+  K[Kubernetes API] -. watch Service 和 EndpointSlice .-> T[Traefik 配置发现]
+  T -. 构建 endpoint 模式 .-> E[Pod 地址列表]
+  T -. 构建 nativeLB 模式 .-> V[Service ClusterIP]
+  C[客户端请求] --> R[Traefik Router]
+  R --> E
+  R --> V
+  E --> P[Pod]
+  V --> P
+```
+
+两条实线分支是配置选择的对照，不是同一次请求都要经过。Ingress 的 `traefik.ingress.kubernetes.io/service.nativelb`、Gateway 后端 Service 的 `traefik.io/service.nativelb` 和 CRD 的 `nativeLB` 位置不同，不能跨 Provider 机械套用字段。
+
+```bash
+kubectl -n traefik-notes get svc echo -o wide
+kubectl -n traefik-notes get endpointslice -l kubernetes.io/service-name=echo -o yaml
+kubectl -n traefik-notes get pod -l app=echo -o wide
+```
+
+比较 API 中后端地址与这些 IP，确认实际模式。Pod not ready 时先看 EndpointSlice readiness，而不是删除重建 Ingress。nativeLB 下连接复用可能使观察到的请求分布不均匀；Kubernetes 均衡的连接选择和 Traefik 请求选择不能混为同一种轮询。
+
+### TraefikService 如何实现服务加权与镜像
+<!-- src: temp/new-traefik/33-HTTP.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+IngressRoute 直接引用 Kubernetes Service 适合简单后端。需要把流量按版本拆分时，TraefikService 可以组合多个 Service；其作用层位于应用版本服务之上，而不是替代 Service 的 selector 和 targetPort。
+
+下面资源依赖已经部署的 `api-stable` 与 `api-canary` Service，均位于 traefik-notes 且暴露端口80。它是组合清单，不包含两个版本应用的 Deployment：
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: TraefikService
+metadata:
+  name: api-rollout
+  namespace: traefik-notes
+spec:
+  weighted:
+    services:
+      - name: api-stable
+        port: 80
+        weight: 9
+      - name: api-canary
+        port: 80
+        weight: 1
+```
+
+IngressRoute 对应 service 项需使用 `kind: TraefikService` 引用 api-rollout。通过稳定/灰度版本返回不同标识统计分布；少量请求不保证恰好9:1，开启 sticky 或连接复用后也需解释观察偏差。多层粘性要在相应层明确配置。
+
+镜像把副本请求交给其他服务，客户端依然接收主服务响应，因此主站成功不证明镜像成功。检查副本日志和请求体大小限制，禁止把有支付/写库副作用的影子流量直接发向真实系统。材料还介绍 HRW 等服务选择策略，使用前核对版本与来源地址语义，不能把 NAT 后的同一来源当作每用户唯一身份。
+
+### HTTP ServersTransport 和 Middleware 如何使用 Secret 与命名空间
+<!-- src: temp/new-traefik/33-HTTP.md; temp/new-traefik/23-Load-Balancing.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+HTTP ServersTransport 管理 Traefik 到后端的 CA、SNI、客户端证书和连接参数，Middleware 管理请求策略。Kubernetes 中证书材料通常通过 Secret 引用，而不是把宿主路径写进 CRD。虽然与 File YAML 对象职责相同，字段表达并不逐字相同。
+
+| 需求 | Kubernetes 表达 | 必查关系 |
+| --- | --- | --- |
+| 后端 CA | ServersTransport 的 Secret 引用 | CA 格式与命名空间 |
+| 后端 mTLS | 客户端证书 Secret | 证书与私钥配对、用途正确 |
+| BasicAuth | Middleware basicAuth.secret | 凭据格式、读取权限 |
+| 路径改写 | Middleware spec 下的配置 | Router 确实引用 |
+| 跨 namespace | 对象引用及 Provider 授权 | 不是增加 namespace 字段就自动获权 |
+
+创建对象后先检查 Controller 解析错误，再检查 IngressRoute 的实际依赖。验证后端 TLS 时分别制造未知 CA、错误 serverName 和缺少客户端证书，定位失败来自后端连接；不要误改入口证书去修复后端 mTLS。跨 Provider 引用要用其完整命名方式，并注意与 Kubernetes namespace 的差异。
+
+#### v3.6.25 的 HTTP CA 引用与完整后端资源
+
+来源定位：`07-Migrate.md / v3.3 to v3.4 / ServersTransport CA Certificate Configuration`；字段层级另以 [v3.6.25 CRD定义](https://raw.githubusercontent.com/traefik/traefik/v3.6.25/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml) 核对。HTTP引用为 `spec.rootCAs`，支持 `secret` 或 `configMap`，每项只选一种，数据key为 `ca.crt` 或 `tls.ca`。
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: backend-mtls
+  namespace: traefik-notes
+spec:
+  serverName: backend-a
+  rootCAs:
+    - configMap: backend-ca
+  certificatesSecrets: [gateway-client]
+```
+
+`gateway-client`为tls.crt/tls.key客户端Secret；`backend-ca`是ca.crt ConfigMap。[完整资源](lab/kubernetes/routes.yml) 包含IngressRoute引用后端8443、scheme https和serversTransport，配套Deployment挂载后端服务证书与CA；[实验包](lab/README.md#kubernetes-复用端点) 提供从本地生成证书创建Secret/ConfigMap的命令，不提交私钥。
+
+同文件也提供实际可部署的weighted和mirroring TraefikService、相应Router及A/B Deployment，不再要求读者另找两个应用版本。镜像仅接受GET，仍须检查A/B Pod的同一请求日志；健康检查传播支持情况与File Provider有差异，不把File Failover字段直接搬进CRD。
+
+## 第 34 章 · TCP · TCP 与 TLS CRD
+
+### IngressRouteTCP 如何把入口连接交给 Kubernetes Service
+<!-- src: temp/new-traefik/34-TCP.md; temp/new-traefik/24-TLS.md; temp/new-traefik/26-TCP.md; temp/new-traefik/27-Routing.md; temp/new-traefik/28-Middlewares.md -->
+
+IngressRouteTCP 引用的是 Kubernetes Service 名称与端口，控制器再根据 endpoints 或 nativeLB 构造实际后端。它不同于 File 配置直接列出 `address`；端口应与 Service 声明一致，不要求直接等于容器端口。
+
+以下为已有 `database` TCP EntryPoint、`traefik-notes/db` Service 和真实 TCP 后端时的清单。通配规则用于非 TLS 专用端口，不需要伪造 HTTP Host 条件：
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: db
+  namespace: traefik-notes
+spec:
+  entryPoints: [database]
+  routes:
+    - match: HostSNI(`*`)
+      middlewares:
+        - name: db-budget
+      services:
+        - name: db
+          port: 5432
+---
+apiVersion: traefik.io/v1alpha1
+kind: MiddlewareTCP
+metadata:
+  name: db-budget
+  namespace: traefik-notes
+spec:
+  inFlightConn:
+    amount: 20
+```
+
+验收先看 Service 和 EndpointSlice，再用数据库客户端执行只读查询。TLS 透传时配置 `tls.passthrough: true` 并采用真实 SNI；由 Traefik 终止 TLS 时则配置所需 Secret。TCP Router 共享入口会先于 HTTP 处理，要测试它是否意外接管 HTTPS 站点。
+
+### ServersTransportTCP 与 MiddlewareTCP 的作用阶段为何不同
+<!-- src: temp/new-traefik/07-Migrate.md; temp/new-traefik/34-TCP.md; temp/new-traefik/24-TLS.md; temp/new-traefik/26-TCP.md; temp/new-traefik/27-Routing.md; temp/new-traefik/28-Middlewares.md -->
+
+MiddlewareTCP 决定连接是否进入后端，例如来源限制与连接额度；ServersTransportTCP 决定如何拨号和处理后端传输，例如 dialTimeout、terminationDelay 与后端 TLS。限制连接数不能修复错误 CA，修改拨号时间也不能代替来源策略。
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransportTCP
+metadata:
+  name: db-transport
+  namespace: traefik-notes
+spec:
+  dialTimeout: 3s
+  terminationDelay: 100ms
+```
+
+这是独立资源，还需在 IngressRouteTCP 的对应 service 项设置 `serversTransport: db-transport` 才会应用。terminationDelay 影响一端关闭写方向后何时完全终止连接，取值应结合协议关闭行为验证，不是通用“数据库查询超时”。
+
+后端 mTLS 使用该资源的 CA 和客户端证书引用，不能放 File Provider 的宿主路径。这里存在采集页的版本差异：TCP 字段页仍展示 `tls.rootCAsSecrets`，第07章的 v3.4 迁移说明则已把旧 `rootCAsSecrets` 标为弃用，并引入支持 Secret/ConfigMap 的 `rootCAs` 引用。本次按 v3.6.25 schema 核实 TCP 为 `spec.tls.rootCAs` 与 `spec.tls.certificatesSecrets`，完整新字段资源见本章末尾；其他版本仍应核对所安装 schema。逐项测试受信证书、错误 SNI、缺少客户端证书，观察后端握手与控制器日志；不要用 insecureSkipVerify 掩盖错误身份。
+
+### TLSOption 和 TLSStore 怎样表达证书策略
+<!-- src: temp/new-traefik/34-TCP.md; temp/new-traefik/24-TLS.md; temp/new-traefik/26-TCP.md; temp/new-traefik/27-Routing.md; temp/new-traefik/28-Middlewares.md -->
+
+TLSOption 控制 TLS 参数及客户端证书要求，TLSStore 管理默认等证书选择。它们虽然在 TCP CRD 材料中介绍，也涉及 HTTP 的 TLS 入口，不能因章节位置而理解为仅属于 TCP 应用。
+
+| 资源/字段 | 含义 | 关键边界 |
+| --- | --- | --- |
+| TLSOption minVersion | 最低 TLS 版本 | 与客户端兼容性一起验证 |
+| clientAuth.secretNames | 信任的客户端 CA 来源 | Secret 权限与内容格式必须正确 |
+| RequireAnyClientCert | 要求证书存在 | 不等同于验证受信 CA |
+| RequireAndVerifyClientCert | 要求并验证证书 | 应测试无证书和错误 CA |
+| TLSStore default | 默认/未匹配证书选择 | 不是每 namespace 独立的安全边界 |
+
+用客户端握手查看实际证书、协议和认证结果，不要只看 TLSOption 资源创建成功。传统全局 TLS Store 的多租户限制见第37章，严格隔离需求可能需要独立 Traefik 实例。默认 TLSOption 的引用与 Provider 后缀还有特殊规则，跨来源引用前核对具体模型。
+
+#### v3.6.25 的 TCP CA 必须位于 tls 下
+
+迁移材料的TCP示例与固定版本schema不完全一致，目标schema明确为 `spec.tls.rootCAs`，客户端证书同在tls下。不要把HTTP的spec层级机械复制到TCP：
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransportTCP
+metadata:
+  name: backend-mtls
+  namespace: traefik-notes
+spec:
+  dialTimeout: 3s
+  tls:
+    serverName: backend-a
+    rootCAs:
+      - secret: backend-ca
+    certificatesSecrets: [gateway-client]
+```
+
+[完整清单](lab/kubernetes/routes.yml) 的IngressRouteTCP在backendtls入口引用这个transport，将明文HTTP字节通过后端TLS连接发送到8443；客户端可用curl读取后端JSON，从而验证TCP transport确实做了mTLS。它是教学协议组合，不是直接暴露数据库。CA Secret含ca.crt，客户端Secret含tls.crt/tls.key。先做schema/server dry-run，再真实请求；仅YAML解析不会发现把rootCAs写错层级。
+
+## 第 35 章 · UDP · UDP CRD
+
+### IngressRouteUDP 如何引用 UDP Service
+<!-- src: temp/new-traefik/35-UDP.md; temp/new-traefik/29-UDP.md; temp/new-traefik/30-Routing.md -->
+
+IngressRouteUDP 把 UDP EntryPoint 关联到 Kubernetes Service。它没有 HTTP URL、Host 或 SNI 匹配字段；源材料的部分 ExternalName 示例混入 `match: Host(...)` 和 `kind: Rule`，不能照抄到 UDP CRD。
+
+以下为依赖现有 `dns` UDP EntryPoint、可提供 DNS 服务的 Pod 和相应 Service 的路由清单。Service 的 port 是引用目标，协议必须为 UDP：
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteUDP
+metadata:
+  name: dns
+  namespace: traefik-notes
+spec:
+  entryPoints: [dns]
+  routes:
+    - services:
+        - name: dns
+          port: 53
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns
+  namespace: traefik-notes
+spec:
+  selector:
+    app: dns
+  ports:
+    - name: dns
+      protocol: UDP
+      port: 53
+      targetPort: 5353
+```
+
+该清单没有部署 DNS 服务器；前提是标签 `app: dns` 的 Pod 在 UDP 5353 监听。检查 EndpointSlice 包含的端口和 Pod readiness，再用 `dig` 对 Traefik 的外部 UDP 端口发送查询并核对应答。没有匹配 Pod 时不能把创建 Service 成功当作服务可用。
+
+### nativeLB、NodePortLB 与 ExternalName 应如何选择
+<!-- src: temp/new-traefik/35-UDP.md; temp/new-traefik/29-UDP.md; temp/new-traefik/30-Routing.md -->
+
+默认目标可来自 Pod endpoints；nativeLB 使用 Service ClusterIP，由 Kubernetes 数据面选择 Pod。NodePortLB 面向能够访问节点网络、但不一定直接访问 Pod 网络的场景。三者改变目的地址路径，不会给 UDP 自动增加应用层可靠性。
+
+| 路径 | Traefik 访问的目标 | 前提 |
+| --- | --- | --- |
+| endpoints | Pod IP 和目标端口 | 可达 Pod 网络 |
+| nativeLB | Service ClusterIP | 可达 Service 网络 |
+| NodePortLB | Node IP 和 NodePort | 可达节点与发布端口 |
+| ExternalName | 外部 DNS 名对应的服务 | 明确允许、DNS/端口可达 |
+
+ExternalName 引用需要有端口信息，资源与 Service 双方定义时应一致；不要用省略端口的 HTTP 思路推断 DNS 服务。对 UDP 的空闲 session timeout、回程映射和丢包观察仍按第30章处理。
+
+在一种路径下验证成功后，改变 nativeLB 并检查运行目标地址和应用响应，不要只修改字段看 YAML diff。多节点、NAT 和安全组变化可能让一种路径可行而另一种失败，需把网络证据与配置发现分开记录。
+
+#### DNS Pod、Service 与 UDP Router 配套清单
+
+[backends.yml](lab/kubernetes/backends.yml) 的backend-a Deployment监听5353/UDP，Service的dns端口也声明UDP；[routes.yml](lab/kubernetes/routes.yml) 的IngressRouteUDP引用相同Service与5353端口。入口Controller仍需配置dns EntryPoint与对外UDP Service端口。
+
+```bash
+kubectl -n traefik-notes get pods,svc,endpointslices
+# TRAEFIK_IP 是测试集群实际可达的入口地址；端口按入口Service配置。
+dig @TRAEFIK_IP -p 5353 lab.test A +notcp +noall +answer
+kubectl -n traefik-notes logs deploy/backend-a | rg '"protocol": "dns"'
+```
+
+`kubectl port-forward`不转发UDP，因此不能用它替代此处入口连通实验；没有UDP可达地址时保留未验收状态。预期答案为192.0.2.42，随后按第30章重复与空闲再查询。
+
+## 第 36 章 · Label-&-Tag-Providers · 标签与 Tag 配置
+
+### Labels 和 Tags 怎样表达完整的 Router、Service 与 Middleware
+<!-- src: temp/new-traefik/36-Label-&-Tag-Providers.md; temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/13-Hashicorp.md; temp/new-traefik/14-KV-Stores.md; temp/new-traefik/15-Others.md -->
+
+标签和 tags 把嵌套路由对象扁平化为键值字符串，服务发现系统再提供实例地址。正文以第02章同网络后端为前提；标签是路由声明，不会替应用开启端口或加入正确网络。
+
+```yaml
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.tag-demo.entrypoints: web
+  traefik.http.routers.tag-demo.rule: Host(`tag.localhost`)
+  traefik.http.routers.tag-demo.service: tag-demo
+  traefik.http.services.tag-demo.loadbalancer.server.port: "80"
+```
+
+这个片段属于 Docker 容器服务；Swarm 应把同类声明放入 deploy.labels，Consul Catalog/Nomad 用注册服务的 tags，ECS 用 task definition 的 dockerLabels。不能只改 Provider 名称而保留原平台的对象层级。
+
+| 来源 | 配置挂在哪里 | 地址/端口来自哪里 |
+| --- | --- | --- |
+| Docker | 容器 labels | 容器网络与显式端口 |
+| Swarm | 服务 deploy.labels | task/VIP 与服务端口 |
+| Consul Catalog | 注册服务 Tags | 目录中的 Address/Port |
+| Nomad | 服务 tags | Nomad 发现的服务信息 |
+| ECS | containerDefinitions.dockerLabels | 任务网络与端口映射 |
+
+生成后在运行 API 查看 `@docker`、`@swarm`、`@consulcatalog`、`@nomad` 或 `@ecs` 对象；名称或 source 不符合预期时先查发现来源，而不是反复修改业务代码。
+
+### 多端口、多网络和跨 Provider 引用怎样避免歧义
+<!-- src: temp/new-traefik/36-Label-&-Tag-Providers.md; temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/13-Hashicorp.md; temp/new-traefik/14-KV-Stores.md; temp/new-traefik/15-Others.md -->
+
+同一个应用有业务端口和管理端口时，应分别定义 Router、Service 并显式关联；只有一个自动生成 Service 的便捷规则不能扩展到所有场景。Docker 多网络需指定真实 Docker 网络名；Swarm 则使用 `traefik.swarm.network`，名称还可能有 stack 前缀。
+
+```yaml
+labels:
+  traefik.http.routers.tag-demo.middlewares: admin-auth@file
+  traefik.http.services.tag-demo.loadbalancer.serverstransport: api-transport@file
+```
+
+片段依赖已经在 File 定义的两个对象；其中 admin-auth 可来自第02章，api-transport 来自第23章。把 Middleware 声明出来但没挂到 Router，不会生效；Service 引用了不存在的 transport 也不能仅靠 Router 名称正确来保证转发。
+
+Labels/tags 对读取平台元数据的人通常可见，不存放私钥、访问 token 或明文密码。BasicAuth 的哈希写进 Compose 标签还涉及 `$` 插值；使用文件/Secret 能减少转义和泄露风险。上线前同时检查最终展开的 Compose 与 Traefik 实际对象，避免模板生成器修改了表达式。
+
+### KV 路径如何对应数组和嵌套字段
+<!-- src: temp/new-traefik/36-Label-&-Tag-Providers.md; temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/13-Hashicorp.md; temp/new-traefik/14-KV-Stores.md; temp/new-traefik/15-Others.md -->
+
+KV Provider 的数据结构不是容器标签的另一种拼写。点号层级通常变成路径，服务器列表等数组由序号表示。实际 rootKey 由第14章配置，带不带前导斜杠应与所选 Provider 的配置约定一致。
+
+| 语义 | rootKey 为 traefik 时的路径示意 | 值 |
+| --- | --- | --- |
+| Router 规则 | traefik/http/routers/api/rule | Host(`api.example.test`) |
+| Router 服务引用 | traefik/http/routers/api/service | api |
+| 后端第一个地址 | traefik/http/services/api/loadbalancer/servers/0/url | http://backend.internal:8080 |
+| Router 第一个入口 | traefik/http/routers/api/entrypoints/0 | web |
+
+这些是 schema 示例，不是可以对任意 Redis/etcd 集群直接执行的写入命令。先在隔离根路径建立完整对象，核对数组顺序和名称，再检查运行配置。只写 rule 而没写 Service 及其后端是典型的半份配置。
+
+多键更新与回滚按第14章的一致性策略执行；从 KV 删除过期数组元素时要确认旧序号不会继续形成服务器。还要记录哪些功能支持 KV，不能从一个通用字段表推导所有协议、TLSStore 或复合 Service 在目标版本都相同。
+
+### 协议前缀和能力限制怎样进入发布校验
+<!-- src: temp/new-traefik/36-Label-&-Tag-Providers.md; temp/new-traefik/11-Configuration-Discovery.md; temp/new-traefik/13-Hashicorp.md; temp/new-traefik/14-KV-Stores.md; temp/new-traefik/15-Others.md -->
+
+HTTP、TCP、UDP 标签分别使用 `traefik.http`、`traefik.tcp`、`traefik.udp` 前缀。声明 TCP/UDP 对象后，平台的自动 HTTP 路由生成可能不再按原来的默认方式发生；需要多协议时应显式声明所有需要的对象。
+
+```text
+检查顺序：标签所在层 → Provider 范围 → 对象协议前缀
+       → Router 引用 → 后端地址与端口 → 真实协议响应
+```
+
+相同 Middleware 名称的冲突声明可能导致对象无法创建，不能依赖“后写的覆盖前写的”作为通用原则。版本升级时还需检查 ruleSyntax、旧 Swarm 字段和支持的 backend scheme，尤其不要把 v2 的 Headers 匹配器残留在 v3 默认规则中。
+
+发布校验应保留正/负样本：正确 Host 成功、错误 Host 不接管、管理路径有认证、错误网络无法访问时错误归因正确。单纯统计标签数量或容器运行数不能说明业务路由已经符合预期。
+
+#### Catalog Tag 到运行对象的对应证据
+
+第13章和 [checks.py](lab/checks.py) 使用 `traefik.enable=true` 与 `traefik.http.routers.catalog.rule=Host(...)` Tag，注册端口8080来自Catalog记录。访问日志中的 `catalog@consulcatalog`、后端IP172.30.39.21与JSON backend=a应一致。
+
+| 写入动作 | 发现对象 | 验收 |
+| --- | --- | --- |
+| agent/service/register | Catalog service + tags | 等待健康passing、真实200 |
+| `/health`改503 | 同一注册对象变critical | Provider刷新后无可用目标，修复后恢复 |
+| agent/service/deregister | 对象移除 | Router不再服务，返回404 |
+
+Consul KV Provider读取的是键树，Catalog Provider读取的是服务注册目录；本实验成功不证明KV多key原子发布，也不证明Nomad/ECS已部署。
+
+## 第 37 章 · Security · 协议与多租户安全
+
+### 多租户、Tailscale、SPIFFE 和 OCSP 有哪些边界
+<!-- src: temp/new-traefik/37-Security.md; temp/new-traefik/16-TLS.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+Namespace RBAC 只能解释部分证书隔离。材料明确说明传统 Ingress/IngressRoute 的 TLS Store 是全局共享，不能仅靠 namespace 就声称已实现严格 TLS 多租户隔离。Gateway API 提供更好的 listener/route 授权原语，但仍应验证实际证书行为；要求强边界时可采用每租户独立 Traefik 实例及 watch 范围。
+
+| 扩展 | 解决的问题 | 前置条件及观察 |
+| --- | --- | --- |
+| Tailscale Resolver | 获取 Tailscale 域名证书 | ts.net 格式、daemon 可用、Router 显式引用；查看续期与实际证书 |
+| SPIFFE | 基于工作负载身份保护后端 | Workload API 提供 SVID，ServersTransport 显式启用；检查身份与信任域 |
+| OCSP Stapling | 在握手中提供撤销状态信息 | 证书带 responder 信息且能查询；观察 staple，不代表自动换证 |
+| 独立租户实例 | 隔离全局配置和证书影响范围 | 独立入口、凭据、namespace 观察范围和发布权限 |
+
+SPIFFE 在首次 SVID 尚未交付时可能阻塞启动，应检查工作负载注册和 Workload API，不能盲目重启。开启全局 SPIFFE 不代表所有后端自动启用；对应 ServersTransport 仍需明确选择。
+
+OCSP 缓存在内存中，重启后需重新取得，不能把它当作持久化证书账户。Tailscale 域名证书也不是任意公网域名签发方案。选型时分别回答“谁签发”“谁信任”“谁能引用”“失败影响哪些租户”，比罗列 TLS 功能名更有价值。
+
+### Content-Length 校验与 Buffering 如何改变消息处理边界
+<!-- src: temp/new-traefik/37-Security.md; temp/new-traefik/16-TLS.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+Traefik 默认作为流式代理，在数据经过时检查消息长度相关约束，不需要先把所有内容存完才开始转发。Buffering 可以改变这一模式，先读取完整请求/响应再处理体积和一致性；它提高前置检查能力，也把更多资源压力放到代理上。
+
+| 模式 | 优点 | 成本与边界 |
+| --- | --- | --- |
+| 流式转发 | 较早把数据交给后端，减少完整缓冲 | 异常可能在传输过程中才被发现 |
+| 请求缓冲 | 转发前检查体积，超大请求可提前拒绝 | 内存/磁盘消耗，影响流式上传 |
+| 响应缓冲 | 可在交给客户端前检查完整体积 | 增加延迟，对大响应成本高 |
+
+源材料关注 Content-Length 与实际字节数不符、截断或过长流的处理。不要把启用 Buffering 当成自动解决所有请求走私、协议歧义或应用输入问题；入口与后端对报文的解析链路都应纳入安全测试。
+
+```yaml
+http:
+  middlewares:
+    bounded-body:
+      buffering:
+        maxRequestBodyBytes: 1048576
+        memRequestBodyBytes: 262144
+```
+
+片段需挂到目标 HTTP Router 才生效。用合法小请求、大于上限请求和被截断的测试消息分别观察代理响应与后端接收；异常报文仅在隔离实验环境发送。容量同时考虑体积、并发和磁盘，不能因为内存阈值很小就忽略落盘耗尽的风险。
+
+## 第 38 章 · Deprecation-Notices · 弃用与版本支持
+
+### Hub、实验功能和源码材料缺口怎样标注
+<!-- src: temp/new-traefik/38-Deprecation-Notices.md; temp/new-traefik/07-Migrate.md; temp/new-traefik/08-Traefik-v2-to-v3.md -->
+
+功能页可能属于 Proxy、Hub 或实验扩展。把三者混在一起会让读者在开源镜像里寻找不存在的字段。笔记应说明解决的问题、依赖的产品/版本与不可直接复用的边界，而不是为了覆盖目录复制所有产品配置。
+
+| 内容 | 在本笔记的处理 |
+| --- | --- |
+| Proxy 内置路由与中间件 | 给出机制、配置、观察与边界 |
+| Hub 专属 JWT/OIDC/WAF 等 | 标记产品能力，不伪称 OSS 已集成 |
+| FastProxy 等实验项 | 按目标版本核对协议/观测限制，单独压测与回滚 |
+| Go 调度、事件循环、内部源码 | 缺源码证据时不提供推测路径 |
+
+材料中的 FastProxy 页面标记实验性，并提到 HTTP/2 和部分观测限制；这些是采集版本信息，不是所有未来版本的固定结论。采用前用实际业务协议和指标链路验证，若 tracing 消失，不能用“性能变好”忽略诊断能力变化。
+
+#### 贡献与安全反馈
+
+普通问题报告应包含版本、最小配置、复现请求、预期与实际结果、脱敏日志；不要把全量配置和证书私钥贴进 issue。安全问题按项目 Security 页的披露渠道处理。构建自定义二进制时保存提交和工具链版本，并明确它不同于已验证的官方镜像。本笔记没有源码阅读证据，因此不把构建成功当作内部机制已研究完成。
+
+### 版本支持表为什么必须带时间语境
+<!-- src: temp/new-traefik/38-Deprecation-Notices.md; temp/new-traefik/07-Migrate.md; temp/new-traefik/08-Traefik-v2-to-v3.md -->
+
+Active Support 表示仍接收一般 bug 修复，Security Support 表示有限的关键/安全修复，二者不是同一个承诺。材料的版本表仍以 3.5 为当时活跃版本，同时目录中其他页采用 3.6 语境，说明这是不同时间内容组成的采集快照。
+
+因此本文不把该表逐项重印为“当前支持版本”。做生产升级选择时，记录查询日期、官方发布公告和目标版本，不能把旧文中的 Yes 当作今天仍然成立的事实。
+
+| 决策项 | 要记录的证据 | 不能推断的结论 |
+| --- | --- | --- |
+| 版本是否受支持 | 当前官方支持声明与日期 | semver 较大就一定在维护 |
+| 是否可直接升级 | 对应版本迁移说明 | 小版本没有行为变化 |
+| 是否可回滚 | 镜像、配置、CRD、证书兼容 | 换回旧镜像即可恢复全部状态 |
+
+为现有实例生成版本清单，与实际 Chart/CRD 对照。把即将到期、已弃用和实际已使用的功能分别列为任务，避免只关注镜像标签而忽略 API schema。支持期限可能调整，笔记提供判断方法，不替代持续维护的官方公告。
+
+### 资源 API 的弃用怎样落实到清单迁移
+<!-- src: temp/new-traefik/38-Deprecation-Notices.md; temp/new-traefik/07-Migrate.md; temp/new-traefik/08-Traefik-v2-to-v3.md -->
+
+材料明确 v3 移除了 `networking.k8s.io/v1beta1` Ingress 与旧 `apiextensions.k8s.io/v1beta1` CRD 定义支持，应使用相应 v1 API。这里的 CRD 定义 API 与 Traefik 自身对象 `traefik.io/v1alpha1` 不是同一个版本号，不要因为看到 alpha 字样就擅自改成 v1。
+
+```bash
+rg -n 'networking.k8s.io/v1beta1|apiextensions.k8s.io/v1beta1' ./manifests
+kubectl api-resources
+```
+
+静态搜索找到旧版本后，还要检查实际集群资源、生成模板和 Helm 渲染结果。Ingress v1 的 backend 字段、pathType 等结构应按 schema 修改并回归请求；简单替换 apiVersion 字符串不足以完成迁移。
+
+区分“配置仍可解析但已警告”“目标版本移除字段”和“环境根本没有安装该 API”三种状态，分别安排清理、迁移和安装。不要通过忽略警告或删除 CRD 实例来追求表面升级成功。
+
+#### 将弃用信息落回升级工单
+
+| 已出现的弃用 | 本笔记处理入口 | 退出兼容状态的证据 |
+| --- | --- | --- |
+| rootCAsSecrets | 第07章矩阵、第33/34章新字段 | 固定CRD schema接受、新握手验证后端CA |
+| v2 ruleSyntax兼容开关 | 第08章迁移 | 删除开关后正负路由样本一致 |
+| Swarm旧docker标签 | 第03/07章 | 运行对象@swarm与正确overlay目标 |
+| TCP旧proxyProtocol位置 | 第07/26章 | transport字段与实际后端协议相符 |
+
+弃用不代表当前patch已删除；能启动也不代表已完成迁移。时间性的支持状态继续以发布方当日信息核对，本表只记录本笔记有明确来源的配置变化。
+
+## 第 39 章 · User-Guides · 用户实践指南
+
+### gRPC 的 TLS、h2c 与 gRPC-Web 怎样区分
+<!-- src: temp/new-traefik/39-User-Guides.md; temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+gRPC 基于 HTTP/2；`h2c` 表示明文 HTTP/2 后端连接，HTTPS 则结合 TLS 和 ALPN。客户端到 Traefik 与 Traefik 到后端可采用不同安全方式。gRPC-Web 是浏览器适配协议，需要转换中间件，不能因名字相似直接当作普通 gRPC。
+
+下面是 File Provider 的后端片段，依赖实际启动在 `grpc-backend:50051` 的 gRPC 服务。Router 仍使用 HTTP Router 并指向该 Service，入口 TLS 按第24章配置。
+
+```yaml
+http:
+  services:
+    grpc:
+      loadBalancer:
+        servers:
+          - url: h2c://grpc-backend:50051
+```
+
+有 server reflection 时可以用 `grpcurl -plaintext 地址:端口 list` 检查服务发现；更严格的验证应带应用 proto 和请求内容调用一个实际 RPC，例如健康检查服务。reflection 未启用时 list 失败不一定代表代理失败，应显式提供 proto。
+
+HTTP 200 也不能证明 RPC 成功，gRPC 的 status/trailer、消息内容与流结束状态都需要检查。对服务器流式或双向流，验证持续消息、取消和超时；不要套用只检查响应头的普通 HTTP 探测。
+
+### WebSocket 升级、空闲和重连怎样观察
+<!-- src: temp/new-traefik/39-User-Guides.md; temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+WebSocket 从 HTTP Upgrade 建立持续消息通道，通常由正常 HTTP Router/Service 代理。正确握手只是开始，后续双向消息、空闲连接和代理滚动更新时的重连才决定应用体验。WSS 还要先通过证书校验。
+
+| 测试阶段 | 应确认的行为 | 常见误判 |
+| --- | --- | --- |
+| 握手 | 101 Switching Protocols 或明确拒绝 | curl 普通 GET 200 当作升级成功 |
+| 双向消息 | 客户端发送并收到预期回复 | 只证明 TCP 端口可连接 |
+| 空闲 | 心跳与实际超时符合应用设计 | 把 HTTP keep-alive 空闲参数当作所有 WebSocket 上限 |
+| 代理更新 | 客户端可重新连接，业务恢复 | 声称存量连接永远不中断 |
+
+使用真实应用客户端或 WebSocket 测试工具连接已部署的 echo 服务，记录一次发送、回复、主动断开和重连。不要无条件手工覆盖 Upgrade/Connection 头；先确认 Traefik 的正常协议处理与后端要求，额外 Headers 策略反而可能破坏握手。
+
+连接保持与应用状态不是同一层：网络重连后订阅、游标或会话需要由客户端和业务恢复。生产更新应协调优雅终止窗口、外层 LB 摘除与客户端重连退避，而不是通过无限延长超时掩盖问题。
+
+### FastProxy 实验功能怎样用真实协议验证
+<!-- src: temp/new-traefik/39-User-Guides.md; temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+FastProxy 页面介绍实验性代理实现，材料提到 HTTP/2 后端回退以及部分观测能力限制。它的适用性必须按实际版本核对，不能把名称里的 Fast 当作固定吞吐收益，也不能拿普通 HTTP 的结果推导 gRPC 和流式协议表现。
+
+| 测试维度 | 固定条件 | 观察 |
+| --- | --- | --- |
+| 协议 | HTTP/1.1、HTTP/2、h2c 分开 | 是否采用预期实现或回退 |
+| 性能 | 相同请求体、TLS、后端、并发 | 延迟、吞吐、CPU、内存 |
+| 观测 | 相同 exporter 与采样配置 | 指标/Trace 是否缺失 |
+| 稳定性 | 长连接、取消、后端异常 | 错误与恢复行为 |
+
+先在独立实例启用，再逐项对比。某个指标降低可能来自未再采集，而非性能变好；缺失 Trace 也不能作为没有慢请求的证据。保留安装配置和旧镜像的回退路径，并在影响业务前确认使用的功能不依赖该实验实现暂不支持的协议。
+
+### Kubernetes 与证书管理器怎样分工
+<!-- src: temp/new-traefik/39-User-Guides.md; temp/new-traefik/17-Certificate-Resolvers.md; temp/new-traefik/24-TLS.md; temp/new-traefik/31-Kubernetes.md -->
+
+User Guides 中的 Kubernetes 与 Let’s Encrypt、cert-manager 条目主要引导到应用暴露教程。关键区别是证书由谁申请和续期：Traefik ACME 自己管理账户与文件状态，外部证书管理器生成 Secret，Traefik 读取 Secret 提供 TLS。
+
+```mermaid
+graph TD
+  I[证书签发策略] --> M[证书管理器]
+  M --> S[Kubernetes TLS Secret]
+  S --> T[Traefik 消费证书]
+  T --> C[客户端验证域名与信任]
+```
+
+使用 cert-manager 还需要独立安装的控制器、Issuer/ClusterIssuer 和证书资源，不能只创建一个 TLS Secret 就称为自动续期。验证 Certificate 状态、Secret 更新与客户端实际证书三者一致，避免只看控制器报告 Ready。
+
+在多副本 Traefik 环境，这种职责分离可以避免多个进程竞争写同一 ACME 文件，但仍需运营 CA 凭据、签发限额和续期告警。新旧证书切换时检查公开 serial/dates，不要求重启每个业务 Pod，也不要把回滚业务版本与恢复旧私钥绑定起来。
+
+#### gRPC proto、方法输入与 WebSocket echo 实物
+
+[echo.proto](lab/app/echo.proto) 定义 `lab.Echo/Say`，输入Message.text，输出 `a:` 加原文本；镜像构建时用固定grpcio-tools生成桩。gRPC后端50051明文HTTP/2，Traefik Service URL为 `h2c://backend-a:50051`，HTTP Router匹配grpc.localhost。客户端使用grpc.default_authority设置Host，不用普通curl HTTP/1.1响应冒充gRPC调用。
+
+```bash
+docker compose run --rm client -c 'import grpc,echo_pb2,echo_pb2_grpc; c=grpc.insecure_channel("traefik:80",options=[("grpc.default_authority","grpc.localhost")]); print(echo_pb2_grpc.EchoStub(c).Say(echo_pb2.Message(text="hello"),timeout=5))'
+docker compose run --rm client /checks.py protocols
+```
+
+WebSocket后端8081由websockets 15.0.1提供echo。协议脚本真正完成Upgrade、发送hello并收回相同消息，空闲5秒（后端ping维持）后再往返，正常close后重新连接再测；后端日志记录open/close。这里验证连接能跨短空闲窗口保持，TCP章节另验证关闭型空闲超时，不能把一次101状态码当消息传输成功。跨重启重连需要客户端重新建连与应用恢复策略，不保证旧连接永不丢失。
+
+同一后端镜像的Kubernetes清单也提供grpc/WS Service端口与IngressRoute，见第31/33章。gRPC-Web需额外浏览器协议转换，本文的native gRPC实验不声称覆盖gRPC-Web或所有流式调用。
