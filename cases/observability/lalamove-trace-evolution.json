@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "货拉拉 Trace 3.0 冷热分离架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1340, 1000],
+    "views": [
+      {
+        "id": "ingest",
+        "label": "采集与缓冲",
+        "focus": ["instrumented-app", "trace-collector", "kafka"],
+        "note": "应用零侵入埋点后，经 Collector 写入 Kafka，削峰并解耦存储。"
+      },
+      {
+        "id": "sampling",
+        "label": "差异化采样",
+        "focus": ["realtime-consumer", "redis-bloom", "delayed-consumer"],
+        "note": "实时消费识别错、慢、核心链路；延迟消费用 Redis 布隆过滤器补全链路。"
+      },
+      {
+        "id": "storage",
+        "label": "冷热存储",
+        "focus": ["es-hot", "es-cold", "hbase-hot", "hbase-cold"],
+        "note": "热数据保留近一小时全量，冷数据仅保留有价值链路并支持查询。"
+      }
+    ],
+    "repository": {
+      "url": "https://github.com/luozijian1990/ops-roadmap",
+      "revision": "90f30e7c7947e900f5353c10a83f6621c0269e61"
+    }
+  },
+  "components": [
+    {
+      "id": "instrumented-app",
+      "type": "frontend",
+      "label": "业务应用",
+      "sublabel": "Java + ByteBuddy 零侵入埋点",
+      "tag": "Trace source",
+      "pos": [20, 390],
+      "size": [150, 72],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 340, "label": "Trace 3.0 输入" }]
+    },
+    {
+      "id": "trace-collector",
+      "type": "backend",
+      "label": "Trace Collector",
+      "sublabel": "接收并投递 Trace",
+      "tag": "Ingest",
+      "pos": [200, 390],
+      "size": [160, 72],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 344, "label": "采集链路" }]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka",
+      "sublabel": "Trace 事件缓冲",
+      "tag": "Durable stream",
+      "pos": [390, 390],
+      "size": [140, 72],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 345, "label": "消息缓冲" }]
+    },
+    {
+      "id": "realtime-consumer",
+      "type": "backend",
+      "label": "实时 Consumer",
+      "sublabel": "近 1 小时全量 + 价值识别",
+      "tag": "Real-time group",
+      "pos": [550, 250],
+      "size": [170, 84],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 346, "label": "实时消费" }]
+    },
+    {
+      "id": "delayed-consumer",
+      "type": "backend",
+      "label": "延迟 Consumer",
+      "sublabel": "约 30 分钟后补全链路",
+      "tag": "Delayed group",
+      "pos": [550, 560],
+      "size": [170, 84],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 456, "label": "延迟消费" }]
+    },
+    {
+      "id": "redis-bloom",
+      "type": "database",
+      "label": "Redis 布隆过滤器",
+      "sublabel": "记录错 / 慢 / 核心 Trace ID",
+      "tag": "Sampling index",
+      "pos": [750, 390],
+      "size": [170, 84],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 347, "label": "过滤器" }, { "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 456, "label": "链路保全" }]
+    },
+    {
+      "id": "es-hot",
+      "type": "database",
+      "label": "ES 热集群",
+      "sublabel": "近 1 小时 Trace 基础数据全量",
+      "tag": "Hot index",
+      "pos": [930, 130],
+      "size": [170, 84],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 348, "label": "热存储" }]
+    },
+    {
+      "id": "es-cold",
+      "type": "database",
+      "label": "ES 冷集群",
+      "sublabel": "错 / 慢 / 核心链路基础数据",
+      "tag": "Cold index",
+      "pos": [930, 650],
+      "size": [170, 84],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 349, "label": "冷存储" }]
+    },
+    {
+      "id": "hbase-hot",
+      "type": "database",
+      "label": "HBase 热数据",
+      "sublabel": "近 1 小时 Trace 详情全量",
+      "tag": "Hot detail",
+      "pos": [1120, 130],
+      "size": [170, 84],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 350, "label": "热详情" }]
+    },
+    {
+      "id": "hbase-cold",
+      "type": "database",
+      "label": "HBase 冷数据",
+      "sublabel": "保留价值链路的完整详情",
+      "tag": "Cold detail",
+      "pos": [1120, 650],
+      "size": [170, 84],
+      "sources": [{ "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 351, "label": "冷详情" }, { "path": "cases/observability/lalamove-end-to-end-tracing.md", "line": 462, "label": "完整链路" }]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Trace 3.0 数据平面",
+      "wraps": ["trace-collector", "kafka", "realtime-consumer", "delayed-consumer", "redis-bloom", "es-hot", "es-cold", "hbase-hot", "hbase-cold"]
+    }
+  ],
+  "connections": [
+    { "id": "app-to-collector", "from": "instrumented-app", "to": "trace-collector", "label": "Trace spans", "variant": "emphasis", "labelDy": -48 },
+    { "id": "collector-to-kafka", "from": "trace-collector", "to": "kafka", "label": "append events", "labelDy": -52 },
+    { "id": "kafka-to-realtime", "from": "kafka", "to": "realtime-consumer", "label": "实时消费组", "fromSide": "top", "toSide": "left" },
+    { "id": "kafka-to-delayed", "from": "kafka", "to": "delayed-consumer", "label": "延迟消费组 / 30 min", "variant": "dashed", "fromSide": "bottom", "toSide": "left" },
+    { "id": "realtime-to-bloom", "from": "realtime-consumer", "to": "redis-bloom", "label": "命中价值 Trace ID", "fromSide": "right", "toSide": "top" },
+    { "id": "delayed-to-bloom", "from": "delayed-consumer", "to": "redis-bloom", "label": "查询过滤器", "fromSide": "right", "toSide": "bottom" },
+    { "id": "realtime-to-es-hot", "from": "realtime-consumer", "to": "es-hot", "label": "全量基础数据", "fromSide": "right", "toSide": "left" },
+    { "id": "realtime-to-hbase-hot", "from": "realtime-consumer", "to": "hbase-hot", "label": "全量详情", "fromSide": "right", "toSide": "bottom", "via": [[900, 292], [900, 260], [1205, 260]] },
+    { "id": "delayed-to-es-cold", "from": "delayed-consumer", "to": "es-cold", "label": "错慢核心", "fromSide": "right", "toSide": "left" },
+    { "id": "delayed-to-hbase-cold", "from": "delayed-consumer", "to": "hbase-cold", "label": "价值链路详情", "fromSide": "right", "toSide": "bottom", "via": [[760, 602], [760, 770], [1205, 770]] }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "采样与链路完整性",
+      "items": ["实时组识别错误、慢请求与核心链路并写入 Redis 布隆过滤器", "延迟组从 Kafka 回看并按 Trace ID 决定是否保留完整链路"]
+    },
+    {
+      "dot": "emerald",
+      "title": "冷热数据策略",
+      "items": ["近 1 小时保留全量基础数据与详情", "超过窗口仅保留错、慢、核心链路，存储成本降低约 60%"]
+    },
+    {
+      "dot": "violet",
+      "title": "存储职责分离",
+      "items": ["ES 热 / 冷集群承担基础数据检索", "HBase 热 / 冷数据承担 Trace 详情回溯"]
+    }
+  ]
+}

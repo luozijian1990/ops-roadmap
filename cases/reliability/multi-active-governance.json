@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "B站同城多活治理架构",
+    "locale": "zh-CN",
+    "output": "multi-active-governance.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/luozijian1990/ops-roadmap.git",
+      "revision": "90f30e7c7947e900f5353c10a83f6621c0269e61"
+    },
+    "views": [
+      {
+        "id": "request-path",
+        "label": "用户请求路径",
+        "focus": ["users", "dcdn", "pop", "az_router", "edge_az1", "service_az1"],
+        "note": "跟随用户请求从 DCDN 和 POP 进入指定可用区。"
+      },
+      {
+        "id": "dual-az-state",
+        "label": "双可用区状态",
+        "focus": ["service_az1", "state_az1", "service_az2", "state_az2", "sync"],
+        "note": "查看两套服务与缓存、KV、DB 之间的本地读写和同步。"
+      },
+      {
+        "id": "governance",
+        "label": "多活管控",
+        "focus": ["invoker", "dcdn", "edge_az1", "edge_az2"],
+        "note": "Invoker 统一维护流量调度和 API Gateway 接入规则。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "用户请求",
+      "pos": [40, 340],
+      "size": [130, 62],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 112, "label": "整体架构" }]
+    },
+    {
+      "id": "dcdn",
+      "type": "cloud",
+      "label": "DCDN 动态 CDN",
+      "pos": [230, 340],
+      "size": [150, 62],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 156, "label": "流量调度" }]
+    },
+    {
+      "id": "pop",
+      "type": "cloud",
+      "label": "流量层 POP",
+      "pos": [440, 340],
+      "size": [140, 62],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 114, "label": "接入层" }]
+    },
+    {
+      "id": "az_router",
+      "type": "backend",
+      "label": "可用区路由",
+      "pos": [640, 340],
+      "size": [160, 62],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 160, "label": "PICK 路由" }]
+    },
+    {
+      "id": "edge_az1",
+      "type": "cloud",
+      "label": "可用区 1 接入",
+      "pos": [860, 175],
+      "size": [170, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 120, "label": "AZ1 接入" }]
+    },
+    {
+      "id": "service_az1",
+      "type": "backend",
+      "label": "可用区 1 业务服务",
+      "pos": [1090, 175],
+      "size": [170, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 123, "label": "业务服务" }]
+    },
+    {
+      "id": "state_az1",
+      "type": "database",
+      "label": "可用区 1 状态",
+      "pos": [1320, 175],
+      "size": [170, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 129, "label": "状态存储" }]
+    },
+    {
+      "id": "edge_az2",
+      "type": "cloud",
+      "label": "可用区 2 接入",
+      "pos": [860, 455],
+      "size": [170, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 121, "label": "AZ2 接入" }]
+    },
+    {
+      "id": "service_az2",
+      "type": "backend",
+      "label": "可用区 2 业务服务",
+      "pos": [1090, 455],
+      "size": [170, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 124, "label": "业务服务" }]
+    },
+    {
+      "id": "state_az2",
+      "type": "database",
+      "label": "可用区 2 状态",
+      "pos": [1320, 455],
+      "size": [170, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 130, "label": "状态存储" }]
+    },
+    {
+      "id": "sync",
+      "type": "messagebus",
+      "label": "数据同步",
+      "pos": [1450, 330],
+      "size": [180, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 132, "label": "同步链路" }]
+    },
+    {
+      "id": "invoker",
+      "type": "security",
+      "label": "GZS Invoker",
+      "pos": [180, 70],
+      "size": [170, 64],
+      "sources": [{ "path": "cases/reliability/high-availability-and-multi-active-governance.md", "line": 518, "label": "管控平台" }]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "上海同城生产区 · 约 1ms",
+      "wraps": ["dcdn", "pop", "az_router", "edge_az1", "service_az1", "state_az1", "edge_az2", "service_az2", "state_az2", "sync"],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "可用区 1",
+      "wraps": ["edge_az1", "service_az1", "state_az1"],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "可用区 2",
+      "wraps": ["edge_az2", "service_az2", "state_az2"],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "多活控制面",
+      "wraps": ["invoker"],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    { "id": "users-to-dcdn", "from": "users", "to": "dcdn", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "dcdn-to-pop", "from": "dcdn", "to": "pop", "label": "动态回源" },
+    { "id": "pop-to-router", "from": "pop", "to": "az_router", "label": "用户流量" },
+    { "id": "router-to-az1", "from": "az_router", "to": "edge_az1", "label": "流量分配 / AZ1", "variant": "emphasis", "route": "orthogonal-h" },
+    { "id": "router-to-az2", "from": "az_router", "to": "edge_az2", "label": "流量分配 / AZ2", "variant": "emphasis", "route": "orthogonal-h" },
+    { "id": "edge1-to-service1", "from": "edge_az1", "to": "service_az1", "label": "同可用区转发", "labelDy": 56 },
+    { "id": "edge2-to-service2", "from": "edge_az2", "to": "service_az2", "label": "同可用区转发", "labelDy": -26 },
+    { "id": "service1-to-state1", "from": "service_az1", "to": "state_az1", "label": "读写 / Proxy", "labelDy": 56 },
+    { "id": "service2-to-state2", "from": "service_az2", "to": "state_az2", "label": "本地读写 / Proxy", "labelDy": -26 },
+    { "id": "state1-to-sync", "from": "state_az1", "to": "sync", "label": "跨可用区状态同步", "variant": "dashed", "fromSide": "right", "toSide": "top", "route": "orthogonal-h", "via": [[1520, 207], [1520, 300], [1540, 300]], "labelAt": [1520, 270] },
+    { "id": "state2-to-sync", "from": "state_az2", "to": "sync", "label": "跨可用区状态同步", "variant": "dashed", "fromSide": "right", "toSide": "bottom", "route": "orthogonal-h", "via": [[1520, 487], [1520, 430], [1540, 430]], "labelAt": [1520, 450] },
+    { "id": "invoker-to-dcdn", "from": "invoker", "to": "dcdn", "label": "DCDN 切流", "variant": "security", "fromSide": "bottom", "toSide": "top", "route": "orthogonal-v", "via": [[265, 200], [305, 200]], "labelAt": [285, 220] },
+    { "id": "invoker-to-edge1", "from": "invoker", "to": "edge_az1", "label": "API 规则（两可用区）", "variant": "security", "fromSide": "right", "toSide": "top", "route": "orthogonal-h", "via": [[420, 102], [420, 145], [945, 145]], "labelAt": [700, 145] },
+    { "id": "invoker-to-edge2", "from": "invoker", "to": "edge_az2", "label": "API 规则（两可用区）", "variant": "security", "fromSide": "left", "toSide": "bottom", "route": "orthogonal-h", "via": [[20, 102], [20, 570], [945, 570]], "labelAt": [560, 570] }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "流量接入",
+      "items": ["DCDN/PICK 按用户 MID 或设备 ID 选择可用区", "SLB 与 API Gateway 负责转发、限流、熔断和降级"]
+    },
+    {
+      "dot": "emerald",
+      "title": "本地闭环",
+      "items": ["两套业务服务和状态存储同时在线", "服务优先访问本可用区，强依赖要求本地部署"]
+    },
+    {
+      "dot": "violet",
+      "title": "治理与一致性",
+      "items": ["Invoker 统一编排 DCDN 和 API Gateway 切流规则", "主从、DTS 或 Canal + Job 维护跨可用区状态一致性"]
+    }
+  ]
+}
