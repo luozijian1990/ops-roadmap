@@ -4,9 +4,9 @@
 
 **一份持续整理的个人运维学习笔记与交互式路线图合集。**
 
-![Topics](https://img.shields.io/badge/topics-33-1f2933?style=flat-square)
-![Markdown notes](https://img.shields.io/badge/markdown_notes-99-1f2933?style=flat-square)
-![Roadmaps](https://img.shields.io/badge/roadmaps-99-f4c95d?style=flat-square)
+![Topics](https://img.shields.io/badge/topics-34-1f2933?style=flat-square)
+![Markdown notes](https://img.shields.io/badge/markdown_notes-102-1f2933?style=flat-square)
+![Roadmaps](https://img.shields.io/badge/roadmaps-102-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
 [快速开始](#快速开始) · [内容导航](#内容导航) · [提示词资料库](#提示词资料库) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
@@ -51,7 +51,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 99 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 102 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |

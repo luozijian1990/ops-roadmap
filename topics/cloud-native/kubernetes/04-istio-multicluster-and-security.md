@@ -4,6 +4,8 @@
 
 ### 微服务架构如何从单体演进到服务治理
 
+本册保留早期课程的机制与案例，已补充 Kubernetes 1.36 相关变化。历史产品案例和版本化配置需按实际部署核对；新增能力的阶段、依赖和升级路径见[第七册](./07-version-evolution-and-upgrade.md)。
+
 单体架构把多个业务模块放在同一个应用和同一套发布链路里。早期系统常见的形态是一个应用服务器承载销售、仓储、结算、折扣等模块，运维人员在少量机器上完成部署和配置。它的好处是链路短、依赖少、排查边界集中；问题是所有模块共享生命周期，一个模块变更、扩容或故障都可能影响整个系统。
 
 先从一个最小的单体结构看“模块还在一个发布单元内”这件事。进销存系统是这种形态的典型例子：业务模块很多，但部署、扩容和故障边界仍然绑在同一个应用服务器上。
@@ -3071,9 +3073,11 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-PodSecurityPolicy 的 `use` 权限说明了策略对象本身也应该纳入 RBAC 权限边界。PSP 作为一种资源，需要通过 Role 或 ClusterRole 授权给用户、组或 ServiceAccount 后才能使用。新版本集群通常会使用 Pod Security Admission 或策略引擎替代 PSP，但角色规划思路相同：系统组件、管理员、普通用户应有不同安全等级。
+PodSecurityPolicy 的 `use` 权限说明了策略对象本身也应该纳入 RBAC 权限边界。PSP 作为一种资源，需要通过 Role 或 ClusterRole 授权给用户、组或 ServiceAccount 后才能使用。PSP 在 1.25 已移除，1.36 应使用 Pod Security Admission 或相应策略引擎，但角色规划思路相同：系统组件、管理员、普通用户应有不同安全等级。
 
-验证 PSP 授权链路时，可以先在目标 namespace 中创建一个低权限 ServiceAccount，再用 `kubectl auth can-i` 按该身份检查它是否能 `use` 指定策略：
+以下 PSP 命令和 RBAC 清单仅用于理解 1.25 之前、确实启用了 PSP 的历史集群，不适用于 1.36。现代 PSA 根据 Namespace 策略与豁免配置执行，不使用 PSP 的 use 授权模型；现代示例见第五册。
+
+在历史环境验证 PSP 授权链路时，可以先在目标 namespace 中创建一个低权限 ServiceAccount，再用 `kubectl auth can-i` 按该身份检查它是否能 `use` 指定策略：
 
 ```bash
 kubectl create namespace psp-demo
@@ -4250,3 +4254,37 @@ spec:
 | 授权 | AuthorizationPolicy | 可信身份能访问哪些服务和操作 |
 
 这三层配合 mTLS、NetworkPolicy、RBAC 和审计，才能形成从集群控制面到服务调用面的完整安全保证。
+
+## Kubernetes 1.36 安全基线衔接
+
+### 用户命名空间如何补充容器与服务网格的隔离
+<!-- src: temp/kubernetes-zh-docs/13-Pod/用户命名空间.md; temp/kubernetes-zh-docs/20-安全/Pod-安全性准入.md -->
+
+本册的 Istio、Envoy 和联邦案例保留各自的版本背景。Kubernetes 1.36 文档不能证明某个 Istio 或多集群产品版本兼容，也不能把 Istio Gateway 资源与 Gateway API 的 Gateway 视为同一种对象：它们的 API Group、Controller、状态和策略契约不同，升级时需分别验证。
+
+节点安全与网格安全同样分层。mTLS 保护服务身份和传输，AuthorizationPolicy 决定服务调用权限；它们不会替代容器的 UID、系统调用、文件系统与宿主机隔离。用户命名空间通过把容器 UID/GID 映射到节点上的不同非重叠范围，降低容器内 root 对节点的影响。
+
+在 1.36 中用户命名空间已稳定，本地中文页仍标为 1.30 beta。Pod 通过 `spec.hostUsers: false` 选择使用，功能默认可用不表示所有 Pod 自动启用。下面是与工作负载 Pod Spec 合并的片段：
+
+```yaml
+hostUsers: false
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+实际使用需要 Linux 内核、卷文件系统的 idmapped mount 能力以及 CRI/OCI 运行时支持。不能同时假定 hostNetwork、hostPID、hostIPC 或原始块设备卷也能按旧方式使用；带代理注入、CSI 挂载或特殊权限的负载应单独验证。用户命名空间不等于 rootless kubelet，也不等于虚拟机级隔离。
+
+| 层次 | 主要控制 | 验证线索 |
+|---|---|---|
+| API 请求 | RBAC、准入策略 | can-i、策略拒绝及审计 |
+| Pod 配置 | PSA、SecurityContext | Namespace 策略版本、实际注入后的 Pod |
+| 节点隔离 | 用户命名空间、seccomp、运行时 | UID 映射、挂卷和运行时事件 |
+| 网络可达 | NetworkPolicy 与 CNI | 允许/拒绝的真实连接 |
+| 服务身份 | Istio mTLS 与授权策略 | 证书身份、代理配置和请求结果 |
+
+验收时既看容器内 `id`，也要通过有权限的节点诊断确认主机 UID 映射；只看 hostUsers 字段不足以证明运行时正确执行。安全基线应检查最终注入后的全部容器，原生 Sidecar 或服务网格注入不会自动豁免 PSA 限制。已有集群升级流程见[第七册](./07-version-evolution-and-upgrade.md)。
+
+官方参考：[User Namespaces](https://v1-36.docs.kubernetes.io/docs/concepts/workloads/pods/user-namespaces/)。

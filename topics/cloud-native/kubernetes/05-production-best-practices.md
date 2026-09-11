@@ -2,11 +2,14 @@
 
 ## 应用开发
 
-Kubernetes 应用开发的最佳实践。
-
 ### 健康检查
 
-Kubernetes 提供了两种机制来跟踪容器和 Pod 的生命周期：存活性探针和就绪性探针。
+本册以 Kubernetes 1.36 为修订基线；历史案例保留经验背景，具体参数需按负载和插件版本验证。涉及新机制时与第一至三册交叉阅读，操作验收参见第六、七册。
+
+Kubernetes 应用开发的最佳实践。
+
+
+Kubernetes 提供 startup、liveness 和 readiness 三类探针。startup 成功前会抑制另外两类探针执行，适合保护慢启动应用；readiness 控制就绪，liveness 判断是否需要重启，两者不应共用会被外部依赖故障拖垮的判据。
 
 **就绪性探针确定容器何时可以接收流量。**
 
@@ -81,6 +84,8 @@ _您应该怎么做？_
 
 ## 应用是独立的
 
+### 就绪性探针是独立的
+
 您可能会倾向于仅在所有依赖项（如数据库或后端 API）也准备就绪时才发出应用的就绪信号。
 
 如果应用连接到数据库，您可能认为在数据库_准备就绪_之前返回失败的就绪性探针是个好主意——但这不是。
@@ -93,7 +98,6 @@ _您应该怎么做？_
 
 更一般地说，**下游依赖项的故障可能会传播到所有上游应用**，最终也会导致面向前端的层崩溃。
 
-### 就绪性探针是独立的
 
 就绪性探针不包括对以下服务的依赖：
 
@@ -116,45 +120,48 @@ Kubernetes 期望应用组件可以按任何顺序启动。
 
 ## 优雅关闭
 
-当 Pod 被删除时，您不希望突然终止所有连接。
+### SIGTERM 如何触发协议级排空和有界退出
+<!-- src: temp/kubernetes-zh-docs/13-Pod/Pod-的生命周期.md; temp/kubernetes-zh-docs/11-容器/容器生命周期回调.md -->
 
-相反，您应该等待现有连接排空并停止处理新的连接。
+SIGTERM 是终止通知，应用收到后仍需执行有界的清理流程。HTTP 服务通常先停止接受新工作，再完成在途请求、关闭空闲连接并退出；消息消费者则要停止拉取、完成或归还已取任务，避免提前确认消息造成丢失。
 
-请注意，当 Pod 被终止时，该 Pod 的端点会从服务中移除。
+Pod 删除时，EndpointSlice 会反映终止状态，数据面消费更新需要时间。终止端点不一定立即从切片消失，ready、serving、terminating 等条件帮助消费者处理排空；不能把对象删除请求当成所有入口已经停止转发的证据。
 
-但是，kube-proxy 或 Ingress 控制器等组件可能需要一些时间才能收到更改通知。
+| 步骤 | 应用动作 | 验证方式 |
+|---|---|---|
+| 收到终止通知 | 记录时间并进入排空状态 | 日志与 deletionTimestamp 对照 |
+| 停止新工作 | 关闭监听或按协议拒绝新请求 | 客户端请求与连接统计 |
+| 完成在途工作 | 等待请求、消息或事务完成 | 成功结果与未完成数量 |
+| 有界退出 | 关闭空闲连接并正常退出 | 退出码与宽限期对照 |
 
-您可以在[使用 Kubernetes 正确处理客户端请求](https://freecontent.manning.com/handling-client-requests-properly-with-kubernetes/)中找到关于优雅关闭如何工作的详细解释。
+不要无限等待长连接：应设计最大连接生命周期、协议级关闭通知和客户端重连。进程按时退出只是第一步，还要统计发布窗口中的错误、超时和重复处理；下一节再说明 kubelet 宽限期如何与这些动作配合。
 
-正确的优雅关闭序列是：
+### 终止宽限期如何覆盖摘流和请求排空
+<!-- src: temp/kubernetes-zh-docs/13-Pod/Pod-的生命周期.md -->
 
-1. 收到 SIGTERM 后
-2. 服务器停止接受新连接
-3. 完成所有活动请求
-4. 然后立即终止所有保持活动连接
-5. 进程退出
+Pod 删除、EndpointSlice 更新和各代理消费更新是并行推进的，应用可能在终止初期继续收到少量流量。应先进入排空状态、使 readiness 失败，再按协议停止接收新工作并完成已接受请求，不能把 SIGTERM 处理成立即退出。
 
-您可以使用[此工具测试您的应用是否优雅关闭：kube-sigterm-test](https://github.com/mikkeloscar/kube-sigterm-test)。
+preStop 消耗同一份 terminationGracePeriodSeconds，不会增加独立的完整宽限期。固定 sleep 只能留出传播时间，不能证明全部代理已经摘流；应结合入口刷新周期和实测设计。
 
-### 应用不会在 SIGTERM 上关闭，但会优雅地终止连接
+| 阶段 | 观察证据 |
+|---|---|
+| 发起删除 | deletionTimestamp |
+| 后端摘流 | EndpointSlice ready/terminating、代理后端状态 |
+| 请求排空 | 未完成请求数、连接状态、应用日志 |
+| 进程退出 | 退出码、是否被强制终止 |
 
-kube-proxy 或 Ingress 控制器等组件可能需要一些时间才能收到端点更改通知。
+最终验收必须从真实客户端持续请求并统计错误、超时和重复处理；仅看到 Pod 在宽限期内消失不足以证明无损发布。
 
-因此，尽管 Pod 被标记为已终止，流量仍可能流向该 Pod。
+### 容器入口如何让应用收到终止信号
+<!-- src: temp/kubernetes-zh-docs/11-容器/容器生命周期回调.md -->
 
-应用应该停止接受所有剩余连接上的新请求，并在传出队列排空后关闭这些连接。
+Dockerfile 的 exec 形式让应用成为容器主进程，避免额外 shell 截获信号；它本身并不会替应用实现优雅关闭。程序还必须注册信号处理、停止接收工作、等待在途请求并按时退出。
 
-如果您需要了解端点如何在集群中传播的复习，[请阅读这篇关于如何正确处理客户端请求的文章](https://freecontent.manning.com/handling-client-requests-properly-with-kubernetes/)。
+```dockerfile
+ENTRYPOINT ["/app/server"]
+```
 
-### 应用在宽限期内仍处理传入请求
-
-您可能想要考虑使用容器生命周期事件，如[preStop 处理程序](https://kubernetes.io/docs/tasks/configure-pod-container/attach-handler-lifecycle-event/#define-poststart-and-prestop-handlers)来自定义 Pod 删除前发生的情况。
-
-### Dockerfile 中的 CMD 将 SIGTERM 转发给进程
-
-您可以通过在应用中捕获 SIGTERM 信号来在 Pod 即将被终止时收到通知。
-
-您还应该注意[在容器中将信号转发给正确的进程](https://pracucci.com/graceful-shutdown-of-kubernetes-pods.html)。
+如果必须运行初始化 shell，最后用 `exec /app/server` 替换 shell；多进程程序还要处理子进程信号和回收。验证时检查进程树与实际 SIGTERM 日志，在保持连接的情况下删除 Pod，确认没有到达宽限期后被 SIGKILL。应用根本没收到信号与收到后排空超时是两类故障，应分别定位。
 
 ### 关闭所有空闲的保持活动套接字
 
@@ -174,6 +181,9 @@ _但是当 Pod 被删除时会发生什么？_
 
 ## 容错性
 
+### 副本数量如何与故障域和容量共同设计
+<!-- src: temp/kubernetes-zh-docs/13-Pod/干扰（Disruptions）.md -->
+
 您的集群节点可能因多种原因随时消失：
 
 - 物理机器的硬件故障
@@ -192,13 +202,17 @@ _但是当 Pod 被删除时会发生什么？_
 
 您应该防止所有 Pod 都不可用且无法提供实时流量的场景。
 
-### 为您的部署运行多个副本
 
-永远不要单独运行单个 Pod。
+多副本的作用是让实例故障时仍有服务能力，但 replicas 大于一并不保证高可用。如果副本落在同一节点、可用区或共享同一个单点依赖，一次故障仍可能中断整个服务。
 
-相反，考虑将您的 Pod 作为部署、守护进程集、副本集或状态集的一部分进行部署。
+需要一起设计拓扑分散、反亲和、滚动更新参数和 PDB；严格约束也可能在容量不足时导致 Pending。副本预算必须考虑失去一个故障域后剩余实例是否仍能承受流量，而不是只计算正常时平均 CPU。
 
-[运行多个 Pod 实例可以保证删除单个 Pod 不会导致停机](https://cloudmark.github.io/Node-Management-In-GKE/#replicas)。
+```bash
+kubectl get pods -n demo -l app=web -o wide
+kubectl get pdb -n demo
+```
+
+上述命令只能验证对象分布与预算。应通过单节点维护和真实请求对照，确认剩余副本可用、扩容有空间、下游连接数不被放大到超限，再决定最小副本数。
 
 ### 避免 Pod 被放置在单个节点上
 
@@ -230,6 +244,8 @@ _但是如果您在重负载下并且不能丢失超过 50% 的 Pod 怎么办？
 
 ## 资源利用
 
+### 为所有容器设置内存限制和请求
+
 您可以将 Kubernetes 想象为一个熟练的俄罗斯方块玩家。
 
 Docker 容器是方块；服务器是棋盘，调度器是玩家。
@@ -238,7 +254,6 @@ Docker 容器是方块；服务器是棋盘，调度器是玩家。
 
 为了最大化调度器的效率，您应该与 Kubernetes 分享资源利用、工作负载优先级和开销等详细信息。
 
-### 为所有容器设置内存限制和请求
 
 资源限制用于约束容器可以利用的 CPU 和内存量，并使用 `containerSpec` 的 resources 属性设置。
 
@@ -269,33 +284,59 @@ _但是您应该总是为内存和 CPU 设置限制和请求吗？_
 
 > 请注意，如果您不确定什么是_正确的_ CPU 或内存限制，您可以在 Kubernetes 中使用[垂直 Pod 自动扩缩器](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)，并开启推荐模式。自动扩缩器会分析您的应用并为其推荐限制。
 
-### 将 CPU 请求设置为 1 CPU 或以下
+### CPU 请求如何依据实际负载确定
+<!-- src: temp/kubernetes-zh-docs/19-配置/为-Pod-和容器管理资源.md -->
 
-除非您有计算密集型作业，[建议将请求设置为 1 CPU 或以下](https://www.youtube.com/watch?v=xjpHggHKm78)。
+CPU request 参与调度和资源竞争时的相对分配，不应设置统一的 1 CPU 上限。多线程计算、低延迟服务和专属 CPU 场景都可能合理地请求多个核；过低 request 会让调度器过度装箱，也会抬高以 request 为分母的 HPA 利用率。
 
-### 禁用 CPU 限制——除非您有好的用例
+先观察正常、峰值、启动及故障降级窗口，结合吞吐和尾延迟确定请求。只有平均 CPU 样本不足以覆盖突发；也不要把 request 当成业务在任何时刻都独占的物理核。
 
-CPU 以每时间单位的 CPU 时间单位来衡量。
+| 负载 | 决策重点 |
+|---|---|
+| 在线服务 | 目标延迟、突发余量和 HPA 行为 |
+| 批处理 | 总运行时间、并行度与成本 |
+| 专属 CPU | CPU Manager 策略、整数 CPU 与 QoS 条件 |
 
-`cpu: 1` 意味着每秒 1 CPU 秒。
+调小请求后应检查节点争用、限流和业务延迟；若只看到调度成功数增加，不能据此判断资源利用更合理。
 
-如果您有 1 个线程，您不能每秒消耗超过 1 CPU 秒。
+### CPU 限制如何在突发性能和租户隔离之间取舍
+<!-- src: temp/kubernetes-zh-docs/19-配置/为-Pod-和容器管理资源.md -->
 
-如果您有 2 个线程，您可以在 0.5 秒内消耗 1 CPU 秒。
+CPU limit 通过运行时与 cgroup 约束资源使用，限流可能使延迟增加而不触发容器重启。对突发敏感的在线服务，较紧的 limit 可能成为瓶颈；对共享节点和不可信任务，完全不限制又可能扩大资源争用。
 
-8 个线程可以在 0.125 秒内消耗 1 CPU 秒。
+应结合 requests、节点余量、租户模型和工作负载特征决定是否设置及设多大，不能笼统建议所有服务禁用。CPU 使用接近限制不必然说明异常，应比较 throttling、应用吞吐、P99 与节点压力。
 
-之后，您的进程会被限制。
+| 现象 | 需要核对 |
+|---|---|
+| CPU 平均值低但 P99 高 | 短时突发、限流周期和应用锁竞争 |
+| 去掉 limit 后本服务变快 | 同节点其他租户延迟是否恶化 |
+| requests 很小但 limits 很大 | 调度装箱与 HPA 分母是否合理 |
 
-如果您不确定应用的最佳设置是什么，最好不要设置 CPU 限制。
+每次调整应保存前后同负载对照。LimitRange 可以给默认值或范围，但默认值仍需按命名空间负载类型规划。
 
-如果您想了解更多，[这篇文章深入探讨了 CPU 请求和限制](https://medium.com/@betz.mark/understanding-resource-limits-in-kubernetes-cpu-time-9eff74d3161b)。
+### LimitRange 如何提供默认值并限制单对象资源
+<!-- src: temp/kubernetes-zh-docs/21-策略/限制范围（LimitRange）.md -->
 
-### 命名空间有 LimitRange
+LimitRange 在准入阶段对容器等对象设置默认资源或检查允许范围。它解决的是单对象默认配置和边界，不是命名空间内全部 Pod 的资源总量，也不负责限制 ConfigMap 总数。
 
-如果您认为可能会忘记设置内存和 CPU 限制，您应该考虑使用 LimitRange 对象来定义在当前命名空间中部署的容器的标准大小。
+```yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: container-defaults
+  namespace: demo
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: "1"
+        memory: 512Mi
+```
 
-[关于 LimitRange 的官方文档](https://kubernetes.io/docs/concepts/policy/limit-range/)是一个绝佳的起点。
+这些数值仅示意配置结构。创建缺少 resources 的测试 Pod 后读取服务端对象，确认注入的请求与上限；已有 Pod 不会因此统一改写。还应测试显式 resources、Quota 约束以及 HPA 计算，避免默认请求意外改变扩缩容行为。
 
 ### 为 Pod 设置适当的服务质量 (QoS)
 
@@ -306,6 +347,8 @@ Kubernetes 根据明确定义的逻辑对 Pod 进行排名和驱逐。
 您可以在官方文档中找到更多关于[为 Pod 配置服务质量](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/)的信息。
 
 ## 标记资源
+
+### 资源定义了技术标签
 
 标签是您用来组织 Kubernetes 对象的机制。
 
@@ -326,7 +369,6 @@ Kubernetes 根据明确定义的逻辑对 Pod 进行排名和驱逐。
 - 与您的业务相关的标签，如成本中心分配
 - 与安全相关的标签，如合规要求
 
-### 资源定义了技术标签
 
 您可以用以下标签标记您的 Pod：
 
@@ -457,11 +499,12 @@ spec:
 
 ## 日志记录
 
+### 应用记录到 `stdout` 和 `stderr`
+
 应用日志可以帮助您了解应用内部发生的情况。
 
 日志对于调试问题和监控应用活动特别有用。
 
-### 应用记录到 `stdout` 和 `stderr`
 
 有两种日志记录策略：_被动_和_主动_。
 
@@ -489,6 +532,7 @@ spec:
 
 ### 容器不在其本地文件系统中存储任何状态
 
+
 容器有本地文件系统，您可能想要使用它来持久化数据。
 
 但是，在容器的本地文件系统中存储持久数据会阻止包含的 Pod 水平扩缩（即通过添加或删除 Pod 副本）。
@@ -507,17 +551,14 @@ spec:
 
 HPA 可以监控内置资源指标（Pod 的 CPU 和内存使用情况）或自定义指标。在自定义指标的情况下，您还负责收集和暴露这些指标，例如，您可以使用[Prometheus](https://prometheus.io/)和[Prometheus 适配器](https://github.com/DirectXMan12/k8s-prometheus-adapter)来做到这一点。
 
-### 在仍处于测试版时不要使用垂直 Pod 自动扩缩器
+### VPA 如何从推荐逐步进入自动更新
+<!-- src: temp/kubernetes-zh-docs/35-配置-Pods-和容器/调整分配给容器的-CPU-和内存资源.md -->
 
-类似于[水平 Pod 自动扩缩器 (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)，存在[垂直 Pod 自动扩缩器 (VPA)](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)。
+VPA 是独立于 Kubernetes 核心安装的组件，其成熟度与行为由实际版本、CRD、Updater 和 Admission 配置共同决定。不能以一份历史教程的 Beta 标签，长期推出“不应在生产使用”的结论。
 
-VPA 可以自动调整 Pod 的资源请求和限制，以便当 Pod 需要更多资源时，它可以获得它们（通过增加/减少单个 Pod 的资源进行扩缩称为_垂直扩缩_，与_水平扩缩_相反，水平扩缩意味着增加/减少 Pod 的副本数量）。
+先使用 Off 模式积累推荐并比较峰值、OOM、延迟和成本；Initial 在新建时设置资源，Recreate 通过驱逐重建更新。支持 InPlaceOrRecreate 的版本会先尝试原地调整，但可能退回重建，不能视为无中断保证。
 
-这对于无法水平扩缩的应用很有用。
-
-但是，VPA 目前处于测试版，它有一些[已知限制](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler#limitations-of-beta-version)（例如，通过更改其资源要求扩缩 Pod 需要杀死并重启 Pod）。
-
-考虑到这些限制，以及 Kubernetes 上的大多数应用无论如何都可以水平扩缩的事实，建议不要在生产中使用 VPA（至少直到有稳定版本）。
+上线前检查资源上下界、PDB、节点可用容量和更新失败行为。若 HPA 按 CPU/内存利用率伸缩，VPA 修改 request 会改变 HPA 分母，需要明确二者分工。原地调整本体和 VPA 集成也应分别验收，具体机制及项目来源见[第三册 VPA 章节](./03-production-and-migration.md)。
 
 ### 如果您有高度变化的工作负载，请使用集群自动扩缩器
 
@@ -535,27 +576,36 @@ VPA 可以自动调整 Pod 的资源请求和限制，以便当 Pod 需要更多
 
 ### 外部化所有配置
 
+
 配置应该维护在应用代码外部。
 
-这有几个好处。首先，更改配置不需要重新编译应用。其次，配置可以在应用运行时更新。第三，相同的代码可以在不同的环境中使用。
+这有几个好处。首先，更改配置不需要重新编译应用。其次，配置可以独立发布；能否在运行时生效取决于注入方式和应用重载能力。第三，相同的代码可以在不同的环境中使用。
 
 在 Kubernetes 中，配置可以保存在 ConfigMaps 中，然后可以作为卷挂载到容器中或作为环境变量传递。
 
 仅在 ConfigMaps 中保存非敏感配置。对于敏感信息（如凭据），使用 Secret 资源。
 
-### 将密钥作为卷挂载，而不是环境变量
+### Secret 注入方式如何匹配轮换与应用重载
+<!-- src: temp/kubernetes-zh-docs/19-配置/Secret.md -->
 
-Secret 资源的内容应该作为卷挂载到容器中，而不是作为环境变量传递。
+卷挂载通常更适合需要轮换的 Secret，因为 kubelet 可以逐步更新投射内容；但应用必须重新读取文件，使用 subPath 挂载也不会获得普通投射卷的更新行为。环境变量不会随 Secret 更新自动刷新，需要重建 Pod 才获得新值。
 
-这是为了防止密钥值出现在用于启动容器的命令中，该命令可能被不应该访问密钥值的个人检查。
+两种方式都不能阻止拥有 Pod exec、节点或等效权限的人获取凭据。Secret 的 Base64 编码也不是加密，应同时配置访问权限、静态加密或外部密钥系统，并限制日志和错误报告中的暴露。
 
----
+| 选择 | 适用前提 | 验收 |
+|---|---|---|
+| 文件投射 | 应用支持重新读取 | 新凭据生效且旧凭据按计划失效 |
+| 环境变量 | 明确接受重建轮换 | 新 Pod 启动并使用新凭据 |
+| 外部 Secret 组件 | 已安装并支持目标后端 | 同步状态、应用结果和故障重试 |
+
+生产中应验证完整轮换过程，而不是只确认 Secret 对象 resourceVersion 变化。
 
 ## 集群配置
 
+### 已批准的 Kubernetes 配置
+
 集群配置的最佳实践。
 
-### 已批准的 Kubernetes 配置
 
 Kubernetes 很灵活，可以以多种不同的方式进行配置。
 
@@ -610,6 +660,8 @@ Alpha 和 beta Kubernetes 功能正在积极开发中，可能有导致安全漏
 
 ## 身份验证
 
+### 使用 OpenID (OIDC) 令牌作为用户身份验证策略
+
 当您使用 `kubectl` 时，您会针对 kube-api 服务器组件进行身份验证。
 
 Kubernetes 支持不同的身份验证策略：
@@ -623,7 +675,6 @@ Kubernetes 支持不同的身份验证策略：
 
 您可以在[官方文档](https://kubernetes.io/docs/reference/access-authn-authz/authentication/)中详细了解这些策略。
 
-### 使用 OpenID (OIDC) 令牌作为用户身份验证策略
 
 Kubernetes 支持各种身份验证方法，包括 OpenID Connect (OIDC)。
 
@@ -637,19 +688,30 @@ OpenID Connect 允许单点登录 (SSO)，如您的 Google 身份连接到 Kuber
 
 ## 基于角色的访问控制 (RBAC)
 
+### 工作负载身份如何使用短期令牌与最小权限
+<!-- src: temp/kubernetes-zh-docs/20-安全/服务账号.md -->
+
 基于角色的访问控制 (RBAC) 允许您定义如何访问集群中资源的策略。
 
-### 服务账户令牌仅用于应用和控制器
 
-服务账户令牌不应用于尝试与 Kubernetes 集群交互的最终用户，但它们是 Kubernetes 上运行的应用和工作负载的首选身份验证策略。
+ServiceAccount 适用于工作负载和自动化身份，人员访问应使用独立可审计的身份体系。每类工作负载分配专用账号和必要的 RoleBinding，不应共享 cluster-admin 凭据。
+
+现代 Pod 使用 TokenRequest 与投射卷提供有期限的令牌，kubelet 负责轮换文件，客户端负责重新读取。外部自动化使用短期令牌时，还要设计凭据刷新和受众，不能把一次生成的 token 固化进长期配置。
+
+```bash
+kubectl auth can-i list pods -n demo   --as=system:serviceaccount:demo:observer
+```
+
+该检查需要调用者有模拟身份权限，验证的是授权判定；真实凭据是否过期、网络是否可达仍需应用请求证明。机制与显式投射配置见[第一册](./01-architecture-and-control-plane.md)。
 
 ## 日志记录设置
 
-您应该收集并集中存储集群中运行的所有工作负载的日志以及集群组件本身的日志。
-
 ### 日志有保留和归档策略
 
-您应该保留 30-45 天的历史日志。
+您应该收集并集中存储集群中运行的所有工作负载的日志以及集群组件本身的日志。
+
+
+日志保留周期应按故障追溯、审计要求、敏感性和存储成本确定；30–45 天只能作为历史案例，不能替代本组织的保留策略。
 
 #### 从节点、控制平面、审计收集日志
 
@@ -684,9 +746,10 @@ OpenID Connect 允许单点登录 (SSO)，如您的 Google 身份连接到 Kuber
 
 ## 治理
 
+### 命名空间限制
+
 创建、管理和管理命名空间的最佳实践。
 
-### 命名空间限制
 
 当您决定将集群隔离到命名空间中时，您应该防止资源滥用。
 
@@ -716,9 +779,12 @@ Kubernetes 有两个用于约束资源利用的功能：ResourceQuota 和 LimitR
 
 您还可以为其他 Kubernetes 对象（如当前命名空间中的 Pod 数量）设置配额。
 
-如果您认为有人可能利用您的集群并创建 20000 个 ConfigMap，使用 LimitRange 就是您如何防止这种情况的方法。
+如果需要限制 ConfigMap 数量，应使用 ResourceQuota 中的 `count/configmaps` 等对象数量配额；LimitRange 不承担对象计数限制。
 
-## Pod 安全策略
+## Pod 安全标准与运行隔离
+
+### Pod Security Admission 如何逐步落实安全标准
+<!-- src: temp/kubernetes-zh-docs/20-安全/Pod-安全性准入.md -->
 
 当 Pod 部署到集群中时，您应该防范：
 
@@ -727,19 +793,28 @@ Kubernetes 有两个用于约束资源利用的功能：ResourceQuota 和 LimitR
 
 更一般地说，您应该将 Pod 可以做的事情限制在最低限度。
 
-### 启用 Pod 安全策略
 
-例如，您可以使用 Kubernetes Pod 安全策略来限制：
+PodSecurityPolicy 已在 Kubernetes 1.25 移除。1.36 应使用 Pod Security Standards 描述安全级别，并由 Pod Security Admission（PSA）按命名空间标签执行；自定义业务规则再交给 CEL 策略或第三方准入。
 
-- 访问主机进程或网络命名空间
-- 运行特权容器
-- 容器运行的用户
-- 访问主机文件系统
-- Linux 功能、Seccomp 或 SELinux 配置文件
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: policy-trial
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: v1.36
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.36
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.36
+```
 
-选择正确的策略取决于集群的性质。
+这个示例以 baseline 强制、restricted 预警和审计，给迁移留出观察阶段。审查镜像用户、全部 init/sidecar 容器、capabilities、seccomp 和卷类型，整改后再收紧 enforce。固定策略版本可以控制升级时的规则变化，但也需要计划更新。
 
-以下文章解释了一些[Kubernetes Pod 安全策略最佳实践](https://resources.whitesourcesoftware.com/blog-whitesource/kubernetes-pod-security-policy)。
+已有运行中 Pod 不会因标签改变立即被驱逐，因此必须验证后续创建、滚动更新和故障重建。PSA 不负责 RBAC、Secret 加密或网络流量隔离；系统组件例外应精确限定，不应为了一个 DaemonSet 放宽整个业务集群。
+
+官方参考：[Pod Security Admission](https://v1-36.docs.kubernetes.io/docs/concepts/security/pod-security-admission/)。
 
 ### 禁用特权容器
 
@@ -747,13 +822,13 @@ Kubernetes 有两个用于约束资源利用的功能：ResourceQuota 和 LimitR
 
 虽然有一些特定用例需要这种级别的访问，但一般来说，让容器这样做是安全风险。
 
-特权 Pod 的有效用例包括使用节点上的硬件，如 GPU。
+少数节点基础设施组件可能需要特权；普通 GPU 工作负载应优先使用设备插件或 DRA 分配设备，不能因为申请 GPU 就默认设为 privileged。
 
 您可以[从这篇文章中了解更多关于安全上下文和特权容器的信息](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)。
 
 ### 在容器中使用只读文件系统
 
-在容器中运行只读文件系统会强制容器不可变。
+readOnlyRootFilesystem 限制容器根文件系统写入，但独立挂载的数据卷仍可按自身模式写入，不能视为整个容器及数据完全不可变。
 
 这不仅减轻了一些旧的（和危险的）做法，如热补丁，还有助于防止恶意进程在容器内存储或操作数据的风险。
 
@@ -792,11 +867,27 @@ _但是应该启用哪些功能以及为什么？_
 - [Linux 功能：为什么存在以及它们如何工作](https://blog.container-solutions.com/linux-capabilities-why-they-exist-and-how-they-work)
 - [Linux 功能实践](https://blog.container-solutions.com/linux-capabilities-in-practice)
 
-### 防止权限升级
+### allowPrivilegeEscalation 如何约束进程提权
+<!-- src: temp/kubernetes-zh-docs/20-安全/针对-Pod-和容器的-Linux-内核安全约束.md -->
 
-您应该关闭权限升级来运行容器，以防止使用 `setuid` 或 `setgid` 二进制文件升级权限。
+容器以非 root 用户运行，不表示它不能利用 setuid/setgid 或文件 capabilities 获得更多权限。allowPrivilegeEscalation: false 约束进程获得新权限，但仍需结合 capabilities、运行用户和 seccomp，不能单独当成完整隔离。
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+这是容器级片段，镜像必须支持非 root 运行并具有正确目录权限。需要额外能力的应用应按最小范围增加，不能直接改 privileged: true；特权容器和拥有 CAP_SYS_ADMIN 的容器有特殊语义。验收应同时覆盖业务正常启动和禁止操作被拒绝，避免只看 YAML 字段。
 
 ## 网络策略
+
+### NetworkPolicy 如何依赖 CNI 执行流量隔离
+<!-- src: temp/kubernetes-zh-docs/17-服务、负载均衡和联网/网络策略.md -->
 
 Kubernetes 网络必须遵守三个基本规则：
 
@@ -812,19 +903,34 @@ _想象一下，如果集群中的用户能够使用集群中的任何其他服�
 
 要解决这个问题，您可以使用网络策略定义 Pod 应该如何被允许在当前命名空间内和跨命名空间进行通信。
 
-### 启用网络策略
 
-Kubernetes 网络策略指定 Pod 组的访问权限，就像云中的安全组用于控制对 VM 实例的访问一样。
+NetworkPolicy 声明哪些流量允许进入或离开选中的 Pod，实际执行依赖支持该能力的 CNI。API 接受策略对象只能证明资源已保存，不能证明网络已经隔离。
 
-换句话说，它在运行在 Kubernetes 集群上的 Pod 之间创建防火墙。
+策略通常具有叠加允许语义：某个 Pod 被多条策略选择时，允许集合会合并。需要连接双方分别满足各自适用的 ingress/egress 规则；标签、Namespace selector 和端口配置错误都会让预期边界失效。
 
-如果您不熟悉网络策略，您可以阅读[保护 Kubernetes 集群网络](https://ahmet.im/blog/kubernetes-network-policy/)。
+验证至少包含允许来源、禁止来源、DNS 和外部依赖四类请求，并分别保存退出码与超时。hostNetwork、NAT 前后地址和 Service 流量的具体处理还受实现影响；不能把 NetworkPolicy 当作通用七层域名或 HTTP 权限策略。
 
-### 每个命名空间都有保守的 NetworkPolicy
+### 默认拒绝如何与 DNS 和业务依赖逐步配套
+<!-- src: temp/kubernetes-zh-docs/17-服务、负载均衡和联网/网络策略.md -->
 
-此存储库包含 Kubernetes 网络策略的各种用例和示例 YAML 文件，以便在您的设置中利用。如果您曾经想知道[如何丢弃/限制对在 Kubernetes 上运行的应用的流量](https://github.com/ahmetb/kubernetes-network-policy-recipes)，请继续阅读。
+默认拒绝可以建立清楚的网络边界，但部署后必须按依赖图逐步放行业务、DNS、监控和外部接口。下面完整策略同时隔离命名空间中全部 Pod 的 ingress 与 egress；它会影响业务，只用于已经准备好允许规则的环境。
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: demo
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+```
+
+DNS 放行要按实际 CoreDNS/NodeLocal DNS 路径验证，不能假定固定 Pod 标签和地址。分别从允许与拒绝的 Pod 发起连接，验证 TCP/UDP、超时和跨节点路径，再推广到其他命名空间。只测试“业务能通”会漏掉拒绝规则根本没有执行的情况。
 
 ## 基于角色的访问控制 (RBAC) 策略
+
+### 禁用默认 ServiceAccount 的自动挂载
 
 基于角色的访问控制 (RBAC) 允许您定义如何访问集群中资源的策略。
 
@@ -844,15 +950,22 @@ _但是您从哪里开始？_
 
 如果您从一个空规则的 Role 开始，您可以逐个添加您需要的所有资源，并仍然确保您没有给予太多。
 
-### 禁用默认 ServiceAccount 的自动挂载
 
 请注意，[默认 ServiceAccount 会自动挂载到所有 Pod 的文件系统中](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#use-the-default-service-account-to-access-the-api-server)。
 
 您可能想要禁用该功能并提供更细粒度的策略。
 
-### RBAC 策略设置为必要的最少权限
+### RBAC 如何按实际操作收敛权限
+<!-- src: temp/kubernetes-zh-docs/20-安全/基于角色的访问控制良好实践.md -->
 
-关于如何设置 RBAC 规则很难找到好的建议。在[Kubernetes RBAC 的 3 种现实方法](https://thenewstack.io/three-realistic-approaches-to-kubernetes-rbac/)中，您可以找到三种实际场景和如何开始的实用建议。
+从应用真实调用的资源、子资源、动词和命名空间推导权限，再把读取与写入拆开。例如 get pods 不会自动授予 pods/log 或 pods/exec；watch/list 也可能暴露大量对象信息。不要为了消除一个 403 就添加 resources: ["*"]。
+
+```bash
+kubectl auth can-i get pods -n demo --as=system:serviceaccount:demo:observer
+kubectl auth can-i create pods/exec -n demo --as=system:serviceaccount:demo:observer
+```
+
+为预期允许与预期拒绝都设置验证项，并结合实际客户端请求检查。能创建 Pod 的用户可能间接使用该 Namespace 中的 Secret 或更高权限 ServiceAccount，因此“禁止 get secrets”不能单独保证 Secret 不可获取；还要用准入约束工作负载身份和挂载行为。
 
 ### RBAC 策略是细粒度的且不共享
 
@@ -877,7 +990,10 @@ Zalando 有一个简洁的策略来定义角色和服务账户。
 
 ## 自定义策略
 
-即使您能够在集群中为 Secrets 和 Pod 等资源分配策略，也有一些情况，Pod 安全策略 (PSP)、基于角色的访问控制 (RBAC) 和网络策略无法满足需求。
+### 镜像来源策略如何覆盖全部容器和供应链
+<!-- src: temp/kubernetes-zh-docs/11-容器/镜像.md -->
+
+即使您能够在集群中为 Secrets 和 Pod 等资源分配策略，也有一些情况，Pod Security Admission、基于角色的访问控制 (RBAC) 和网络策略无法满足需求。
 
 例如，您可能想要避免从公共互联网下载容器，并希望首先批准这些容器。
 
@@ -893,18 +1009,20 @@ _您应该做什么？_
 
 您可以使用[准入控制器](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/)来审查提交到集群的资源。
 
-### 仅允许从已知注册表部署容器
 
-您可能想要考虑的最常见的自定义策略之一是限制可以在集群中部署的镜像。
+注册表允许列表可以减少随意拉取镜像，但已批准域名不等于镜像可信。应检查完整主机名边界，避免把 registry.example.com.evil.invalid 当作同一注册表，并覆盖 containers、initContainers 与 ephemeralContainers 的适用请求。
 
-[以下教程解释了如何使用 Open Policy Agent 限制未批准的镜像](https://blog.openpolicyagent.org/securing-the-kubernetes-api-with-open-policy-agent-ce93af0552c3#3c6e)。
+CEL 适合验证对象中的镜像字符串和固定格式，签名、漏洞、镜像来源证明等需要相应供应链组件。建议同时使用不可变 Digest、扫描结果及签名策略，明确镜像代理缓存与离线仓库的处理方式。
+
+先在小范围返回警告，测试批准仓库、相似恶意域名、缺少 Digest 和临时调试容器的请求；再开启拒绝。故障时检查准入策略与镜像拉取事件，区分“策略拒绝”与“仓库认证/网络失败”。
 
 ### 在 Ingress 主机名中强制唯一性
+<!-- src: temp/kubernetes-zh-docs/71-Service-资源/Ingress.md -->
 
 当用户创建 Ingress 清单时，他们可以在其中使用任何主机名。
 
-```yaml|highlight=7|title=ingress.yaml
-apiVersion: networking.k8s.io/v1beta1
+```yaml
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: example-ingress
@@ -913,21 +1031,26 @@ spec:
     - host: first.example.com
       http:
         paths:
-          - backend:
-              serviceName: service
-              servicePort: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: service
+                port:
+                  number: 80
 ```
 
 但是，您可能想要防止用户使用**相同的主机名多次**并相互覆盖。
 
-Open Policy Agent 的官方文档有[关于如何将 Ingress 资源检查作为验证 webhook 的一部分的教程](https://www.openpolicyagent.org/docs/latest/kubernetes-tutorial/#4-define-a-policy-and-load-it-into-opa-via-kubernetes)。
+域名格式可以通过准入校验，但跨对象唯一性还需要具备一致性设计的域名分配或治理机制。仅在 Webhook 中列举已有 Ingress 再判断，可能遭遇并发创建竞态；应验证跨命名空间和跨 Controller 的域名归属。
 
 ### 在 Ingress 主机名中仅使用已批准的域名
+<!-- src: temp/kubernetes-zh-docs/71-Service-资源/Ingress.md -->
 
 当用户创建 Ingress 清单时，他们可以在其中使用任何主机名。
 
-```yaml|highlight=7|title=ingress.yaml
-apiVersion: networking.k8s.io/v1beta1
+```yaml
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: example-ingress
@@ -936,11 +1059,15 @@ spec:
     - host: first.example.com
       http:
         paths:
-          - backend:
-              serviceName: service
-              servicePort: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: service
+                port:
+                  number: 80
 ```
 
 但是，您可能想要防止用户使用**无效的主机名**。
 
-Open Policy Agent 的官方文档有[关于如何将 Ingress 资源检查作为验证 webhook 的一部分的教程](https://www.openpolicyagent.org/docs/latest/kubernetes-tutorial/#4-define-a-policy-and-load-it-into-opa-via-kubernetes)。
+可使用 CEL 或 Webhook 检查完整域名与受控后缀，注意通配符、空 host 和相似恶意域名。该示例还依赖明确的 IngressClass 或集群默认 Class、Service 后端与实际 Controller；准入通过不表示 DNS、证书和数据面已经生效。

@@ -4,6 +4,8 @@
 
 ### kube-scheduler 和调度框架如何工作
 
+本册保留早期课程的机制与案例，已补充 Kubernetes 1.36 相关变化。历史产品案例和版本化配置需按实际部署核对；新增能力的阶段、依赖和升级路径见[第七册](./07-version-evolution-and-upgrade.md)。
+
 #### kube-scheduler 的定位
 
 `kube-scheduler` 的职责很单一：为还没有绑定节点的 Pod 选择一个合适的 Node。它监听 API Server 中 `spec.nodeName` 为空的 Pod，经过过滤、评分和绑定后，把 Pod 与某个节点关联起来。调度器不会直接创建容器，也不会配置网络或挂载存储；这些动作都发生在目标节点上的 kubelet 中。
@@ -166,6 +168,8 @@ max(sum(app containers), max(init containers))
 即使 init container 执行完退出，它的资源需求仍要纳入调度计算，因为 Pod 可能重启，init container 也可能再次运行。
 
 ##### requests/limits 如何落到 cgroup 和 QoS
+
+下面的 cpu.shares 等文件名属于 cgroup v1。1.36 的节点观察应结合第三册的 cgroup v2 对照；Pod 级预算和原地调整的增量语义见本册补充章。
 
 调度器只用 `requests` 做节点容量判断，但 kubelet 和运行时会把 `requests`、`limits` 转成 cgroup 约束。理解这个落点，才能把调度、限速、OOM 和压力驱逐串起来。
 
@@ -750,7 +754,7 @@ Cloud Controller Manager 把云厂商相关逻辑从核心 controller manager �
 
 #### Leader Election
 
-Scheduler 和 Controller Manager 可以部署多个副本，但同一时间通常只能有一个 leader 执行写操作，否则多个副本同时 reconcile 可能互相打架。Kubernetes 使用 Lease、ConfigMap 或 Endpoints 作为分布式锁资源。
+Scheduler 和 Controller Manager 可以部署多个副本，但同一时间通常只能有一个 leader 执行写操作，否则多个副本同时 reconcile 可能互相打架。现代组件通常使用 Lease 进行选主；ConfigMap/Endpoints 锁属于历史实现，具体以组件版本为准。
 
 ```mermaid
 sequenceDiagram
@@ -966,6 +970,9 @@ spec:
 生产中要避免把 readiness 和 liveness 混用。readiness 适合表达“暂时不能接流量”，liveness 适合表达“进程已经坏到需要重启”。配置过激的 liveness probe 可能导致应用在高负载时被反复重启。
 
 ### CRI 如何连接 kubelet 和容器运行时
+<!-- src: temp/kubernetes-zh-docs/11-容器/容器运行时接口（CRI）.md -->
+
+本节保留 Docker 与 dockershim 的历史链路用于解释演进。内置 dockershim 已在 Kubernetes 1.24 移除，1.36 节点应使用支持 CRI v1 的运行时；Docker Engine 需要独立 CRI 适配器，不能直接作为 CRI endpoint。containerd 1.x 与 2.x 的配置表路径不同，以下历史配置片段必须对照实际运行时版本调整。
 
 #### CRI 的定位
 
@@ -1015,7 +1022,7 @@ CRI 不负责镜像构建，也不负责 push 镜像。因此即使生产节点�
 
 | 层次 | 例子 | 职责 |
 | --- | --- | --- |
-| 高级运行时 | dockershim containerd CRI-O | 对 kubelet 暴露 CRI 管理镜像和容器 |
+| 高级运行时 | containerd CRI-O | 对 kubelet 暴露 CRI 管理镜像和容器 |
 | 低级运行时 | runc | 根据 OCI 规范创建命名空间 cgroup 和进程 |
 | 安全运行时 | Kata Containers gVisor | 用虚拟化或用户态内核增强隔离 |
 
@@ -1080,7 +1087,6 @@ containerd config default > /etc/containerd/config.toml
 systemctl restart containerd
 
 # 编辑 kubelet 启动参数或 kubeadm-flags.env：
-# --container-runtime=remote
 # --container-runtime-endpoint=unix:///run/containerd/containerd.sock
 
 systemctl restart kubelet
@@ -2739,6 +2745,8 @@ Service 的拓扑和流量策略也会影响转发。它不是简单“偏向本
 
 ### kube-proxy iptables 和 IPVS 如何实现服务转发
 
+以下保留 iptables/IPVS 的机制说明以支持旧集群排障。1.36 选型应同时阅读本册末尾的现代 Service 小节：IPVS 代理模式自 1.35 起弃用，nftables 是应评估的替代路径，但需要检查内核、CNI 与 NodePort 行为。
+
 Service 和 EndpointSlice 只是对象，真正把 Service IP 或 NodePort 转成后端 Pod IP 的，是每个节点上的数据面。默认情况下，这个角色由 kube-proxy 承担。
 
 kube-proxy 在每个节点运行，watch API Server 里的 Service、Endpoint、EndpointSlice 变化，然后在本机配置转发规则。由于每个节点都配置了全量 Service 规则，所以从集群任意节点发起到 Service 的访问，都能被本机规则处理并转发到后端。
@@ -3376,3 +3384,304 @@ flowchart LR
 ```
 
 这条链路中的任一环都可能导致“服务不可访问”：DNS 解析不对、Service selector 错误、EndpointSlice 里没有 Ready 地址、kube-proxy 规则异常、Pod readiness 未通过、应用终止不优雅。生产排查时按链路分层验证，比只看一个对象更可靠。
+
+## 现代工作负载与资源管理补充
+
+### 原生 Sidecar 如何参与启动顺序和优雅终止
+<!-- src: temp/kubernetes-zh-docs/13-Pod/边车容器.md; temp/kubernetes-zh-docs/59-配置/使用边车（Sidecar）容器.md -->
+
+传统 Sidecar 把日志代理、网络代理与业务进程都放进 `containers`，但容器列表不提供严格的启动顺序，也不能自然表达“主任务结束后停止辅助进程”。原生 Sidecar 使用 `initContainers` 中的 `restartPolicy: Always`：它先作为初始化序列的一环启动，然后在主应用运行期间持续工作。该能力在 1.33 稳定，不应与普通 InitContainer 的一次性执行混淆。
+
+以下完整 Job 示例把日志写入共享 emptyDir。它用于说明生命周期，生产中通常优先让应用写 stdout，由节点日志组件采集。
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sidecar-demo
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: log-reader
+          image: busybox:1.37.0
+          restartPolicy: Always
+          command: [sh, -c, 'touch /logs/job.log; exec tail -f /logs/job.log']
+          startupProbe:
+            exec:
+              command: [sh, -c, 'test -f /logs/job.log']
+            periodSeconds: 1
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+      containers:
+        - name: task
+          image: busybox:1.37.0
+          command: [sh, -c, 'echo completed >> /logs/job.log; sleep 2']
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+      volumes:
+        - name: logs
+          emptyDir: {}
+```
+
+有 startupProbe 时，Sidecar 的启动探针成功后，kubelet 才继续后面的初始化步骤；没有时也不能把“进程启动”理解为“依赖服务已可用”。readinessProbe 可以影响整个 Pod 的 Ready 状态，但 readiness 不负责替代初始化顺序。
+
+```mermaid
+graph TD
+    Init[常规 Init 完成] --> Sidecar[原生 Sidecar 启动]
+    Sidecar --> Startup[启动条件满足]
+    Startup --> App[应用运行]
+    App --> Stop[应用退出]
+    Stop --> StopSidecar[Sidecar 按声明逆序停止]
+```
+
+在 Job 中，原生 Sidecar 不会因为持续运行而阻止主任务完成。Pod 终止时应让主应用先排空，再停止 Sidecar；它们共享终止宽限期，不是各自获得完整的额外时间。验收需同时看 Job Complete、主容器退出状态、initContainerStatuses 和日志采集结果，不能只看某个辅助容器是否仍 Running。
+
+官方参考：[Sidecar Containers](https://v1-36.docs.kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/)。
+
+### 容器原地调整如何区分期望资源与已生效资源
+<!-- src: temp/kubernetes-zh-docs/35-配置-Pods-和容器/调整分配给容器的-CPU-和内存资源.md -->
+
+容器 CPU/内存原地调整在 1.35 稳定。客户端通过 Pod 的 `/resize` 子资源提交目标值，kubelet 根据节点容量、资源策略和运行时能力尝试执行。因此 API 接受补丁只表示期望状态已更新，不表示节点上的 cgroup 约束已经改变。
+
+`spec.containers[*].resources` 表达期望值；`status.containerStatuses[*].resources` 表达实际资源；Pod 的 resize conditions 描述等待或执行状态。观察时还应保存 Pod UID、容器 ID、restartCount 和相关 observedGeneration，避免把上一次状态当成刚提交的请求结果。
+
+下面是容器配置片段，适用于已有可调整的 Linux Pod：
+
+```yaml
+resources:
+  requests:
+    cpu: 500m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+resizePolicy:
+  - resourceName: cpu
+    restartPolicy: NotRequired
+  - resourceName: memory
+    restartPolicy: RestartContainer
+```
+
+```bash
+# demo 命名空间中的 resize-demo 已存在，容器名为 app
+kubectl patch pod resize-demo -n demo --subresource=resize --type=strategic \
+  -p '{"spec":{"containers":[{"name":"app","resources":{"requests":{"cpu":"750m"},"limits":{"cpu":"1500m"}}}]}}'
+kubectl get pod resize-demo -n demo -o yaml
+kubectl describe pod resize-demo -n demo
+```
+
+| 观察结果 | 含义 | 下一步 |
+|---|---|---|
+| PodResizePending / Deferred | 当前资源不足等暂时条件 | 检查节点余量与重试状态 |
+| PodResizePending / Infeasible | 在当前节点上无法满足 | 降低目标或通过工作负载更新重建到其他节点 |
+| PodResizeInProgress | kubelet 正在执行或等待条件 | 比对实际资源、事件及内存使用 |
+| 实际资源达到目标 | 资源层调整生效 | 检查应用是否适应新限制和性能目标 |
+
+原地调整不迁移 Pod，也不能改变它创建时的 QoS 类。减少内存上限时，如果当前用量过高，操作可能持续等待；即便经过检查，也不能保证随后不发生 OOM。`RestartContainer` 明确允许容器重启；Pod 级 restartPolicy 为 Never 时不能配置要求重启的 resizePolicy。
+
+常规 InitContainer、临时容器、Windows，以及静态 CPU/Memory Manager 管理的 Pod 存在限制，不能套用这个基础例子。对 Deployment 管理的 Pod 单独 resize 也不会自动修改模板，新副本仍按模板创建；最终必须让声明来源或专门控制器负责资源配置，避免临时调整随重建丢失。
+
+官方参考：[容器原地调整](https://v1-36.docs.kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)。
+
+### Pod 级资源预算如何影响多容器共享
+<!-- src: temp/kubernetes-zh-docs/35-配置-Pods-和容器/分配-Pod-级别-CPU-和内存资源.md -->
+
+只按容器分配资源时，常常需要为应用、代理、采集器分别猜测峰值。Pod 级资源通过 `spec.resources` 表达整体预算，让未单独限定的容器共享 Pod 内的空闲资源；显式容器限制仍然要遵守。Pod 总预算不是给每个容器分别复制一份相同额度，也不是所有容器都可以同时达到整个 Pod 的上限。
+
+1.36 的 PodLevelResources 仍为 Beta、默认启用，支持 CPU、内存和大页。下面展示一份 Pod Spec 片段：整体限制 2 CPU/1Gi，应用容器还被自己的 1500m/768Mi 限制约束，辅助容器使用剩余共享空间。
+
+```yaml
+spec:
+  resources:
+    requests:
+      cpu: "1"
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.10
+      resources:
+        requests:
+          cpu: 500m
+          memory: 256Mi
+        limits:
+          cpu: 1500m
+          memory: 768Mi
+    - name: helper
+      image: registry.k8s.io/pause:3.10
+```
+
+这是资源结构示例，pause 不用于制造负载。真正评估时，要分别观察 Pod 汇总与各容器使用量，在辅助容器突发时测量业务延迟和 OOM 情况。Pod 级预算能提高共享效率，也让同 Pod 内的争用更加明显；强隔离负载不一定适合省略容器限制。
+
+Pod 级原地调整是另一项能力：固定的 1.36 英文任务页将其标为 Beta，而本地中文页仍写 Alpha。使用前应核对 `InPlacePodLevelResourcesVerticalScaling`、`PodLevelResources`、`InPlacePodVerticalScaling` 与 `NodeDeclaredFeatures` 的目标版本状态和组件配置。Pod 级 CPU/Memory/Topology Manager 支持又有独立的 Alpha 开关，不能从“Pod 预算已开启”推断专属 CPU 或 NUMA 对齐已可用。
+
+官方参考：[资源预算](https://v1-36.docs.kubernetes.io/docs/concepts/configuration/manage-resources-containers/)、[Pod 级调整](https://v1-36.docs.kubernetes.io/docs/tasks/configure-pod-container/resize-pod-resources/)、[资源管理器](https://v1-36.docs.kubernetes.io/docs/concepts/workloads/resource-managers/)。
+
+### Job 失败策略与 StatefulSet 保留策略如何避免误重试和误删除
+<!-- src: temp/kubernetes-zh-docs/15-工作负载管理/Job.md; temp/kubernetes-zh-docs/15-工作负载管理/StatefulSet.md; temp/kubernetes-zh-docs/44-运行-Jobs/使用-Pod-失效策略处理可重试和不可重试的-Pod-失效.md -->
+
+批任务的失败不都值得重试。输入格式错误需要修复数据，节点中断通常可以重试，外部系统暂时超时则需要退避与幂等。只用一个 backoffLimit 会混淆这些情况。podFailurePolicy 根据失败容器退出码或 Pod condition，选择 FailJob、Ignore、Count 等动作；Indexed Job 还可以用每索引重试预算，让一个分片的问题不会耗尽所有分片的重试机会。
+
+以下为 Job spec 片段，假定任务约定退出码 42 表示不可恢复的输入错误。rules 按顺序匹配，配套 Pod 模板使用 `restartPolicy: Never`。
+
+```yaml
+backoffLimit: 4
+podFailurePolicy:
+  rules:
+    - action: FailJob
+      onExitCodes:
+        containerName: worker
+        operator: In
+        values: [42]
+    - action: Ignore
+      onPodConditions:
+        - type: DisruptionTarget
+          status: "True"
+template:
+  spec:
+    restartPolicy: Never
+    containers:
+      - name: worker
+        image: busybox:1.37.0
+        command: [sh, -c, 'exit 42']
+```
+
+Indexed Job 的 `completionMode: Indexed` 适合静态分片；`backoffLimitPerIndex` 按分片限制重试，`maxFailedIndexes` 控制可容忍失败分片数量，`successPolicy` 可以表达部分索引成功即达成任务目标。选择前先明确业务完成语义：提前满足策略不能自动保证所有结果已经提交到外部系统。控制器重试和节点故障仍可能产生重复执行，幂等键应由任务分片与业务批次生成。
+
+StatefulSet 则要把 Pod 生命周期与 PVC 生命周期分别设计。默认保留数据不代表有备份；启用自动删除也不代表删除即时完成。以下片段表示删除 StatefulSet 时保留 PVC，但缩容时删除被缩掉序号对应的 PVC，适合可重建数据，不能作为数据库的默认策略。
+
+```yaml
+persistentVolumeClaimRetentionPolicy:
+  whenDeleted: Retain
+  whenScaled: Delete
+```
+
+生产检查必须把该策略、PV reclaimPolicy、备份和恢复流程放在一起看。`rollingUpdate.partition` 控制按序号更新的范围；坏版本卡住时，恢复模板不一定会立即修复已经卡住的实例，还需按 StatefulSet 行为检查 Pod 并逐个恢复。强制删除前必须确认旧进程无法继续写入共享存储，避免同一身份有两个写者。
+
+验证 Job 要看 conditions、failedIndexes/completedIndexes、退出码和业务结果；验证 StatefulSet 要看 revision、就绪实例、PVC/PV 及数据读取结果。对象创建成功都不足以证明任务完成或数据安全。
+
+### EndpointSlice 和 nftables 如何改变 Service 运维基线
+<!-- src: temp/kubernetes-zh-docs/17-服务、负载均衡和联网/服务（Service）.md; temp/kubernetes-zh-docs/82-网络参考/虚拟-IP-和服务代理.md -->
+
+Service 的声明、后端集合和节点转发规则属于不同层。EndpointSlice 承载端点地址、就绪与终止状态、拓扑信息；kube-proxy 或替代数据面消费这些状态，才生成实际转发规则。排障时应优先查 EndpointSlice，并按标签收集同一 Service 的全部切片，不能把单个切片当成完整后端列表。
+
+```bash
+kubectl get service web -n demo -o yaml
+kubectl get endpointslices -n demo \
+  -l kubernetes.io/service-name=web -o yaml
+kubectl get pods -n demo -l app=web -o wide
+```
+
+1.36 文档中，IPVS 代理模式已弃用，nftables 模式自 1.33 稳定。nftables 改善规则更新与规模表现，但并不是把宿主机 iptables 命令切到 nft 后端就自动启用；需要 kube-proxy 使用相应代理模式。它要求受支持的 Linux 内核与网络插件，官方最低内核要求为 5.13，实际还应遵循发行版/CNI 的支持矩阵。
+
+| 检查项 | 迁移时的影响 |
+|---|---|
+| kube-proxy `mode` | 决定使用哪种代理实现；替代 kube-proxy 的 CNI 另查自身配置 |
+| NodePort 地址 | nftables 默认主地址范围可能与旧模式不同 |
+| localhost NodePort | 不应依赖 iptables 模式下的回环访问行为 |
+| 主机防火墙 | 需要明确允许业务所需流量，不能假定代理自动放行 |
+| 长连接与 conntrack | 规则切换和内核行为需要真实连接验证 |
+
+Service 的流量政策是约束，流量分发字段是偏好。`internalTrafficPolicy: Local` 要求内部流量使用节点本地端点；没有本地可用端点时，不会按普通集群策略自动找远端。`trafficDistribution: PreferSameNode` 则偏好本节点，缺少端点时可以逐级回退；PreferSameZone 偏好同区。Local 政策对其对应流量优先于分发偏好，因此两者不能等同。
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  trafficDistribution: PreferSameZone
+```
+
+这份示例面向支持该值的 1.36 数据面。旧的 PreferClose 在 1.36 已弃用为同区偏好的旧别名；`spec.externalIPs` 也应列入迁移审查。不要只看跨区流量下降：端点分布不均时，本地区域可能被压满。应从不同节点、区域重放请求，检查后端分布、错误率和无本地端点时的行为。Gateway API 的对象安装、Controller 支持和数据面验收仍独立于 Kubernetes 本体版本。
+
+官方参考：[Service](https://v1-36.docs.kubernetes.io/docs/concepts/services-networking/service/)、[Virtual IPs and Service Proxies](https://v1-36.docs.kubernetes.io/docs/reference/networking/virtual-ips/)。
+
+### CSI 卷的访问模式和生命周期如何形成数据保障
+<!-- src: temp/kubernetes-zh-docs/18-存储/持久卷.md; temp/kubernetes-zh-docs/18-存储/卷快照.md; temp/kubernetes-zh-docs/18-存储/卷属性类.md; temp/kubernetes-zh-docs/30-管理集群/将-PersistentVolume-的访问模式更改为-ReadWriteOncePod.md -->
+
+PVC Bound 只证明卷供给和绑定阶段完成，不证明文件系统已挂载、应用能写入或数据能恢复。存储设计至少要分开访问模式、拓扑绑定、容量变化、性能参数变化和备份恢复。第二册前面的 CSI/Rook 链路解释组件职责，本节补充对象生命周期上的决策。
+
+| 能力 | 配置或对象 | 验收重点 |
+|---|---|---|
+| 延迟绑定 | StorageClass `WaitForFirstConsumer` | Pod 落点与卷可用区一致 |
+| 单节点读写 | ReadWriteOnce | 同节点多个 Pod 仍可能使用，不等于单 Pod |
+| 单 Pod 读写 | ReadWriteOncePod | CSI 驱动和 sidecar 支持；第二个使用者被限制 |
+| 容量扩展 | PVC requests.storage、allowVolumeExpansion | PVC、PV 与容器文件系统容量一致 |
+| 快照恢复 | VolumeSnapshot 与新 PVC dataSource | readyToUse、恢复后应用读取与一致性 |
+| 卷克隆 | 新 PVC 引用源 PVC | 驱动支持、源卷条件、容量和卷模式 |
+| 性能参数调整 | VolumeAttributesClass | 驱动支持及 PVC 实际修改状态 |
+
+ReadWriteOncePod 自 1.29 稳定，仅适用于支持它的 CSI 链路；旧卷迁移应按停止使用、保留数据、调整绑定和重建声明的专门流程处理，不能期待直接 patch 任意已绑定 PVC 的 accessModes 就完成迁移。
+
+扩容需要 StorageClass 和 CSI 驱动允许，通常不能缩容。直接修改 PV 容量可能绕过应由 PVC 触发的扩容流程，造成声明值与实际卷大小不一致。若 PVC 请求已增大但应用仍见旧容量，应区分后端扩容、节点文件系统扩容与应用自身缓存，检查 conditions 和 CSI controller/node 日志。
+
+VolumeSnapshot 系列是 CRD，并非装好 Kubernetes 就自动具备；需要快照控制器和支持快照的 CSI 驱动。以下完整快照声明依赖预先存在的 `csi-snapshot` 类与 `data` PVC：
+
+```yaml
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: data-before-change
+  namespace: demo
+spec:
+  volumeSnapshotClassName: csi-snapshot
+  source:
+    persistentVolumeClaimName: data
+```
+
+应检查 `status.readyToUse`，再用快照创建新的 PVC、挂载到恢复实例并读取业务数据。底层快照成功通常不等于数据库应用一致，是否需要冻结写入、数据库备份协议或多卷协调由应用决定。Retain/Delete 决定删除对象后底层资产是否保留，也影响清理成本。
+
+VolumeAttributesClass 在 1.36 稳定，针对卷的可修改性能属性，不能替代 StorageClass 或容量扩展。类的 driverName/parameters 创建后不可原地修改，调整时创建另一类并修改 PVC 的 `spec.volumeAttributesClassName` 引用。参数名属于驱动契约，不存在所有 CSI 都通用的 `iops` 配置；检查 PVC 的 `status.currentVolumeAttributesClassName`、`status.modifyVolumeStatus` 和驱动事件，而不是只看 spec 已变。
+
+官方参考：[Persistent Volumes](https://v1-36.docs.kubernetes.io/docs/concepts/storage/persistent-volumes/)、[Volume Snapshots](https://v1-36.docs.kubernetes.io/docs/concepts/storage/volume-snapshots/)、[Volume Attributes Classes](https://v1-36.docs.kubernetes.io/docs/concepts/storage/volume-attributes-classes/)。
+
+### DRA 与 PodGroup 如何支持设备分配和成组调度
+<!-- src: temp/kubernetes-zh-docs/22-调度、抢占和驱逐/动态资源分配.md; temp/kubernetes-zh-docs/13-Pod/调度组.md; temp/kubernetes-zh-docs/16-PodGroup-API/PodGroup-生命周期.md; temp/kubernetes-zh-docs/22-调度、抢占和驱逐/PodGroup-Scheduling-(EN).md -->
+
+传统扩展资源通常把设备表达成 `vendor.example/device: 1` 这样的整数，适合按数量申请，但难以表达设备属性、分配约束和更复杂的共享模型。Dynamic Resource Allocation（DRA）让设备供给、用户声明和调度分配通过独立对象协作。核心能力在 1.35 稳定，设备污点、共享容量等子特性仍有各自的阶段，不能把整页所有功能都称为稳定。
+
+DeviceClass 表达可选择的设备类别，ResourceSlice 发布驱动可供分配的设备，ResourceClaim 表达请求和分配结果，ResourceClaimTemplate 为工作负载生成声明。驱动还需在节点完成设备准备，调度成功只是链路的一部分。
+
+```mermaid
+graph TD
+    Driver[DRA 驱动] --> Slice[ResourceSlice 设备供给]
+    Class[DeviceClass 选择规则] --> Claim[ResourceClaim 请求]
+    Pod[Pod 引用声明] --> Claim
+    Claim --> Scheduler[调度与分配]
+    Slice --> Scheduler
+    Scheduler --> Prepare[节点驱动准备设备]
+    Prepare --> Run[容器运行]
+```
+
+```bash
+kubectl api-resources --api-group=resource.k8s.io
+kubectl get deviceclasses
+kubectl get resourceslices
+kubectl get resourceclaims -n demo -o yaml
+kubectl describe pod worker-0 -n demo
+```
+
+这些命令用于读取已安装 DRA 的集群，不会自动安装 GPU 驱动。Pending 时先看 Claim 是否生成、选择器能否匹配、分配是否完成、设备是否落在可调度节点；已调度却启动失败则继续检查节点驱动准备和容器设备访问。RBAC 需限制谁能修改设备供给与 Claim 状态，否则用户可能绕过设备分配边界。
+
+PodGroup 解决的是另一问题：一组相互依赖的任务需要共同获得调度机会。例如训练任务只调度一半就各自占用设备等待，会浪费资源甚至互相阻塞。原生 PodGroup 在 1.36 仍是 Alpha 路径，不能与 Volcano 等第三方同名 CRD 混用；必须核对 API Group、版本与 GenericWorkload、GangScheduling 等相关门控。
+
+group 的 gang 策略按 minCount 等条件进行组级调度，Pod 通过 `spec.schedulingGroup.podGroupName` 引用同命名空间的组。引用不存在的组会等待；组能够调度也不表示所有进程同时就绪，更不提供数据库事务式回滚。网络、镜像和设备初始化仍可能在绑定后失败。
+
+因此先掌握普通调度、设备驱动与任务幂等，再在独立试验环境评估 PodGroup。生产验收需要关注组 conditions、各 Pod 调度结果、Claim 占用及失败后释放，不能只以一个 worker Running 判断整组可用。
+
+官方参考：[DRA](https://v1-36.docs.kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/)、[PodGroup API](https://v1-36.docs.kubernetes.io/docs/concepts/workloads/podgroup-api/)。

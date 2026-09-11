@@ -4,6 +4,8 @@
 
 ### 云计算与 Borg 如何奠定 Kubernetes 的设计背景
 
+本册保留早期课程的机制与案例，已补充 Kubernetes 1.36 相关变化。历史产品案例和版本化配置需按实际部署核对；新增能力的阶段、依赖和升级路径见[第七册](./07-version-evolution-and-upgrade.md)。
+
 Kubernetes 不是从“怎么运行一个容器”开始设计的，而是从“怎么把大量计算、网络、存储资源抽象成一个可调度的平台”开始设计的。理解这一点很重要：容器只是运行单元，Kubernetes 真正解决的是大规模集群里资源分配、应用高可用、故障恢复、服务发现和平台扩展的问题。
 
 传统的小规模部署里，团队可以手工给几台服务器安装系统、配置中间件、部署应用、替换故障机器。但当业务从单体应用演进到微服务，实例数量可能从几十个变成几千个，手工操作会变成主要风险：耗人、慢、不可重复，而且很难保证每次操作都一致。云计算平台的价值就是把计算、存储、网络抽象成统一资源池，让业务只声明“我要多少实例、多少 CPU、多少内存、什么访问方式”，平台负责选择节点、启动应用、处理故障和调度资源。
@@ -708,12 +710,12 @@ Kubernetes 的分层架构也服务于扩展性：
 |---|---|---|
 | 核心层 | Pod Node Namespace Service API Machinery | 提供最小可运行抽象 |
 | 应用层 | Deployment StatefulSet DaemonSet Job CronJob | 面向不同 workload 类型 |
-| 治理层 | RBAC ResourceQuota NetworkPolicy PSP 或替代策略 | 控制权限 配额 安全和隔离 |
+| 治理层 | RBAC ResourceQuota NetworkPolicy PSA 与准入策略 | 控制权限 配额 安全和隔离 |
 | 接口层 | kubectl client-go SDK | 让用户和外部系统接入 |
 | 生态层 | Helm Operator Istio Knative 各类插件 | 在 Kubernetes API 上扩展业务能力 |
 | 底层插件 | CRI CNI CSI Cloud Provider Registry | 对接不同运行时 网络 存储和云厂商 |
 
-安全也是 Kubernetes 设计理念中的一条主线，不只是后面某个安全章节的附属内容。控制面通信依赖 TLS，认证可以接内部 ServiceAccount，也可以对接外部用户和认证系统；授权通过 RBAC 等机制限制谁能看、改哪些对象；Namespace 提供资源边界，Secret 用来承载敏感数据，并在生产中配合 etcd at-rest encryption 或 KMS 做加密保存；数据面还可以用 Taint 隔离节点、用 Pod 安全策略或其替代机制约束容器权限、用 NetworkPolicy 限制不同 Pod 之间的端口和协议访问。生产上要把这些层叠起来看，而不是只开一个 RBAC 就认为集群已经安全。
+安全也是 Kubernetes 设计理念中的一条主线，不只是后面某个安全章节的附属内容。控制面通信依赖 TLS，认证可以接内部 ServiceAccount，也可以对接外部用户和认证系统；授权通过 RBAC 等机制限制谁能看、改哪些对象；Namespace 提供资源边界，Secret 用来承载敏感数据，并在生产中配合 etcd at-rest encryption 或 KMS 做加密保存；数据面还可以用 Taint 隔离节点、用 Pod Security Admission 与准入策略约束容器权限、用 NetworkPolicy 限制不同 Pod 之间的端口和协议访问。生产上要把这些层叠起来看，而不是只开一个 RBAC 就认为集群已经安全。
 
 把生态系统展开看，应用开发、渐进式发布、公共服务、数据面对象、控制面组件、集群管理和基础设施管理分别承担不同关注点。也可以拆成两个视角：集群管理员关注控制面、节点、认证授权、网络存储和备份恢复；应用开发者关注镜像构建、资源需求、服务发现、扩缩容和发布流水线。
 
@@ -829,6 +831,7 @@ flowchart TB
 这种分层让 Kubernetes 不局限在某一种云、某一种网络、某一种存储或某一种业务模型上。它定义 API 和接口，具体实现由生态系统补齐。技术选型时真正困难的是“围绕 Kubernetes 的方案太多”，所以必须先判断自己要解决的是核心对象问题、底层插件问题，还是上层生态问题。
 
 ### API 对象的 TypeMeta Metadata Spec Status 如何表达系统状态
+<!-- src: temp/kubernetes-zh-docs/66-API-概述/Kubernetes-弃用策略.md -->
 
 Kubernetes 的所有管理能力都落在 API 对象上。一个对象通常包含四类属性：`TypeMeta`、`Metadata`、`Spec`、`Status`。
 
@@ -3347,7 +3350,7 @@ flowchart LR
 | DefaultStorageClass | 为 PVC 设置默认 StorageClass |
 | NodeRestriction | 限制 kubelet 访问与自身无关的资源 |
 
-`AlwaysPullImages` 真正解决的不是“镜像越新越好”，而是同一个 image tag 被重新构建并覆盖推回 registry 的风险。不规范流水线里，开发者修了 bug 却沿用旧 tag，`imagePullPolicy=IfNotPresent` 会让已有老镜像的节点跳过拉取，Pod 看似重建成功，实际运行的仍然是旧代码。开启 `AlwaysPullImages` 或把 Pod 的 `imagePullPolicy` 设为 `Always` 后，每次创建 Pod 都会访问 registry 拉取镜像，可以覆盖这类 tag override 风险；代价是大规模批量启动 Pod 时会显著增加镜像仓库压力。更理想的治理方式是标准 CI 每次产出不可变新 tag，允许 tag 被覆盖的团队才需要强制 Always。
+`AlwaysPullImages` 将新 Pod 的镜像拉取策略改为 Always，在多租户场景中可避免未获仓库授权的主体仅借助节点镜像缓存运行镜像。Always 会向仓库解析镜像引用并检查授权，已缓存的内容层仍可能复用，不表示每次都完整下载镜像。可变 Tag 仍不适合作为可复现发布依据，应使用 Digest 并设计仓库可用性与认证；镜像来源准入、签名验证和运行时拉取权限是不同层次。
 
 准入 Webhook 与认证 Webhook 类似，也遵循 Kubernetes 定义的对象协议。认证 Webhook 收到的是 TokenReview，准入 Webhook 收到的是 AdmissionReview。外部服务处理后，把允许、拒绝、patch 等信息写回 AdmissionReview response。
 
@@ -3445,6 +3448,7 @@ spec:
 当 `ResourceQuota` admission plugin 开启后，再创建超出配额的对象时，API Server 会在准入阶段拒绝请求。它不是调度器行为，而是 API 对象创建前的策略检查。
 
 ### 限流和 API Priority and Fairness 如何保护控制面
+<!-- src: temp/kubernetes-zh-docs/66-API-概述/已弃用-API-的迁移指南.md -->
 
 API Server 是控制面入口，如果没有限流，一个异常客户端、错误控制器或批量 list 请求就可能把控制面压垮。Kubernetes 集群不一定被恶意攻击才会出问题，错误的 DaemonSet、控制器无 backoff 重试、无节制 list 都可能造成类似 DoS 的效果。
 
@@ -3527,7 +3531,7 @@ APF 的两个核心对象是：
 FlowSchema 示例：
 
 ```yaml
-apiVersion: flowcontrol.apiserver.k8s.io/v1beta1
+apiVersion: flowcontrol.apiserver.k8s.io/v1
 kind: FlowSchema
 metadata:
   name: service-accounts
@@ -3536,7 +3540,7 @@ spec:
     type: ByUser
   matchingPrecedence: 9000
   priorityLevelConfiguration:
-    name: workload-low
+    name: learning-workload
   rules:
     - subjects:
         - kind: ServiceAccount
@@ -3553,14 +3557,14 @@ spec:
 PriorityLevelConfiguration 示例：
 
 ```yaml
-apiVersion: flowcontrol.apiserver.k8s.io/v1beta1
+apiVersion: flowcontrol.apiserver.k8s.io/v1
 kind: PriorityLevelConfiguration
 metadata:
-  name: global-default
+  name: learning-workload
 spec:
   type: Limited
   limited:
-    assuredConcurrencyShares: 20
+    nominalConcurrencyShares: 20
     limitResponse:
       type: Queue
       queuing:
@@ -3573,13 +3577,13 @@ spec:
 
 | 字段 | 含义 |
 |---|---|
-| `assuredConcurrencyShares` | 当前优先级可获得的并发份额 |
+| `nominalConcurrencyShares` | 当前优先级可获得的并发份额 |
 | `queues` | 当前优先级的队列数量 |
 | `handSize` | 一个 flow 通过 shuffle sharding 最多参与选择的队列数量 |
 | `queueLengthLimit` | 单个队列可排队请求数 |
 | `distinguisherMethod` | 用 namespace、user 等维度区分不同 flow |
 
-APF 的直觉是：每个 PriorityLevel 有一组队列，一个 flow 不会占用全部队列，而是通过 shuffle sharding 只落到少数队列里。即使某个 ServiceAccount 发送大量请求，它最多影响自己命中的那几条队列，不会把同优先级的所有队列都填满，更不会影响其他优先级。
+APF 的直觉是：每个 PriorityLevel 有一组队列，一个 flow 不会占用全部队列，而是通过 shuffle sharding 只落到少数队列里。即使某个 ServiceAccount 发送大量请求，它最多影响自己命中的那几条队列，不会把同优先级的所有队列都填满，可以减轻跨优先级干扰，但 CPU、etcd、Webhook 和总并发等共享瓶颈仍然存在。
 
 默认优先级通常包括：
 
@@ -3683,7 +3687,7 @@ flowchart LR
     Kubelet --> Mirror
 ```
 
-从 kubelet 视角看，static Pod 的来源不止本地目录一种。最常见的是 `staticPodPath` 扫描本地 manifest 目录，kubeadm 部署控制面通常就是这种方式；还可以通过 `--manifest-url` 从某个 HTTP URL 获取 manifest；也可以由 kubelet 监听 API Server 中与自身相关的 Pod 配置。生产里第一种最常见，后两种更适合理解 kubelet 的配置来源设计，而不是日常首选部署方式。
+kubeadm 通常通过 kubelet 的 staticPodPath 监视本地 manifest 目录来运行控制面静态 Pod。旧资料中的 HTTP manifest 来源需要按目标 kubelet 版本核对，不能作为现代部署默认入口。kubelet 从 API Server 获取分配给本节点的普通 Pod 是另一条配置链路，这些对象不属于 static Pod。静态 Pod 的 API 镜像对象用于可见性，删除镜像对象不会移除节点上的源清单。
 
 运行参数设计里，资源预留非常关键。随着对象数量、watch 连接、缓存和并发请求增长，API Server CPU 和内存都会上升。CPU 太少会导致控制面响应慢，内存太小会导致 API Server OOM。生产环境不要只按当前规模给资源，要为未来集群规模预留。
 
@@ -3795,7 +3799,7 @@ flowchart LR
     Internal --> Store
 ```
 
-API 版本演进通常经历 alpha、beta、stable。alpha 表示可演示但可能大改；beta 表示功能基本完成但仍可能调整；stable 表示生产就绪，API 语义应保持稳定。Kubernetes API 只承诺向前兼容 3 个 minor 版本，通常可以理解为当前版本加前 2 个 minor；第 4 个 minor 里，旧的 beta API 就可能被删除。跳过太多版本升级集群时，老控制器继续调用 `v1beta1` 这类旧 API 可能直接遇到 404。生产升级前必须阅读 CHANGELOG，确认 CRD、控制器、客户端库和 manifests 是否还在兼容窗口内。
+API 版本演进通常经历 alpha、beta、stable。alpha 表示可演示但可能大改；beta 表示功能基本完成但仍可能调整；stable 表示生产就绪，API 语义应保持稳定。API 弃用政策、组件版本偏差和版本支持周期是三件事，不能统一理解成“三个 minor 的兼容窗口”。稳定 API、Beta API 和 Alpha API 的移除约束不同，具体对象还必须查目标版本的移除清单；kubelet、kubectl 与 kube-apiserver 的允许偏差则按组件判断。升级前同时检查存量对象、客户端调用的 API、控制器和 CRD，详见[第七册](./07-version-evolution-and-upgrade.md)。
 
 Group 的定义通常在 `register.go` 一类文件中完成。核心内容是定义 GroupVersion，把对象加入 Scheme。
 
@@ -4062,3 +4066,151 @@ https://cncamp.notion.site/kube-apiserver-10d5695cbbb14387b60c6d622005583d
 ```
 
 最后，把本章串成一条主线：API Server 是控制面入口；认证确认身份；授权决定边界；准入补齐平台策略；限流和 APF 保护控制面；高可用和缓存保护运行稳定性；多租户把这些能力组合成平台方案；apimachinery、Strategy、Storage 和代码生成则支撑 Kubernetes API 的可扩展实现。
+
+## 现代声明式管理与 API 治理补充
+
+### Server-Side Apply 如何划分字段所有权并处理冲突
+<!-- src: temp/kubernetes-zh-docs/66-API-概述/服务器端应用（Server-Side-Apply）.md -->
+
+当 GitOps、HPA 和人工操作同时修改 Deployment，问题不只是“最后谁写入”，还包括谁应该负责哪个字段。Server-Side Apply（SSA）把合并和字段归属交给 API Server：客户端用固定的 field manager 提交自己负责的意图，服务端在 `metadata.managedFields` 记录所有权。提交内容可以是对象的一个合法字段子集，不必照抄完整的服务器对象。
+
+SSA 自 1.22 稳定。它提供协作冲突检查，不是权限控制：普通 Update/Patch 仍可能修改这些字段，RBAC 和准入政策负责决定主体能否写入。与客户端 apply 的 last-applied 注解相比，managedFields 能区分同一对象上多个管理者的责任。
+
+```bash
+# app.yaml 是经过审阅的 Deployment 声明；先在目标集群检查
+kubectl apply --server-side --field-manager=app-delivery --dry-run=server -f app.yaml
+kubectl diff --server-side --field-manager=app-delivery -f app.yaml
+kubectl get deployment web -n demo -o yaml --show-managed-fields
+```
+
+`kubectl diff` 返回 1 通常表示有差异，不等于工具运行失败；大于 1 才应进一步检查错误。dry-run 经过服务端校验与适用的准入过程，但不会验证 Pod 真正调度或应用启动。
+
+| 情形 | 处理方式 | 要检查的结果 |
+|---|---|---|
+| 另一个 manager 拥有不同值 | 停止并决定责任归属 | 报错里的字段路径、manager |
+| 交给其他控制器管理 | 完成所有权交接后从声明中省略 | 字段值保留，原 manager 不再拥有 |
+| 有意覆盖其他管理者 | 审阅后才使用 force-conflicts | 所有权转移及控制器是否写回 |
+| 同一个 manager 不再提交字段 | 无其他所有者时可能删除或恢复默认 | 对象 diff 和默认值 |
+
+例如把 `spec.replicas` 交给 HPA，不能在 HPA 尚未拥有该字段时随意删掉 Git 中的 replicas；它可能短暂恢复为默认值。先观察 managedFields，必要时用临时 manager 以相同值共享所有权，再让交付工具放弃字段。不要把 `--force-conflicts` 固化为所有发布的默认参数，也不要手工清空 managedFields 掩盖争用。
+
+官方参考：[Server-Side Apply](https://v1-36.docs.kubernetes.io/docs/reference/using-api/server-side-apply/)。
+
+### ServiceAccount 短期令牌如何投射和轮换
+<!-- src: temp/kubernetes-zh-docs/20-安全/服务账号.md; temp/kubernetes-zh-docs/35-配置-Pods-和容器/为-Pod-配置服务账号.md -->
+
+ServiceAccount 表达工作负载身份，RoleBinding 决定这个身份的权限，Token 是证明身份的凭据。三者不能混为一谈：创建一个 ServiceAccount 不会自动授予读取业务 Secret 的权限；关闭自动挂载也不会撤销已存在的 RBAC 授权。
+
+现代 Pod 通常使用 TokenRequest 生成有期限、受众和对象绑定信息的令牌，由 kubelet 通过 projected volume 提供并轮换。1.24 起不再默认为每个 ServiceAccount 自动创建长期 Token Secret。旧教程中“查找 service-account-token Secret 再复制 token”的流程不应作为新应用的默认方案。
+
+下面是 Pod Spec 片段，适用于已经信任集群签发者、并约定 `inventory.example.com` 受众的外部服务；它不是访问 Kubernetes API 的通用受众值。
+
+```yaml
+spec:
+  serviceAccountName: inventory-reader
+  automountServiceAccountToken: false
+  containers:
+    - name: app
+      image: registry.k8s.io/pause:3.10
+      volumeMounts:
+        - name: identity
+          mountPath: /var/run/identity
+          readOnly: true
+  volumes:
+    - name: identity
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3600
+              audience: inventory.example.com
+```
+
+这是结构示例，pause 不会发起认证请求。实际客户端必须重新读取轮换后的文件，不能只在启动时缓存 token，也不要用 subPath 固定住旧文件。接收端要验证签名、issuer、audience 与有效期；仅解码 JWT 不能证明其可信。
+
+排查 401 时先看签发者、受众、有效期和文件重载；排查 403 时再看 RBAC 与请求资源。`kubectl auth can-i get configmaps --as=system:serviceaccount:demo:inventory-reader -n demo` 可以辅助检查授权，但需要调用者有 impersonate 权限，而且不验证真实令牌和应用网络。不要把 Token 内容打印到日志、工单或证据包。
+
+官方参考：[Service Accounts](https://v1-36.docs.kubernetes.io/docs/concepts/security/service-accounts/)。
+
+### CEL 准入策略如何与 Webhook 分工
+<!-- src: temp/kubernetes-zh-docs/67-API-访问控制/验证准入策略（ValidatingAdmissionPolicy）.md; temp/kubernetes-zh-docs/67-API-访问控制/变更性准入策略.md -->
+
+如果策略只依赖请求对象、旧对象、请求身份和受支持的参数，就不一定需要维护外部 Webhook 服务。ValidatingAdmissionPolicy 使用 CEL 在 API Server 内执行验证；Policy 定义规则，Binding 决定范围和验证动作，参数对象则把平台规则与租户配置分开。只有 Policy 没有 Binding，规则不会因此自动覆盖整个集群。
+
+以下完整示例只约束带 `governance: trial` 标签的 Namespace 内的 Deployment，先 Warn/Audit 观察，不影响其他命名空间。
+
+```yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: deployment-owner.example.com
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments]
+  validations:
+    - expression: "has(object.metadata.labels) && 'owner' in object.metadata.labels && object.metadata.labels['owner'] != ''"
+      message: "Deployment must carry a non-empty owner label"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: deployment-owner-trial
+spec:
+  policyName: deployment-owner.example.com
+  validationActions: [Warn, Audit]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        governance: trial
+```
+
+落地时先检查 Policy 的类型检查结果，再对匹配范围内有标签、缺标签、标签为空的三个对象做服务端 dry-run。Warn 只返回警告；Audit 需要审计配置保留对应事件。确认现有工作负载可正常发布后，才把动作改为 `[Deny, Audit]`；Deny 与 Warn 不能同时使用。`failurePolicy` 控制表达式求值等失败的处理方式，不能替代 Binding 对业务验证失败的动作设置。
+
+ValidatingAdmissionPolicy 在 1.30 稳定；MutatingAdmissionPolicy 在固定的 1.36 英文文档中已稳定，本地中文页仍标为 1.34 beta。变更性策略通过 CEL 生成 ApplyConfiguration 或 JSONPatch 修改对象，适用于默认标签等可重复、结果可预测的改写。它同样需要 Binding，要避免多条策略反复覆盖同一字段；变更完成后仍应由验证策略守住最终约束。
+
+需要外部系统查询、复杂依赖或专门业务逻辑时仍可能需要 Webhook。CEL 不提供任意访问集群其他对象的能力，不能凭一个对象内的表达式就保证全局 Ingress 域名唯一。Webhook 也要限制匹配范围、设置超时、验证高可用与证书轮换，避免治理服务故障阻塞整个集群发布。
+
+官方参考：[验证策略](https://v1-36.docs.kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/)、[变更性策略](https://v1-36.docs.kubernetes.io/docs/reference/access-authn-authz/mutating-admission-policy/)。
+
+### CRD 校验与存储版本如何支持安全演进
+<!-- src: temp/kubernetes-zh-docs/47-使用自定义资源/使用-CustomResourceDefinition-扩展-Kubernetes-API.md; temp/kubernetes-zh-docs/47-使用自定义资源/CustomResourceDefinition-的版本.md -->
+
+CRD 让 API Server 接受一种新对象，Controller 才负责把对象的期望状态转为实际行为。仅安装 CRD 后成功创建资源，不表示对应控制器已经执行。平台 API 应先设计结构化 OpenAPI Schema，再考虑默认值、必填字段、范围校验、status 子资源和版本转换，避免把所有输入都留给控制器运行后才报错。
+
+下面是 `spec.versions[*].schema.openAPIV3Schema` 下的局部结构，用于约束自定义对象的副本范围；它不是完整 CRD。
+
+```yaml
+type: object
+properties:
+  spec:
+    type: object
+    required: [minReplicas, maxReplicas]
+    properties:
+      minReplicas:
+        type: integer
+        minimum: 0
+      maxReplicas:
+        type: integer
+        minimum: 1
+    x-kubernetes-validations:
+      - rule: "self.minReplicas <= self.maxReplicas"
+        message: "minReplicas must not exceed maxReplicas"
+```
+
+Schema 会影响未知字段裁剪和 SSA 合并语义。列表是整体不可分的 atomic，还是按键合并的 map，决定多个控制器能否管理不同条目；随意更改列表拓扑会改变字段所有权边界。验证时同时检查合法输入、非法输入、未知字段以及旧对象升级后的往返转换。
+
+| 字段/机制 | 解决的问题 | 常见误判 |
+|---|---|---|
+| `served: true` | 允许客户端访问这个版本 | 不等于以这个版本存储 |
+| `storage: true` | 指定新写入的存储版本，只能有一个 | 改标志不会重写所有旧数据 |
+| conversion Webhook | 不同版本间转换字段语义 | `None` 只换版本标识，不会自动改名 |
+| `status.storedVersions` | 记录仍需考虑的存储版本 | 手动删掉记录不等于完成数据迁移 |
+
+可靠的顺序是先提供新版本及转换服务，让客户端迁移，再切换 storage、迁移旧对象，确认旧存储版本已清空后才停止服务和删除旧版本。转换 Webhook 是读取链路的一部分：证书或后端故障可能导致 list/watch 失败，影响控制器恢复。升级前应保存 CRD、CR 数据、转换服务版本及证书依赖，不能只备份 Deployment YAML。
+
+官方参考：[CRD Versioning](https://v1-36.docs.kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/)。

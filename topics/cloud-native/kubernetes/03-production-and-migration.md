@@ -4,6 +4,8 @@
 
 ### 计算节点如何规划边界和设计原则
 
+本册保留早期课程的机制与案例，已补充 Kubernetes 1.36 相关变化。历史产品案例和版本化配置需按实际部署核对；新增能力的阶段、依赖和升级路径见[第七册](./07-version-evolution-and-upgrade.md)。
+
 生产化集群管理和“把 Kubernetes 手工搭起来”不是同一件事。手工安装解决的是第一天交付，生产化管理解决的是长期运行：节点如何批量上架、升级、替换，控制面如何高可用，节点异常如何自动发现，资源不够时如何扩容，多个团队共享集群时如何隔离。
 
 从计算节点视角看，一个节点不只是 Pod 的运行位置。它同时承载宿主机操作系统、内核、kubelet、kube-proxy、容器运行时、CNI、CSI、日志采集、监控采集、node-problem-detector、系统守护进程和安全基线。规划节点时要把这些基础组件当成集群的一部分，而不是把节点理解成“纯业务资源”。
@@ -3655,8 +3657,9 @@ flowchart LR
 HPA 还可能把压力从应用层放大到下游依赖。比如基于 QPS 或 CPU 把 Web 副本从 10 个扩到 50 个，如果数据库连接池、缓存热点、外部接口限额和消息队列消费能力没有同步设计，新增副本会同时制造更多连接、更多缓存 miss 和更多写入请求。生产上要把 HPA 与限流、连接池上限、熔断、队列削峰、下游容量和压测结果一起评估，不能只看应用 Pod 是否扩起来。
 
 ### VPA 垂直扩缩容如何推荐和更新资源
+<!-- src: temp/kubernetes-zh-docs/35-配置-Pods-和容器/调整分配给容器的-CPU-和内存资源.md -->
 
-VPA 负责纵向扩缩容，也就是推荐或调整单个 Pod 的 CPU 和内存 request。它适合副本数不能随意增加、资源申请长期不准、希望降低人工调参成本的场景。但 VPA 的生产化风险高于 HPA，因为更新资源往往需要重建 Pod。
+VPA 负责纵向扩缩容，也就是推荐或调整单个 Pod 的 CPU 和内存 request。它适合副本数不能随意增加、资源申请长期不准、希望降低人工调参成本的场景。更新风险取决于 VPA 版本、更新模式、负载能否接受重启和节点容量，不能仅凭 Kubernetes 版本判断。
 
 #### VPA 的目标是让 request 更接近真实需求
 
@@ -3700,7 +3703,7 @@ flowchart LR
 |---|---|
 | VerticalPodAutoscaler | 定义目标工作负载、资源边界和更新模式 |
 | Recommender | 根据当前指标、历史指标和 OOM 事件计算推荐值 |
-| Updater | 在允许自动更新时驱逐旧 Pod 触发重建 |
+| Updater | 按所装版本和更新模式发起资源调整，或通过驱逐重建更新 |
 | Admission Controller | 新 Pod 创建时把推荐资源写入 Pod Spec |
 | History Storage | 保存历史利用率和事件，常用 Prometheus 等系统 |
 | Checkpoint | 保存推荐器直方图状态，降低对外部监控的硬依赖 |
@@ -3730,7 +3733,7 @@ spec:
         memory: 2Gi
 ```
 
-`Off` 模式只给推荐，不自动驱逐 Pod，适合先观察。`Auto` 模式会允许 Updater 根据推荐值驱逐并重建 Pod，风险更高。
+`Off` 模式只给推荐，不自动调整现有 Pod，适合先观察。`Initial` 在创建时设置资源，`Recreate` 允许通过驱逐重建更新。支持 `InPlaceOrRecreate` 的版本会先尝试原地调整，失败时可能退回重建；不要把这个名字理解成“不发生中断”。旧配置中的 `Auto` 应按安装版本核实，优先选择明确的更新模式。
 
 #### 推荐算法依赖历史分布
 
@@ -3796,7 +3799,7 @@ VPA 的主要风险包括：
 
 | 风险 | 说明 |
 |---|---|
-| 重建 Pod | 当前主流实现通过驱逐和重建更新资源 |
+| 更新中断 | Recreate 通过驱逐重建；InPlaceOrRecreate 仍可能回退到重建 |
 | 调度变化 | 新资源请求可能让 Pod 被调度到其他节点 |
 | 与 HPA 冲突 | 若 HPA 也基于 CPU 或 Memory，二者可能互相影响 |
 | webhook 依赖 | Admission Controller 故障会影响 Pod 创建链路 |
@@ -3809,7 +3812,9 @@ VPA 的主要风险包括：
 
 VPA 对有状态应用有一定价值，因为有些有状态应用无法通过增加副本解决资源不足，只能让单实例资源更合适。但这要求 Operator、PDB、readiness 和故障转移策略足够成熟，确保逐个重建不会破坏服务。
 
-社区也长期讨论 Pod 资源原地调整能力。若未来 Pod resources 能在不重建 Pod 的情况下变更，VPA 的适用面会扩大；但这会挑战 Pod Spec 不变性、调度器、kubelet、配额和其他控制器的既有假设。
+容器 CPU/内存原地调整在 Kubernetes 1.35 已稳定，1.36 中可通过 Pod 的 resize 子资源请求。它不保证容器永不重启，也不保证请求立即可行；参见第二册的资源调整小节。VPA 是独立安装的项目，必须同时检查 CRD 接受的 updateMode、Updater/Admission 镜像与开关。
+
+核验依据：[VPA API 文档](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/api.md)。该链接随项目变化，部署时应改查与镜像 Tag 一致的发布版本；核心 Kubernetes 文档中的概述可能滞后于 VPA 实现。
 
 ### 云原生成本优化和 Crane 如何结合 FinOps
 
@@ -4122,3 +4127,119 @@ flowchart TB
 一些厂商会在标准内核能力外增加定制调度能力，例如基于 TKernel 或在 CFS 之下增加 BVT/BT 类调度器，让低优任务只消费高优任务不用的空闲时间片。迁移到这类高利用率资源池时，应用侧不能只填写 request 和 limit，还要标注 PriorityClass、QoS 等级、可抢占性和业务 SLO，让平台能在 CPU、内存、磁盘、网络多个维度上执行隔离策略。
 
 资源隔离的目标不是让低优任务永远不运行，而是在高优任务 SLO 受威胁时有明确的让路机制。Crane 这类系统把预测、PriorityClass、QoS 策略和主动回避结合起来，正是为了在高利用率和业务稳定性之间建立可执行的边界。
+
+## 现代节点基线与生产诊断补充
+
+### cgroup v2 如何改变资源观察和节点升级前提
+<!-- src: temp/kubernetes-zh-docs/31-用-kubeadm-进行管理/配置-cgroup-驱动.md; temp/kubernetes-zh-docs/30-管理集群/升级集群.md -->
+
+cgroup v2 把资源控制放到统一层级，旧课程中的 `cpu.shares`、`cpu.cfs_quota_us`、`memory.limit_in_bytes` 等路径不能直接用于新节点。先识别节点的 cgroup 版本，再解释限流、OOM 与驱逐证据；容器内看到的路径可能经过 cgroup namespace 隔离，不能与宿主机路径简单拼接。
+
+```bash
+# 在待检查的 Linux 节点执行，只读
+stat -fc %T /sys/fs/cgroup
+cat /proc/1/cgroup
+systemctl cat kubelet
+sudo crictl info
+```
+
+文件系统类型 `cgroup2fs` 是识别统一层级的线索。用容器 PID 的 `/proc/<pid>/cgroup` 找到归属后，再读取对应目录，而不是扫描任意同名文件当作目标容器数据。
+
+| 观察目标 | cgroup v1 常见接口 | cgroup v2 常见接口 |
+|---|---|---|
+| CPU 相对权重 | cpu.shares | cpu.weight |
+| CPU 配额 | cpu.cfs_quota_us / cpu.cfs_period_us | cpu.max |
+| CPU 限流统计 | cpu.stat | cpu.stat |
+| 内存使用与上限 | memory.usage_in_bytes / memory.limit_in_bytes | memory.current / memory.max |
+| 内存事件 | memory.failcnt 等 | memory.events |
+| 压力信号 | 取决于内核和层级 | cpu.pressure / memory.pressure / io.pressure |
+
+权重值不能直接按同一个数字迁移；资源 request、limit 到内核参数的转换由 kubelet/运行时完成。`memory.max` 不是工作集指标，`memory.events` 的 oom_kill 也不是 kubelet eviction，两者必须结合 Pod reason、节点 pressure condition 和内核日志区分。
+
+在使用 systemd 的节点上，kubelet 与运行时应保持一致的 cgroup 管理方式。containerd 配置结构随版本变化，不能把 1.x 插件表原样贴入 2.x。具备 CRI RuntimeConfig 支持的组合还可能由 kubelet 自动获取驱动，应检查有效配置与日志，而不是只看某份静态文件。
+
+1.36 默认 `FailCgroupV1: true`，旧节点升级前必须检查 cgroup v2 支持与应用运行时兼容性。建议通过新节点池逐步替换验证，避免在承载工作负载的节点上随意切换驱动。旧版 JVM、监控 Agent 和自定义资源检测脚本也要检查，否则可能读取不到限制，按宿主机容量错误配置线程池或堆大小。
+
+官方参考：[1.36 集群升级前提](https://v1-36.docs.kubernetes.io/docs/tasks/administer-cluster/cluster-upgrade/)。
+
+### Swap 如何与内存请求和驱逐策略共同评估
+<!-- src: temp/kubernetes-zh-docs/23-集群管理/Swap-memory-management-(EN).md; temp/kubernetes-zh-docs/81-节点参考信息/Linux-节点的交换（Swap）行为.md -->
+
+“节点有 Swap”“kubelet 允许节点有 Swap”“Pod 可以用 Swap”是不同条件。旧安装教程通常直接关闭 Swap；现代 Linux 集群可以在符合内核、cgroup v2 和运行时要求的条件下评估有限使用，但它不是增加可调度物理内存的捷径。
+
+下面是 KubeletConfiguration 片段，用于解释配置关系，不应未经节点池验证就推广到全部节点。
+
+```yaml
+failSwapOn: false
+memorySwap:
+  swapBehavior: NoSwap
+```
+
+`failSwapOn: false` 允许 kubelet 在启用 Swap 的主机启动；`NoSwap` 表示 Kubernetes 工作负载不使用 Swap，宿主机系统进程仍可能使用。选择 LimitedSwap 时，仅满足相应条件的工作负载获得有限额度，1.36 文档限制 BestEffort/Guaranteed 等场景，不能理解为所有 Pod 都能交换全部内存。
+
+```bash
+# 节点只读观察
+swapon --show
+vmstat 1 5
+cat /proc/pressure/memory
+cat /proc/pressure/io
+```
+
+持续换入换出会增加 I/O 和尾延迟。评估时要同时观察应用 P99、磁盘延迟、内存压力、OOM 和驱逐，不能仅以 OOM 次数下降认定改善。调度器不能把 Swap 当成普通 memory request 对应的物理内存容量，资源预算仍需保留系统和突发余量。
+
+加密 Swap、tmpfs 的 noswap 支持以及 Secret/内存卷是否可能落盘都属于节点基线。改变驱逐阈值可能改变内核回收、Swap 与 kubelet 驱逐的先后顺序，应通过同一负载的前后对照确定，不能直接复制一个通用阈值。没有这些约束和性能证据时，继续使用禁用 Swap 的保守基线也完全合理。
+
+### kubectl debug 与 crictl 如何连接 Pod 和节点证据
+<!-- src: temp/kubernetes-zh-docs/39-应用故障排除/调试运行中的-Pod.md; temp/kubernetes-zh-docs/38-集群故障排查/用-Kubectl-调试-Kubernetes-节点.md; temp/kubernetes-zh-docs/38-集群故障排查/使用-crictl-对-Kubernetes-节点进行调试.md -->
+
+精简镜像没有 shell、curl 或 ps 时，反复 exec 不能获得更多证据。临时容器可以加入现有 Pod 进行诊断，但会修改 Pod 的 ephemeralcontainers 子资源，需要对应权限和准入许可。它没有普通业务容器的资源与重启管理能力，不能用来承载常驻监控任务。
+
+```bash
+# 先保存只读状态；web-0 和 app 应替换为目标 Pod 与容器
+kubectl get pod web-0 -n demo -o yaml
+kubectl logs web-0 -n demo -c app --previous --timestamps
+kubectl describe pod web-0 -n demo
+# 会创建临时容器，需已授权的诊断镜像与权限
+kubectl debug pod/web-0 -n demo -it --image=busybox:1.37.0 \
+  --target=app --profile=general
+```
+
+`--target` 能否看到目标进程取决于运行时支持和进程命名空间行为；目标文件系统也不会简单变成调试容器自己的根目录。退出临时容器不能从 Pod 中删除其定义，需要在工作负载后续重建时消除。先收集 UID、containerID、事件和退出码，避免重建后失去故障现场。
+
+节点诊断可用 `kubectl debug node/<node>` 创建访问主机命名空间和 `/host` 的调试 Pod。默认配置不等于任意宿主机 root 权限，sysadmin profile 需要更高授权。如果节点 kubelet 或运行时已经无法创建容器，这条链路也不可用，应走已授权的 SSH、串口或云控制台。
+
+```bash
+# 在目标节点执行；endpoint 按真实运行时填写
+sudo crictl --runtime-endpoint=unix:///run/containerd/containerd.sock pods
+sudo crictl --runtime-endpoint=unix:///run/containerd/containerd.sock ps -a
+sudo journalctl -u kubelet --since '30 minutes ago' --no-pager
+sudo journalctl -u containerd --since '30 minutes ago' --no-pager
+```
+
+用 CRI 容器 ID 将 inspect、logs 与 Pod UID 关联，区分镜像拉取、sandbox 网络、挂卷、进程退出和 kubelet 失联。`ctr` 属于 containerd 工具，不能替代 CRI 视角；直接删除运行时对象还可能绕过 kubelet 的状态管理。节点调试结束后删除实际创建的调试 Pod，保留脱敏后的时间线与结论，不保留挂载得到的凭据。
+
+### 组件指标、对象状态和 Trace 如何共同定位控制面问题
+<!-- src: temp/kubernetes-zh-docs/23-集群管理/可观测性.md; temp/kubernetes-zh-docs/38-集群故障排查/资源指标管道.md -->
+
+Metrics Server 为资源指标 API 提供 CPU/内存样本，不承担完整的历史监控；kube-state-metrics 从 API 对象生成状态指标；组件自身的 metrics 则解释 API 请求、调度与控制循环的执行情况。三者回答不同问题，缺一个都可能让“集群正常”的结论失真。
+
+| 信号 | 典型用途 | 不足以单独证明什么 |
+|---|---|---|
+| metrics.k8s.io | HPA、kubectl top 的近期资源用量 | 长期容量趋势、应用健康 |
+| 对象状态指标 | Pending、期望与可用副本差异 | 容器内部真正处理请求 |
+| API Server / Scheduler 指标 | 请求延迟、拒绝、队列与调度问题 | 哪个业务请求具体失败 |
+| Events / 组件日志 | 失败原因和时间线 | 完整长期历史，Events 会过期 |
+| 控制面 Trace | 已采样请求中的内部调用耗时 | 应用全链路自动接通 |
+
+例如发布变慢，要先判断请求是否卡在 API/准入层，还是对象已写入但控制器、调度器或 kubelet 没推进。读取 Deployment observedGeneration、ReplicaSet、Pod conditions 后，再关联请求延迟、Webhook 日志、调度事件和节点日志，避免看到 API 延迟高就直接扩容控制面。
+
+```bash
+kubectl get --raw='/readyz?verbose'
+kubectl get apiservices
+kubectl get events -n demo --sort-by=.metadata.creationTimestamp
+kubectl get deployment web -n demo -o yaml
+```
+
+readyz 成功只覆盖该端点报告的检查，不能证明所有节点和插件健康。组件指标端点需要认证、网络和抓取配置，API tracing 也需要相应配置及 Collector/后端；安装 Kubernetes 不等于自动得到完整 Trace。高基数标签、请求体与日志采集还可能增加负载或暴露敏感信息，应按故障问题控制粒度和保留周期。
+
+验收应把一次操作的开始时间、请求结果、对象变化与业务探测连起来。监控面板没有数据首先是可观测性缺口，不应显示为“零错误”。

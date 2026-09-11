@@ -2204,3 +2204,47 @@ status:
 8. 交给 GitOps 阶段的是同一不可变候选及其运行证据，不允许在晋级途中替换镜像内容。
 
 这份检查表负责关闭实验，不替代前文机制与 Runbook。通过后交出的仍是本地 Kind 证据包；生产发布、真实 Gateway/云负载均衡、生产 CNI 和容量结果需要在对应环境重新验证。
+
+## 第 9 章 · Kubernetes 1.36 差异验收
+
+### 版本与组件清单如何约束实验结论
+<!-- src: temp/kubernetes-zh-docs/35-配置-Pods-和容器/调整分配给容器的-CPU-和内存资源.md; temp/kubernetes-zh-docs/13-Pod/边车容器.md -->
+
+前八章的镜像、配置、网络、容量与终止验收继续适用，但不能因为把目标写成 1.36，就默认 Kind、CNI、Gateway Controller 和指标组件全部支持新增能力。本章只补文档内的差异验收方法，不新增应用源码或宣称现有实验已在新版本跑通。
+
+```bash
+kubectl version -o yaml
+kubectl get nodes -o wide
+kubectl api-resources
+kubectl explain pod.spec.resources
+kubectl explain pod.spec.initContainers.restartPolicy
+kubectl get apiservices
+```
+
+这些只读检查确认服务器、节点和 API 结构；还需把 Kind 版本与 node image Digest、运行时、CNI、入口和 Metrics Server 版本写入原有环境清单。发现 API 字段不等于节点一定执行，字段可能受门控、运行时和节点版本共同约束。
+
+| 检查 | 静态通过能证明 | 还需运行证明 |
+|---|---|---|
+| Sidecar 清单 | 结构合法 | 启停顺序、Job 完成和日志 |
+| resize 补丁 | API 接受目标值 | 实际资源、重启次数和应用表现 |
+| PSA 标签 | 策略声明存在 | 合法创建成功、违规创建拒绝 |
+| Service 偏好 | 服务对象保留字段 | 跨节点/区域请求分布和回退 |
+| Snapshot/VAC | CRD 或 API 存在 | CSI 执行、恢复读写或属性改变 |
+
+原有证据清单中的 pending/not-executed 只有在相应实验真实完成后才能改为 passed。未安装 Snapshot Controller、DRA 驱动或 Gateway Controller 的环境，应明确记录能力缺失，不用模拟输出代替。
+
+### 如何验证 Sidecar 与资源调整没有破坏应用行为
+<!-- src: temp/kubernetes-zh-docs/13-Pod/边车容器.md; temp/kubernetes-zh-docs/35-配置-Pods-和容器/调整分配给容器的-CPU-和内存资源.md -->
+
+Sidecar 验收复用第二册的 Job 示例或应用中的真实辅助进程。先记录主容器和 Sidecar 的启动时间、探针结果、日志位置，再等待任务完成并观察辅助容器退出。仅以 Job Complete 为成功条件会漏掉尾部日志尚未送达的问题；还需校验预期输出与下游持久化结果。
+
+资源调整实验先选择支持普通容器 resize 的 Linux 节点，记录 Pod UID、containerID、requests/limits、实际 resources 和 restartCount。修改一个资源维度后持续观察 resize conditions，并使用相同业务请求比较调整前后延迟、错误与吞吐。CPU NotRequired 预期不因本次调整重启容器；内存 RestartContainer 则应允许并观察重启。
+
+| 路径 | 预期观察 | 恢复方法 |
+|---|---|---|
+| 可行 CPU 增配 | 实际资源达到目标，UID 不变 | 调整回已验证的预算 |
+| 不可行请求 | Pending 原因明确，实际值保持旧值 | 提交节点可满足的目标 |
+| 内存按策略重启 | restartCount 与应用启动日志对应 | 验证 readiness 和数据恢复 |
+| 控制器重建 Pod | 资源来自模板或管理控制器 | 将最终值落实到声明来源 |
+
+不要为了演示失败在共享环境申请夸张资源或触发内存耗尽；使用可丢弃环境并记录预计影响。最后检查没有遗留不可行的资源请求、任务、临时容器或测试策略；卷与命名空间的删除仍按原有清理契约逐项确认。
