@@ -8,6 +8,8 @@
 
 | 模型 | 文档 | 适用环境与用途 | 主要来源 |
 | --- | --- | --- | --- |
+| GPT-6 Astra | [`gpt-6-prompt.md`](./gpt-6-prompt.md) | GPT-6 Astra、Codex 与自定义 Agent；关注努力程度、进度更新、工具调用、上下文管理、范围控制、长输出、子智能体和视觉任务 | [GPT-6 Astra 模型与提示指南](https://developers.openai.com/api/docs/guides/latest-model) |
+| GPT-6 Astra Agent 工作指令 | [`gpt-6-agent-prompt.md`](./gpt-6-agent-prompt.md) | 可直接改写使用的通用 Agent 工作指令；关注任务边界、自主执行、工具协作、事实核验、文件修改、验证和最终交付 | [`gpt-6-prompt.md`](./gpt-6-prompt.md) |
 | Codex / GPT-5.6 | [`codex-5.6-prompt.md`](./codex-5.6-prompt.md) | Codex、Codex CLI、Codex-like Harness 等 Agentic Coding 环境；关注工作契约、工具协作、范围控制、验证和交付 | [OpenAI Codex 文档](https://developers.openai.com/codex/) |
 | DeepSeek V4 | [`deepseek-v4-prompt.md`](./deepseek-v4-prompt.md) | DeepSeek Harness、Claude Code（DeepSeek 接入）、Codex、Cline、OpenCode 等；关注思考模式、工具调用、上下文缓存和接入 | [DeepSeek API 文档](https://api-docs.deepseek.com/) |
 | Claude Fable 5.1 | [`fable-5.1-prompt.md`](./fable-5.1-prompt.md) | Claude Fable 5.1 智能体环境；关注 effort、进度更新、工具批处理、对话历史、范围和长输出 | [Claude Fable 5.1 提示工程](https://platform.claude.com/docs/zh-CN/build-with-claude/prompt-engineering/prompting-claude-fable-5-1) |

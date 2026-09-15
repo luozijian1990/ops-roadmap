@@ -69,7 +69,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 提示词资料库
 
-[`prompts/`](./prompts/) 收录五份面向 Agentic Coding 环境的模型专项双语提示词参考文档，覆盖 Codex / GPT-5.6、DeepSeek V4、Claude Fable 5.1、GLM-5.3 和 Kimi K3。资料库说明、模型用途、官方来源和安全提醒见 [`prompts/README.md`](./prompts/README.md)。这些文档是独立参考资料，不参与 `topics/` 学习笔记和 Roadmap 生成。
+[`prompts/`](./prompts/) 收录七份面向 Agentic Coding 环境的模型专项提示词参考文档，覆盖 GPT-6 Astra（提示指南与 Agent 工作指令）、Codex / GPT-5.6、DeepSeek V4、Claude Fable 5.1、GLM-5.3 和 Kimi K3。资料库说明、模型用途、官方来源和安全提醒见 [`prompts/README.md`](./prompts/README.md)。这些文档是独立参考资料，不参与 `topics/` 学习笔记和 Roadmap 生成。
 
 ## 企业案例库（整理中）
 
