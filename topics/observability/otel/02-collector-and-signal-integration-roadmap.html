@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>OpenTelemetry 学习笔记 · 第二卷：Collector 与多信号集成 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenTelemetry 学习笔记 · 第二卷：Collector 与多信号集成</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "OpenTelemetry 学习笔记 · 第二卷：Collector 与多信号集成", "intro": "> 面向已经能读懂并产生跨服务 Trace 的运维、SRE 与平台工程师。本卷重点是 Collector 的数据流、Metrics / Logs 集成、采样和 Kubernetes 接入。\n> 资料核查日期：2026-09-19。Collector 配置以 contrib 0.136.0 为教学基线，沿用第一卷 Go v1.38.0 / otelhttp v0.63.0 示例；不把它们当成当前生产推荐版本。\n> 完整配置与增量片段分别标明。增量必须合并进对应顶层键和 pipeline，不能把多段带同名顶层键的 YAML 直接拼接成一个文件。\n> 多配置示例已使用基线对应的 confmap v1.42.0 解析库验证合并顺序、列表替换、默认值和转义；关键配置字段另经固定版本源码核对。本次未进行 Docker、Kubernetes 或后端端到端实测；验证命令与预期现象用于读者本地验收，不能视为已经通过的运行报告。\n> 前一卷：基础模型与应用接入。后一卷：生产运维与故障排查。\n\n| 章节 | 复习时要回答的问题 |\n| --- | --- |\n| 第 10 章 | YAML 定义了什么，数据实际经过什么？ |\n| 第 11 章 | 处理规则改变了什么，如何防止误删？ |\n| 第 12 章 | OTel 指标进入现有监控后，统计语义是否一致？ |\n| 第 13 章 | 日志怎样成为可关联 Trace 的结构化记录？ |\n| 第 14 章 | 采样留下了哪些证据，又失去了哪些？ |\n| 第 15 章 | Collector 在 Kubernetes 中放在哪里、如何识别来源？ |\n| 第 16 章 | 怎样实际采集节点指标、容器日志和 Kubernetes Events？ |\n| 第 17 章 | Operator 如何管理 Collector 并给三种语言配置接入？ |", "parts": [{"title": "第 10 章：Collector 的组件与管道", "sections": [{"title": "10.1 区分发行版与组件能力", "content": "Collector 不是一个“所有插件天然齐全”的单一二进制。实际镜像携带一组编译进去的 Receiver、Processor、Exporter、Connector 和 Extension。网上看到某个组件的 README，并不表示当前镜像一定包含它；配置里能写出名字，也不表示该组件支持你正在处理的信号。\n\n#### 先回答三个问题，再复制配置\n\n**第一，当前运行的到底是哪一个发行版和版本？** 例如第一卷使用 `otel/opentelemetry-collector-contrib:0.136.0`，而不是把 core 镜像和 contrib 文档混用。第三方发行版还可能额外修改组件、默认值或配置格式，必须查对应产品的说明。\n\n**第二，这个组件在该版本中叫什么、支持什么信号？** 本教学基线使用 `otlp`、`otlphttp`、`loadbalancing` 等类型名。在线滚动文档可能展示更新命名，不能仅凭英文含义替换。组件稳定级别也按组件、信号或管道方向区分，不应用一句“OpenTelemetry 已稳定”概括全部能力。\n\n**第三，组件是否在最终运行配置里被启用？** 定义一个 exporter 但未放进 `service.pipelines`，不会产生数据导出。这是配置问题，不是后端问题。\n\n```bash\n# 在第一卷 lab 目录执行，检查实际镜像与可用命令。\ndocker compose images\ndocker compose run --rm --no-deps otel-collector --version\ndocker compose run --rm --no-deps otel-collector --help\n# 该基线可使用组件清单命令；先核对 --help。\ndocker compose run --rm --no-deps otel-collector components\n```\n\n| 本卷组件 | 主要职责 | 特别需要核对的边界 |\n| --- | --- | --- |\n| `otlp` receiver | 接收 OTLP | 协议、监听与信号是否启用 |\n| `filelog` receiver | 文件读取与日志解析 | 文件路径、权限、轮转和偏移 |\n| `transform` processor | OTTL 转换 | 字段上下文、类型与错误处理 |\n| `tail_sampling` processor | 按 Trace 决策 | 内存状态、到达窗口、路由亲和 |\n| `prometheus` exporter | 暴露可抓取的指标端点 | 不是主动 remote write |\n| `spanmetrics` connector | 从 Span 生成 Metrics | 该固定版本为 alpha，不应忽略版本风险 |\n\n这张表只选本卷实际使用的组件，不是发行版完整清单。标准 Collector Builder 可以构建自选组件发行版，但第一版笔记不展开自定义组件开发；先掌握现有组件如何组合，更有利于排查生产问题。", "subs": ["先回答三个问题"]}, {"title": "10.2 连接 Receiver、Processor 与 Exporter", "content": "从第一卷配置中提取主干，可得到一条清晰的数据路径：Receiver 把输入转为 Collector 内部的数据表示，Processor 按顺序修改或筛选数据，Exporter 负责输出。`service.pipelines` 才是连接这三类组件的位置。\n\n```mermaid\nflowchart LR\n    A[Go SDK] -->|OTLP HTTP| B[otlp receiver]\n    B --> C[memory_limiter]\n    C --> D[batch]\n    D --> E[debug exporter]\n    D --> F[otlp jaeger exporter]\n    F --> G[Jaeger]\n```\n\n同一个 OTLP receiver 可以被 traces、metrics、logs 三种 pipeline 引用。这表示同一个监听组件把收到的不同信号交给相应管道，**不是自动把 Trace 转成 Metric 或 Log**。\n\n```yaml\n# 结构示例：已定义的实例必须在 pipeline 中被引用。\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [memory_limiter, batch]\n      exporters: [otlp/jaeger]\n    metrics:\n      receivers: [otlp]\n      processors: [memory_limiter, batch]\n      exporters: [prometheus]\n```\n\n上面不是可独立启动的完整配置，因为它有意省略了组件定义。实际文件应保留第一卷定义，再按第 12 章补齐 `prometheus` exporter。不要因为能通过通用 YAML 解析，就认为所有组件引用都能解析。\n\n#### 同一类型可以有多个实例\n\n`batch/traces` 与 `batch/metrics` 是两个实例，可以有不同超时和批量大小；`otlp/primary` 与 `otlp/shadow` 可以指向不同后端。斜杠后缀不是任意路径，而是 Collector 组件 ID 的实例部分。\n\n多个 exporter 形成数据扇出，但它不是隔离保证。慢后端可能经队列、重试和同步消费路径影响同一 pipeline；增加第二个 exporter 之前，必须讨论其故障是否会牵连主后端。真正需要隔离时，应评估独立管道、独立进程或独立缓冲层，而不是只给实例改名。\n\n重复采集也可能发生在这里：同一 receiver 进入两条都会写到同一后端的 traces pipeline，可能把相同 Span 导出两次。后端是否去重是后端行为，不能作为配置重复的理由。\n\n**阅读 YAML 的顺序建议：** 先看 `service.pipelines` 找实际数据路径，再反查实例定义，最后检查监听、认证、环境替换和运行时挂载。这样比从文件首行逐个背参数更容易识别“定义了但没使用”和“引用了但不存在”。", "subs": ["同一类型可以有多个实例"]}, {"title": "10.3 理解 Connector 与 Extension", "content": "Connector 和 Extension 经常被误认为“另一种 Processor”，但它们解决的问题不同。\n\n**Connector 连接两个 pipeline。** 它在上游表现为 exporter，在下游表现为 receiver，可以转换信号，也可以路由或汇聚。例如 `spanmetrics` 接收 traces 并产生 metrics；这不是在 traces 的 processors 列表里添加一个普通处理步骤。\n\n**Extension 为 Collector 提供附加能力。** health_check 提供健康端点，file_storage 为使用它的组件提供存储接口，认证扩展为 receiver 或 exporter 提供认证能力。Extension 不自动成为一条遥测数据管道，也不会因为启用就替所有信号生效。\n\n```mermaid\nflowchart LR\n    A[traces pipeline] --> B[spanmetrics connector]\n    B --> C[metrics pipeline]\n    C --> D[Prometheus exporter]\n    E[health_check extension] -.-> F[运维探针]\n    G[file_storage extension] -.-> H[Exporter 持久化队列]\n```\n\n```yaml\n# 增量结构示例，完整指标接入见第 12 章。\nconnectors:\n  spanmetrics:\n    histogram:\n      unit: s\n    metrics_flush_interval: 15s\n\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [memory_limiter, batch]\n      exporters: [otlp/jaeger, spanmetrics]\n    metrics/from-spans:\n      receivers: [spanmetrics]\n      processors: [batch]\n      exporters: [prometheus]\n```\n\n这个例子统计的是所见 Span，不是天然只统计入口请求。若同一业务请求有 SERVER、CLIENT 和内部 Span，必须按服务、Span Kind 和操作语义区分，否则“请求量”会被错误放大。第 12.4 节解释它与业务原生指标的差异。\n\n再看 Extension：仅写 `extensions: {file_storage: ...}` 不会自动让所有队列持久化。还需要 `service.extensions` 启用它，并由 exporter 的 `sending_queue.storage` 或 filelog 的 `storage` 明确引用。这些状态的用途也不同：一个是待发送数据，一个是读取文件的位置。\n\n验证 Connector 是否正确连接，应在下游观察真实生成的数据；验证 Extension，应观察调用它的组件是否按预期工作。健康检查返回 200，既不能证明 Span Metrics 已生成，也不能证明磁盘队列可以在重启后恢复。", "subs": []}, {"title": "10.4 调试配置、实例和处理顺序", "content": "Collector 配置检查有至少三层：**文件能解析、组件能初始化、实际数据满足目标**。缺少第三层时，错误字段名、误过滤和后端映射问题往往会被“启动成功”掩盖。\n\n| 检查层次 | 能发现的问题 | 不能替代的检查 |\n| --- | --- | --- |\n| YAML / Compose 检查 | 缩进、引用、变量替换和挂载 | Collector 组件是否存在 |\n| Collector `validate` / 启动 | 非法组件、无效配置、部分初始化错误 | 是否有请求产生数据 |\n| 固定输入对照输出 | 字段、采样、路由与转换结果 | 大规模容量与故障恢复 |\n| 端到端查询 | 后端实际可见与可解释 | 长期可靠性与全量覆盖 |\n\n```bash\n# 在 lab 目录；输出可能包含环境信息，保存前注意脱敏。\ndocker compose config > compose.effective.yaml\n\ndocker compose run --rm --no-deps otel-collector \\\n  validate --config=/etc/otelcol/config.yaml\n\ndocker compose up -d --force-recreate otel-collector\ndocker compose logs --tail=100 --no-color otel-collector\n```\n\n#### 处理器顺序为什么是语义问题\n\n若健康检查识别依赖 `http.route`，却先删除了这个属性，后面的过滤可能不再命中。若尾采样的错误策略依赖 `Status=ERROR`，而转换先把状态重写为 OK，就会改变保留结果。若 Pod 关联依赖连接来源，却先经过重组批次或尾采样，原连接上下文可能已经丢失。\n\n可采用如下思路，而不是一份放之四海皆准的固定顺序：\n\n```text\n接收与信任边界\n  → 尽早补齐依赖连接上下文的身份\n  → 资源保护与必要的数据清洗\n  → 明确会影响证据的过滤/采样\n  → 适合当前出口的批处理\n  → 独立配置的导出队列与重试\n```\n\n`memory_limiter` 通常靠前放置，避免后续昂贵处理在内存压力下继续接收大量数据；连接关联应在会丢失连接信息的处理之前完成。实际顺序必须同时满足这两类约束，并通过输入验证，不应用图示代替具体组件文档。\n\n调试时临时使用 `debug` exporter 可查看处理后的数据。但**同一 pipeline 的两个 exporter 都在处理器之后**，不能把一个 debug 当成“处理前”、另一个当成“处理后”。做 A/B 对照可以启动独立 Collector 配置，对同一份合成数据分别处理，或者建立明确隔离的输入和输出分支。", "subs": ["处理器顺序为什么是语义问题"]}, {"title": "10.5 管理多配置来源、环境替换与最终配置", "content": "配置文件能通过 YAML 解析，只说明文本结构合法。真实生效配置还取决于启动参数指定的来源、合并顺序、变量替换、容器挂载和发行版包含的配置提供者。将一份通用配置拆成基础文件与环境覆盖文件时，应把这条加载路径作为发布产物一起记录。\n\n#### 从两个小文件理解合并\n\n在 `lab/config-demo/` 保存以下两个文件。这是独立的合并实验，仅将 traces 输出到 debug，不替换第一卷的业务环境。配置中的接收器不会因为定义存在就自动出现在新 pipeline 中。\n\n**文件：`config-demo/base.yaml`。**\n\n```yaml\nreceivers:\n  otlp:\n    protocols:\n      http:\n        endpoint: 0.0.0.0:4318\nprocessors:\n  batch:\n    timeout: 1s\nexporters:\n  debug:\n    verbosity: basic\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [debug]\n```\n\n**文件：`config-demo/lab.yaml`。**\n\n```yaml\nprocessors:\n  resource/lab:\n    attributes:\n      - key: deployment.environment.name\n        value: lab\n        action: upsert\nservice:\n  pipelines:\n    traces:\n      processors: [resource/lab, batch]\n```\n\n第二份文件增加一个 processor，并明确提供完整的 processors 列表。不要把后文件的 `[resource/lab]` 理解为“自动追加到已有 `[batch]`”：此类列表覆盖要以最终配置为准。映射中的不同子键可合并，同一路径的标量按后面的来源覆盖；不能把文件名 `lab.yaml` 当成自动识别环境的机制。\n\n```bash\n# 在 lab 目录执行；挂载路径统一为容器中的 /conf。\ndocker run --rm -v \"$PWD/config-demo:/conf:ro\" \\\n  otel/opentelemetry-collector-contrib:0.136.0 \\\n  validate --config=file:/conf/base.yaml --config=file:/conf/lab.yaml\n```\n\n验收应确认最终顺序是 `resource/lab → batch`，receiver 和 debug exporter 仍存在，再发送一条受控 Trace 检查 Resource。调换两个参数会改变冲突路径的覆盖结果；这是一个可以用于回归的反例。\n\n#### 配置提供者与环境变量各自解决什么\n\n| 写法或来源 | 含义 | 使用时需要说明的边界 |\n| --- | --- | --- |\n| `--config=file:/conf/base.yaml` | 读取一个文件作为配置来源 | 容器内路径与启动工作目录 |\n| 多次 `--config` | 合并多个完整或部分配置 | 来源顺序、冲突键和列表替换 |\n| `${file:/conf/exporters.yaml}` | 在配置某个位置引入另一份内容 | 引入内容的形状要与该位置匹配 |\n| `--config=env:OTEL_COLLECTOR_CONFIG` | 环境变量保存一整段配置 | 与单个字段里的变量替换不同 |\n| `--config='yaml:exporters::debug::verbosity: detailed'` | 用 YAML provider 覆盖嵌套字段 | Shell 引号、双冒号路径、发行版支持 |\n| HTTP/HTTPS provider | 从远端取得配置 | 获取失败、认证、内容版本及回退；不等于自动热更新 |\n\n例如主文件写 `exporters: ${file:/conf/exporters.yaml}`，被引入文件的顶层应直接是 `debug:`、`otlp/jaeger:` 等实例，不能再套一层 `exporters:`。配置提供者也属于发行版能力，不能假定自定义构建包含所有 scheme。\n\nCollector 字段替换可使用 `${env:变量名}`。对非秘密的可选项可以使用 `${env:变量名:-默认值}`，必需凭据则不设置一个看似能工作的兜底 Token。字面量美元符号需要按 Collector 配置规则使用 `$$`，Prometheus relabel 的捕获组替换尤其容易受影响。\n\n```yaml\n# Collector 配置片段：将正则捕获结果用于 Prometheus target 标签。\nreceivers:\n  prometheus:\n    config:\n      scrape_configs:\n        - job_name: demo\n          static_configs:\n            - targets: [demo:9100]\n          relabel_configs:\n            - source_labels: [__address__]\n              regex: '(.*):[0-9]+'\n              target_label: source_host\n              replacement: '$$1'\n```\n\n外部挂载的 `collector.yaml` 不会因为出现在 Compose 的 volumes 中就被 Compose 再解析一遍；若把相同内容写入 Compose 内联字段、Helm 模板或 Shell heredoc，又会多一层替换。应分别检查每一层产物，不能对所有场景机械地增加同样数量的 `$`。\n\n#### 保存生效配置而不是只保存输入文件\n\n`docker compose config` 输出的是 Compose 的最终配置，不是 Collector 合并后的配置。Collector 的 `validate` 用来检查引用与组件配置；要确认合并、变量和列表结果，需要使用该发行版提供的配置打印能力或在隔离运行中检查实际行为。\n\n本教学基线 `0.136.0` 使用的是实验性 `print-initial-config`，需要启用 `otelcol.printInitialConfig`；它输出解码成组件配置结构之前的合并 YAML，**可能包含敏感值，不具备新版命令默认脱敏的保证**。因此下面只打印本节不含凭据的合并实验，不对生产配置直接照抄。\n\n```bash\n# 在 lab 目录执行，配置中仅有本节的测试数据。\ndocker run --rm -v \"$PWD/config-demo:/conf:ro\" \\\n  otel/opentelemetry-collector-contrib:0.136.0 \\\n  print-initial-config --feature-gates=otelcol.printInitialConfig \\\n  --config=file:/conf/base.yaml --config=file:/conf/lab.yaml\n```\n\n打印结果不是组件校验的替代品，仍应单独执行 `validate`。较新的 `print-config --mode=redacted`、JSON 输出及相应验证选项不属于本基线这条命令，不能根据滚动文档给它添加参数。处理真实配置时，只在受控环境读取必要字段，分享之前脱敏，不依赖命令替你识别任意字符串中的秘密。\n\n`0.136.0` 也支持 `--set`；可用 `--set=processors.batch.timeout=2s` 覆盖本例已定义组件的属性。该版本会处理路径分隔，含点号的业务键容易与路径发生歧义，复杂对象和数组仍优先写在明确的覆盖文件中。默认列表按后来源替换；如果显式启用实验性 `confmap.enableMergeAppendOption`，列表合并方式会改变，应记录 feature gates 并重新验证处理器顺序，不让测试环境与生产环境使用不同规则。\n\n最终记录至少包括镜像、参数顺序、配置文件校验值、启用的 feature gates、非秘密环境项和受控检查后的解析结果。", "subs": ["从两个小文件理解合并", "配置提供者与环境变量各自解决什么", "保存生效配置而不是只保存输入文件"]}, {"title": "10.6 理解组件复用、同步调用与故障隔离", "content": "YAML 中写了几次组件 ID，不一定就创建几个运行实例。对于同一信号下的管道复用，receiver 可以把同一份输入扇出到多个管道，exporter 可以被多个管道共用，而同名 processor 在不同管道中拥有独立实例和状态。跨信号的复用细节还取决于组件实现，不能把一个监听地址简单理解成全进程只有一份处理状态。\n\n| 配置方式 | 需要建立的运行模型 | 常见误判 |\n| --- | --- | --- |\n| `otlp` 同时进入 `traces/main` 与 `traces/shadow` | 输入复制到两个消费分支 | 误以为流量会自动按比例分流 |\n| 两条 traces 管道都使用 `batch` | 每条管道有独立批处理实例 | 误以为它们共享一个总大小限制 |\n| 两条管道共用同名 OTLP exporter | 共用出口组件及其故障影响面 | 误以为改 pipeline 名称就隔离队列 |\n| 定义 `otlp/main` 与 `otlp/shadow` | 明确创建不同出口实例 | 忽略仍共享进程资源与上游调用路径 |\n\n下面的配置是**结构片段**，用两个出口说明主后端与影子后端。需要配合 receiver、processor、exporter 的实际定义，不能单独启动。\n\n```yaml\nservice:\n  pipelines:\n    traces/main:\n      receivers: [otlp]\n      processors: [memory_limiter, batch]\n      exporters: [otlp/main]\n    traces/shadow:\n      receivers: [otlp]\n      processors: [memory_limiter, batch]\n      exporters: [otlp/shadow]\n```\n\n```mermaid\nflowchart LR\n    R[共享 Receiver] --> F[扇出消费调用]\n    F --> M[主管道 独立处理器]\n    F --> S[影子管道 独立处理器]\n    M --> Q1[主出口队列]\n    S --> Q2[影子出口队列]\n    Q1 --> B1[主后端]\n    Q2 --> B2[影子后端]\n```\n\nCollector 消费路径包含同步调用。某个分支在返回前发生长时间阻塞，可能拖住共享 receiver 的转发；有异步队列时，排队会在一段时间内吸收压力，但队列满、拒绝或错误传播后仍可能影响上游。因此“处理器独立实例”不等于“故障完全隔离”。\n\n验证时只中断隔离实验的影子后端，同时观察主链路查询延迟、两个出口的队列与发送失败、receiver 的接收/拒绝。先记录队列尚有空间时的行为，再观察接近容量后的行为，不能只测中断后的前几秒。\n\n若主链路有严格可靠性要求，应按数据复制位置评估独立 Collector 进程、独立接收路径或持久中转层。多个进程可以减少进程级资源牵连，但如果复制发生在同一个会阻塞的上游，仍不是绝对隔离；必须沿全路径说明故障边界。", "subs": []}]}, {"title": "第 11 章：数据处理、过滤与转换", "sections": [{"title": "11.1 设置资源与数据量保护", "content": "内存限制、批处理和发送队列经常同时出现，但三者不是同一种缓存。理解“哪个组件持有数据、多久释放、满了怎么办”，比记住几个默认值更重要。\n\n| 机制 | 控制对象 | 主要目的 | 不能提供的保证 |\n| --- | --- | --- | --- |\n| 容器内存 limit | 进程占用的总体边界 | 防止无限侵占节点资源 | 不能确保 OTel 数据无损 |\n| `memory_limiter` | Collector 的内存压力 | 拒绝新消费、形成背压 | 不能把 RSS 精确锁在一个数值 |\n| `batch` | 一批发送的数据 | 减少频繁小请求 | 不是磁盘缓存 |\n| `sending_queue` | 等待 exporter 发送的数据 | 应对出口短时变慢 | 有容量、重试和生命周期边界 |\n| tail sampling 缓冲 | 尚未决定的 Trace | 收集决策所需 Span | 不会被普通 exporter 持久化队列保护 |\n\n第一卷示例给 Collector 512 MiB 容器上限、memory_limiter 400 MiB 限制与 80 MiB spike 范围。这些是演示参数，用来保留运行余量，不是根据你的生产流量测得。Collector 进程还有协议解码、Go Runtime、连接和其他组件的开销，不能把配置中的 MiB 简单理解成可容纳 Span 的净空间。\n\n```yaml\n# 原配置中的处理器；解释而非新增一组重名定义。\nprocessors:\n  memory_limiter:\n    check_interval: 1s\n    limit_mib: 400\n    spike_limit_mib: 80\n  batch:\n    timeout: 1s\n    send_batch_size: 256\n    send_batch_max_size: 512\n```\n\n`send_batch_size` 是触发批量发送的阈值，`send_batch_max_size` 才限制发送批次的最大条目数；条目数量不是字节数。同样 512 个 Span，只有少量属性和带巨大堆栈的占用可能完全不同。因此数据量保护要同时管理条数、字段长度、属性数量和实际内存。\n\n当 memory_limiter 拒绝消费时，上游若能够识别可重试错误并且仍有缓冲，可能稍后重试；若上游不支持、重试期限耗尽或队列已满，就可能丢失。不要把某一次拒绝计数直接当作最终丢失数量，也不要把“开启重试”解释成永不丢失。\n\n资源调优的有效验证包含三种状态：正常流量、受控突发、后端短时不可用。分别记录输入速率、RSS、拒绝、队列和排空时间；只看空闲时内存很低，没有容量判断价值。", "subs": []}, {"title": "11.2 统一属性与过滤低价值数据", "content": "属性统一的目标是减少不同信号、不同服务之间的解释歧义，而不是把所有数据都覆盖成相同身份。服务名通常由应用或发布元数据定义，环境和集群可以由可信平台补充；中央 Collector 不应把所有来源都改名为自己。\n\n#### 先补默认值，不轻易覆盖来源\n\n```yaml\n# 增量片段：适合仅接收实验环境数据的 Collector。\nprocessors:\n  resource/lab-defaults:\n    attributes:\n      - key: deployment.environment.name\n        value: lab\n        action: insert\n      - key: telemetry.pipeline\n        value: otel-lab\n        action: upsert\n```\n\n`insert` 仅在属性缺失时插入，`upsert` 则可能覆盖已有值。这里 `telemetry.pipeline` 是本笔记定义的自有约定，不是 OTel 标准字段；它表示经过的处理路径，不能替代真正的源服务身份。多环境共用 Gateway 时，不能把 `deployment.environment.name=lab` 作为所有输入的默认真相。\n\n#### 过滤要写清楚丢弃单位\n\n```yaml\n# 增量片段：此条件丢弃匹配的 Span，不是自动丢弃整个 Trace。\nprocessors:\n  filter/health:\n    error_mode: ignore\n    traces:\n      span:\n        - 'attributes[\"http.route\"] == \"/healthz\"'\n```\n\n规则匹配的是 Span 属性，不是 HTTP 请求本身，也不是完整调用树。若只删除入口 Span 而保留子 Span，后端可能看到不完整父子关系。若整个请求都没有诊断价值，在应用边界避免埋点、按根请求设计采样，通常比后面随意删一个父 Span 更容易解释。\n\n第一卷已经对 `/healthz` 不加 OTel 中间件，因此默认实验中这条 filter 很可能没有额外效果。不能因为“配置已经存在”就声称减少了多少数据；应通过合成一个携带该属性的 Span 来验证规则。\n\n| 动作 | 改变了什么 | 适用前提 |\n| --- | --- | --- |\n| 删除一个属性 | 记录还在，但信息减少 | 字段非关键、无需用其关联或决策 |\n| 丢弃一个 Span | 调用树可能缺一个节点 | 接受不完整关系并说明原因 |\n| 丢弃整条 Trace | 此请求不再有链路证据 | 由一致的采样策略决定 |\n| 不采集某类日志 | 失去该类事件记录 | 有明确日志价值和审计边界 |\n\n过滤健康检查、测试请求和重复字段之前，先列出保留例外。例如健康检查失败时可能有价值，安全日志不能因“量太大”就套普通业务日志过滤条件。默认规则应偏窄，确认效果后再扩大范围。", "subs": ["先补默认值，不轻易覆盖来源", "过滤要写清楚丢弃单位"]}, {"title": "11.3 使用少量 OTTL 完成实际转换", "content": "OTTL 是 Collector 内对遥测对象执行条件和变换的语言。它能访问 Resource、Span、LogRecord、Metric 和 DataPoint 等上下文，但字段合法与否取决于当前信号和处理上下文。**不能把日志正文中的 JSON 字段，直接当作 Span 的标准字段使用。**\n\n本节采用 contrib 0.136.0 `transform` 支持的带前缀写法，明确 `span`、`log`、`datapoint` 和 `resource` 的归属。不展开全量函数词典，只学习四种能够直接用在当前实验中的操作。\n\n```yaml\n# 增量片段：加入需要处理的 pipeline，不能只定义不启用。\nprocessors:\n  transform/normalize:\n    error_mode: ignore\n    trace_statements:\n      - set(span.attributes[\"demo.result\"], \"failed\") where span.status.code == STATUS_CODE_ERROR\n      - delete_key(span.attributes, \"demo.secret\")\n    metric_statements:\n      - set(datapoint.attributes[\"service.name\"], resource.attributes[\"service.name\"]) where resource.attributes[\"service.name\"] != nil\n      - set(datapoint.attributes[\"deployment.environment.name\"], resource.attributes[\"deployment.environment.name\"]) where resource.attributes[\"deployment.environment.name\"] != nil\n    log_statements:\n      - delete_key(log.attributes, \"demo.secret\")\n      - set(log.attributes[\"demo.failed\"], true) where log.severity_number >= SEVERITY_NUMBER_ERROR\n```\n\n第一种操作是**根据状态派生属性**。它不负责发现业务错误，而是把已经存在的 ERROR 状态转为方便检索的演示字段。若源应用忘记设置错误状态，这条规则并不能神奇识别问题。\n\n第二种是**删除明确的敏感演示字段**。这只删除指定位置的键；同样的值若还出现在异常 message、堆栈、URL、嵌套 body 或其他属性中，依然可能泄露。源头避免收集与完整的数据审查不能被一个 `delete_key` 代替。\n\n第三种是**有选择地将 Resource 复制到 DataPoint 标签**，让 Prometheus 查询服务和环境更直接。它不是把全部 Resource 自动铺到每个指标上。实例标签和聚合身份的处理要结合第 12 章，避免删除区分不同写入者的必要信息。\n\n第四种是**根据标准日志级别派生结构化布尔属性**。只有前面的日志解析已经把级别映射到 LogRecord SeverityNumber，规则才有预期含义；正文里仅出现字符串 `ERROR` 并不足够。\n\n#### 错误模式不是“安全等级”\n\n| 模式 | 出错后的行为 | 运维取舍 |\n| --- | --- | --- |\n| `ignore` | 记录转换错误并继续 | 保留业务数据，但转换可能没完成 |\n| `silent` | 忽略且不输出对应错误日志 | 降低噪声，也更难发现规则失效 |\n| `propagate` | 向上游传播错误 | 可能导致该批数据失败或丢弃 |\n\n对普通字段丰富可选择 `ignore`，但对必须阻止敏感字段离开边界的规则，不能默认失败继续就是安全的。应在独立验证环境测试错误路径，并由源头白名单、受控出口或其他强制机制保证边界。", "subs": ["错误模式不是“安全等级”"]}, {"title": "11.4 验证处理顺序与规则误伤", "content": "规则验证应从“输入集合”出发，而不是从“看起来合理的表达式”出发。一条只在理想 JSON 上通过的规则，遇到字段缺失、数字变字符串、旧版本字段或嵌套对象时，可能保持静默、出错或误删。\n\n下面的脚本生成一份**合成 OTLP/HTTP JSON Trace 载荷**，不代表实际业务流量。使用当前时间、随机 Trace ID，并把一条 ERROR Span 和一条健康检查 Span 放到不同 Trace 中，便于分别验证转换和过滤。\n\n```python\n# 文件建议名：make-otel-fixture.py；运行：python3 make-otel-fixture.py > fixture.json\nimport json\nimport secrets\nimport time\n\nnow = time.time_ns()\nspans = []\nfor route, status in [(\"/work\", 2), (\"/healthz\", 0)]:\n    spans.append({\n        \"traceId\": secrets.token_hex(16),\n        \"spanId\": secrets.token_hex(8),\n        \"name\": \"fixture \" + route,\n        \"kind\": 2,\n        \"startTimeUnixNano\": str(now - 100_000_000),\n        \"endTimeUnixNano\": str(now),\n        \"status\": {\"code\": status},\n        \"attributes\": [\n            {\"key\": \"http.route\", \"value\": {\"stringValue\": route}},\n            {\"key\": \"demo.secret\", \"value\": {\"stringValue\": \"FAKE_SECRET_ONLY\"}},\n        ],\n    })\nprint(json.dumps({\n    \"resourceSpans\": [{\n        \"resource\": {\"attributes\": [\n            {\"key\": \"service.name\", \"value\": {\"stringValue\": \"rule-fixture\"}}\n        ]},\n        \"scopeSpans\": [{\"scope\": {\"name\": \"ops-roadmap/fixture\"}, \"spans\": spans}],\n    }]\n}))\n```\n\n```bash\ncurl -sS --max-time 5 \\\n  -H 'Content-Type: application/json' \\\n  --data-binary @fixture.json \\\n  http://127.0.0.1:4318/v1/traces\n```\n\nOTLP JSON 编码不是任意业务 JSON；它遵循协议对字段名、Trace ID 十六进制和 64 位整数字段等的编码规则。本脚本把纳秒时间编码为十进制字符串。不要拿第一卷的业务日志 JSON 直接 POST 到 OTLP Trace 接口。\n\n#### 建立处理规则的输入矩阵\n\n| 输入 | 应检查的输出 | 失败意味着什么 |\n| --- | --- | --- |\n| `/work`、ERROR、含假 secret | Span 保留，派生 failed，secret 键消失 | 转换未启用或字段路径不匹配 |\n| `/healthz`、UNSET | 在启用 filter 后被丢弃 | 规则未引用、属性不符或顺序错误 |\n| 缺少 `http.route` | 明确是否保留，而非意外丢弃 | 缺失值逻辑未经设计 |\n| 同一 secret 放进 body / event | 验证现有规则不会自动覆盖其他位置 | 说明脱敏范围不完整，不是实验失败的借口 |\n| 不存在的环境字段 | insert 默认是否符合可信来源 | 可能错误给跨环境数据贴标签 |\n\n建议一次只改变一个规则或处理顺序，保存输入和处理后的 debug 输出，成功后再叠加。要验证“处理前”，可以先在无规则配置下发送同一输入，再在有规则配置下发送；不要把两轮都写到正式后端造成重复记录而影响统计。\n\n验证结束后，删除实验 `FAKE_SECRET_ONLY` 数据、关闭详细 debug，并保留规则、输入样例和预期结果作为回归材料。版本升级和字段改名时重复执行，比依赖“以前启动过”可靠得多。", "subs": ["建立处理规则的输入矩阵"]}, {"title": "11.5 自动检测资源身份并防止来源污染", "content": "手工注入 `service.name` 与 Kubernetes Pod 身份之外，`resourcedetection` 可以根据运行环境补充主机、操作系统或云资源信息。但检测发生在运行检测器的进程所在环境：中心 Gateway 看到的主机不一定是产生业务遥测的主机。\n\n#### 让检测位置与数据来源一致\n\n下面是节点 Collector 的增量配置，可用于第 16 章同节点产生的 hostmetrics 数据。初次验证只在该数据源的专用 pipeline 中启用，不把它直接接到汇聚远程应用的公共 OTLP pipeline。\n\n```yaml\nprocessors:\n  resourcedetection/node:\n    detectors: [env, system]\n    timeout: 2s\n    override: false\n    system:\n      hostname_sources: [os]\n```\n\n`env` 可以读取 Collector 进程的 `OTEL_RESOURCE_ATTRIBUTES`，`system` 检测本地环境。`override: false` 用于保留输入中已有的同名 Resource 属性；它不保证新补充的属性就一定代表正确来源。在容器内，OS hostname 可能是容器的名字，所以本例只是验证机制，不能仅凭字段非空就认定得到了物理节点名。\n\n节点 Collector 已通过 Downward API 获得的 `k8s.node.name`，与 `host.name` 是两个不同字段。若需要统一主机名称，应明确选择可信来源并验证映射，而不是同时保留互相冲突的自动检测结果。\n\n| 数据路径 | 适合的身份来源 | 不宜直接套用的做法 |\n| --- | --- | --- |\n| 应用 SDK → Gateway | 应用 Resource 与经过校验的接入身份 | 给所有服务补上 Gateway 的主机/云实例 ID |\n| hostmetrics → 节点 Agent | 所在节点与受控的主机检测 | 把 Agent Pod 名当节点名 |\n| 应用 Pod → 节点 Agent | Pod UID 关联与应用身份 | 假定同节点的全部记录来自同一个 Pod |\n| 云主机 Agent → Gateway | 该主机对应云 detector 与角色权限 | 同时启用所有云厂商 detector |\n\nEC2、GCP、Azure 等 detector 应按实际部署环境单独选择。元数据接口不可达、代理误配、权限不足或容器网络隔离都会影响检测；某个 detector 超时不等于业务调用超时。先确认检测依赖、启动耗时与缺失时的处理方式，再进入公共模板。\n\n#### 用冲突样本验证覆盖优先级\n\n准备两条带不同 `service.name`、不同 `host.name` 的输入，再准备一条不带主机信息的输入。在 debug 输出中核对：已有服务身份没有被覆盖；缺失字段只在预期数据源上被补齐；没有把三条记录都归到 Collector 自身。\n\n同时记录检测器顺序、`override`、输入 Resource 和 Collector 环境变量。修改其中一项后重新比对。若公共 Gateway 无法可靠判断来源主机，应保留字段缺失并说明原因；错误的完整身份比明确缺失更容易误导排障。", "subs": ["让检测位置与数据来源一致", "用冲突样本验证覆盖优先级"]}, {"title": "11.6 对照转换前后的指标名称、标签与 Span 状态", "content": "转换规则需要回答“原始事实是否改变”。指标重命名通常用于迁移或兼容，标签重命名用于统一查询；数值和单位变化则直接影响统计含义。首先为一条明确命名的测试指标写规则，不从匹配所有指标的正则开始。\n\n#### 重命名而不改变数值含义\n\n下例使用 `metricstransform`，将教学队列深度指标改名并规范标签。它是 metrics pipeline 的 processor 增量，需在 exporter 前显式引用。\n\n```yaml\nprocessors:\n  metricstransform/queue:\n    transforms:\n      - include: demo.queue.length\n        action: update\n        new_name: demo.queue.depth\n        operations:\n          - action: update_label\n            label: cluster_name\n            new_label: cluster\n```\n\n| 输入 | 预期输出 | 必须保持 |\n| --- | --- | --- |\n| 名称 `demo.queue.length` | `demo.queue.depth` | 值不变 |\n| 标签 `cluster_name=lab` | `cluster=lab` | 标签值不变 |\n| Gauge 值 `12` | Gauge 值 `12` | 类型、时间戳与其他维度不变 |\n| 不匹配的另一指标 | 原样保留 | 不能被宽泛匹配误伤 |\n\n这与第 12 章 exporter 的命名翻译不同：本例在 OTel 数据内主动改变名字，exporter 之后还可能再做点号转下划线和单位后缀处理。验收需要同时看 Collector 内部输出和后端实际指标名。\n\n删除或合并标签会让原本不同的序列拥有相同身份，必须有明确聚合方式。不能把删掉 `instance` 当成自动求和，更不能把来自不同节点的 Cumulative 写入者变成同一个时间序列。\n\n#### 单位换算要同时检查数值与分布\n\n把 Gauge 从毫秒转秒时，`250 ms` 应对应 `0.25 s`，单位字段与面板阈值也要同步；只改名称后缀或 `unit` 不会自动修正数值。Histogram 还涉及桶边界和 sum，不能仅缩放其中一项；计数 count 通常不随时长单位变化。应使用明确支持该指标类型的转换方式，并分别验证整数、浮点和分布数据。\n\n| 测试输入 | 应确认的结果 |\n| --- | --- |\n| 已经是秒的指标 | 不再次除以 1000 |\n| Histogram 的 100 ms 桶边界 | 转为 0.1 s，桶内计数保持含义 |\n| 空标签与缺失标签 | 不凭空生成不可解释的身份 |\n| 已存在目标名称/标签 | 先定义冲突策略，避免两份数据混在一起 |\n\n#### 状态修正必须有独立业务证据\n\n状态可以通过 OTTL 修改，但 Collector 不应仅凭 HTTP 400 或正文里的字符串就替业务认定成功。下面的增量规则仅在已经收到可信、明确的业务失败属性时，把仍为 UNSET 的 Span 标为 ERROR：\n\n```yaml\nprocessors:\n  transform/business-status:\n    error_mode: ignore\n    trace_statements:\n      - set(span.status.code, STATUS_CODE_ERROR) where span.attributes[\"demo.business_failed\"] == true and span.status.code == STATUS_CODE_UNSET\n```\n\n该属性应由受控应用在确定失败时产生，不能将外部用户任意传入的同名字段当作判据。规则不负责补齐异常堆栈或根因；已有 ERROR 不需要重复改写，已有 OK 与业务失败标记冲突时应查埋点逻辑，而非静默抹平。\n\n状态变化若发生在尾采样前，会改变错误保留集合；发生在 Span Metrics 前，会改变按状态聚合的结果。因此应在固定样本中覆盖属性为 true、false、缺失，以及状态为 UNSET、OK、ERROR 的组合，并明确 processor 顺序。将 ERROR 统一改成 OK 来消除红色标记，会让诊断证据和采样策略一起失真。", "subs": ["重命名而不改变数值含义", "单位换算要同时检查数值与分布", "状态修正必须有独立业务证据"]}]}, {"title": "第 12 章：OTel Metrics 与 Prometheus / VictoriaMetrics", "sections": [{"title": "12.1 理解 Instrument、聚合与 Temporality", "content": "应用调用 Counter.Add 或 Histogram.Record 时，记录的是一次测量。它不必对应网络上的一条单独消息；SDK 会按配置聚合，再由 Reader 与 Exporter 周期性取出数据。理解这个过程，才能判断接口 QPS、累计值和延迟分布是否正确。\n\n```mermaid\nflowchart LR\n    A[业务测量] --> B[Instrument]\n    B --> C[View 和属性选择]\n    C --> D[SDK 聚合]\n    D --> E[MetricReader]\n    E --> F[OTLP Exporter]\n    F --> G[Collector 与指标后端]\n```\n\n| Instrument | 典型含义 | 容易误用的地方 |\n| --- | --- | --- |\n| Counter | 只增加的累计事件，如完成请求数 | 不能用负数撤销以前的事件 |\n| UpDownCounter | 可增加和减少的数量，如活跃任务 | 不等于任意瞬时快照 |\n| Histogram | 一组数值的分布，如耗时 | 单位和桶边界必须一致 |\n| Observable Gauge | 回调观察当前值，如队列深度 | 不应用 Counter 的增长速率解释 |\n| Observable Counter | 回调提供累计总值 | 要处理进程重启和累计起点 |\n\n本笔记 `demo.requests` 是同步 Counter，`demo.request.duration` 是以秒计的显式桶 Histogram。View 明确设置 `.005` 到 `5` 秒的边界，SDK 在导出时形成桶计数、sum、count 等数据；它不是每隔五秒计算一次应用的 p99 再发给 Prometheus。\n\n#### Cumulative 与 Delta 的差异\n\n假设一个实例在两个连续采集周期新增 8 次和 5 次请求。Cumulative 可以报告从同一开始时间累计的 8、13；Delta 则报告各自区间的 8、5。两者表达同一组事件的不同聚合时域，不能在未知起点和丢失区间的情况下随意互换。\n\n进程重启会影响 Cumulative 起点；Delta 到 Cumulative 的转换器需要记住每条指标流的状态。若多台转换器轮流接收同一流而不共享状态，可能产生错误重置或不连续的累计结果。这个问题属于第三卷的状态所有权，不是仅换 exporter 就能解决。\n\nHistogram 还区分显式桶与指数桶。不能因为两个后端都有“直方图”就认定桶布局、序列名称、查询函数与精度一致。第一版实验固定显式桶和 Cumulative，先减少变量；要改变聚合形式，再单独做兼容验证。", "subs": ["Cumulative 与 Delta 的差异"]}, {"title": "12.2 比较三种指标接入路径", "content": "OTel 接入不要求把现有 node-exporter、kube-state-metrics、Prometheus 和 vmagent 全部替换。首先区分“新应用怎样产生指标”和“基础设施既有指标怎样采集”，再为每条路径指定唯一负责人。\n\n| 路径 | 数据流 | 优势 | 需要验证 |\n| --- | --- | --- | --- |\n| 保留原抓取 | Exporter → Prometheus / vmagent | 保持已有查询和告警 | 新旧采集不要重复 |\n| Collector 转换 | OTel SDK → Collector → Prometheus scrape / remote write | 统一接入与处理 | 名称、单位、Resource 映射 |\n| 后端原生 OTLP | SDK / Collector → 后端 OTLP 接口 | 少一层格式转换出口 | 后端独有路径与语义约束 |\n\n本卷主实验选择第二种中的 **Collector 暴露 Prometheus 端点、Prometheus 主动抓取**。这样可以在抓取前直接看到文本指标，方便理解转换过程。不把“Prometheus exporter”误认为“Prometheus remote write exporter”。\n\n#### 给第一卷实验增加指标路径\n\n第一步，在 `collector.yaml` 的 `processors` 中增加：\n\n```yaml\n# 增量：只提升少量用于查询的 Resource 属性。\nprocessors:\n  transform/metric-labels:\n    error_mode: ignore\n    metric_statements:\n      - set(datapoint.attributes[\"service.name\"], resource.attributes[\"service.name\"]) where resource.attributes[\"service.name\"] != nil\n      - set(datapoint.attributes[\"deployment.environment.name\"], resource.attributes[\"deployment.environment.name\"]) where resource.attributes[\"deployment.environment.name\"] != nil\n```\n\n第二步，增加 exporter，并在 `service.pipelines` 中新增 metrics；原 traces pipeline 保持不变：\n\n```yaml\n# 增量：与第一卷同名顶层段合并。\nexporters:\n  prometheus:\n    endpoint: 0.0.0.0:8889\n    enable_open_metrics: true\n    translation_strategy: UnderscoreEscapingWithSuffixes\n    resource_to_telemetry_conversion:\n      enabled: false\n\nservice:\n  pipelines:\n    metrics:\n      receivers: [otlp]\n      processors: [memory_limiter, transform/metric-labels, batch]\n      exporters: [prometheus]\n```\n\n第三步，在 `lab/prometheus.yaml` 写入完整 Prometheus 配置：\n\n```yaml\nglobal:\n  scrape_interval: 5s\n  evaluation_interval: 5s\n\nscrape_configs:\n  - job_name: otel-app-metrics\n    honor_labels: true\n    static_configs:\n      - targets: [otel-collector:8889]\n```\n\n`honor_labels: true` 让 exporter 提供的 job / instance 身份不被统一替换为 Collector 抓取地址，便于保留不同源应用的指标身份。这种设置只适用于信任该出口提供标签的场景；未知租户不应随意覆盖监控系统的标签身份。\n\n第四步，在 Compose 的 `services` 中新增 Prometheus，并在已有 Collector 服务的 `ports` 列表追加 8889 映射：\n\n```yaml\n# Compose 增量，不是独立 compose.yaml。\nservices:\n  prometheus:\n    image: prom/prometheus:v3.5.0\n    command:\n      - --config.file=/etc/prometheus/prometheus.yml\n      - --storage.tsdb.path=/prometheus\n      - --enable-feature=exemplar-storage\n    volumes:\n      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro\n    ports:\n      - \"127.0.0.1:9090:9090\"\n    depends_on:\n      - otel-collector\n    mem_limit: 512m\n\n  otel-collector:\n    ports:\n      - \"127.0.0.1:8889:8889\"\n```\n\n手动编辑原文件时只追加 8889，保留第一卷的 4318 和 13133。后端数据没有在本示例做长期持久化，主要服务于实验；Prometheus 版本同样是教学固定值，不是生产维护建议。\n\n```bash\n# 在 lab/.env 保存开关，避免每次命令的环境不一致。\nprintf 'DEMO_SAMPLE_RATIO=1\\nDEMO_METRICS_ENABLED=true\\n' > .env\n\ndocker compose config\ndocker compose run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml\ndocker compose up -d --force-recreate otel-collector service-a service-b prometheus\n\nfor i in $(seq 1 20); do\n  curl -sS --max-time 5 http://127.0.0.1:8080/work?mode=ok > /dev/null\ndone\ncurl -sS http://127.0.0.1:8889/metrics | grep '^demo_'\n```\n\n该 `printf` 会覆盖实验 `.env`；若已有其他变量，请合并而不是直接执行覆盖。Metrics Reader 与 Prometheus scrape 各有周期，不要在第一条请求结束的同一瞬间要求面板已经更新。\n\n#### 原生 OTLP 是备选路径，不是同时必开的路径\n\nPrometheus 可通过 `--web.enable-otlp-receiver` 开启 OTLP Metrics 接收，常用 HTTP 路径是 `/api/v1/otlp/v1/metrics`。Collector 的 `otlphttp` 基地址可指向 `http://prometheus:9090/api/v1/otlp`。这需要单独核验 Prometheus 的 OTLP 配置、Resource 提升与时间聚合设置，不与本节 scrape 路径同时写入同一业务流。\n\nVictoriaMetrics 原生接收使用其文档说明的 `/opentelemetry/v1/metrics` 路径，集群通过对应租户入口；名称转换、Resource 提升和 Delta 行为与 Prometheus 不完全相同。对已有 VM 环境，应记录实际版本和 flags，再按 12.3 做对照；本文不为了学习额外启动第二套指标存储。", "subs": ["给第一卷实验增加指标路径", "原生 OTLP 是备选路径"]}, {"title": "12.3 核对名称、单位与属性到标签映射", "content": "一张图能够画出来，不代表两条接入路径的指标等价。最容易遗漏的差异有名称翻译、单位后缀、Resource 属性提升、实例身份以及 Cumulative / Delta 解释。\n\n本实验显式使用 `UnderscoreEscapingWithSuffixes`，将指标名称和标签转换为常见 Prometheus 形式。按这套配置，预期会看到类似 `demo_requests_total` 和 `demo_request_duration_seconds_bucket` 的名称；**以实际 `/metrics` 输出为准，不从代码中的名字直接猜查询表达式。**\n\n| OTel 层 | 主实验预期 Prometheus 层 | 核查重点 |\n| --- | --- | --- |\n| `demo.requests` 单调 Sum | `demo_requests_total` | 是否带 `_total`，是否单调累计 |\n| `demo.request.duration`，单位 s | `demo_request_duration_seconds_*` | 桶边界的单位是否仍是秒 |\n| `http.route` | `http_route` | 是否使用模板路径，不是完整 URL |\n| `service.name` 复制到 DataPoint | `service_name` | A 和 B 能否分开查询 |\n| `deployment.environment.name` | `deployment_environment_name` | 环境是否正确 |\n| Resource 中实例身份 | exporter 的来源标签 / target_info | 不同实例是否发生序列碰撞 |\n\n先看原始输出中的 HELP、TYPE 和标签，再写查询。以下 PromQL 假设已确认上述名称与服务标签；不是对任意后端的通用查询：\n\n```promql\n# 入口服务完成请求的速率，不叠加 service-b。\nsum by (http_route) (\n  rate(demo_requests_total{service_name=\"service-a\"}[5m])\n)\n```\n\n```promql\n# 5xx 比例。没有流量时分母为 0，结果应保留无数据/不可判定语义。\nsum(rate(demo_requests_total{service_name=\"service-a\",http_response_status_code=~\"5..\"}[5m]))\n/\nsum(rate(demo_requests_total{service_name=\"service-a\"}[5m]))\n```\n\n```promql\n# 显式桶 Histogram 的入口 p95；保留 le 后聚合。\nhistogram_quantile(\n  0.95,\n  sum by (le, http_route) (\n    rate(demo_request_duration_seconds_bucket{service_name=\"service-a\"}[5m])\n  )\n)\n```\n\n低流量短实验可能不足以支撑稳定分位数，桶之间还会产生估计误差。不要对各实例的 p95 直接求平均，也不要在请求量为零时默认错误率为零，进而把“没有证据”写成“业务正常”。\n\n#### 与 VictoriaMetrics 对照时保存哪些信息\n\n不要求后端输出完全同名，而要求**翻译规则清楚、统计含义一致**。可以保存一条 SDK 原始指标、Collector 出口样例、后端查询结果，以及后端版本和命名 flags。VM 当前文档允许保留 OTel 风格名称或启用 Prometheus 命名，还提供 Resource 提升控制；旧部署并不一定具备当前所有选项。\n\nDelta 指标尤其不能仅换查询名称。VM 文档对 Delta 的支持存在版本边界，且其查询与去重/降采样限制需要另行核验。本主实验统一 Cumulative；不得把收到的区间增量直接当成累计 Counter 去做相同的 `rate()`。\n\n“服务实例”是指标流身份的一部分，不能为了降低基数删除所有实例区分字段，导致多个累计写入者争用同一序列。更合适的方式是先保持合法身份，再在查询或经过验证的聚合层求和。", "subs": ["与 VictoriaMetrics 对照时保存哪些信息"]}, {"title": "12.4 理解 Exemplar 与 Span 派生指标", "content": "Exemplar 是某个指标观测对应的一个具体样本线索，可以带 Trace ID / Span ID，让读者从延迟曲线跳到代表性调用。它不是把所有请求 ID 都做成常规标签，也不是每个指标点都必定保存一个可查询 Trace。\n\n```mermaid\nflowchart LR\n    A[全量业务请求] --> B[业务 Histogram]\n    A --> C[Span 与采样]\n    B --> D[指标存储和曲线]\n    C --> E[Trace 后端]\n    D -.->|Exemplar 关联| E\n```\n\n要实现跳转，应用测量时应带正确 Context，SDK 应支持并允许产生 Exemplar，传输与出口应保留它，指标后端应接收并保存，查询或可视化层也需配置 Trace 数据源。第一卷在 `duration.Record(ctx, ...)` 传入当前 Context，是其中一个前提，不是完整功能保证。\n\n在本实验中，Collector 的 `enable_open_metrics: true` 与 Prometheus 的 exemplar 存储开关为传输和保存提供条件。可以用协商 OpenMetrics 的方式查看出口：\n\n```bash\ncurl -sS \\\n  -H 'Accept: application/openmetrics-text; version=1.0.0; charset=utf-8' \\\n  http://127.0.0.1:8889/metrics | grep '^demo_'\n```\n\n若样本不足、当前测量没有有效采样上下文，或中间组件没有保留 Exemplar，输出可能没有关联信息。若 Tail Sampling 在后面丢弃了对应 Trace，也可能出现指标上有 ID、链路后端却没有结果的情况。**Exemplar 不是后端存在性索引。**\n\n#### Span Metrics 和原生业务指标不是同一统计口径\n\n`spanmetrics` connector 从它收到的 Span 生成调用数、错误数和耗时分布。它的输入已经可能受头部采样、传输失败和过滤影响；放在尾采样之后，还会只看到被策略保留的偏置样本。\n\n```yaml\n# 可选增量：只在理解口径后启用，不替换业务 demo.* 指标。\nconnectors:\n  spanmetrics:\n    namespace: demo.span\n    histogram:\n      unit: s\n      explicit:\n        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s]\n    aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE\n    metrics_flush_interval: 15s\n    dimensions:\n      - name: http.route\n        default: unknown\n```\n\n再把 connector 同时放入 traces 的 exporters 和 metrics 的 receivers，具体连接方式见 10.3。选择服务端入口 Span 才能解释服务请求量；全部 Span 的 calls 是操作次数，不是用户请求数。\n\n若准备在尾采样前生成 Span Metrics，不能把 `spanmetrics` 简单加入一条已经经过 `tail_sampling` 的 pipeline 的 exporters。应显式拆出前置分支或在独立上游 Collector 生成，并审查每条数据是否只进入一个聚合器。增加分支也会增加队列和状态成本，第三卷讨论其扩容风险。\n\n一个实用原则是：**用未依赖 Trace 保留策略的业务指标判断异常规模，用 Trace 样本解释具体过程。** 错误优先保留后的 Trace 集合，适合观察错误细节，不适合直接计算总体错误率或延迟分位数。", "subs": ["Span Metrics 和原生业务指标不是同一统计口径"]}]}, {"title": "第 13 章：日志接入与 Trace 关联", "sections": [{"title": "13.1 理解 LogRecord 与结构化字段", "content": "日志文本、日志采集和日志关联是三个不同问题。应用向 stdout 写出一行 JSON，只说明它产生了结构化文本；Collector 读取该行后，还需要把时间、级别、正文、属性与链路上下文映射到正确位置。\n\nOTel LogRecord 有独立的时间和上下文字段。`Body` 可以是文本或结构化值；`Attributes` 是事件附加信息；Resource 说明来源；TraceId、SpanId 和 TraceFlags 用于关联当前执行上下文。不要把整个原始 JSON 放在 Body 里，就认为后端已经能够使用所有标准字段。\n\n| 本例原始 JSON | 规范化后的位置 | 为什么要区分 |\n| --- | --- | --- |\n| `time` | Timestamp | 业务发生时间，不是采集时间 |\n| 采集器实际观察时刻 | ObservedTimestamp | 帮助识别采集延迟 |\n| `level` | SeverityText / SeverityNumber | 可以按级别查询和过滤 |\n| `msg` | Body | 主体消息 |\n| `service.name` | Resource Attributes | 日志由哪个服务产生 |\n| `trace_id` | LogRecord TraceId | 正式链路关联字段 |\n| `span_id` | LogRecord SpanId | 当前操作关联 |\n| HTTP 状态、耗时、案例号 | LogRecord Attributes | 事件相关查询维度 |\n\n#### 时间、级别与错误需要保持原义\n\n如果文件里只有采集时间而没有业务时间，排障时间窗可能偏移；如果存在明显积压，日志最近被采集也不能证明事件刚发生。两个时间字段应分别解释，不把延迟数据误认为实时故障。\n\nERROR 级别日志也不等于用户请求一定失败。重试中间失败、被捕获异常、业务容错都可能产生日志而最终成功。反过来，业务失败也可能被不恰当地写成 INFO。日志级别是来源表达，应结合入口状态、错误码和 Span，而不是直接代替故障判定。\n\n没有活动 Trace 的启动、定时维护和基础设施日志可以没有 TraceId。不要为每条这样的日志强造一个“能跳转的 Trace ID”，也不要把不存在上下文时的全零 ID 当作有效关联键。\n\n本卷的日志主实验先把第一卷实际生成的日志导出到文件，再由 filelog 解析并在 debug 中检查结构。这样即使没有新的日志后端，也能验证最容易出错的数据映射层。", "subs": ["时间、级别与错误需要保持原义"]}, {"title": "13.2 比较日志桥接与文件采集", "content": "日志接入可以从应用内直接导出，也可以沿用应用原本的 stdout / 文件，再由 Collector 或现有采集器读取。选择标准不是“哪种更像 OTel”，而是接入成本、字段质量、故障缓冲和已有系统边界。\n\n| 路径 | 优点 | 主要责任 |\n| --- | --- | --- |\n| 日志框架桥接到 OTel SDK | 更容易取得当前 Context 和原生结构 | 日志桥、SDK 队列、生命周期、语言版本 |\n| stdout / 文件 → filelog | 较少改动应用，便于保留旧日志路径 | 解析、轮转、偏移、权限与容器格式 |\n| 保留 Filebeat / Logstash → ES | 不重建已可用链路 | 统一 JSON 字段和 Trace ID 查询能力 |\n| 双路短期验证 | 比较新旧路径数据质量 | 去重口径、成本上限、退出时间 |\n\n```mermaid\nflowchart LR\n    A[应用日志框架] --> B[stdout 或文件]\n    A -.->|可选桥接| C[OTel Logs SDK]\n    B --> D[现有 Filebeat 链路]\n    B --> E[filelog 实验链路]\n    C --> F[OTLP Logs Receiver]\n    E --> G[LogRecord]\n    F --> G\n    G --> H[日志后端或 debug]\n```\n\n图中的两条从同一文件出发的路径只适合明确的对照实验，不是默认推荐同时保留。若它们都写同一索引而没有可靠的事件 ID 去重，会增加日志数量；若双路分开存储，则应把对照窗口和费用限制写清楚。\n\n容器 stdout 还可能包着 CRI 格式、Docker JSON 外壳或运行时特有字段。`json_parser` 适合处理本实验提取的纯应用 JSON，不应直接拿去解析所有 `/var/log/pods` 文件。生产中要先处理运行时包裹、部分行与多行事件，再解析应用正文。\n\n第一卷没有配置 OTel Logs SDK，不应看到 `/v1/logs` 空闲就认定接入失败。它的日志仍由 stdout 输出；Trace 导出成功也不会自动把 stdout 转为 LogRecord。是否替换现有日志采集器，应放在第三卷的渐进接入决策中。", "subs": []}, {"title": "13.3 解析 JSON 与映射上下文", "content": "先在第一卷 lab 中产生几条新请求，再提取真正的业务完成日志。不使用固定假的 Trace ID 做端到端证明，因为假的 ID 只能测试字段解析，无法证明已有 Trace 的查询关联。\n\n```bash\nmkdir -p logs\ncurl -sS --max-time 5 -H 'X-Demo-Case: logs-001' \\\n  'http://127.0.0.1:8080/work?mode=error' > /dev/null\n\ndocker compose logs --no-color --no-log-prefix service-a service-b \\\n  | python3 -c '\nimport json, sys\nfor line in sys.stdin:\n    try:\n        item = json.loads(line)\n    except json.JSONDecodeError:\n        continue\n    if item.get(\"msg\") == \"request.complete\":\n        print(json.dumps(item, ensure_ascii=False))\n' > logs/requests.jsonl\nchmod 644 logs/requests.jsonl\n```\n\n以上是**一次性文件回放实验**，不是生产持续消费 Docker 日志的脚本。它会收集当前可取得的历史完成日志，并覆盖目标文件；已经做过采样或重启 Jaeger 时，文件里的旧 ID 未必仍可查询。\n\n#### 增加 filelog receiver\n\n```yaml\n# collector.yaml 增量；输入是本实验提取的纯 JSON Lines。\nreceivers:\n  filelog/demo:\n    include: [/input-logs/requests.jsonl]\n    start_at: beginning\n    include_file_path: true\n    operators:\n      - type: json_parser\n        parse_from: body\n        parse_to: attributes\n        on_error: send\n        timestamp:\n          parse_from: attributes.time\n          layout_type: gotime\n          layout: '2006-01-02T15:04:05.999999999Z07:00'\n        severity:\n          parse_from: attributes.level\n        trace:\n          trace_id:\n            parse_from: attributes.trace_id\n          span_id:\n            parse_from: attributes.span_id\n      - type: move\n        from: attributes.msg\n        to: body\n        if: 'attributes.msg != nil'\n      - type: move\n        from: attributes[\"service.name\"]\n        to: resource[\"service.name\"]\n        if: 'attributes[\"service.name\"] != nil'\n\nexporters:\n  debug/logs:\n    verbosity: detailed\n\nservice:\n  pipelines:\n    logs:\n      receivers: [filelog/demo]\n      processors: [memory_limiter, batch]\n      exporters: [debug/logs]\n```\n\n同时在 Compose 已有 Collector 的 volumes 列表追加：\n\n```yaml\n# Compose 增量：保留已有配置挂载。\nservices:\n  otel-collector:\n    volumes:\n      - ./logs:/input-logs:ro\n```\n\n本例没有把 `trace_sampled` 布尔值直接塞进 `trace_flags`，因为二者不是同一类型。TraceId 与 SpanId 已能验证关联；需要 Flags 时，应按 parser 要求增加正确编码的来源字段并测试。原始布尔值暂保留为普通属性，不冒充已填好的标准 Flags。\n\n#### 观察转换后的结构\n\n重建 Collector 前先执行配置校验，再查看 debug 输出。应该能看到 Resource 中的 service.name、LogRecord 的 Trace ID / Span ID、解析后的时间和级别，以及 Body 中的 `request.complete`。\n\n```bash\ndocker compose run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml\ndocker compose up -d --force-recreate otel-collector\ndocker compose logs --no-color --tail=200 otel-collector\n```\n\n如果 Trace ID 仍然只在 `Attributes` 的字符串里，应检查 `trace` 解析段是否真正执行，而不是继续加一个同名普通属性。若解析错误，`on_error: send` 选择保留问题记录，便于调查；它不保证每条记录已经规范化。生产上应对解析失败建立计数或隔离路径，避免看似有日志、实际字段质量很差。\n\n本例从 beginning 回放且未配置偏移持久化，Collector 重启后可能重新读取；这用于学习字段映射，不是 exactly-once 采集方案。第三卷将区分 filelog 偏移存储和 exporter 数据队列。删除日志文件也不等于删掉后端已入库的数据。", "subs": ["增加 filelog receiver", "观察转换后的结构"]}, {"title": "13.4 从访问日志定位具体 Trace", "content": "有效的日志关联流程是：先以接口、状态和时间定位异常集合，再从中选择能查询到的代表性 Trace。它不是把所有错误日志逐条无限查询，也不是默认每个 ID 都对应一条保存完好的链路。\n\n#### 把查询结果分成三种状态\n\n| 状态 | 已有证据 | 合理行动 |\n| --- | --- | --- |\n| 已找到 | 后端返回与 ID 对应的 Span | 核对服务、时间、父子关系和错误来源 |\n| 暂不可见 | 采样与导出预期存在，但仍在等待窗口 | 有限退避重查，检查队列和尾采样窗口 |\n| 当前无法取得 | 未采样、已过保留期、导出失败或原因未知 | 记录原因或未知，转用日志和指标，不编造 Trace |\n\n尤其在比例采样环境，接口错误聚合仍可以反映日志侧异常分布，而 Trace 只是其中的样本证据。维护一个“日志 ID 是否存在”的消费者可以改善后续检索效率，但它需要限流、退避、去重、截止时间和结果缓存；仅为了补偿查询延迟，先做有限重试可能更简单。\n\n一个合理的候选筛选顺序是：优先当前时间窗、确定业务失败、服务身份完整、Trace ID 合法的记录；再对不同错误码或接口挑代表样本。`trace_sampled=true` 可作为线索，但不是存在性结论。若所有失败样本都不可查询，应同时审查采样与遥测链路，而不是持续扩大搜索量。\n\n#### 对接 Loki 或保留 ELK\n\n已部署支持原生 OTLP 的 Loki 时，可以把标准 LogRecord 通过 `otlphttp` 发到其 `/otlp` 基地址，Exporter 追加 `/v1/logs`。这是**后端集成片段**，要求已有名为 `loki` 的可达服务与符合其版本要求的存储配置：\n\n```yaml\nexporters:\n  otlphttp/loki:\n    endpoint: http://loki:3100/otlp\n\nservice:\n  pipelines:\n    logs:\n      receivers: [filelog/demo]\n      processors: [memory_limiter, batch]\n      exporters: [otlphttp/loki]\n```\n\nLoki 原生接收依赖 Structured Metadata 的配置和存储支持；字段名也会做规范化。Trace ID 不应成为高基数索引标签。第 13.5 节给出已有 Grafana 数据源上的查询与跳转流程，本文不重复搭建完整 Loki / Grafana，保留原 ELK 的读者只需确保 Trace ID 字段以可精确检索的方式保存，并让界面跳转或查询程序使用正确的 Trace 后端。\n\n关联的最后一步必须检查内容匹配：响应的 ID、日志时间、服务和后端数据是否一致。不要只打开一个有内容的 Jaeger 页面，就把它当成刚才错误的证据。", "subs": ["把查询结果分成三种状态", "对接 Loki 或保留 ELK"]}, {"title": "13.5 在 Grafana 中从指标走到日志与 Trace", "content": "多信号关联需要三个条件同时成立：数据属于相同服务与环境，查询时间窗口覆盖事件，日志或 Exemplar 中的 Trace ID 能映射到正确的 Trace 后端。把 Prometheus、Loki、Jaeger 三个数据源都添加到 Grafana，只完成了连接配置。\n\n#### 先建立人工可复查的查询链\n\n沿用第一卷三语言实验，给同一轮请求使用 `multilang-error-001` 实验号。接入第二卷的 metrics pipeline 后，分别启用 Java/Python 的指标导出，再观察各服务的 `demo.requests`。业务入口是 Java，Python/Go 记录的是下游操作，不把三份请求数相加作为入口流量。\n\n1. 在 Grafana Explore 选择 Prometheus，先查询 `demo_requests_total` 查看真实标签，再按 Java 的服务身份筛选错误率；不同语言导出的标签映射以结果为准。\n2. 将时间范围缩到异常前后，切换 Loki，按 `service_name` 和环境筛选服务日志。\n3. 找到同一实验号的完成日志，读取 Trace ID，切换 Jaeger 数据源按 ID 查询。\n4. 在 Trace 中找到原始 Go 失败，再对照 Python/Java 的上游错误，记录各层状态。\n\n如果保留应用原始 JSON 作为 Loki 的日志正文，可以使用下面的 LogQL。`service_name` 前提是已经被配置为索引标签；字段过滤不要求 Trace ID 成为标签。\n\n```logql\n{service_name=\"stock-python\"}\n  | json\n  | __error__ = \"\"\n  | trace_id = \"4bf92f3577b34da6a3ce929d0e0e4736\"\n```\n\n若按照第 16 章把正文改为 `request.complete`，Trace ID 已放入标准 LogRecord 字段，Loki 原生 OTLP 接收后通常可通过 `trace_id` Structured Metadata 筛选。这时不再对纯文本正文使用 `| json`：\n\n```logql\n{service_name=\"stock-python\"}\n  | trace_id = \"4bf92f3577b34da6a3ce929d0e0e4736\"\n```\n\n上面的固定 ID 是查询语法示例，实际操作必须替换成刚产生的 ID。先在 Explore 展开真实日志确认存储字段；应用 `attributes.app` 中的嵌套字段可能被映射或序列化，不能假定界面字段名仍与应用 JSON 完全相同。\n\n#### 将已验证的查询变成跳转\n\n对保留原始 JSON 正文的 Loki 数据源，可添加 Derived Field：名称为 `TraceID`，正则为 `\"trace_id\"\\s*:\\s*\"([0-9a-f]{32})\"`，Internal Link 指向已配置的 Jaeger 数据源，查询值使用捕获出的 ID。数据源 UID 必须是 Grafana 内实际配置的 UID，不是 Collector Service 名。\n\n对原生 OTLP Structured Metadata 路径，应按部署的 Grafana 版本使用字段关联能力；不要继续用正文正则匹配已经移到标准字段中的 ID。无论使用何种 UI 跳转，先手工复制 ID 能查到 Trace，再验收自动跳转，才能区分数据缺失与链接配置错误。\n\nExemplar 则从指标样本提供具体 Trace 的入口，前提是 SDK 记录了它、导出与存储路径保留了它、Grafana 配好了对应 Trace 数据源。普通标签中添加 Trace ID 不能替代 Exemplar，还会增加时间序列基数。\n\n| 现象 | 下一步检查 |\n| --- | --- |\n| 指标异常但没有 Exemplar | SDK/Exporter/后端是否保留 Exemplar，是否有可采样上下文 |\n| 日志有 ID，但 Jaeger 查不到 | 头/尾采样、导出延迟、时间/租户/后端是否一致 |\n| 手工查得到，点击跳转失败 | Derived Field 匹配范围、数据源 UID、传入查询值 |\n| 三端都出现错误日志 | 找原始失败与上游观察，不能计为三次入口事故 |\n| 相同服务名跨环境混杂 | 先修复 Resource 和筛选条件，再解释关联结果 |", "subs": ["先建立人工可复查的查询链", "将已验证的查询变成跳转"]}]}, {"title": "第 14 章：采样策略——比例、错误与慢请求", "sections": [{"title": "14.1 头部采样与父级决策", "content": "头部采样在创建 Span 的早期决定是否记录和导出。它适合在数据生成处控制开销，但决策时通常还不知道请求最后会不会报错、是否会变慢。因此“入口随机保留 10%，但所有后续错误都要留下”不能仅靠普通头部比例采样实现。\n\n第一卷用 `ParentBased(TraceIDRatioBased(ratio))`，使同一链路通常遵循根决策，而不是 A 保留 10%、B 再独立保留 10%，导致可见子链进一步随机破碎。这里的 ParentBased 行为依赖正确上下文传播，断链后 B 会建立新的根决策。\n\n```mermaid\nflowchart TD\n    A[开始处理请求] --> B{有有效父 Context}\n    B -->|有| C[按 ParentBased 策略处理父决策]\n    B -->|无| D[按根比例决定]\n    C --> E[传播 Trace Context]\n    D --> E\n    E --> F[请求结束并尝试导出被记录 Span]\n```\n\n#### 以本实验改变采样比例\n\n在实验 `.env` 中将 `DEMO_SAMPLE_RATIO` 修改为 `0.1`，保持 Metrics 开关与其他设置不变。然后重新创建两个应用，而不是只重启进程假定新的环境已加载。\n\n```bash\n# 以下命令假定你已手动编辑 lab/.env。\ndocker compose up -d --force-recreate service-a service-b\n```\n\n发送足够多独立请求，日志仍应大体保留业务完成记录，而 `trace_sampled=true` 的入口日志只占其中一部分。比例选择对独立随机 ID 有统计波动；20 个请求恰好保留 2 个不是协议保证，更不能每看一个小样本就判定算法错误。\n\n#### 验证远程未采样父级\n\n```bash\ncurl -sS --max-time 5 \\\n  -H 'traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00' \\\n  -H 'X-Demo-Case: parent-unsampled' \\\n  'http://127.0.0.1:8080/work?mode=error'\n```\n\n这是隔离实验使用的固定父上下文。即使根比例设为 1，本例的 ParentBased 默认也会尊重该未采样父决策。不要反复把这个固定 Trace ID 用作不同请求的正常压测数据，否则会把不相干的调用混入同一个上下文身份。\n\n在不可信边界，要由接入策略决定是否接受外部传播，不能让外部任意 `sampled=1` 成为强制消耗内部采集预算的权限。改变边界决策还要考虑原链路关联、Span Links 和跨组织可观测性，不能简单覆盖一个头就结束设计。", "subs": ["以本实验改变采样比例", "验证远程未采样父级"]}, {"title": "14.2 尾部采样与业务保留条件", "content": "尾部采样等待收集到一部分或全部调用证据后，再决定保留哪些 Trace。它可以依据错误状态、延迟或业务属性做选择，但付出的成本是：**候选数据已经到达采样层，需要网络、内存、等待时间和稳定的路由。**\n\n本章先用一个 Collector 实例，避免把策略学习与多副本状态问题混在一起。将两个应用的根采样比例恢复为 1，不主动带入未采样父上下文；否则尾采样只能在上游留下的候选中选择。\n\n#### 错误、慢请求与正常样本\n\n```yaml\n# collector.yaml 增量；固定于 contrib 0.136.0。\nprocessors:\n  tail_sampling:\n    decision_wait: 5s\n    num_traces: 10000\n    expected_new_traces_per_sec: 100\n    decision_cache:\n      sampled_cache_size: 50000\n      non_sampled_cache_size: 50000\n    policies:\n      - name: keep-errors\n        type: status_code\n        status_code:\n          status_codes: [ERROR]\n      - name: keep-slow\n        type: latency\n        latency:\n          threshold_ms: 500\n      - name: keep-normal-sample\n        type: probabilistic\n        probabilistic:\n          sampling_percentage: 10\n\nservice:\n  pipelines:\n    traces:\n      receivers: [otlp]\n      processors: [memory_limiter, tail_sampling, batch]\n      exporters: [otlp/jaeger]\n```\n\n本例的三条都是保留策略，匹配任一条即可保留；没有加入更复杂的 drop、反向匹配或 composite 策略。不要把“第一条只保留错误、第二条只保留慢”理解为顺序覆盖前一条决定。复杂组合应查固定版本的决策规则。\n\n`status_code` 判断 Span 状态，不是搜索日志里的 ERROR 字符串，也不是仅扫描 HTTP 响应码。第一卷已在明确业务失败处设置 `codes.Error`，因此错误策略有可用信号。HTTP 200 中的业务失败若从未被表达，采样器无从知道。\n\n`latency` 按收到的 Trace 中最早开始和最晚结束时间计算持续范围，不等同于总 Span 时长之和，也不一定等于某个入口 Span 的持续时间。缺失 Span、时钟偏移、异步延后都可能影响判断，需要结合实际场景验证。\n\n#### 这些参数不是什么\n\n`decision_wait: 5s` 是从该 Trace 首次到达采样器开始的等待条件，不是“等待业务请求结束后再加五秒”。`num_traces` 是容量边界；`expected_new_traces_per_sec` 用于结构分配提示，不是限速器。两个 decision cache 保存决定，用来处理已经决策后到达的 Span，不等于保留完整 Trace 的永久数据库。\n\n用于教学的 5 秒窗口能覆盖当前大部分短请求，但不能保证覆盖生产长事务、消息延迟和极端网络抖动。窗口越长通常保留更多未决状态；窗口太短则可能基于不完整信息决策。这一权衡将在第三卷量化。", "subs": ["错误、慢请求与正常样本", "这些参数不是什么"]}, {"title": "14.3 组合策略与不可恢复边界", "content": "最容易误解的组合是：应用头部采样 10%，Collector 尾部保留错误 100%。后面的“100%”只作用于**已经到达并被识别为错误的候选 Trace**，不能追回应在应用层就没有记录和导出的 90%。\n\n```text\n请求总体：10000\n  → 头部采样候选：约 1000\n  → 传输、过滤与采样层实际收到：不一定等于 1000\n  → 尾部策略保留：收到候选中的一部分\n  → 后端可查询：还受导出、存储、保留与查询影响\n```\n\n这些数字只说明关系，不是实测比例。即使不用头采样，尾采样也不能做“全生产所有错误零遗漏”的承诺：缺失埋点、断链、网络丢失、内存压力、决策窗口和后端失败都可能破坏前提。\n\n#### 选型先看需要回答什么\n\n| 主要需求 | 可考虑的策略 | 必须接受或补偿的边界 |\n| --- | --- | --- |\n| 限制应用侧开销，保留随机样本 | 头部比例采样 | 稀有错误可能没有 Trace |\n| 候选中优先保留错误与慢请求 | 尾部采样 | 需要承担候选传输与状态成本 |\n| 既有固定比例接入暂不能改 | 保持头采样，增加日志和指标证据 | 不能把尾采样当作追回机制 |\n| 少量核心流量需要更完整证据 | 明确边界的路由 / 业务策略 | 属性来源可信，防止滥用预算 |\n| 以 Trace 计算总体 SLI | 独立业务指标或经过论证的统计方法 | 偏置样本不能直接当总体 |\n\n若同时采用错误保留、慢请求保留和随机正常样本，那么查询出来的集合天然更偏向错误和慢请求。对这个集合计算“错误率 60%”，只能说明保存样本的组成，不代表真实流量有 60% 错误；对它计算 p95，也会夸大正常总体的延迟分布。\n\n有些采样场景可以通过已知采样概率进行估计，但组合策略、动态限速、缺失和未知概率会使简单放大失效。本文不提供一条把样本乘以十就称为准确总体的公式。运维上更稳妥的是独立保留全路径业务计数与延迟指标，让 Trace 承担可解释的样本诊断任务。\n\n“日志有 ID 却查不到”也要落到这个模型上：ID 生成是上下文行为，是否记录、是否导出、是否保留和是否可查询是连续但不相同的条件。增加查询消费者不会改变前面的采样事实。", "subs": ["选型先看需要回答什么"]}, {"title": "14.4 验证采样率与业务解释范围", "content": "采样实验要分清分母。请求工具发出多少请求、入口 handler 完成多少请求、应用标记 sampled 的根请求有多少、Collector 收到多少不同 Trace、Jaeger 最终查询到多少，不能混用。\n\n下面的 Python 脚本只负责产生低速请求并保存实际响应。它不假定 5xx 是网络错误，也不会在网络失败时伪造 Trace ID。修改 `MODE` 和 `N` 可以分别测试正常、错误与慢请求。\n\n```python\n# 文件建议名：sample-requests.py\n# 例如 MODE=ok N=200 python3 sample-requests.py > requests.jsonl\nimport json\nimport os\nimport secrets\nimport sys\nimport time\nimport urllib.error\nimport urllib.request\n\nmode = os.environ.get(\"MODE\", \"ok\")\ncount = int(os.environ.get(\"N\", \"100\"))\nif mode not in {\"ok\", \"error\", \"slow\", \"timeout\", \"broken\"}:\n    raise SystemExit(\"unsupported MODE\")\nif not 1 <= count <= 10000:\n    raise SystemExit(\"N must be in [1,10000]\")\nrun_id = secrets.token_hex(4)\n\nfor i in range(count):\n    case_id = f\"{run_id}-{mode}-{i:05d}\"\n    request = urllib.request.Request(\n        f\"http://127.0.0.1:8080/work?mode={mode}\",\n        headers={\"X-Demo-Case\": case_id},\n    )\n    item = {\"case_id\": case_id, \"sent_at_ns\": time.time_ns(), \"mode\": mode}\n    try:\n        try:\n            response = urllib.request.urlopen(request, timeout=6)\n        except urllib.error.HTTPError as exc:\n            response = exc\n        with response:\n            item[\"http_status\"] = response.status\n            item[\"response\"] = json.loads(response.read().decode(\"utf-8\"))\n    except (OSError, ValueError) as exc:\n        item[\"transport_or_decode_error\"] = str(exc)\n    print(json.dumps(item, ensure_ascii=False), flush=True)\n    time.sleep(0.02)\nprint(f\"run_id={run_id}\", file=sys.stderr)\n```\n\n#### 分两轮验证，不叠加混乱配置\n\n**第一轮只验证头采样。** Collector 不启用 tail_sampling，应用比例 0.1；用多条独立正常请求对比入口完成日志数与 sampled 数。不要把 A、B 的日志合在一起作为两个独立请求样本，也不要拿 Span 数除以请求数计算采样比例。\n\n**第二轮只验证尾采样。** 应用比例恢复 1，启用 14.2 的策略；分别产生正常、错误和慢请求。等决策窗口及导出完成后，比较不同类别的保存情况。错误和慢请求应在候选完整且容量正常的前提下被保留，正常请求只保留随机部分；未观察到的例外要排查，而非直接填为通过。\n\n| 记录项 | 实际填写 |\n| --- | --- |\n| 应用与 Collector 配置版本 | 文件快照或哈希 |\n| run_id、开始/结束时刻 | 请求文件中的真实值 |\n| 正常 / 错误 / 慢请求完成数 | 按 service-a 和案例号去重 |\n| sampled 根请求数 | 来源于 service-a 日志 |\n| 后端找到的不同 Trace 数 | 使用实际查询结果去重 |\n| 缺失原因分类 | 未采样、窗口未到、导出失败、未知等 |\n\n简单随机选择可用二项分布理解波动，例如理论标准差为 `sqrt(n × p × (1-p))`，但这里只适用于独立样本和固定概率的近似模型。存在相同 Trace ID、多级采样、错误优先策略或采集失败时，不能照搬这个验收阈值。\n\n学习完成的标准不是看到某个百分比，而是能准确说出：**哪个阶段选择了哪些候选，哪些请求没有证据，保存的数据能够支持什么范围的结论。**", "subs": ["分两轮验证，不叠加混乱配置"]}]}, {"title": "第 15 章：Kubernetes 上的部署与数据关联", "sections": [{"title": "15.1 比较 Agent、Gateway 和 Sidecar", "content": "Agent、Gateway 与 Sidecar 首先是拓扑角色，不是三种完全不同的遥测协议。Agent 靠近应用或节点采集，Gateway 汇聚多个来源，Sidecar 与应用共享 Pod 生命周期。选择哪个角色，应从数据位置、身份关联、故障影响和运维成本出发。\n\n```mermaid\nflowchart LR\n    subgraph NodeA[节点 A]\n      A[应用 Pod] --> B[节点 Agent]\n      C[容器日志文件] --> B\n    end\n    subgraph NodeB[节点 B]\n      D[应用与 Sidecar] --> E[Sidecar Collector]\n    end\n    B --> F[Gateway]\n    E --> F\n    F --> G[指标 日志 Trace 后端]\n```\n\n| 拓扑 | 适合的任务 | 代价或风险 |\n| --- | --- | --- |\n| 应用直接到 Gateway | 明确的 OTLP Push，接入路径短 | 应用承担到 Gateway 的网络与队列边界 |\n| 节点 Agent + Gateway | 节点日志、资源关联、集中治理 | 多一跳与更多运维对象 |\n| Sidecar | 强隔离、Pod 局部接入要求 | 每个 Pod 的额外资源与配置升级 |\n| 多级 Gateway | 区域汇聚、路由与尾采样分层 | 状态归属、扇出和故障面更复杂 |\n\n不是所有集群都需要三层。只有少量应用做 OTLP traces 时，直接到一个受控 Gateway 可以先解决问题；已经有成熟 Filebeat 和 vmagent 时，也不必为了形式统一再增加节点日志采集器。\n\n相反，读取节点上的容器日志不能仅靠一个中心 Deployment 挂载自己的文件系统完成。它必须访问真实节点文件或收到节点侧转发的数据。Pod 身份关联也要考虑信号经过哪些代理，不能只在最后一层拿连接 IP 猜来源。\n\n本章先给一个**仅用于验证 Kubernetes Resource 丰富的单实例 Gateway**，第 16 章再展开节点日志与指标采集，第 17 章学习 Operator；每个实验分别选择数据源。Kubernetes 运行环境需要单独验证；Compose 的服务 DNS 和镜像构建不会自动在集群里出现。", "subs": []}, {"title": "15.2 选择 DaemonSet 与 Deployment", "content": "DaemonSet 更适合每节点一份的文件和主机采集，Deployment 更适合接收应用主动发送的遥测和集中处理。它们的副本数含义不同：给 Deployment 增加副本不会自动把 Prometheus 抓取任务切成互斥分片，给 DaemonSet 增加节点也不会自动让尾采样状态完整。\n\n下面是完整的 Kubernetes 教学清单，建议保存为 `k8s-gateway.yaml`。它不使用 Compose 中的 Jaeger 地址，而是把处理后的 traces 输出到 debug，以便先验证集群接入和属性。接通集群内真实 Trace 后端后，再替换出口。\n\n```yaml\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: otel-lab\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: otel-gateway\n  namespace: otel-lab\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: otel-lab-pod-reader\nrules:\n  - apiGroups: [\"\"]\n    resources: [pods, namespaces]\n    verbs: [get, list, watch]\n  - apiGroups: [apps]\n    resources: [replicasets]\n    verbs: [get, list, watch]\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: otel-lab-pod-reader\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: otel-lab-pod-reader\nsubjects:\n  - kind: ServiceAccount\n    name: otel-gateway\n    namespace: otel-lab\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: otel-gateway-config\n  namespace: otel-lab\ndata:\n  config.yaml: |\n    extensions:\n      health_check:\n        endpoint: 0.0.0.0:13133\n    receivers:\n      otlp:\n        protocols:\n          grpc:\n            endpoint: 0.0.0.0:4317\n          http:\n            endpoint: 0.0.0.0:4318\n    processors:\n      memory_limiter:\n        check_interval: 1s\n        limit_mib: 400\n        spike_limit_mib: 80\n      k8sattributes:\n        auth_type: serviceAccount\n        passthrough: false\n        extract:\n          metadata:\n            - k8s.namespace.name\n            - k8s.pod.name\n            - k8s.pod.uid\n            - k8s.node.name\n            - k8s.deployment.name\n        pod_association:\n          - sources:\n              - from: resource_attribute\n                name: k8s.pod.uid\n      batch:\n        timeout: 1s\n        send_batch_size: 256\n        send_batch_max_size: 512\n    exporters:\n      debug:\n        verbosity: detailed\n    service:\n      extensions: [health_check]\n      pipelines:\n        traces:\n          receivers: [otlp]\n          processors: [memory_limiter, k8sattributes, batch]\n          exporters: [debug]\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: otel-gateway\n  namespace: otel-lab\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: otel-gateway\n  template:\n    metadata:\n      labels:\n        app: otel-gateway\n    spec:\n      serviceAccountName: otel-gateway\n      securityContext:\n        runAsNonRoot: true\n        runAsUser: 10001\n        runAsGroup: 10001\n      containers:\n        - name: collector\n          image: otel/opentelemetry-collector-contrib:0.136.0\n          args: [\"--config=/conf/config.yaml\"]\n          securityContext:\n            allowPrivilegeEscalation: false\n            readOnlyRootFilesystem: true\n            capabilities:\n              drop: [ALL]\n          ports:\n            - name: otlp-grpc\n              containerPort: 4317\n            - name: otlp-http\n              containerPort: 4318\n            - name: health\n              containerPort: 13133\n          readinessProbe:\n            httpGet:\n              path: /\n              port: health\n          livenessProbe:\n            httpGet:\n              path: /\n              port: health\n            initialDelaySeconds: 10\n          resources:\n            requests:\n              cpu: 100m\n              memory: 128Mi\n            limits:\n              memory: 512Mi\n          volumeMounts:\n            - name: config\n              mountPath: /conf\n              readOnly: true\n      volumes:\n        - name: config\n          configMap:\n            name: otel-gateway-config\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: otel-gateway\n  namespace: otel-lab\nspec:\n  selector:\n    app: otel-gateway\n  ports:\n    - name: otlp-grpc\n      port: 4317\n      targetPort: otlp-grpc\n    - name: otlp-http\n      port: 4318\n      targetPort: otlp-http\n```\n\n```bash\n# 仅在授权的测试集群执行；先确认当前上下文。\nkubectl config current-context\nkubectl apply --dry-run=server -f k8s-gateway.yaml\nkubectl apply -f k8s-gateway.yaml\nkubectl rollout status deployment/otel-gateway -n otel-lab\nkubectl logs -n otel-lab deployment/otel-gateway --tail=100\n```\n\n该清单没有公网 Ingress、没有 hostNetwork、没有特权模式，也没有节点文件挂载。RBAC 只为本示例的 Pod 与 Deployment 归属查询提供只读能力，不等于生产最小权限已经完成；如果只观察某个 Namespace，应再评估限定范围。\n\nConfigMap 更新也不等于 Collector 自动热加载。验证配置后按部署策略触发 rollout，并考虑正在处理的数据。文件日志 Agent 若需要 hostPath 和偏移目录，应独立审查读写范围，而不是把这个只读 Gateway 直接改成特权容器。", "subs": []}, {"title": "15.3 补充 Kubernetes 身份与权限", "content": "`k8sattributes` 需要把一条资源数据匹配到 Kubernetes Pod，才能补充 namespace、node 和 deployment 等信息。匹配依据可以是连接 IP，也可以是数据中明确携带的 Pod UID 等属性；两者各有前提。\n\n本节清单优先使用 **Downward API 注入的 `k8s.pod.uid`**，没有启用连接 IP 回退。这样应用忘记携带 UID 时，表现为缺失关联，而不是在经过代理时误把 Gateway 自身识别为业务来源。生产上可以设计其他关联规则，但必须对实际拓扑验证。\n\n#### 给应用注入 Pod 身份\n\n下面是应用 Pod 的容器 `env` 增量，应合并到已部署应用的清单，不是独立 Deployment。先把第一卷应用镜像发布到集群可访问的仓库，再按实际工作负载部署；不要把 Compose 的本地构建名称直接当成远端可拉取镜像。\n\n```yaml\n# 应用容器 env 片段；先定义被后续变量引用的值。\nenv:\n  - name: POD_UID\n    valueFrom:\n      fieldRef:\n        fieldPath: metadata.uid\n  - name: POD_NAME\n    valueFrom:\n      fieldRef:\n        fieldPath: metadata.name\n  - name: POD_NAMESPACE\n    valueFrom:\n      fieldRef:\n        fieldPath: metadata.namespace\n  - name: OTEL_SERVICE_NAME\n    value: service-a\n  - name: SERVICE_INSTANCE_ID\n    value: $(POD_UID)\n  - name: OTEL_RESOURCE_ATTRIBUTES\n    value: service.namespace=ops-roadmap,deployment.environment.name=lab,k8s.pod.uid=$(POD_UID),k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(POD_NAMESPACE)\n  - name: OTEL_EXPORTER_OTLP_ENDPOINT\n    value: http://otel-gateway.otel-lab.svc.cluster.local:4318\n```\n\n这里使用默认集群域 `cluster.local`；自定义集群域需要调整。service-b 应保持自己的服务名，不能把这段 `service-a` 原样复制给所有服务。示例用 Pod UID 表示实验实例，若要区分同一 Pod 内的容器重启实例，还需加入相应启动标识。\n\n#### 核对归属而不是只看字段存在\n\n```bash\n# 先选择实际应用命名空间和 Pod，再查看身份。\nAPP_NS=default\nAPP_POD=replace-with-your-app-pod\nkubectl get pod -n \"$APP_NS\" \"$APP_POD\" \\\n  -o jsonpath='{.metadata.uid}{\"\\t\"}{.metadata.name}{\"\\t\"}{.spec.nodeName}{\"\\n\"}'\n\nkubectl auth can-i list pods --all-namespaces \\\n  --as=system:serviceaccount:otel-lab:otel-gateway\n\nkubectl logs -n otel-lab deployment/otel-gateway --tail=200\n```\n\n`--as` 检查需要当前操作者具备相应 impersonation 权限；若命令被拒绝，不能直接推出 ServiceAccount 自身没有权限，应结合 RBAC 和 Collector 实际 403 日志判断。\n\n检查输出中的 Pod UID、名字、节点是否与真实应用一致。若所有数据都带 Gateway 的 Pod 名，首先怀疑关联依据或 Resource 被误写，而不是把它当成成功补充属性。ReplicaSet 或 Namespace API 权限缺失也可能只影响部分属性，不一定让所有 traces 停止接收。\n\n应用携带的 Resource 属性不是天然可信的认证身份。跨租户网关不能允许任意来源声称自己属于另一个 Pod 或 Namespace；应结合认证边界、允许来源和服务接入登记，而不是让元数据处理器承担认证职责。", "subs": ["给应用注入 Pod 身份", "核对归属而不是只看字段存在"]}, {"title": "15.4 避免重复采集并认识 Operator", "content": "Kubernetes 中最常见的观测配置失误，不是组件没装，而是**每个副本都采集了同一份数据**。节点日志、集群对象指标、Prometheus 抓取和应用 OTLP Push 的分配方式不同，不能用同一个副本策略处理。\n\n| 数据或任务 | 适合的归属 | 重复风险 |\n| --- | --- | --- |\n| 节点容器日志 | 每节点明确的采集者 | 多个 Agent 同时读同一目录 |\n| 节点主机指标 | 每节点实例 | 旧 exporter 与新 host receiver 双写 |\n| 集群对象事件或指标 | 指定集中采集者或有明确分片 | 每个节点都观察整个集群 |\n| Prometheus scrape targets | 互斥分片或明确 HA 去重方案 | 多个 Collector 抓同一目标 |\n| 应用 OTLP Push | 接收副本分担流量 | 不恰当扇出和状态处理造成重复 |\n\n第一版接入可以保留 node-exporter 和 kube-state-metrics，只增加应用 traces。新增 Collector 不应顺手全开 hostmetrics、kubeletstats 和 k8s_cluster，再发现已有 Prometheus 数字翻倍。\n\n#### Operator 管理什么，不管理什么\n\nOpenTelemetry Operator 可以管理 Collector 资源和部分语言自动埋点注入，减少手工维护工作负载。它不替代理解组件 pipeline，也不会自动保证尾采样完整、认证安全或所有应用都已经产生正确业务 Span。\n\nTarget Allocator 用于把 Prometheus receiver 的抓取目标分配给 Collector 实例。它解决的是“谁抓哪个 target”，不是“同一 Trace 进入哪台尾采样器”，也不是所有 receiver 的通用分片器。是否需要它，取决于你是否把 Prometheus 抓取迁移到了多副本 Collector。\n\n```mermaid\nflowchart LR\n    A[Prometheus targets] --> B[Target Allocator 的目标分配]\n    B --> C[Collector scrape shard 1]\n    B --> D[Collector scrape shard 2]\n    E[应用 Trace] --> F[按 Trace ID 路由]\n    F --> G[Tail sampler 1]\n    F --> H[Tail sampler 2]\n```\n\n这两条路径的分片键、状态和验证方式不同。增加副本之前，应明确是否允许同一个目标被抓多次、后端是否采用明确的 HA 去重、路由成员变更是否影响状态。第三卷会进一步区分抓取状态、指标累计状态和尾采样状态。\n\n本卷 Kubernetes 学习的验收，不是成功安装 Operator，而是能解释一条数据从哪个 Pod 来、经过哪些 Collector、谁负责其采集、是否重复、缺失元数据时去哪里查。实验结束后按你创建的清单清理资源，注意 ClusterRole / Binding 是集群级对象，删除前确认没有被其他实验共用。", "subs": ["Operator 管理什么"]}]}, {"title": "第 16 章：Kubernetes 节点指标、容器日志与事件采集", "sections": [{"title": "16.1 先分配采集职责，再部署节点 Collector", "content": "第 15 章只验证应用 OTLP 和 Pod 身份。本章增加实际基础设施数据源：每节点读取主机与容器数据，集群级对象由一个有明确归属的采集实例负责。已有 node-exporter、kube-state-metrics、Filebeat 或 vmagent 时，先在隔离命名空间验证重叠范围，不默认替换已有链路。\n\n| 组件 | 数据来自哪里 | 适合部署位置 | 容易重复的已有来源 |\n| --- | --- | --- | --- |\n| `hostmetrics` | 节点操作系统与挂载的主机文件系统 | 每节点 DaemonSet | node-exporter 的部分指标 |\n| `kubeletstats` | 所在节点 kubelet 的统计接口 | 每节点 DaemonSet | kubelet/cAdvisor 的部分资源指标 |\n| `k8s_cluster` | Kubernetes API 中的对象状态 | 明确单份归属的 Deployment | kube-state-metrics 的部分对象指标 |\n| `filelog` | 节点容器日志文件 | 有日志挂载的 DaemonSet | Filebeat、Fluent Bit 等文件采集 |\n| `k8sobjects` | Kubernetes API 对象与 Events | 明确单份归属的 Deployment | 既有 Event exporter |\n| `k8sattributes` | API 元数据缓存及关联规则 | 需要丰富身份的处理管道 | 它是 processor，不是指标来源 |\n\n“有部分重叠”不意味着指标名、单位、标签、采样周期和缺失语义相同。迁移时先选节点 CPU、Pod 内存、容器重启三个问题做对照，不把旧 Dashboard 的表达式只换前缀就当完成。\n\n#### 可独立检查的节点配置\n\n以下完整 Collector 配置保存为 `node-collector.yaml`，以 contrib `0.136.0` 为基线。先输出到 debug，确认来源后再接后端。它只读取 `otel-demo` 命名空间的容器日志，并排除下一章的 Gateway 日志；节点 Collector 自身位于 `otel-lab`，避免把详细输出再次采集形成循环。\n\n```yaml\nextensions:\n  health_check:\n    endpoint: 0.0.0.0:13133\n  file_storage:\n    directory: /var/lib/otelcol/storage\nreceivers:\n  hostmetrics:\n    collection_interval: 30s\n    root_path: /hostfs\n    scrapers:\n      cpu: {}\n      memory: {}\n      load: {}\n  kubeletstats:\n    collection_interval: 30s\n    auth_type: serviceAccount\n    endpoint: https://${env:K8S_NODE_NAME}:10250\n    insecure_skip_verify: false\n    metric_groups: [node, pod, container]\n  filelog/containers:\n    include: [/var/log/pods/otel-demo_*/*/*.log]\n    exclude: [/var/log/pods/otel-demo_language-gateway-collector-*/*/*.log]\n    include_file_path: true\n    start_at: beginning\n    storage: file_storage\n    operators:\n      - type: container\n        id: container-parser\nprocessors:\n  memory_limiter:\n    check_interval: 1s\n    limit_mib: 400\n    spike_limit_mib: 80\n  resource/node:\n    attributes:\n      - key: k8s.node.name\n        value: ${env:K8S_NODE_NAME}\n        action: upsert\n  k8sattributes:\n    auth_type: serviceAccount\n    passthrough: false\n    filter:\n      node_from_env_var: K8S_NODE_NAME\n    extract:\n      metadata: [k8s.namespace.name, k8s.pod.name, k8s.pod.uid, k8s.node.name]\n    pod_association:\n      - sources:\n          - from: resource_attribute\n            name: k8s.pod.uid\n  batch:\n    timeout: 5s\n    send_batch_size: 256\n    send_batch_max_size: 512\nexporters:\n  debug:\n    verbosity: detailed\nservice:\n  extensions: [health_check, file_storage]\n  pipelines:\n    metrics:\n      receivers: [hostmetrics, kubeletstats]\n      processors: [memory_limiter, resource/node, k8sattributes, batch]\n      exporters: [debug]\n    logs:\n      receivers: [filelog/containers]\n      processors: [memory_limiter, k8sattributes, batch]\n      exporters: [debug]\n```\n\n`resource/node` 在 metrics 管道中注明实际采集节点；hostmetrics 没有 Pod UID 是正常情况，不应猜测它属于 Collector Pod。`k8sattributes.filter` 限制元数据缓存范围，并不是数据过滤器；`passthrough: false` 表示执行元数据丰富，不能解释为“丢弃不匹配数据”。\n\n#### 清单、挂载与最小权限\n\n先在测试集群创建命名空间和 ServiceAccount，再把配置创建为 ConfigMap。命令在保存这些实验文件的目录执行。\n\n```bash\nkubectl create namespace otel-lab --dry-run=client -o yaml | kubectl apply -f -\nkubectl create namespace otel-demo --dry-run=client -o yaml | kubectl apply -f -\nkubectl -n otel-lab create configmap otel-node-config \\\n  --from-file=config.yaml=node-collector.yaml --dry-run=client -o yaml | kubectl apply -f -\n```\n\n**文件：`node-collector-k8s.yaml`。** 节点日志通常有受限权限，本实验显式使用 UID 0 读取；只读挂载、关闭权限提升与丢弃 capabilities 不能把主机文件访问变成无风险操作。应用到生产前应按节点权限模型缩小挂载与读取身份。\n\n```yaml\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: otel-node\n  namespace: otel-lab\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: otel-lab-node-reader\nrules:\n  - apiGroups: [\"\"]\n    resources: [pods, namespaces, nodes]\n    verbs: [get, list, watch]\n  - apiGroups: [\"\"]\n    resources: [nodes/stats]\n    verbs: [get]\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: otel-lab-node-reader\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: otel-lab-node-reader\nsubjects:\n  - kind: ServiceAccount\n    name: otel-node\n    namespace: otel-lab\n---\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: otel-node\n  namespace: otel-lab\nspec:\n  selector:\n    matchLabels: {app: otel-node}\n  template:\n    metadata:\n      labels: {app: otel-node}\n    spec:\n      serviceAccountName: otel-node\n      nodeSelector:\n        kubernetes.io/os: linux\n      containers:\n        - name: collector\n          image: otel/opentelemetry-collector-contrib:0.136.0\n          args: [\"--config=/conf/config.yaml\"]\n          env:\n            - name: K8S_NODE_NAME\n              valueFrom:\n                fieldRef: {fieldPath: spec.nodeName}\n          securityContext:\n            runAsUser: 0\n            allowPrivilegeEscalation: false\n            readOnlyRootFilesystem: true\n            capabilities: {drop: [ALL]}\n          resources:\n            requests: {cpu: 100m, memory: 128Mi}\n            limits: {memory: 512Mi}\n          readinessProbe:\n            httpGet: {path: /, port: 13133}\n          volumeMounts:\n            - {name: config, mountPath: /conf, readOnly: true}\n            - {name: hostfs, mountPath: /hostfs, readOnly: true}\n            - {name: logs, mountPath: /var/log/pods, readOnly: true}\n            - {name: storage, mountPath: /var/lib/otelcol/storage}\n      volumes:\n        - name: config\n          configMap: {name: otel-node-config}\n        - name: hostfs\n          hostPath: {path: /, type: Directory}\n        - name: logs\n          hostPath: {path: /var/log/pods, type: Directory}\n        - name: storage\n          hostPath: {path: /var/lib/otelcol-lab, type: DirectoryOrCreate}\n```\n\n```bash\nkubectl apply --dry-run=server -f node-collector-k8s.yaml\nkubectl apply -f node-collector-k8s.yaml\nkubectl -n otel-lab rollout status daemonset/otel-node\nkubectl -n otel-lab get pods -l app=otel-node -o wide\nkubectl -n otel-lab logs -l app=otel-node --tail=100 --prefix\n```\n\n本清单不为全部 taint 添加通配 toleration，因此不是“无条件覆盖所有节点”。应按实际节点池核对期望副本数。kubelet 还可能要求专用 CA、证书 SAN 与节点名一致、DNS 可解析；出现 x509 错误时先修复信任与地址，不将 `insecure_skip_verify: true` 当默认答案。Pod Ready 只证明健康端口可用，不证明 kubeletstats 已采到数据。", "subs": ["可独立检查的节点配置", "清单、挂载与最小权限"]}, {"title": "16.2 解析容器外壳、应用 JSON 与多行异常", "content": "容器文件里的“一行”与应用的一次日志事件不是同一个概念。CRI 在正文外增加时间、stdout/stderr、完整或部分记录标志；较大的应用日志可能被运行时拆成多个片段。应先还原运行时记录，再解析应用正文。\n\n```text\n2026-09-19T10:00:00.000000000Z stdout F {\"msg\":\"request.complete\",\"trace_id\":\"...\"}\n|            CRI 时间              | 流 |标志|             应用正文             |\n```\n\n上节 `container` operator 根据容器格式进行解析并处理运行时片段，也从文件路径提取 Kubernetes 身份。它不能推断所有 Java/Python 堆栈中哪些行属于同一异常。运行时 partial 重组和应用多行合并是不同层次；优先让业务事件以 JSON 单行输出，把异常堆栈作为转义字符串放入字段。\n\n#### 三语言业务日志的字段映射\n\n下面替换 `filelog/containers.operators`，其余节点配置保留。非 JSON 启动日志继续作为文本，应用 JSON 才进入第二步。先在有限的 `otel-demo` 命名空间使用，确认错误日志没有被静默丢弃。\n\n```yaml\n# filelog/containers 下的增量字段。\noperators:\n  - type: container\n    id: container-parser\n  - type: json_parser\n    id: application-json\n    if: 'body matches \"^\\\\s*\\\\{\"'\n    parse_from: body\n    parse_to: attributes.app\n    on_error: send\n  - type: trace_parser\n    if: 'attributes.app != nil and attributes.app.trace_id != nil and attributes.app.span_id != nil'\n    trace_id:\n      parse_from: attributes.app.trace_id\n    span_id:\n      parse_from: attributes.app.span_id\n    on_error: send\n  - type: move\n    if: 'attributes.app != nil and attributes.app[\"service.name\"] != nil'\n    from: attributes.app[\"service.name\"]\n    to: resource[\"service.name\"]\n  - type: move\n    if: 'attributes.app != nil and attributes.app.msg != nil'\n    from: attributes.app.msg\n    to: body\n```\n\n这条管道以 CRI 时间作为 LogRecord 时间，应用的 `time` 保存在 `attributes.app` 中供比较；时间语义不应在合并片段时悄悄变化。Trace ID 必须是有效编码，不能用订单号或字符串 `unknown` 填入标准字段。`on_error: send` 保留有问题的记录用于排查，不代表成功解析；持续观察 parser 错误并修复格式。\n\n#### 用可辨认事件验证读取行为\n\n在 `otel-demo` 命名空间创建下面的测试 Pod，**固定 Trace ID 是解析样本，不会对应真实 Jaeger Trace**。先看 Collector 的 LogRecord 字段，再换成第一卷真实业务流量验证关联。\n\n```yaml\napiVersion: v1\nkind: Pod\nmetadata:\n  name: otel-log-demo\n  namespace: otel-demo\nspec:\n  restartPolicy: Never\n  containers:\n    - name: writer\n      image: busybox:1.37.0\n      command: [sh, -c]\n      args:\n        - |\n          echo '{\"msg\":\"parser-fixture\",\"service.name\":\"log-fixture\",\"trace_id\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"span_id\":\"00f067aa0ba902b7\"}'\n          echo 'plain startup message'\n          sleep 300\n```\n\n查这个 Pod 所在节点对应的 Collector，预期一条日志被解析出 TraceId/SpanId，另一条保留纯文本，两条都有可解释的文件来源。再重启 Collector Pod，观察是否从已记录的位置继续。\n\n`start_at: beginning` 主要影响未见过的文件，不表示每次启动都从头读。`file_storage` 保存读取状态，不等于替所有已读取但未导出的日志建立持久化队列；节点丢失、状态目录被删、文件轮转过快仍可能导致丢失或重复。日志内容、读取偏移、exporter 队列是三份不同状态，第三卷进一步讨论保护范围。", "subs": ["三语言业务日志的字段映射", "用可辨认事件验证读取行为"]}, {"title": "16.3 单独采集集群状态与 Kubernetes Events", "content": "`k8s_cluster` 观察对象状态，`k8sobjects` 观察对象或事件记录；二者并不属于某个节点的文件，不能把同一全局配置放到每个 DaemonSet 实例中后再把结果相加。\n\n以下是独立 `cluster-collector.yaml` 的完整内容。部署为单副本 Deployment，使用单独的 ServiceAccount 与权限；此处不与接收应用流量的 Gateway 共用扩容策略。\n\n```yaml\nreceivers:\n  k8s_cluster:\n    auth_type: serviceAccount\n    collection_interval: 30s\n    node_conditions_to_report: [Ready]\n    allocatable_types_to_report: [cpu, memory]\n  k8sobjects:\n    auth_type: serviceAccount\n    objects:\n      - name: events\n        group: \"\"\n        mode: watch\nprocessors:\n  memory_limiter:\n    check_interval: 1s\n    limit_mib: 400\n    spike_limit_mib: 80\n  batch:\n    timeout: 5s\nexporters:\n  debug:\n    verbosity: detailed\nservice:\n  pipelines:\n    metrics:\n      receivers: [k8s_cluster]\n      processors: [memory_limiter, batch]\n      exporters: [debug]\n    logs:\n      receivers: [k8sobjects]\n      processors: [memory_limiter, batch]\n      exporters: [debug]\n```\n\n下面给出该示例的工作负载和读取规则。实际版本若启用额外对象或指标，应跟着组件需要补权限；不要直接绑定 cluster-admin。\n\n```yaml\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: otel-cluster\n  namespace: otel-lab\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: otel-lab-cluster-reader\nrules:\n  - apiGroups: [\"\"]\n    resources: [events, namespaces, nodes, pods, replicationcontrollers, resourcequotas, services]\n    verbs: [get, list, watch]\n  - apiGroups: [apps]\n    resources: [daemonsets, deployments, replicasets, statefulsets]\n    verbs: [get, list, watch]\n  - apiGroups: [batch]\n    resources: [jobs, cronjobs]\n    verbs: [get, list, watch]\n  - apiGroups: [autoscaling]\n    resources: [horizontalpodautoscalers]\n    verbs: [get, list, watch]\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: otel-lab-cluster-reader\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: otel-lab-cluster-reader\nsubjects:\n  - kind: ServiceAccount\n    name: otel-cluster\n    namespace: otel-lab\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: otel-cluster\n  namespace: otel-lab\nspec:\n  replicas: 1\n  strategy: {type: Recreate}\n  selector:\n    matchLabels: {app: otel-cluster}\n  template:\n    metadata:\n      labels: {app: otel-cluster}\n    spec:\n      serviceAccountName: otel-cluster\n      containers:\n        - name: collector\n          image: otel/opentelemetry-collector-contrib:0.136.0\n          args: [\"--config=/conf/config.yaml\"]\n          resources:\n            requests: {cpu: 100m, memory: 128Mi}\n            limits: {memory: 512Mi}\n          securityContext:\n            runAsNonRoot: true\n            runAsUser: 10001\n            allowPrivilegeEscalation: false\n            readOnlyRootFilesystem: true\n            capabilities: {drop: [ALL]}\n          volumeMounts:\n            - {name: config, mountPath: /conf, readOnly: true}\n      volumes:\n        - name: config\n          configMap: {name: otel-cluster-config}\n```\n\n把清单保存为 `cluster-collector-k8s.yaml`，配置保存为 `cluster-collector.yaml` 后执行：\n\n```bash\nkubectl -n otel-lab create configmap otel-cluster-config \\\n  --from-file=config.yaml=cluster-collector.yaml --dry-run=client -o yaml | kubectl apply -f -\nkubectl apply --dry-run=server -f cluster-collector-k8s.yaml\nkubectl apply -f cluster-collector-k8s.yaml\nkubectl -n otel-lab rollout status deployment/otel-cluster\nkubectl -n otel-lab logs deployment/otel-cluster --tail=100\nkubectl -n otel-demo get events --sort-by=.metadata.creationTimestamp\n```\n\n`Recreate` 减少滚动更新时新旧实例同时采集的重叠，但更新期间会有窗口；单副本也不是严格的去重机制。Events 有保留期、聚合与重复更新，watch 重连不能视为永久审计日志。关联时优先使用事件中的对象 UID、namespace 和时间窗口，不能把事件记录自身的 UID 当成目标 Pod UID。", "subs": []}, {"title": "16.4 通过 Helm 安装时检查最终产物与后端路径", "content": "手写清单让权限和挂载显式可见，Helm 则把重复配置做成 presets。使用 Helm 时不再同时安装上一节同职责的手写采集器。Chart 版本与 Collector 镜像版本是两条独立版本轴，必须分别记录。\n\n```bash\nhelm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts\nhelm repo update open-telemetry\nhelm search repo open-telemetry/opentelemetry-collector --versions\n# 先从团队验证的版本中设置 OTEL_CHART_VERSION，不能默认取 latest。\n: \"${OTEL_CHART_VERSION:?请设置已选择的 Collector Chart 版本}\"\nhelm show values open-telemetry/opentelemetry-collector \\\n  --version \"$OTEL_CHART_VERSION\" > collector-chart-defaults.yaml\nhelm template otel-node open-telemetry/opentelemetry-collector \\\n  --namespace otel-lab --version \"$OTEL_CHART_VERSION\" \\\n  -f node-values.yaml > node-rendered.yaml\n```\n\n`node-values.yaml` 是需要按选定 Chart 核对的输入，不是上面的原生 Collector 配置。下面展示预设意图；在使用前补齐该版本要求的镜像、command、出口与资源配置，再渲染检查。\n\n```yaml\n# Helm values 片段；不承诺跨 Chart 版本直接兼容。\nmode: daemonset\npresets:\n  hostMetrics: {enabled: true}\n  kubeletMetrics: {enabled: true}\n  kubernetesAttributes: {enabled: true}\n  logsCollection: {enabled: true}\n  clusterMetrics: {enabled: false}\n  kubernetesEvents: {enabled: false}\n```\n\npresets 可能增加 receiver、pipeline、RBAC、卷和环境变量；已有默认 receiver 也可能被保留。最终检查的是渲染后的 ConfigMap 与工作负载，而不是 values 看起来是否简洁。尤其核对日志 include/exclude，不能把启用 debug 输出的 Collector 自身重新采集进去。\n\n#### 指标、日志进入已有后端\n\n节点与集群配置先用 debug 验收；接入后端时，替换相应 pipeline 的 exporter。采用 Gateway 汇聚前，先为它启用 metrics/logs 接收管道，第 15 章的 traces-only Gateway 不能直接接收全部信号。\n\n```yaml\n# Collector 配置增量：仅用于已启用 Remote Write Receiver 的实验 Prometheus。\nexporters:\n  prometheusremotewrite/lab:\n    endpoint: http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write\n    resource_to_telemetry_conversion:\n      enabled: false\n    external_labels:\n      cluster: otel-lab\n```\n\n这是 Remote Write 出口，不是第 12 章的 Prometheus scrape exporter，也不是 OTLP 接收接口。需要在 Prometheus 启动时开启 `--web.enable-remote-write-receiver`，并在 Collector 的 metrics pipeline 中引用 `prometheusremotewrite/lab`。该 Service 地址是示例前提，本章没有替读者创建 Prometheus。\n\n关闭全量 Resource 转标签后，仍要按查询需要通过 transform 选择提升 `k8s.node.name`、namespace 等少量字段；不要把 Pod UID、所有标签或注解自动展开。迁移对照时把新旧数据写入可区分的路径，避免同一业务流既被 scrape 又被 Remote Write 重复计数。\n\n日志采用 `otlphttp/loki` 输出到 Loki 的 `/otlp` 基地址，并检查 Structured Metadata 支持，沿用第 13 章的日志管道。接入成功后应关闭持续详细 debug，避免日志量本身压垮节点磁盘。\n\n验收结束后按保存的两个清单删除工作负载与 RBAC，单独删除对应 ConfigMap；不要直接删除可能还有其他实验使用的命名空间。节点 `/var/lib/otelcol-lab` 保存的读取状态是否清理应单独决定，下次实验保留或重置它会改变读取起点。", "subs": ["指标、日志进入已有后端"]}]}, {"title": "第 17 章：Operator 管理与三语言自动注入", "sections": [{"title": "17.1 分清 Collector CR、Instrumentation CR 与安装前提", "content": "Operator 将声明式资源转成工作负载，并在 Pod 创建时按注解修改容器配置。它不会替应用定义业务 Span，也不会因为安装成功就让所有 Pod 自动产生数据。\n\n| 对象 | 改变什么 | 不能替代什么 |\n| --- | --- | --- |\n| Operator Deployment / Webhook | 监听资源并处理准入请求 | Collector 运行时组件校验 |\n| `OpenTelemetryCollector` | Collector 配置与部署形态 | 应用 SDK 与业务埋点 |\n| `Instrumentation` | 语言注入配置、Exporter、传播器与采样 | 自动识别所有框架与自定义线程模型 |\n| 工作负载 Pod 模板注解 | 哪个 Pod/容器参与注入 | 更新已经运行进程的内存状态 |\n\n本节以支持 `OpenTelemetryCollector v1beta1` 对象式 `spec.config` 和 `Instrumentation v1alpha1` 的 Operator 为前提。两个 CR 的 API 版本不必相同；不要把旧材料的所有 `v1alpha1` 一次替换成 `v1beta1`。\n\n```bash\n# 已安装并配置好 cert-manager 的测试集群可使用 Chart 的证书管理方案。\nhelm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts\nhelm repo update open-telemetry\n: \"${OTEL_OPERATOR_CHART_VERSION:?请设置已选择的 Operator Chart 版本}\"\nhelm show values open-telemetry/opentelemetry-operator \\\n  --version \"$OTEL_OPERATOR_CHART_VERSION\" > operator-chart-defaults.yaml\nhelm template otel-operator open-telemetry/opentelemetry-operator \\\n  --namespace otel-system --version \"$OTEL_OPERATOR_CHART_VERSION\" \\\n  > operator-rendered.yaml\n# 核对证书、webhook、CRD 安装/升级策略和渲染镜像后再安装。\nhelm upgrade --install otel-operator open-telemetry/opentelemetry-operator \\\n  --namespace otel-system --create-namespace --version \"$OTEL_OPERATOR_CHART_VERSION\"\nkubectl -n otel-system get pods\nkubectl get crd opentelemetrycollectors.opentelemetry.io instrumentations.opentelemetry.io\nkubectl explain opentelemetrycollector.spec --api-version=opentelemetry.io/v1beta1\n```\n\n若集群采用自管证书，按所选 Chart 的字段覆盖 values，并将同一个 values 文件同时用于 template 与 install；不要沿用旧材料中的证书参数名。控制平面必须能访问 webhook，证书链也必须被信任。Webhook 有故障可能影响带注入要求的 Pod 创建，应有清楚的故障策略与回退步骤。", "subs": []}, {"title": "17.2 用 Collector CR 管理一个独立的 Gateway", "content": "下面清单保存在 `operator-gateway.yaml`，使用 `otel-demo` 命名空间，不覆盖第 15、16 章的资源。它先输出详细 debug；验证注入后再对接真实 Trace 后端。只安装 CR 不会创建 Java/Python 应用。\n\n```yaml\napiVersion: opentelemetry.io/v1beta1\nkind: OpenTelemetryCollector\nmetadata:\n  name: language-gateway\n  namespace: otel-demo\nspec:\n  mode: deployment\n  replicas: 1\n  image: otel/opentelemetry-collector-contrib:0.136.0\n  resources:\n    requests: {cpu: 100m, memory: 128Mi}\n    limits: {memory: 512Mi}\n  config:\n    receivers:\n      otlp:\n        protocols:\n          grpc: {endpoint: \"0.0.0.0:4317\"}\n          http: {endpoint: \"0.0.0.0:4318\"}\n    processors:\n      memory_limiter:\n        check_interval: 1s\n        limit_mib: 400\n        spike_limit_mib: 80\n      batch: {}\n    exporters:\n      debug: {verbosity: detailed}\n    service:\n      pipelines:\n        traces:\n          receivers: [otlp]\n          processors: [memory_limiter, batch]\n          exporters: [debug]\n```\n\n```bash\nkubectl apply --dry-run=server -f operator-gateway.yaml\nkubectl apply -f operator-gateway.yaml\nkubectl -n otel-demo get opentelemetrycollector language-gateway -o yaml\nkubectl -n otel-demo get deploy,svc,pods\nkubectl -n otel-demo get endpointslice \\\n  -l kubernetes.io/service-name=language-gateway-collector\n```\n\n预期生成 `language-gateway-collector` 服务，实际名称与端口以集群对象为准。server dry-run 能检查 CR schema 和准入，却不能证明嵌套 Collector 配置在指定镜像中有效；还要观察 Collector 启动日志和实际接收的 Span。\n\nSidecar Collector 则是把数据处理进程放入应用 Pod；Java/Python 自动注入通常通过初始化容器准备埋点文件与环境变量，两者不是同一种 Sidecar。是否增加 Collector Sidecar，应由隔离、网络和缓冲需求决定，不是使用 Agent 的必选项。", "subs": []}, {"title": "17.3 注入 Java 与 Python 并检查实际容器变化", "content": "先创建下面 `Instrumentation`，再让应用 Pod 按模板启动。此示例固定 Java 注入镜像 `2.20.0`；Python 注入镜像由所选 Operator 版本决定，需要从渲染/生成的 Pod 中记录镜像与摘要，其版本不应冒充第一卷本地虚拟环境的 `0.58b0`。\n\n```yaml\napiVersion: opentelemetry.io/v1alpha1\nkind: Instrumentation\nmetadata:\n  name: language-lab\n  namespace: otel-demo\nspec:\n  exporter:\n    endpoint: http://language-gateway-collector.otel-demo.svc.cluster.local:4318\n  propagators: [tracecontext, baggage]\n  sampler:\n    type: parentbased_always_on\n  env:\n    - {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: \"http/protobuf\"}\n    - {name: OTEL_TRACES_EXPORTER, value: \"otlp\"}\n    - {name: OTEL_METRICS_EXPORTER, value: \"none\"}\n    - {name: OTEL_LOGS_EXPORTER, value: \"none\"}\n  java:\n    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:2.20.0\n```\n\n下面是应用 Deployment 的**增量片段**，镜像、Service、依赖地址与探针沿用读者已经可运行的应用清单。先确保未注入时业务可用，再做注入对照；本章不把镜像构建或仓库推送隐藏在一个占位镜像名后。\n\n```yaml\n# Java Deployment 的 spec.template 合并片段。\nspec:\n  template:\n    metadata:\n      annotations:\n        instrumentation.opentelemetry.io/inject-java: \"language-lab\"\n        instrumentation.opentelemetry.io/container-names: \"app\"\n    spec:\n      containers:\n        - name: app\n          env:\n            - {name: OTEL_SERVICE_NAME, value: \"order-java\"}\n            - name: OTEL_RESOURCE_ATTRIBUTES\n              value: \"service.namespace=ops-roadmap,deployment.environment.name=lab\"\n```\n\n```yaml\n# Python Deployment 的 spec.template 合并片段。\nspec:\n  template:\n    metadata:\n      annotations:\n        instrumentation.opentelemetry.io/inject-python: \"language-lab\"\n        instrumentation.opentelemetry.io/container-names: \"app\"\n    spec:\n      containers:\n        - name: app\n          env:\n            - {name: OTEL_SERVICE_NAME, value: \"stock-python\"}\n            - {name: OTEL_PYTHON_FASTAPI_EXCLUDED_URLS, value: \"healthz$\"}\n            - name: OTEL_RESOURCE_ATTRIBUTES\n              value: \"service.namespace=ops-roadmap,deployment.environment.name=lab\"\n```\n\n不要把注解放在 Deployment 自己的 `metadata.annotations` 中，它必须进入 Pod 模板。多容器 Pod 要选择真正的应用容器；有服务网格 Sidecar 时尤其不能盲选第一个容器。\n\nJava 应用启动命令不再手工添加另一份 `-javaagent`。Python 应用不再同时使用本地 `opentelemetry-instrument` 启动器或显式 Provider 初始化；验证注入环境中的依赖兼容性，避免镜像里旧的 OTel 包覆盖注入包。Alpine/musl 与 glibc 基础镜像的注入支持要按所选版本核对。\n\n#### 验证注入不是只看 Pod Running\n\n```bash\n# 将变量换成自己已创建的工作负载和最新 Pod。\n: \"${APP_DEPLOYMENT:?设置应用 Deployment 名}\"\n: \"${APP_POD:?设置最新应用 Pod 名}\"\nkubectl -n otel-demo get deployment \"$APP_DEPLOYMENT\" -o yaml\nkubectl -n otel-demo get pod \"$APP_POD\" -o yaml\nkubectl -n otel-demo describe pod \"$APP_POD\"\nkubectl -n otel-demo logs \"$APP_POD\" -c app --tail=100\nkubectl -n otel-demo logs deployment/language-gateway-collector --tail=100\n```\n\n在最终 Pod 中核对初始化容器、挂载目录、应用环境变量和目标容器，再产生业务请求。`JAVA_TOOL_OPTIONS` / `PYTHONPATH` 的变化是注入证据，Collector 中对应 service.name 的 Span 才是生成与导出证据。更新 Instrumentation 不会直接改写旧进程；有需要时滚动重建应用 Pod，并确认新 Pod 使用了新资源。", "subs": ["验证注入不是只看 Pod Running"]}, {"title": "17.4 Go 自动接入、Target Allocator 与注入回退", "content": "Go 应先保留第一卷 SDK 路线。对已读取 OTel 环境变量的程序，可以用 `inject-sdk` 统一部分配置；它不会提供 SDK、不会包装 HTTP 客户端，也不会修改不读取环境变量的硬编码采样器。\n\n本笔记 Go 示例用 `DEMO_SAMPLE_RATIO` 配置采样，因此只注入 `OTEL_TRACES_SAMPLER` 不会改变它。平台统一配置前，应先把语言实现真实读取的变量登记清楚。\n\n| 路线 | Pod 变化 | 要额外核对 |\n| --- | --- | --- |\n| Go SDK + `inject-sdk` | 注入环境变量 | SDK 已初始化，参数实际生效 |\n| Go `inject-go` | eBPF 代理 Sidecar | Operator 的 Go 开关、Linux/内核、权限、可执行路径和支持库 |\n| Java/Python 注入 | 准备语言埋点文件与启动环境 | 框架支持、包冲突、多容器选择、启动方式 |\n| Collector Sidecar | 新增 Collector 进程 | 应用是否真正发送给它、出口是否配置 |\n\nGo eBPF 路线还需要 `instrumentation.opentelemetry.io/otel-go-auto-target-exe` 指向真实二进制，不能用宿主机源码路径。所需权限可能不符合普通业务 Pod 策略，不能以“所有语言统一加一个注解”为由扩大整个命名空间权限。此路线作为选学，未在本实验中启用。\n\nTarget Allocator 分配的是 Prometheus 抓取目标，具体分片验收见第 17.5 节。它不会把 `k8s_cluster` 或 Events 自动切成互斥份额，也不负责将相同 Trace 路由到同一个 tail sampler。进入多副本前应分别列出抓取归属、Trace 状态归属和节点文件归属。\n\n#### 有明确回退点的注入实验\n\n回退时在 Deployment 的 Pod 模板中删除对应语言注解，或设置为 `\"false\"`，保留原应用启动命令和业务配置，然后正常滚动重建 Pod。只删除 Instrumentation CR 或修改 Namespace 注解，不会从已经运行的进程中卸载 Agent。\n\n检查新 Pod 没有注入产生的初始化容器/挂载，业务请求仍成功；无 SDK 的应用回退后可能没有有效 Trace，这是预期覆盖变化，不能称为业务故障。若应用本来已有 SDK，则还要验证恢复到了原来的导出配置。\n\n先回退应用，再删除本实验的 Collector CR 与 Instrumentation。不要卸载共享 Operator 或删除 CRD 来清理单个实验；删除 CRD 可能影响全部命名空间中的同类资源。", "subs": ["有明确回退点的注入实验"]}, {"title": "17.5 用 Target Allocator 验证 Prometheus 抓取分片", "content": "Target Allocator 把目标发现和实际抓取分开：TA 决定某个 Collector 负责哪些 target，Collector 的 Prometheus receiver 按分配结果抓取。它不会增加目标服务的性能，也不会把一个过慢的单目标拆成多个抓取任务。\n\n#### 先准备能独立验证的目标\n\n本例要求已有两个可从集群访问的 Prometheus metrics 端点，例如两个独立 node-exporter。把下列 `node-a.example.internal:9100` 和 `node-b.example.internal:9100` 替换成自己的测试端点，先确认它们的 `/metrics` 可访问且能区分来源。这里不使用 `0.0.0.0:8888` 作为远程抓取目标：监听通配地址不是任意 Pod 都能访问的后端身份。\n\n沿用第 17.1 节已安装的 Operator，先核对其 CRD 支持的字段。Collector 镜像固定 `0.136.0`，Operator/TA 镜像则按已选择的 Operator 版本记录，二者不是一个统一版本号。\n\n```bash\nkubectl explain opentelemetrycollector.spec.targetAllocator \\\n  --api-version=opentelemetry.io/v1beta1\n```\n\n**文件：`ta-lab.yaml`。** 这是完整 CR，但依赖前述 Operator、`otel-demo` 命名空间、目标 DNS 与网络；不自动创建外部 exporter。\n\n```yaml\napiVersion: opentelemetry.io/v1beta1\nkind: OpenTelemetryCollector\nmetadata:\n  name: ta-lab\n  namespace: otel-demo\nspec:\n  mode: statefulset\n  replicas: 2\n  image: otel/opentelemetry-collector-contrib:0.136.0\n  targetAllocator:\n    enabled: true\n  resources:\n    requests: {cpu: 100m, memory: 128Mi}\n    limits: {memory: 512Mi}\n  config:\n    receivers:\n      prometheus:\n        config:\n          scrape_configs:\n            - job_name: node-lab\n              scrape_interval: 30s\n              scrape_timeout: 10s\n              static_configs:\n                - targets:\n                    - node-a.example.internal:9100\n                    - node-b.example.internal:9100\n    processors:\n      memory_limiter:\n        check_interval: 1s\n        limit_mib: 400\n        spike_limit_mib: 80\n      batch: {}\n    exporters:\n      debug: {verbosity: detailed}\n    service:\n      pipelines:\n        metrics:\n          receivers: [prometheus]\n          processors: [memory_limiter, batch]\n          exporters: [debug]\n```\n\n这里使用 static targets，先不引入 ServiceMonitor/PodMonitor 发现。若后续启用这些 CR 的发现，需要额外核对 TA 的选择器、命名空间范围和 ServiceAccount 权限，不能只打开一个开关就假定能读取全集群对象。\n\n#### 对照声明配置与生成配置\n\n```bash\nkubectl apply --dry-run=server -f ta-lab.yaml\nkubectl apply -f ta-lab.yaml\nkubectl -n otel-demo get statefulset,deploy,svc,pods\nkubectl -n otel-demo get statefulset ta-lab-collector -o yaml\nkubectl -n otel-demo get configmap\n```\n\n从 StatefulSet 的 volume 找到实际挂载的 ConfigMap，查看 Prometheus receiver 的最终配置。正常协调后，抓取发现会指向 TA 的 HTTP SD 接口，而不是让每个 Collector 都独立使用原始完整 static target 列表。具体生成名称与配置格式以所安装 Operator 为准，不手工修改它管理的 ConfigMap。\n\n确认实际 TA Service 名后，在单独终端执行端口转发；下面使用此 CR 常见的生成名称：\n\n```bash\nkubectl -n otel-demo port-forward service/ta-lab-targetallocator 18080:80\n```\n\n```bash\n# 另一个终端检查任务与两个 Collector 身份得到的分配。\ncurl -fsS http://127.0.0.1:18080/jobs\ncurl -fsS 'http://127.0.0.1:18080/jobs/node-lab/targets?collector_id=ta-lab-collector-0'\ncurl -fsS 'http://127.0.0.1:18080/jobs/node-lab/targets?collector_id=ta-lab-collector-1'\n```\n\n如果实际 job ID 或 Collector ID 不同，应按生成配置与 TA 返回值替换，不能把空结果直接解释为没有目标。TA 返回目标只证明分配成功，还需检查对应 Collector 的 debug 输出、抓取状态与错误日志，证明目标被真正采到。\n\n#### 扩缩容后检查目标集合\n\n将 CR 中的 `spec.replicas` 改为 3，重新 apply，等待成员发现和多个抓取周期稳定，再查询全部 Collector 的分配。两个 target 分配给三个实例时，某个实例为空是正常的；均衡不代表每个实例在任何规模下都有工作。\n\n设目标全集为 T，各 Collector 稳定后的分配集合为 T1、T2、T3。首先检查它们的并集覆盖 T，再检查是否存在意外重复归属，最后检查每个 target 的实际采样时间是否连续。分配变化的过渡窗口可能出现短暂重叠或间隔，TA 不是后端“恰好一次写入”的保证。\n\n缩回两个副本时执行同样检查。不要直接 scale Operator 管理的 StatefulSet 并期待它长期保留；声明来源是 Collector CR。实验结束删除 `ta-lab.yaml` 对应 CR，并核对由 Operator 管理的工作负载与 Service 已清理，保留外部测试 exporter。", "subs": ["先准备能独立验证的目标", "对照声明配置与生成配置", "扩缩容后检查目标集合"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
