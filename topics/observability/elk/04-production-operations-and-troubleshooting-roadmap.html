@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ELK 与 OpenSearch 日志平台学习笔记 · 第四篇：生产架构、成本治理、告警与故障排查 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>ELK 与 OpenSearch 日志平台学习笔记 · 第四篇：生产架构、成本治理、告警与故障排查</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "ELK 与 OpenSearch 日志平台学习笔记 · 第四篇：生产架构、成本治理、告警与故障排查", "intro": "> 教学基线：Elastic Stack 7.17.29、Kafka 2.8.2 ZooKeeper 模式；双后端对照采用 OpenSearch / Dashboards 2.19.6。固定版本用于教学，不表示生产推荐或联合认证。\n> 配置与脚本完整保留在四篇 Markdown；对照实验从[文件索引与提取入口](02-pipeline-and-reliability.md#s-11-1)准备。基础实验和对照实验使用独立目录、端口、数据卷及脚本。\n> 验证边界：静态与离线逻辑测试不能替代真实组件、TLS、故障、性能与 UI 验收。具体状态见[专题说明](README.md)。\n\n[返回专题](README.md) · [第1篇](01-log-foundations-and-collection.md) · [第2篇](02-pipeline-and-reliability.md) · [第3篇](03-search-storage-and-visualization.md)\n\n| 章节 | 核心主题 |\n| --- | --- |\n| 18 | 多节点架构与故障域 |\n| 19 | 冷热分层、容量与成本 |\n| 20 | 分段调优与混合负载验证 |\n| 21 | 平台监控、探针与业务日志告警 |\n| 22 | 安全连接、权限与日志治理 |\n| 23 | 备份恢复、节点维护与版本变更 |\n| 24 | 故障排查与综合验收 |", "parts": [{"title": "第 18 章 · 多节点架构与故障域", "sections": [{"title": "18.1 区分选举、数据冗余和客户端入口的可用性", "content": "<a id=\"s-18-1\"></a>\n\n#### 节点角色与主节点选举\n\n7.17 可以通过 `node.roles` 明确配置节点角色。\nMaster-eligible 节点参与集群管理与选举，数据节点保存分片，Ingest 角色执行接入管道，协调工作则发生在接收请求的节点上。[节点角色](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-node.html)\n\n| 角色或职责 | 关注内容 | 不应误解为 |\n| --- | --- | --- |\n| Master-eligible | 集群状态、索引和分片管理 | 每条日志都先写入主节点 |\n| Data | 文档存储、检索、聚合 | 只负责磁盘、不消耗 CPU |\n| Ingest | 写入前字段处理 | 具备 Kafka 式长期缓冲能力 |\n| Coordinating | 拆分请求、汇总结果 | 配置独立角色就自动获得无限查询容量 |\n| Data tier | Hot、Warm 等数据层 | 配置名称后数据一定有地方迁移 |\n\n实验单节点同时承担多种职责，便于理解。\n拆角色需要足够节点和维护能力，不是越早拆越专业。\n\n**选举多数与故障容忍**\n\n生产常见做法是部署三个位于独立故障域的 master-eligible 节点，避免单个节点故障导致无法选主。\n但“三台虚拟机在同一宿主机”不能抵抗宿主机故障。\n选举、投票配置和数据副本是不同维度，不能用“副本还有两份”证明集群一定能维持管理能力。\n\n**查看节点角色**\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_nodes?filter_path=nodes.*.name,nodes.*.roles&pretty'\ncurl -fsS 'http://127.0.0.1:9200/_cat/master?v'\n```\n\n节点 ID、节点名称、集群 UUID 都值得进入变更记录。\n同名节点不意味着同一个数据目录，同名集群也不意味着同一个集群 UUID。\n\n\n#### 三条相互独立的可用性链路\n\n一个三节点搜索集群，仍可能因为单个反向代理失效而不可访问。\n一个副本齐全的集群，也可能因为失去集群管理投票多数而不能安全推进写入或集群状态。\n“数据还有一份”与“服务还能继续处理请求”需要分别证明。\n\n| 层面 | 保护什么 | 不能替代什么 |\n| --- | --- | --- |\n| 集群管理/选举 | 节点成员、分片分配与集群状态推进 | 不自动增加日志正文副本 |\n| 主副分片 | 已接受数据的冗余和读取路径 | 不保证客户一定能连到健康入口 |\n| 客户端多地址/入口 | 请求抵达健康接收节点 | 不修复未分配主分片或投票失效 |\n| 上游持久缓冲 | 搜索后端不可用时保留待处理事件 | 不替代已写入数据的快照 |\n| 快照与独立归档 | 恢复到另一个可用集群 | 不等于实时在线副本或零恢复时间 |\n\n本篇讨论的是失效模型：进程、节点、宿主、机架/可用区、网络、磁盘或误删除。\n对不同失效模型，保护机制和验证办法不同。\n节点角色及集群发现按产品版本分别配置；OpenSearch 使用 `cluster_manager` 术语，旧 ES 使用 `master`。[OS 集群配置](https://docs.opensearch.org/2.19/tuning-your-cluster/) [ES 集群分配](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-cluster.html)\n\n\n#### 管理节点、数据节点与协调职责\n\n生产规模较大时，可以将集群管理职责从繁重的写入与查询任务分离。\n管理节点需要稳定的 CPU、内存和网络，不应成为普通 Bulk 客户端的默认目标。\n数据节点负责保存和搜索分片；接收查询的节点还承担协调与合并结果的责任。\n\n“协调节点”不总是一种必须单独部署的产品组件。\n独立协调层可以隔离连接与结果合并压力，也会增加一组需要监控、负载均衡和容量规划的节点。\n小规模教学中让热数据节点同时具备管理资格，是降低资源需求的选择，不是生产拓扑的唯一建议。\n\n```mermaid\nflowchart TD\n  LS[多个 Logstash 实例] --> IN[多地址或高可用接入层]\n  IN --> H1[热数据区 A]\n  IN --> H2[热数据区 B]\n  IN --> H3[热数据区 C]\n  M1[管理资格 A] --- M2[管理资格 B]\n  M2 --- M3[管理资格 C]\n  H1 --> W[温层数据节点]\n  H2 --> W\n  H3 --> W\n```\n\n图中每个“区”只有在实际位于不同物理故障域时，才具有相应隔离意义。\n同一宿主的三个容器加上不同字符串标签，不会抵御该宿主失效。\n\n\n#### 一主两副不等于可以随便停两台\n\n一主两副让每个分片有三份逻辑副本，但实际是否全部分配、是否位于不同故障域、是否有足够健康的管理节点，都决定故障后的行为。\n如果三份都在同一可用区，失去该区仍可能丢失全部在线副本。\n如果只有一份已分配，配置里写着两个副本也没有产生另外两份数据。\n\n验收时要同时记录：集群管理成员、每个主副分片位置、客户端成功率和新事件可见性。\n绿色只能说明当前分片分配满足要求，不证明入口、高峰性能、快照或整个业务链路都正常。\n黄色也不能一律解释为“不可读写”；需要看缺少的是副本还是主分片，以及写入确认条件。\n\n\n#### 端到端剩余单点\n\n双后端对照主链路只有单 broker Kafka、单 ZooKeeper，以及每个后端一个 Logstash 实例。\n它们用于对照，不是 Kafka 生产高可用示范。\n即便后端改为六节点，也仍需要说明这些上游单点。\n\n| 依赖 | 实验中的单点 | 生产评审问题 |\n| --- | --- | --- |\n| Kafka / ZooKeeper | 单实例 | 副本、ISR、选举、保留与恢复能力 |\n| Logstash | 每分支一个进程 | 多消费者、分区数、PQ 归属、优雅停止 |\n| Filebeat | 每个日志源一个采集状态 | 节点失效后源文件能否恢复 |\n| 入口/DNS | 单地址可能失效 | 多地址、DNS TTL、健康检查与连接重试 |\n| 监控告警 | 若依赖同一故障系统 | 是否有独立指标与通知通道 |\n\n本篇不把这些问题扩展成另一部 Kafka 运维教程，但必须把它们写进高可用评审的剩余风险。\n\n\n#### 客户端多地址的实质\n\nLS output 的多个 `hosts` 提供连接候选和客户端调度，不等价于跨区健康流量策略。\n仍需核对失效连接回收、重试、DNS 缓存和是否包含不应承受 Bulk 的专用管理节点。[OS output 连接参数](https://github.com/opensearch-project/logstash-output-opensearch/blob/2.0.3/lib/logstash/plugin_mixins/opensearch/api_configs.rb)\n\nHA 教学中热节点同时是数据节点，因此可以作为小规模写入入口。\n正式拆分管理节点后，客户端只连接合格的数据/协调入口。\n验收应故意停掉首选地址，看客户端能否切换，再确认请求成功与事件可查；只观察 TCP 重连不够。", "subs": ["节点角色与主节点选举", "三条相互独立的可用性链路", "管理节点、数据节点与协调职责", "一主两副不等于可以随便停两台", "端到端剩余单点", "客户端多地址的实质"]}, {"title": "18.2 构建六节点教学集群并管理首次引导配置", "content": "<a id=\"s-18-2\"></a>\n\n首次引导只用于建立新的集群身份。基础 ES 配置片段解释这个规则；双后端 HA 生成器进一步给出六节点、三故障域标签的教学拓扑。所有容器仍运行在同一宿主，标签和多进程不能证明真实跨机容灾。\n\n#### 首次引导与已有集群重启\n\n首次组建多节点集群，需要明确初始 master-eligible 节点列表。\n集群形成后应移除 `cluster.initial_master_nodes`，不要在已有集群重启、扩容或故障恢复时重新用它引导一个独立集群。[首次引导](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-discovery-bootstrap-cluster.html)\n\n以下是三节点教学配置片段，不是可以直接替换单节点 Compose 的完整生产清单。\n三台节点的 `cluster.name` 相同，`node.name` 各不相同。\n主机名、IP 和证书 SAN 必须由实际环境提供。\n\n```yaml\n# es-1 的首次启动配置片段。\ncluster.name: logging-prod-example\nnode.name: es-1\nnode.roles: [master, data, ingest]\npath.data: /var/lib/elasticsearch\npath.logs: /var/log/elasticsearch\nnetwork.host: 10.0.10.11\nhttp.port: 9200\ntransport.port: 9300\ndiscovery.seed_hosts:\n  - 10.0.10.11:9300\n  - 10.0.10.12:9300\n  - 10.0.10.13:9300\ncluster.initial_master_nodes:\n  - es-1\n  - es-2\n  - es-3\n```\n\n另外两台分别使用 `es-2`、`es-3` 和自己的绑定地址。\n启用安全的完整多节点配置还需要传输层 TLS，见[相关章节](04-production-operations-and-troubleshooting.md#s-22-1)。\n不能把上述未配置认证的片段直接暴露到生产网络。\n\n**成功引导后的动作**\n\n确认三个节点处于同一 cluster UUID，并产生稳定主节点。\n在配置管理中移除 `cluster.initial_master_nodes`，保留用于发现的 `discovery.seed_hosts`。\n随后重启按已有集群的滚动维护流程执行，而不是再次生成初始集群。\n\n**扩容不是重新引导**\n\n新节点使用同一集群名称和正确的发现地址，通过已有集群加入。\n不要复制另一节点已经使用的数据目录。\n不要删除原节点数据目录来“解决 UUID 不一致”，除非已经证明目标是可丢弃实验数据，并有明确重建计划。\n\n\n#### 教学拓扑及其验证范围\n\n完整 `tools/make_ha.py` 根据参数输出一份 Compose JSON，Compose 可直接读取 JSON 格式。\n每个产品分别建立六节点，不把两个产品加入同一集群。\n\n| 节点集合 | 标签 | 管理资格 | 数据职责 |\n| --- | --- | --- | --- |\n| `*-hot-a/b/c` | temp=hot，zone=a/b/c | 有 | 热层写入与查询 |\n| `*-warm-a/b/c` | temp=warm，zone=a/b/c | 无 | 滚动后迁移的索引 |\n\nES 教学节点使用通用 `data` 角色配合自定义 `temp` 属性；OpenSearch 同样使用 `data` 和属性分配。\n这样可直接观察两个产品共有的属性约束。\nES 原生 `data_hot/data_warm` 角色和 `_tier_preference` 另在[相关章节](04-production-operations-and-troubleshooting.md#s-19-1)比较，不能与自定义属性实验混接。\n\n实例 HTTP 端口为 ES `19300～19305`，OS `29300～29305`，只绑定回环地址。\n每节点 512MiB Heap、2GiB 容器上限是小数据教学预算；真实分片规模需要重新测量。\n单个六节点实验为搜索容器预留至少 12GiB 上限空间，宿主还需要系统和文件缓存余量。\n\n\n#### 启动、形成集群与移除首次引导设置\n\n```bash\n# 先停止不用的单节点环境，避免内存竞争。\nbash run.sh stop\npython3 tools/make_ha.py os > compose-ha-os.json\n# 使用生成文件的固定项目名，不混用主项目 compose.yaml。\ndocker compose -f compose-ha-os.json up -d\npython3 tools/wait_ready.py os --url http://127.0.0.1:29300 --seconds 300\ncurl -fsS 'http://127.0.0.1:29300/_cat/nodes?format=json'\ncurl -fsS 'http://127.0.0.1:29300/_cluster/health?pretty'\n```\n\n只有出现六个预期节点且共享同一 cluster UUID，才进入后续实验。\n首次引导列表不是日常种子列表；集群形成后，用 `--joined` 生成不含首次引导字段的配置并在后续维护中采用。\n不能在已有集群失去多数时，通过重新填引导列表制造一个新的集群身份。\n\n```bash\npython3 tools/make_ha.py os --joined > compose-ha-os-joined.json\n# 此时先审阅两个文件差异；后续滚动更新使用 joined 文件，保持项目和卷名称相同。\ndocker compose -f compose-ha-os-joined.json config --quiet\n```\n\nES 操作相同，只将生成器参数替换为 `es`，入口改成 `19300`。\n配置中的首次引导键是 `cluster.initial_master_nodes`；OpenSearch 使用 `cluster.initial_cluster_manager_nodes`。\n\n\n#### 对照实验完整文件：`tools/make_ha.py`\n\nES/OS 六节点完整 Compose 生成器。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/make_ha.py -->\n```python\n\"\"\"输出完整多节点 Compose JSON（Compose 同样接受 JSON），不访问后端。\"\"\"\nfrom __future__ import annotations\nimport argparse,json\n\ndef topology(backend: str, joined=False):\n    if backend not in ('es','os'):raise ValueError(backend)\n    root='/usr/share/elasticsearch' if backend=='es' else '/usr/share/opensearch'\n    image='docker.elastic.co/elasticsearch/elasticsearch:7.17.29' if backend=='es' else 'opensearchproject/opensearch:2.19.6'\n    managers=','.join(f'{backend}-hot-{z}' for z in 'abc')\n    services,volumes={},{}\n    for i,(temp,zone) in enumerate((t,z) for t in ('hot','warm') for z in 'abc'):\n        name=f'{backend}-{temp}-{zone}'\n        roles=(['master','data','ingest'] if temp=='hot' else ['data','ingest']) if backend=='es' else (\n               ['cluster_manager','data','ingest'] if temp=='hot' else ['data','ingest'])\n        env={'cluster.name':f'elk-expansion-ha-{backend}','node.name':name,\n             'node.roles':','.join(roles),'node.attr.zone':zone,'node.attr.temp':temp,\n             'discovery.seed_hosts':managers,\n             'cluster.routing.allocation.awareness.attributes':'zone',\n             'cluster.routing.allocation.awareness.force.zone.values':'a,b,c',\n             'path.repo':'/snapshots'}\n        if backend=='es':env.update({'xpack.security.enabled':'false','ES_JAVA_OPTS':'-Xms512m -Xmx512m'})\n        else:env.update({'DISABLE_INSTALL_DEMO_CONFIG':'true','DISABLE_SECURITY_PLUGIN':'true','OPENSEARCH_JAVA_OPTS':'-Xms512m -Xmx512m'})\n        if not joined:\n            env['cluster.initial_master_nodes' if backend=='es' else 'cluster.initial_cluster_manager_nodes']=managers\n        volumes[name]={}\n        services[name]={'image':image,'environment':env,\n             'ports':[f'127.0.0.1:{(19300 if backend==\"es\" else 29300)+i}:9200'],\n             'volumes':[f'{name}:{root}/data','snapshots:/snapshots'],\n             'mem_limit':'2g', 'stop_grace_period':'90s'}\n    volumes['snapshots']={}\n    return {'name':f'elk-expansion-ha-{backend}','services':services,'volumes':volumes}\n\nif __name__=='__main__':\n    p=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--joined',action='store_true')\n    a=p.parse_args();print(json.dumps(topology(a.backend,a.joined),indent=2))\n```", "subs": ["首次引导与已有集群重启", "教学拓扑及其验证范围", "启动、形成集群与移除首次引导设置", "对照实验完整文件"]}, {"title": "18.3 配置分配感知并解释未分配分片", "content": "<a id=\"s-18-3\"></a>\n\n#### 分配感知与强制分配感知\n\n`zone` 是节点属性，分配感知使主副分片避免集中在相同 zone。\n强制感知再声明完整故障域集合 `a,b,c`，避免失去一个区后所有副本被集中重建到剩余较少的区而超出预期故障隔离。[ES 分配感知](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-cluster.html)\n\n生成器中已包含：\n\n```yaml\n# 节点级配置示意，完整配置由 make_ha.py 生成。\nnode.attr.zone: a\ncluster.routing.allocation.awareness.attributes: zone\ncluster.routing.allocation.awareness.force.zone.values: a,b,c\n```\n\n标签不创造物理隔离，强制感知也不创造容量。\n对于一主一副，剩余两个区可能仍能放满两份；对于一主两副，丢失一个区后可能有一份保持未分配。\n因此不要把“失去一个 zone 必然黄色”当成与副本数无关的定律。\n\n**独立创建三副本观察索引**\n\n在 OS HA 的 Dev Tools 或 `29300` API 创建：\n\n```http\nPUT /exp-ha-check\n{\n  \"settings\": {\n    \"number_of_shards\": 1,\n    \"number_of_replicas\": 2,\n    \"index.routing.allocation.require.temp\": \"hot\"\n  },\n  \"mappings\": {\n    \"properties\": {\n      \"event_id\": {\"type\":\"keyword\"},\n      \"message\": {\"type\":\"text\"}\n    }\n  }\n}\nPUT /exp-ha-check/_doc/ha-event-1?refresh=wait_for\n{\"event_id\":\"ha-event-1\",\"message\":\"before failure\"}\nGET /_cat/shards/exp-ha-check?format=json\n```\n\n先确认一主两副分别落到 `hot-a/b/c`。\n若没有，停下检查节点属性、磁盘、角色与分配解释，不能继续宣称正在测试三副本容错。\n\n\n#### 未分配分片要问分配决策器\n\n```http\nPOST /_cluster/allocation/explain\n{\n  \"index\": \"exp-ha-check\",\n  \"shard\": 0,\n  \"primary\": false\n}\nGET /_cluster/settings?include_defaults=true&flat_settings=true\nGET /_cat/nodeattrs?format=json\nGET /_cat/allocation?format=json\n```\n\n示例需要对应实际存在且可解释的分片；没有未分配副本时，不应把无结果理解为接口失效。\n重点阅读每个候选节点的 decision 与解释，而不是只看最终 NO。\n\n可能同时存在多个限制：`temp=warm`、zone 感知、磁盘水位、节点排除、单节点分片数上限。\n解除一个限制后仍不能分配，并不说明第一项诊断错误，而可能是其他约束仍成立。\n修复必须匹配故障原因，不通过关闭全部分配保护强行“变绿”。", "subs": ["分配感知与强制分配感知", "未分配分片要问分配决策器"]}, {"title": "18.4 演练节点、故障域与网络故障并核对恢复", "content": "<a id=\"s-18-4\"></a>\n\n#### 演练前检查与停止条件\n\n所有故障动作只在 `elk-expansion-ha-*` 中执行。\n每次只引入一种故障；保留源样本、卷和快照，禁止删除数据目录或使用 `accept_data_loss`。\n\n| 前置条件 | 必须确认 |\n| --- | --- |\n| 集群身份 | 精确产品版本、名称、UUID |\n| 健康状态 | 目标索引主副分片全部分配 |\n| 负载 | 小规模持续探针，无生产请求 |\n| 容量 | 足够承受恢复；不是磁盘已满的现场 |\n| 回退 | 已写清启动/重连命令及负责人 |\n| 观察 | API 请求状态、事件 ID、分片位置、恢复流量 |\n\n本书演练停止条件：主分片不可用超出预设窗口、容器持续 OOM、磁盘超过安全预算、出现未解释的数据缺失，或者故障对象与计划不符。\n停止注入、恢复已停对象、保存证据，然后分析，不通过扩大超时掩盖失败。\n\n\n#### 单节点故障实验\n\n```bash\n# 先保存现场。以下是 OS 教学集群，不是主 compose。\nmkdir -p evidence/ha-node\ncurl -fsS 'http://127.0.0.1:29301/_cluster/health?pretty' > evidence/ha-node/before-health.json\ncurl -fsS 'http://127.0.0.1:29301/_cat/shards/exp-ha-check?format=json' > evidence/ha-node/before-shards.json\ndocker compose -f compose-ha-os-joined.json stop os-hot-a\ncurl -fsS 'http://127.0.0.1:29301/_cluster/health?pretty' > evidence/ha-node/during-health.json\ncurl -fsS 'http://127.0.0.1:29301/exp-ha-check/_doc/ha-event-1' > evidence/ha-node/read-existing.json\n# 恢复原实例和原数据卷。\ndocker compose -f compose-ha-os-joined.json start os-hot-a\n```\n\n在故障期间向健康入口写入一个新 ID，再恢复后查询两条事件。\n请求失败应保留状态和错误，不用 `|| true` 隐藏。\n管理节点重新选举、主分片提升和客户端重试可能带来短暂中断；实验记录实际过程，不预填“零中断”。\n\n恢复后的成功标准是：集群身份未变、预期节点恢复、分片状态符合策略、故障前后事件存在且没有不可解释的重复、恢复任务趋于稳定。\n\n\n#### 故障域失效与多数丢失\n\n```bash\n# 模拟 zone=a 的两个容器停机；仍然不是真实可用区失效。\ndocker compose -f compose-ha-os-joined.json stop os-hot-a os-warm-a\n# 从 b 区入口观察；不要访问已经停下的 29300。\ncurl -fsS 'http://127.0.0.1:29301/_cat/shards/exp-ha-check?format=json'\ndocker compose -f compose-ha-os-joined.json start os-hot-a os-warm-a\n```\n\n一主两副的观察索引预计仍有两份在线数据，但强制感知可能保留未分配副本。\n不同索引的副本数、温度约束不同，状态可能不同。\n不能用某个索引读通，证明所有索引都具备相同可用性。\n\n失去两个具有管理资格的故障域，可能失去投票多数，即使剩余磁盘上还有数据，也不能按“最后一份副本仍在”保证写入继续。\n不同 no-master block 设置下读操作行为可能不同，必须记录实际返回和数据新鲜度。\n本书不要求为了演示而自动连续关闭多个区；此项应由读者在已掌握单故障后单独评审执行。\n\n\n#### 有界网络隔离示例\n\n只隔离一个非关键实验容器，并确保退出时尝试重连。\n下面脚本保存为临时 `isolate-one.sh`，在有 Docker 权限的隔离主机执行；不要传任意容器 ID。\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\ncompose_file=compose-ha-os-joined.json\ncid=$(docker compose -f \"$compose_file\" ps -q os-hot-a)\ntest -n \"$cid\"\nproject=$(docker inspect --format '{{ index .Config.Labels \"com.docker.compose.project\" }}' \"$cid\")\ntest \"$project\" = elk-expansion-ha-os\nnetwork=elk-expansion-ha-os_default\nrestore() {\n  docker network connect --alias os-hot-a \"$network\" \"$cid\" || {\n    echo '自动重连失败，请检查容器当前网络后手工恢复。' >&2\n  }\n}\ntrap restore EXIT INT TERM\ndocker network disconnect \"$network\" \"$cid\"\nsleep 30\n```\n\n该实验模拟容器网络不可达，不模拟真实交换机、跨区路由或非对称分区的所有行为。\n重连后检查 DNS 名称、发布地址和 集群成员、管理节点和 cluster UUID，不只检查容器 still running。\n若 Docker 实现或网络驱动不允许此操作，记录“受阻”，不要改用宿主全局防火墙制造更大故障。", "subs": ["演练前检查与停止条件", "单节点故障实验", "故障域失效与多数丢失", "有界网络隔离示例"]}]}, {"title": "第 19 章 · 冷热分层、容量与成本", "sections": [{"title": "19.1 从访问频率与保留目标推导数据分层", "content": "<a id=\"s-19-1\"></a>\n\n#### 从访问需求推导分层\n\n热、温、冷首先是业务需求：最近日志写入多、查询密；较旧日志少量排障；更旧数据可能只用于审计恢复。\n产品的 node role、存储插件和索引策略只是实现方式。\n不能因为一台机器配置了 `temp=cold`，就认为它自动具有低成本对象存储查询能力。\n\n| 层次 | 教学需求假设 | 需要测量 |\n| --- | --- | --- |\n| 热 | 最近 7 天，持续写入，分钟级排障 | 写入、并发查询、恢复空间 |\n| 温 | 8～30 天，较少查询 | 搜索延迟、迁移带宽、压缩效果 |\n| 冷/归档 | 更旧数据，低频取证 | 在线查询要求、恢复时间、对象保存完整性 |\n\n这些天数是示例，不是推荐所有业务采用相同保留期。\n业务事件访问频率、权限和删除要求应先于技术名称确定。\n\n\n#### Elastic 与 OpenSearch 的实现差别\n\nES 7.17 支持数据层角色，ILM 的 migrate 会设置数据层偏好。\n使用 `data_hot/data_warm/data_cold` 时应检查目标层是否存在，以及 `_tier_preference` 的回退行为。[ES 数据层](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/data-tiers.html)\n\n本书可运行实验使用通用 `data` 角色和 `node.attr.temp`：ILM warm phase 禁用自动 migrate，改由 allocate.require.temp 迁移。\n这是为了避免同时存在 `temp=warm` 与另一套 `_tier_preference` 的不一致限制。[ILM allocate](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/ilm-allocate.html)\n\nOpenSearch 2.19 主实验通过节点属性和 ISM allocation 动作实现本地磁盘热/温分配。\n不把云托管 UltraWarm、托管 cold storage 或专属资源类型写成自建 OpenSearch 的默认功能。\n涉及 searchable snapshot、remote-backed storage 等另一种存储架构时，必须另核对版本、插件和运维边界，本书不默认启用。", "subs": ["从访问需求推导分层", "Elastic 与 OpenSearch 的实现差别"]}, {"title": "19.2 验证滚动、转层、位置变化与删除的完整过程", "content": "<a id=\"s-19-2\"></a>\n\n转层实验依赖已形成并核对身份的 [六节点集群](04-production-operations-and-troubleshooting.md#s-18-2)，使用 [独立生命周期脚本](03-search-storage-and-visualization.md#s-14-3) 和本节的 `cycle_data.py`。先确认分片所在节点，再观察策略状态；策略进入下一阶段不一定意味着所有物理迁移已经结束。\n\n#### 完整转层实验\n\n在前面的教学章节形成的 HA 实验集群上执行：\n\n```bash\npython3 tools/lifecycle.py os --url http://127.0.0.1:29300 --tiered\npython3 tools/lifecycle.py os --url http://127.0.0.1:29300 --tiered --apply\npython3 tools/cycle_data.py os --url http://127.0.0.1:29300 --apply\n```\n\nES 对照换成 `es` 和 `19300`。\n两个实验都用新的 `exp-cycle`，不会改变普通对账数据的生命周期。\n如果安装过程中某一步失败，保留已创建资源与日志；不要重跑时覆盖所有资源。\n\n| 阶段 | 观察 | 通过条件 |\n| --- | --- | --- |\n| 首次写入 | alias、cat shards、查询 | 首索引在 hot，25 个 ID 可查 |\n| 滚动 | 唯一 write alias | 新写索引后缀推进，旧索引不再接收普通写入 |\n| 转层 | policy 状态、分片节点 temp | 旧索引主副分片真正落到 warm |\n| 保留 | 旧 run_id 查询 | 迁移前后事件集合一致 |\n| 删除 | explain/alias/index、查询 | 到达策略年龄后旧索引被删除，新写索引仍正常 |\n\n生命周期执行成功与物理迁移完成是不同观察点。\n即使策略已进入后续状态，也要从分片位置和恢复任务确认迁移实际完成。\n删除是明确设计的验收阶段，不应把这时旧 ID 消失判为采集丢失。\n\n\n#### 生命周期年龄、迟到日志和最短/最长保留\n\nRollover 后的保留年龄与业务 `@timestamp` 无直接一一对应关系。\n同一个索引内，最早与最晚写入的事件会在同一次索引删除中一起消失。\n晚到的历史日志可能保留得比业务期望更久；如果按业务日期索引又可能马上落入待删除范围。\n\n本实验保留 30 分钟从滚动后计算，故意加入三天前事件来观察这一差异。\n查询时分别按 `@timestamp` 与入库时刻理解，不修改事件时间“让界面好看”。\n\n| 时间 | 意义 |\n| --- | --- |\n| 事件时间 | 业务实际发生时间，依赖源时钟 |\n| 采集时间 | 采集器构造外层事件的时间 |\n| 入库时间 | Ingest Pipeline 接收处理时刻 |\n| 索引创建时间 | 当前索引生命周期起点之一 |\n| Rollover 时间 | 后续生命周期年龄可能采用的基准 |\n| 删除完成时间 | 后台任务实际完成，可能晚于阈值 |\n\n\n#### 对照实验完整文件：`tools/cycle_data.py`\n\n生命周期的 25 条独立样本。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/cycle_data.py -->\n```python\n\"\"\"只对独立 exp-cycle alias 写入 25 个带唯一 ID 的样本，供生命周期观察。\"\"\"\nfrom datetime import datetime,timezone,timedelta\nimport argparse,json,uuid\nfrom client import Client,check_bulk\np=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--url');p.add_argument('--apply',action='store_true')\na=p.parse_args();c=Client(a.backend,a.url);c.guard()\nif not a.apply:raise SystemExit('未执行：这是写入实验，请显式 --apply')\nrun='cycle-'+uuid.uuid4().hex\nlines=[]\nfor i in range(25):\n    eid=f'{run}-{i}'\n    lines.append(json.dumps({'index':{'_index':'exp-cycle','_id':eid}}))\n    lines.append(json.dumps({'@timestamp':(datetime.now(timezone.utc)-timedelta(days=3 if i==0 else 0)).isoformat(),\n        'event':{'id':eid,'dataset':'nginx.access'},'labels':{'run_id':run},\n        'service':{'name':'orders-api','environment':'lab'},'message':'tiering evidence'}))\nr=c.request('POST','/_bulk?refresh=wait_for', ('\\n'.join(lines)+'\\n').encode())\ncheck_bulk(r,25);print(json.dumps({'run_id':run,'documents':25,'note':'包含一条迟到三天的事件；索引年龄不会因此变为三天。'}))\n```", "subs": ["完整转层实验", "生命周期年龄、迟到日志和最短/最长保留", "对照实验完整文件"]}, {"title": "19.3 计算流量、缓冲、分片、故障余量与排空时间", "content": "<a id=\"s-19-3\"></a>\n\n#### 先统一单位和统计口径\n\n容量预算至少需要平均 EPS、峰值倍数、平均事件大小、保留时长、压缩后比率、副本数和预留空间。\n应明确大小测量发生在原始文本、Filebeat 事件、Kafka 压缩日志还是 ES 主分片。\n这些层次不是同一个字节数。\n\n| 输入 | 应如何取得 |\n| --- | --- |\n| 平均 EPS | 代表性工作日与周末的实际流量 |\n| 峰值 EPS | 业务峰值与故障重试时段 |\n| 事件大小 | 完整事件样本，不只 message 文本 |\n| Kafka 存储比率 | 同一批事件实际压缩后大小 |\n| ES 主分片比率 | 对应 Mapping 与实际文档的主分片大小 |\n| 保留期 | 排障、审计和恢复要求 |\n| 余量 | 恢复、迁移、合并与节点故障空间 |\n\n1 GiB = 1024³ 字节，1 GB = 1000³ 字节。\n监控、磁盘厂商标注和 API 输出可能使用不同单位，预算表必须标明。\n\n\n#### 原始流量与 Kafka 缓冲\n\n设平均 EPS 为 `E`，每事件平均字节为 `S`，Kafka 保留小时为 `H`，压缩存储比率为 `K`，副本因子为 `R`：\n\n```text\n原始字节/秒 = E × S\nKafka 数据估算 = E × S × 3600 × H × K × R\n```\n\n这是数据量模型，不包含所有索引、控制器、段、文件系统及运维开销。\nKafka 的副本因子已经包含主副本总份数，不能再额外乘一次 `1 + R`。\n\n**缓冲时间与磁盘限额**\n\n若同时存在时间和大小保留限制，消息可能在时间期限之前因大小限制被清理。\n峰值流量下仍应重新计算可回放时间窗口。[Kafka Topic 设置](https://kafka.apache.org/28/configuration/topic-level-configs/)\n\n“可以缓冲 72 小时”应以最坏合理流量和可用磁盘为前提，而不是只设置 `retention.ms` 后就成立。\n\n\n#### Elasticsearch 存储与分片数量\n\n设 ES 主分片实际存储与原始事件字节比率为 `M`，保留天数为 `D`，副本数量为 `r`：\n\n```text\nES 文档与索引数据估算 = E × S × 86400 × D × M × (1 + r)\n```\n\nES 的 `number_of_replicas` 不包含主分片，所以这里使用 `1 + r`。\n`M` 必须实测，它受到 `_source`、字段数量、分析器、doc_values、压缩与数据重复程度影响。\n不要在没有样本时保证“ES 一定是原始日志的两倍”。\n\n**分片数量的预算**\n\n```text\n总分片实例数 ≈ 每日或每次滚动索引数 × 保留代次数 × 主分片数 × (1 + 副本数)\n```\n\n如果正常、隔离、Java、容器日志分别滚动，需要分别计算后求和。\n不能只看一个业务的分片数，再认为整个集群还很空。\n\n**预留空间**\n\n按可用比例 `U` 分配容量时，可写为 `数据估算 / U`。\n例如 U=0.7 代表只计划使用配置容量的 70%，剩余用于不确定性和维护。\n它不是对 ES 磁盘水位设置的自动推荐，水位保护和容量计划需要分别设计。\n\n\n#### 积压恢复需要净吞吐\n\n故障期间积压 `B` 条，恢复后输入仍为 `E` 条/秒，总处理能力为 `C` 条/秒：\n\n```text\n净排空速度 = C - E\n预计排空时间 = B / (C - E)\n```\n\n当 C ≤ E，系统无法排空已有积压。\n“消费者恢复到正常每秒一千条”并不代表能消化过去两小时积压，因为当前仍有每秒一千条进入。\n\n这个模型假设吞吐稳定且没有额外重试或资源变化。\n恢复过程中应根据实际净流出速率更新估计，不使用一次压测峰值作为持续能力承诺。\n\n\n#### 基础实验：可复用容量算例脚本\n\n保存为 `scripts/capacity.py`。\n所有默认值都是假设，不是对你生产环境的测量结果。\n脚本输出数据估算和净排空时间，便于替换为自己的采样值。\n\n```python\n#!/usr/bin/env python3\n\"\"\"日志平台容量的假设算例；不是性能测试结果或采购建议。\"\"\"\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport math\n\n\ndef positive(value: str) -> float:\n    number = float(value)\n    if not math.isfinite(number) or number <= 0:\n        raise argparse.ArgumentTypeError(\"需要有限正数\")\n    return number\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--eps\", type=positive, default=1000)\n    parser.add_argument(\"--event-bytes\", type=positive, default=1200)\n    parser.add_argument(\"--peak-factor\", type=positive, default=3)\n    parser.add_argument(\"--kafka-hours\", type=positive, default=72)\n    parser.add_argument(\"--kafka-stored-ratio\", type=positive, default=0.55)\n    parser.add_argument(\"--kafka-replication\", type=int, default=3)\n    parser.add_argument(\"--es-days\", type=positive, default=14)\n    parser.add_argument(\"--es-primary-ratio\", type=positive, default=1.3)\n    parser.add_argument(\"--es-replicas\", type=int, default=1)\n    parser.add_argument(\"--usable-fraction\", type=positive, default=0.70)\n    parser.add_argument(\"--outage-hours\", type=positive, default=2)\n    parser.add_argument(\"--recovery-eps\", type=positive, default=2500)\n    args = parser.parse_args()\n    if args.kafka_replication < 1 or args.es_replicas < 0:\n        parser.error(\"Kafka replication >= 1，ES replicas >= 0\")\n    if not 0 < args.usable_fraction < 1:\n        parser.error(\"usable-fraction 必须在 0 与 1 之间\")\n    raw_per_second = args.eps * args.event_bytes\n    kafka_payload = (raw_per_second * 3600 * args.kafka_hours *\n                     args.kafka_stored_ratio * args.kafka_replication)\n    es_payload = (raw_per_second * 86400 * args.es_days *\n                  args.es_primary_ratio * (1 + args.es_replicas))\n    backlog = args.eps * args.outage_hours * 3600\n    net_drain = args.recovery_eps - args.eps\n    gib = 1024 ** 3\n    result = {\n        \"assumptions\": vars(args),\n        \"raw_gib_per_day\": raw_per_second * 86400 / gib,\n        \"peak_raw_mib_per_second\": raw_per_second * args.peak_factor / 1024 ** 2,\n        \"kafka_payload_gib\": kafka_payload / gib,\n        \"kafka_provisioned_gib_estimate\": kafka_payload / args.usable_fraction / gib,\n        \"es_payload_gib\": es_payload / gib,\n        \"es_provisioned_gib_estimate\": es_payload / args.usable_fraction / gib,\n        \"backlog_events\": backlog,\n        \"net_drain_eps\": net_drain,\n        \"catchup_hours\": backlog / net_drain / 3600 if net_drain > 0 else None,\n        \"warning\": \"容量比率是假设；不含独立快照和全部运维开销，必须实测校准。\",\n    }\n    if net_drain <= 0:\n        result[\"warning\"] += \" 恢复吞吐不高于持续输入，无法排空积压。\"\n    print(json.dumps(result, ensure_ascii=False, indent=2))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n```\n\n```bash\npython3 scripts/capacity.py\n\npython3 scripts/capacity.py \\\n  --eps 3000 --event-bytes 1500 \\\n  --kafka-hours 48 --kafka-stored-ratio 0.6 \\\n  --es-days 30 --es-primary-ratio 1.4 \\\n  --recovery-eps 6000\n```\n\n计算结果不包含独立快照仓库。\n单台服务器容量还需要考虑分片不均衡、节点故障后的重新分配及磁盘设备性能，而不仅是集群总字节数。\n\n\n#### 扩展原容量公式\n\n前面的算例已经讨论 EPS、平均事件大小与保留周期。\n本篇新增四项：节点/故障域余量、迁移与合并临时空间、独立快照空间，以及可接受恢复时间。\n\n```text\n原始日量 = EPS × 平均事件字节 × 86400\n主分片保留量 = 原始日量 × 实测主索引/原文比率 × 保留天数\n在线副本量 = 主分片保留量 × (1 + 副本数)\n故障后单存活节点最低盘容量\n  = (在线副本量 + 临时空间预算) / 存活节点数 / 允许占用比例\n快照存储单列，不与在线副本相互抵消\n```\n\n比率必须采样测量，不能从某个博客压缩率照抄。\n热层和温层需要分别计算；如果温层没有足够 zone 或满足属性的节点，总空间公式成立也仍可能迁移失败。\n\n\n#### 假设明确的算例\n\n以下全为教学假设：原始日志 100GiB/日，主分片/原文比率 1.2，保留 7 日，一副本，三个节点，要求失去一节点后仍容纳全部在线副本，允许磁盘占用 70%，另留 200GiB 集群临时空间。\n独立快照预算 900GiB；假设有效恢复吞吐 100GiB/小时，仅用于算术示例。\n\n```bash\npython3 tools/cost.py --raw-gib-day 100 --primary-ratio 1.2 --days 7 \\\n  --replicas 1 --nodes 3 --failed 1 --usable 0.70 \\\n  --temp-gib 200 --snapshot-gib 900 --restore-gib-hour 100\n```\n\n算术结果：主分片约 840GiB，在线副本约 1680GiB；每个存活节点需要约 1342.86GiB 盘容量，按三个同规格节点采购约 4028.57GiB 在线容量。\n主数据恢复下界约 8.4 小时，但不含索引检查、排队、网络共享、恢复后回放和业务验收。\n这些数值不是实测，也不是建议购买某种云磁盘。\n\n成本比较可以再乘用户自己取得的单位成本，并加入计算、网络、对象请求、运维人力和停机风险。\n没有来源的云价格不应写进固定结论。\n\n\n#### 对照实验完整文件：`tools/cost.py`\n\n容量、故障余量与恢复下界算例。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/cost.py -->\n```python\n\"\"\"无云单价的分层与故障余量算例。比率必须用自己采样替换。\"\"\"\nimport argparse,json,math\n\ndef capacity(raw_gib_day,primary_ratio,days,replicas,nodes,failed,usable,temp_gib,snapshot_gib,restore_gib_hour):\n    args=[raw_gib_day,primary_ratio,days,nodes,usable,restore_gib_hour]\n    if any(not math.isfinite(x) for x in [replicas,failed,temp_gib,snapshot_gib]):\n        raise ValueError('所有参数必须为有限值')\n    if any(not math.isfinite(x) or x<=0 for x in args) or not 0<usable<1:\n        raise ValueError('需要有限正值且 usable 在 0..1')\n    if not 0<=failed<nodes or replicas<0 or temp_gib<0 or snapshot_gib<0:raise ValueError('故障/副本/空间参数错误')\n    primary=raw_gib_day*primary_ratio*days\n    payload=primary*(1+replicas)\n    per_survivor=(payload+temp_gib)/(nodes-failed)/usable\n    return {'primary_gib':primary,'online_payload_gib':payload,\n            'minimum_disk_gib_per_surviving_node':per_survivor,\n            'provisioned_online_gib':per_survivor*nodes,\n            'separate_snapshot_gib':snapshot_gib,\n            'lower_bound_restore_hours':primary/restore_gib_hour,\n            'warning':'均匀分布假设；故障域分配规则和单分片容量还可能阻止恢复。恢复下界不含排队、重放与校验。'}\nif __name__=='__main__':\n    p=argparse.ArgumentParser();p.add_argument('--raw-gib-day',type=float,default=100)\n    p.add_argument('--primary-ratio',type=float,default=1.2);p.add_argument('--days',type=float,default=7)\n    p.add_argument('--replicas',type=int,default=1);p.add_argument('--nodes',type=int,default=3)\n    p.add_argument('--failed',type=int,default=1);p.add_argument('--usable',type=float,default=.70)\n    p.add_argument('--temp-gib',type=float,default=200);p.add_argument('--snapshot-gib',type=float,default=900)\n    p.add_argument('--restore-gib-hour',type=float,default=100);a=p.parse_args()\n    print(json.dumps({'assumptions':vars(a),'estimate':capacity(**vars(a))},ensure_ascii=False,indent=2))\n```", "subs": ["先统一单位和统计口径", "原始流量与 Kafka 缓冲", "Elasticsearch 存储与分片数量", "积压恢复需要净吞吐", "基础实验：可复用容量算例脚本", "扩展原容量公式", "假设明确的算例", "对照实验完整文件"]}, {"title": "19.4 实测字段、压缩、副本与归档的空间和恢复代价", "content": "<a id=\"s-19-4\"></a>\n\n#### 日志降噪与分级保留\n\n降噪应该先回答哪些证据允许丢失，再确定过滤规则。\n单纯删除所有 INFO 可能丢掉成功请求分母和关键状态转换；只保留 ERROR 也不一定能解释故障发生前的过程。\n\n| 策略 | 适用目的 | 应验证的损失 |\n| --- | --- | --- |\n| 健康检查降频 | 减少高重复低价值请求 | 不影响真实可用性判断 |\n| 调试日志短保留 | 限制短期排查开销 | 过期后无法追溯细节 |\n| 敏感字段删除或脱敏 | 降低泄漏风险 | 是否保留必要关联字段 |\n| 正常日志采样 | 控制高流量成本 | 请求统计需要采样权重和覆盖说明 |\n| 错误与慢请求较长保留 | 保留故障证据 | 字段和判定规则是否可靠 |\n\n错误日志百分之百保留只是采集策略目标，不能保证链路永不丢失，也不能使已被上游采样丢弃的 Trace 重新出现。\n日志与 Trace 的采样边界应分别记录。\n\n\n#### 容量评审的验收材料\n\n最终容量评审应包含样本区间、峰值依据、压缩比实测、索引放大比、保留要求、恢复目标和预警阈值。\n同时展示正常情况与节点故障后的预算。\n\n```text\n场景：日常 / 峰值 / ES 中断 / Kafka 节点故障\n平均与峰值 EPS：填写实测\n原始与封装后事件大小：填写样本分布\nKafka 保留窗口：分别计算平均和峰值\nES 主副分片容量：分数据集计算\n最小剩余空间：考虑恢复与迁移\n恢复净吞吐：使用可持续测量值\n扩容触发点：按增长速率而非磁盘满后处理\n```\n\n不要只给出“需要三台 16 核 64G”的结论却没有工作负载和恢复要求。\n容量模型要能随着流量、字段和保留策略变化重新计算。\n\n\n#### 压缩、Force Merge 与快照不是同一件事\n\n减少不需要的多字段和索引，比盲目压缩全部原文更容易保持可解释的检索能力。\n改变 codec 通常影响之后创建的 segment，不能把配置更新当成历史数据已经重压缩。\nForce Merge 会产生额外 I/O 和临时空间，适合不再写入、容量充足且经过评审的索引；不是磁盘已满时的急救按钮。[ES Force Merge](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/indices-forcemerge.html)\n\nES 7.17 的 `best_compression` 可作为独立新索引实验；OpenSearch 也应按选定版本的 codec 文档核对。\n不要把较新版本的额外压缩算法配置复制进 7.17。\n比较时使用同样文档、分片、副本和 merge 稳定状态，记录 primaries 与 total，避免副本数变化被误认作压缩收益。\n\n快照是恢复材料；普通快照不是一个可以直接拿来承接在线查询的温/冷数据节点。\n启用专门的可搜索快照能力又涉及独立功能、版本和许可证条件，本书的普通文件系统快照实验不包含它。\n\n**ISM 分配动作的参数核对**\n\n本实验在 allocation 中使用 `wait_for: true`，要求观察分片迁移完成，而不是仅看到设置更新。\n2.19 文档参数表将该项类型显示为 string，但同分支 `AllocationAction` 的 `waitFor` 声明为 Boolean；本示例按源码使用布尔值，不照抄表格类型。\n这项核对是配置依据，不是已经在 2.19.6 实例完成分配测试。[2.19 分配动作源码](https://github.com/opensearch-project/index-management/blob/2.19/src/main/kotlin/org/opensearch/indexmanagement/indexstatemanagement/action/AllocationAction.kt)\n\n\n#### 同批数据的存储对照\n\n[混合压测脚本 `performance.py`](04-production-operations-and-troubleshooting.md#s-20-3) 提供 wide 与 lean 两种 Mapping。\nwide 多存原文可检索字段并展开动态 app；lean 保存 app 原始结构但不索引，避免动态字段增长。\n两个版本仍保留本书主要查询字段，方便比较相同查询。\n\n| 观察项 | 方法 |\n| --- | --- |\n| 主数据大小 | `_stats/store` 中 primaries |\n| 含副本总大小 | 同接口 total，记录副本数 |\n| 字段数量 | Mapping 展开后计数，不只看 `_source` 键数 |\n| segment / deleted docs | `_stats/segments,docs` |\n| 合并开销 | `_stats/merge`、节点 IO 与 CPU |\n| 查询代价 | 同样查询、时间范围、缓存说明和重复次数 |\n| 恢复代价 | 独立新目标恢复、实测吞吐与校验时间 |\n\nlean 无法对未索引的 app 任意键执行同等搜索，这是能力变化，不应隐藏在“成本下降”里。\n只有保留业务真正需要的检索语义，成本优化才有意义。", "subs": ["日志降噪与分级保留", "容量评审的验收材料", "压缩、Force Merge 与快照不是同一件事", "同批数据的存储对照"]}]}, {"title": "第 20 章 · 分段调优与混合负载验证", "sections": [{"title": "20.1 用分段证据定位采集、Kafka、Logstash 和后端瓶颈", "content": "<a id=\"s-20-1\"></a>\n\n先确定变慢的是读取、发送、加工、写入还是查询。为同一时间窗口收集各段流入流出速率、队列深度、错误和资源占用，再选择一项参数进行对照。不要把下游阻塞造成的上游空闲解释为上游能力不足。\n\n#### 先定位瓶颈所在阶段\n\n吞吐低不等于 Logstash Grok 慢。\n没有 Grok 的链路也可能因为 Kafka 分区、单消费者、ES 写入、磁盘、网络或限额而变慢。\n\n```text\n源文件产生速度\n→ Filebeat 读取与输出速度\n→ Kafka 生产成功与分区分布\n→ 消费组读取速度\n→ Logstash Filter 成本与队列\n→ ES Bulk 响应与索引速度\n→ 刷新和查询可见时间\n```\n\n每一层都要在同一时间窗口采样。\n只拿 Filebeat 的一分钟平均值与 ES 的瞬时值比较，可能把批量行为误认为数据丢失。\n\n| 层 | 首先查看 |\n| --- | --- |\n| Filebeat | 已读取、已发布、已确认、输出错误、进程资源 |\n| Kafka | Topic 分区、ISR、生产速率、Lag、网络和磁盘 |\n| Logstash | Pipeline in/out、处理耗时、队列、JVM |\n| Elasticsearch | 写入拒绝、索引时间、Heap、磁盘、Merge |\n| 查询 | Refresh、时间范围、查询成本、返回体 |", "subs": ["先定位瓶颈所在阶段"]}, {"title": "20.2 调整批量、队列和并行度并解释吞吐与延迟的取舍", "content": "<a id=\"s-20-2\"></a>\n\n#### Filebeat 批量、队列与文件发现\n\n采集端性能受文件数量、单行大小、处理器、输出批量和下游确认影响。\n大量短生命周期文件与少量大文件的压力模型不同。[Filebeat Kafka output](https://www.elastic.co/guide/en/beats/filebeat/7.17/kafka-output.html)\n\n| 参数或设计 | 影响 | 调整前验证 |\n| --- | --- | --- |\n| 扫描间隔 | 新文件发现延迟与目录扫描成本 | 新文件数量与可接受延迟 |\n| 内存队列 | 短暂缓冲与内存占用 | 下游是否长期阻塞 |\n| 输出批量 | 请求次数和批量等待 | 单事件大小、下游限制 |\n| 压缩 | 网络与 CPU 的取舍 | broker 和客户端 CPU |\n| 处理器 | 采集端解析成本 | 是否有重复解码和复杂脚本 |\n\n批量参数的单位可能是事件数，不是字节数。\n例如相同 500 条，普通访问日志可能很小，包含长堆栈时请求体会大得多。\n\n**不能靠队列解决持续供需失衡**\n\n把队列从几千条增加到几十万条，只会延后满队列时刻。\n如果长期输出能力小于输入，必须处理吞吐瓶颈、限流或保留策略。\n增加队列还会改变重启恢复和内存预算。\n\n\n#### Kafka 分区与消费者并行度\n\n同一消费组内，一个分区在一个时刻由一个消费者处理。\n增加消费者线程超过分区数，不能让同一分区在该组内被任意并发切分。[Kafka 设计](https://kafka.apache.org/28/design/design/)\n\n本书 Topic 有 3 个分区。\n同组消费者的总数、线程与分区分配应一并检查，而不是看到 CPU 空闲就继续增线程。\n\n```bash\ndocker compose -p elk-full exec kafka kafka-topics.sh \\\n  --bootstrap-server kafka:9092 --describe --topic logs-lab-raw\n\ndocker compose -p elk-full exec kafka kafka-consumer-groups.sh \\\n  --bootstrap-server kafka:9092 --describe --group logs-lab-main-v1\n```\n\n**热分区**\n\n总 Lag 不大，但某个分区持续积压，可能是 Key 分布、数据大小或特定异常记录造成。\n单纯增加 broker 不会自动把该分区内部的历史记录拆散。\n改变分区数可能改变 Key 到分区的映射和顺序假设，需要评审生产者与消费者语义。\n\n**Rebalance 的代价**\n\n频繁扩缩容、超时或实例重启会触发组成员变化。\n调大超时不一定修复根因；应先确认是处理阻塞、GC 停顿、网络问题还是滚动策略不合理。\n观察消费者日志与组状态，保留变化时间线。\n\n\n#### Logstash Workers、Batch 与 Filter 成本\n\nLogstash Pipeline 的 worker 数、batch size 和插件行为共同影响吞吐。[性能调优](https://www.elastic.co/guide/en/logstash/7.17/tuning-logstash.html)\n\n一个粗略的在途事件基数是：\n\n```text\npipeline.workers × pipeline.batch.size\n```\n\n但实际内存还包括 Input、队列、插件内部结构、输出序列化、长事件和 JVM 开销。\n不能把这个乘积乘平均日志字节数后当成精确 Heap 上限。\n\n| 类型 | 常见瓶颈 | 调优方向 |\n| --- | --- | --- |\n| CPU 密集解析 | 正则、复杂 Ruby、重复 JSON 解码 | 减少无效工作、稳定格式使用更简单解析 |\n| I/O 等待 | 外部查询、慢输出 | 缓存、超时、异步设计或吞吐隔离 |\n| 大事件 | 长堆栈、巨大 JSON | 上限、批次和内存预算 |\n| 单线程语义 | 有状态聚合等插件 | 先理解正确性要求，不盲增 workers |\n\n**Grok、Dissect 与 JSON**\n\n已是合法 JSON 的事件不应先 Grok 拆成 JSON 再解析。\n固定分隔符的文本可以评估 Dissect；格式可变才需要更灵活的模式。\n改变解析器之前要比较正常、缺字段、特殊字符和坏日志的输出，而不是只看跑得快。\n\n**Ruby 脚本并发安全**\n\n第二篇规范化脚本使用事件级局部变量，注册时设置的源集群名不在处理期间修改。\n不要用共享实例变量累计当前事件字段，否则多个 worker 并发时可能串数据。[Ruby filter](https://github.com/logstash-plugins/logstash-filter-ruby/blob/v3.1.8/docs/index.asciidoc)\n\n\n#### ES 批量写入与查询竞争\n\n在固定硬件和 Mapping 下，从小批次逐步增加，观察吞吐、请求延迟、拒绝和内存。\n找到可持续区间后再考虑并发，不是直接把 bulk size 和 worker 都调到最大。[索引调优](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/tune-for-indexing-speed.html)\n\n| 变化 | 可能改善 | 可能恶化 |\n| --- | --- | --- |\n| 增大批量 | 减少请求开销 | 大请求内存、重试放大、代理限制 |\n| 增加并发 | 利用剩余处理能力 | 饱和后拒绝、队列和 GC |\n| 延长刷新 | 降低部分刷新开销 | 日志可见延迟 |\n| 减少不必要字段 | 降低存储与索引工作 | 未评审时丢失证据 |\n| 调整分片 | 改善布局 | 小分片增加、查询扇出、迁移成本 |\n\n在数据导入实验中临时降低副本或关闭刷新，会改变可靠性与可见性。\n这种测试值不能不经恢复就变成生产默认配置。\n本书主实验不要求通过降低持久化语义获取漂亮的吞吐数字。", "subs": ["Filebeat 批量、队列与文件发现", "Kafka 分区与消费者并行度", "Logstash Workers、Batch 与 Filter 成本", "ES 批量写入与查询竞争"]}, {"title": "20.3 设计固定样本、预热、并发和停止条件的混合压测", "content": "<a id=\"s-20-3\"></a>\n\n#### 一个可复查的压测过程\n\n先记录初始 Kafka Lag、Logstash 队列、ES 索引大小和各进程资源。\n使用唯一 run_id 和有界事件数，逐轮增加输入速率。\n每轮结束等待处理稳定，并对账确认没有用丢弃换取吞吐。\n\n```bash\n# 仅用于隔离 lab。不要直接把 count 改成无限。\npython3 scripts/generate_logs.py \\\n  --output logs/access.jsonl --count 5000 \\\n  --run-id perf-round-001 --interval 0.002\n```\n\n`--interval` 是生成器的等待时间，不是承诺精确 EPS。\n文件系统写入、Python 调度和其他开销都会影响实际产生速度。\n吞吐应从实际事件数和时间测量，不从参数倒数推断。\n\n**记录模板**\n\n| 轮次 | 输入实测 EPS | 输出实测 EPS | P95 可见延迟 | 峰值 Lag/PQ | 错误与对账 | 唯一变更 |\n| --- | --- | --- | --- | --- | --- | --- |\n| 基线 | 待测 | 待测 | 待测 | 待测 | 待测 | 无 |\n| 第一轮 | 待测 | 待测 | 待测 | 待测 | 待测 | 只调整一个参数 |\n| 第二轮 | 待测 | 待测 | 待测 | 待测 | 待测 | 明确记录 |\n\n表内是待填写模板，没有虚构测量数据。\n完成调优后记录配置差异和回滚值，避免下次升级只留下“曾经调过”的口头印象。\n\n\n#### 先写实验协议\n\n本书脚本是轻量教学工具，不替代专业容量基准体系。\n它不模拟所有真实用户查询，也不声称线程数等于生产并发连接模型。\n\n| 参数 | 本书起点 | 扩大前必须考虑 |\n| --- | --- | --- |\n| 数据量 | 每轮 2000 条 | 先增加到代表性数据规模，再提高并发 |\n| 数据分布 | 固定种子、5% 504、动态上下文与长原文 | 必须用实际日志分布校正 |\n| 写入批次 | 200 条 | 记录真实请求字节与最大事件 |\n| 客户端并发 | 2，限制最高 8 | 后端预算和停止条件 |\n| 查询 | 错误日志、路由聚合、耗时分位数 | 热点、宽时间范围与复杂检索比例 |\n| 副本 | 教学 0 副本 | 不能把结果当成生产一副本性能 |\n| 预热 | 混合阶段后重复 4 轮查询 | 第0轮与后续轮分开报告 |\n\n同一个运行编号不得覆盖旧输出文件；每轮生成新索引，避免上一轮覆盖同 ID 后的 segment 状态影响下一轮。\n也不能不清点历史索引就连续压测，最终磁盘满而误认某版本性能退化。\n\n\n#### 混合测试的测量边界\n\n混合阶段随机交错写入和查询任务，查询看到的数据量可能随时间变化。\n这适合观察资源竞争，不适合直接比较每一次查询结果是否完全相同。\n写入完成后刷新并单独做静态查询和事件对账，才检查结果语义。\n\n客户端报告请求级 P50/P95/P99，而不是每条日志从源文件到可见的分位数。\n端到端新鲜度由探针与事件时间差另测。\n失败请求必须进入错误率；成功延迟分位数之外还要报告失败数量和错误类型。\n\n```bash\npython3 tools/performance.py es --variant wide --count 2000 --concurrency 2 \\\n  --run-id wide-01 --output evidence/es-wide-01.json --apply\npython3 tools/performance.py es --variant lean --count 2000 --concurrency 2 \\\n  --run-id lean-01 --output evidence/es-lean-01.json --apply\n```\n\n先做一组小数据功能验证，再按同一协议重复至少三轮。\n冷热缓存状态必须说明；本书没有清空宿主 page cache，也不把第一次查询称为严格的冷缓存实验。\n\n\n#### 停止条件与记录模板\n\n出现持续拒绝、主要索引缺失、频繁 GC/OOM、磁盘接近保护水位、错误率超过实验允许值时，停止增加负载。\n不要为了得到漂亮曲线关闭副本保护、无限扩大队列或忽略失败。\n\n```text\n实验编号：\n产品/插件/镜像 digest：\n节点、CPU、内存、磁盘、网络：\n数据量、大小分布、字段分布、种子：\n写入与查询比例、并发、批量：\n预热方法和缓存说明：\n成功文档、失败请求与 item：\nP50/P95/P99、资源与索引大小：\n等价性对照：\n重复轮次与离散程度：\n改变的唯一变量：\n结论适用范围和未验证项：\n```\n\n此模板留空是待测，不应填入捏造的速度或节省比例。\n\n\n#### 对照实验完整文件：`tools/performance.py`\n\n有界混合负载与资源证据。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/performance.py -->\n```python\n\"\"\"有界写入+查询混合负载。结果只报告本次客户端观测，不承诺生产性能。\"\"\"\nfrom __future__ import annotations\nimport argparse,concurrent.futures,json,math,random,re,statistics,time,uuid\nfrom datetime import datetime,timezone,timedelta\nfrom pathlib import Path\nfrom client import Client,check_bulk,complete_search\nfrom model import properties\n\ndef percentile(values,p):\n    if not values:return None\n    data=sorted(values);position=(len(data)-1)*p;lo=math.floor(position);hi=math.ceil(position)\n    return data[lo]+(data[hi]-data[lo])*(position-lo)\n\ndef documents(n,run):\n    rng=random.Random(42);base=datetime(2026,9,1,tzinfo=timezone.utc)\n    docs=[]\n    for i in range(n):\n        failed=i%20==0\n        docs.append({'@timestamp':(base+timedelta(seconds=i%3600)).isoformat(),\n          'event':{'id':f'{run}-{i:08d}','duration':rng.randint(1,2000)*1000000,\n                   'dataset':'nginx.access','original':'access request '+('x'*256)},\n          'service':{'name':'orders-api','environment':'lab'},\n          'http':{'response':{'status_code':504 if failed else 200}},\n          'route':'/orders/{id}','url':{'original':f'/orders/{i}'},\n          'labels':{'run_id':run},'message':'inventory timeout' if failed else 'order accepted',\n          'app':{'debug_'+str(i%300):i,'dynamic_user':str(i)}})\n    return docs\n\ndef queries():\n    # 三个查询返回相同业务范围但计算形态不同；正式语义比较另见第47章。\n    return [\n      {'size':20,'sort':[{'@timestamp':'desc'},{'event.id':'asc'}],\n       'query':{'bool':{'filter':[{'term':{'service.name':'orders-api'}},{'range':{'http.response.status_code':{'gte':500,'lt':600}}}]}}},\n      {'size':0,'aggs':{'routes':{'terms':{'field':'route','size':10}}}},\n      {'size':0,'aggs':{'latency':{'percentiles':{'field':'event.duration','percents':[50,95,99]}}}}\n    ]\n\ndef run(c,n,variant,run_id,concurrency):\n    c.guard()\n    if not re.fullmatch('[a-z0-9-]{1,40}',run_id):raise ValueError('run_id 仅允许小写字母数字短横线')\n    index=f'exp-perf-{variant}-{run_id}';props=properties()\n    if variant=='wide':\n        props['app']={'type':'object','dynamic':True}\n        props['message']={'type':'text','fields':{'raw':{'type':'keyword','ignore_above':1024}}}\n        props['event']['properties']['original']={'type':'text','fields':{'raw':{'type':'keyword','ignore_above':2048}}}\n    c.request('PUT','/'+index,{'settings':{'number_of_shards':1,'number_of_replicas':0,\n              'refresh_interval':'1s'},'mappings':{'dynamic':False,'properties':props}})\n    before=c.request('GET','/_nodes/stats/indices,jvm,fs,thread_pool')\n    docs=documents(n,run_id);jobs=[]\n    for start in range(0,n,200):\n        batch=docs[start:start+200];rows=[]\n        for d in batch:\n            rows.extend([json.dumps({'index':{'_index':index,'_id':d['event']['id']}}),json.dumps(d)])\n        jobs.append(('write',('\\n'.join(rows)+'\\n').encode(),len(batch)))\n    q=queries()\n    for _ in range(max(15,len(jobs))):jobs.append(('query',q[_%len(q)],0))\n    random.Random(43).shuffle(jobs)\n    def task(job):\n        # 每个请求独立客户端，避免假设 urllib opener 的共享线程状态安全。\n        local=Client(c.backend,c.base);kind,body,count=job;t=time.perf_counter()\n        try:\n            if kind=='write':check_bulk(local.request('POST','/_bulk',body),count)\n            else:complete_search(local.request('POST',f'/{index}/_search?allow_partial_search_results=false',body))\n            return {'kind':kind,'seconds':time.perf_counter()-t,'ok':True,'documents':count}\n        except Exception as exc:\n            return {'kind':kind,'seconds':time.perf_counter()-t,'ok':False,'documents':0,'error':str(exc)}\n    started=time.perf_counter()\n    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as pool:results=list(pool.map(task,jobs))\n    elapsed=time.perf_counter()-started;c.request('POST','/'+index+'/_refresh')\n    after=c.request('GET','/_nodes/stats/indices,jvm,fs,thread_pool')\n    stats=c.request('GET','/'+index+'/_stats/store,segments,merge,refresh,flush')\n    # 静态同一查询的重复轮次供热查询观察；没有声称清空 OS page cache。\n    warm=[]\n    for repetition in range(4):\n        for query_id,body in enumerate(q):\n            t=time.perf_counter();r=complete_search(c.request('POST',f'/{index}/_search?allow_partial_search_results=false',body))\n            warm.append({'repetition':repetition,'query':query_id,'seconds':time.perf_counter()-t,'took_ms':r.get('took')})\n    failures=[r for r in results if not r['ok']]\n    summary={}\n    for kind in ('write','query'):\n        lat=[r['seconds'] for r in results if r['kind']==kind and r['ok']]\n        summary[kind]={f'p{int(p*100)}_seconds':percentile(lat,p) for p in (.5,.95,.99)}\n    return {'backend':c.backend,'index':index,'variant':variant,'seed':42,'documents_requested':n,\n            'documents_confirmed':sum(r['documents'] for r in results),'elapsed_seconds':elapsed,\n            'error_rate':len(failures)/len(results),'summary':summary,'requests':results,\n            'warm_queries':warm,'nodes_before':before,'nodes_after':after,'index_stats':stats,\n            'status':'通过' if not failures else '失败',\n            'scope':'单机教学；统计为请求延迟，不是逐文档入库延迟。查询与写入交错时快照不同。'}\nif __name__=='__main__':\n    p=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--url')\n    p.add_argument('--count',type=int,default=2000);p.add_argument('--concurrency',type=int,default=2)\n    p.add_argument('--variant',choices=['wide','lean'],default='lean');p.add_argument('--run-id',required=True)\n    p.add_argument('--output',required=True);p.add_argument('--apply',action='store_true');a=p.parse_args()\n    if not a.apply:p.error('会创建索引和写数据，需要 --apply')\n    if not 100<=a.count<=50000 or not 1<=a.concurrency<=8:p.error('count=100..50000, concurrency=1..8')\n    path=Path(a.output)\n    if path.exists():p.error('输出已存在，不覆盖证据')\n    result=run(Client(a.backend,a.url),a.count,a.variant,a.run_id,a.concurrency)\n    path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(result,ensure_ascii=False,indent=2))\n    print(result['status'],path);raise SystemExit(0 if result['status']=='通过' else 2)\n```", "subs": ["一个可复查的压测过程", "先写实验协议", "混合测试的测量边界", "停止条件与记录模板", "对照实验完整文件"]}, {"title": "20.4 核对结果一致性并报告错误率、分位数和资源代价", "content": "<a id=\"s-20-4\"></a>\n\n先确认样本、字段、事件集合与查询结果满足同一契约，再比较延迟和资源。每轮保留原始请求结果，失败请求单独进入错误率；重试后的成功不能抹去首次失败。以下结论模板用于解释已有测量，不填入未经执行的吞吐或存储节省数字。\n\n#### 从结果文件取出结论\n\n报告保存请求明细、失败原因、节点前后指标、索引大小和预热轮次。\n比较时同时查看：成功文档数、请求错误率、分位数、GC、磁盘、线程池拒绝、索引大小和后台 Merge。\n\n| 观察结果 | 合理结论范围 |\n| --- | --- |\n| lean 更小但缺少 app 任意键搜索 | 空间换取功能边界，不能隐瞒 |\n| 并发升高吞吐升高但 P99 恶化 | 需要根据延迟目标选择工作点 |\n| 总发送量升高但 item 失败多 | 不是有效吞吐改善 |\n| 热查询快而首轮慢 | 缓存/预热可能影响，不证明所有查询都快 |\n| 两后端字段不一致 | 先修复契约，停止比较速度 |", "subs": ["从结果文件取出结论"]}]}, {"title": "第 21 章 · 平台监控、探针与业务日志告警", "sections": [{"title": "21.1 监控组件、数据流和端到端新鲜度", "content": "<a id=\"s-21-1\"></a>\n\n#### 三层监控：组件、数据流与端到端\n\n日志平台也会故障，不能只依赖它自己的日志来发现它已经失效。\n至少建立组件资源、数据流状态和端到端探针三层观测。\n\n```mermaid\nflowchart TD\n    A[主机与组件指标] --> D[Prometheus 或现有监控]\n    B[采集 消费 队列 写入状态] --> D\n    C[已知日志从源到查询的探针] --> D\n    D --> E[告警路由与责任人]\n```\n\n组件存活能证明进程存在，不能证明新日志已被检索。\nKafka Lag 为零也不能证明 Logstash PQ 或 ES 输出没有积压。\n端到端探针负责补上这个盲区。\n\n\n#### Filebeat 与 Logstash 原生 API\n\n第二篇实验映射 Filebeat 5066 和 Logstash 9600 到本机回环地址。\n这些端口用于诊断，不应无认证暴露到不可信网络。\n\n```bash\ncurl -fsS 'http://127.0.0.1:5066/stats?pretty'\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/pipelines?pretty'\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/jvm?pretty'\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/reloads?pretty'\n```\n\nFilebeat HTTP 监控是诊断能力，具体字段以 7.17.29 实际响应为准。\n不要复制较新版本才有的队列指标名称后，把空响应当成零。\n\nLogstash 7.17 Node Stats 可以查看 Pipeline 事件、插件耗时、队列、JVM 和 reload 信息。[Node Stats](https://www.elastic.co/guide/en/logstash/7.17/node-stats-api.html)\n不要依赖较新版本的 Flow Metrics 字段来编写本版本的唯一告警条件。\n\n**常见指标解释**\n\n| 观察 | 需要结合 |\n| --- | --- |\n| Input 计数增长、Output 停滞 | 队列、Filter、输出重试 |\n| Filter 耗时增长 | 输入量、事件大小、插件版本 |\n| PQ 事件增加 | ES 输出速度、恢复计划 |\n| Reload failures 增长 | 配置发布记录与错误日志 |\n| JVM GC 时间增加 | Heap、批量、复杂解析 |\n\n累计处理时间可能跨多个 worker 累加，不能直接除以观察窗口后称为单请求延迟。\n解释指标之前先确认它是计数、累计时间还是当前状态。\n\n\n#### Kafka 与 ES 的重点信号\n\nKafka 重点看分区和消费组，ES 重点看节点和索引。\n聚合视图便于告警，但排查需要保留可以下钻的身份。\n\n```bash\ndocker compose -p elk-full exec kafka kafka-consumer-groups.sh \\\n  --bootstrap-server kafka:9092 --describe --group logs-lab-main-v1\n\ncurl -fsS 'http://127.0.0.1:9200/_cluster/health?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_nodes/stats/indices,jvm,fs,thread_pool,indexing_pressure?pretty'\n```\n\n[ES Nodes Stats](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/cluster-nodes-stats.html)提供写入、JVM、文件系统、线程池和索引压力信息。\n脚本应检查 `_nodes.failed`，不能把少几个节点的响应当成完整集群数据。\n\n| 类别 | 重点 |\n| --- | --- |\n| Kafka 数据安全 | 未充分复制分区、ISR 变化、离线分区 |\n| Kafka 消费 | 各分区 Lag、消费速率、Rebalance、积压年龄 |\n| Kafka 容量 | 磁盘余量、保留窗口、网络与磁盘吞吐 |\n| ES 可靠性 | 未分配主副分片、恢复进度、快照状态 |\n| ES 吞吐 | 拒绝、索引时间、Merge、Ingest 失败 |\n| ES 成本 | 分片数量、索引增长、磁盘水位 |\n\nJMX 转 Prometheus 或其他 exporter 的指标名受具体 exporter 和配置影响。\n应在实际 `/metrics` 上核对名称和标签，不直接把任意博客指标名写进正式告警。\n\n\n#### 告警设计与故障分层\n\n告警应指向可采取的动作，而不是每个错误日志都发一条通知。\n相同根因导致 ES 拒绝、Logstash 重试、Kafka Lag 同时升高时，要分组并保留因果链。\n\n| 告警 | 初步动作 |\n| --- | --- |\n| 探针不可见 | 按源文件→Kafka→Logstash→ES 逐段定位 |\n| Kafka Lag 持续增长 | 看消费是否活跃、PQ 和 ES 是否阻塞 |\n| PQ 快满 | 看输出失败，准备恢复容量与源保留窗口 |\n| ES 磁盘水位 | 看增长、ILM、恢复和扩容空间 |\n| DLQ 或隔离事件增加 | 看具体字段、规则版本和输入变更 |\n| 长时间没有快照成功 | 检查仓库权限、失败原因和恢复风险 |\n\n探针、指标和告警渠道最好不要全部依赖同一个待监控日志集群。\n否则平台整体不可用时，负责通知的组件也可能一起失效。\n\n\n#### 把监控结果纳入周报与变更验收\n\n可以跟踪日志可见延迟、采集覆盖率、解析失败率、恢复净吞吐、索引增长和快照恢复结果。\n这些比单纯记录“接入了多少个组件”更接近日志平台的实际价值。\n\n但指标定义需要稳定。\n如果某周改了采样率或丢弃规则，不能直接把日志量下降解释为业务流量下降或成本优化成功。\n报告应标明口径变化和未覆盖区域。", "subs": ["三层监控：组件、数据流与端到端", "Filebeat 与 Logstash 原生 API", "Kafka 与 ES 的重点信号", "告警设计与故障分层", "把监控结果纳入周报与变更验收"]}, {"title": "21.2 实现经采集入口的探针并识别探针自身失效", "content": "<a id=\"s-21-2\"></a>\n\n两个探针都从采集入口写日志，但能力不同：基础 `probe.py` 保留历史状态并可输出 textfile 指标，对照 `probe_v2.py` 只执行一次产品适配探测。需要连续监控时必须安排调度并检测任务停止，不能以新脚本较短为由覆盖旧监控能力。\n\n#### 基础实验：端到端日志探针\n\n探针向被 Filebeat 采集的文件追加一条唯一事件，再通过 ES 查询该事件 ID。\n这样覆盖文件采集、Kafka、Logstash、ES 写入和搜索可见性，而不是绕过链路直接向 ES 写入。\n\n测量从本地探针开始到查询可见的时间，使用单调时钟计算延迟，避免本机墙钟调整干扰时长。\n它仍包含本地文件写入和查询轮询开销，应称为探针可见延迟，不是某一个组件的纯处理时间。\n\n保存为 `scripts/probe.py`：\n\n```python\n#!/usr/bin/env python3\n\"\"\"写一条采集端探针并查询 ES；只用于本书隔离 lab。\"\"\"\nfrom __future__ import annotations\n\nimport argparse\nfrom datetime import datetime, timezone\nimport json\nimport os\nfrom pathlib import Path\nimport sys\nimport tempfile\nimport time\nfrom urllib.error import HTTPError, URLError\nfrom urllib.request import Request, urlopen\nimport uuid\n\n\ndef http_json(base: str, method: str, path: str, body=None, timeout=5.0):\n    data = None if body is None else json.dumps(body).encode(\"utf-8\")\n    request = Request(base + path, data=data, method=method,\n                      headers={\"Content-Type\": \"application/json\"})\n    try:\n        with urlopen(request, timeout=timeout) as response:\n            return json.load(response)\n    except (HTTPError, URLError, TimeoutError, ValueError) as exc:\n        raise RuntimeError(f\"{method} {path}: {exc}\") from exc\n\n\ndef atomic_write(path: Path, content: str, mode: int = 0o600) -> None:\n    path.parent.mkdir(parents=True, exist_ok=True)\n    temporary = None\n    try:\n        with tempfile.NamedTemporaryFile(\"w\", encoding=\"utf-8\", dir=path.parent,\n                                         prefix=path.name + \".\", suffix=\".tmp\",\n                                         delete=False) as handle:\n            temporary = Path(handle.name)\n            handle.write(content)\n            handle.flush()\n            os.fsync(handle.fileno())\n        os.chmod(temporary, mode)\n        temporary.replace(path)\n    finally:\n        if temporary is not None and temporary.exists():\n            temporary.unlink()\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--url\", default=\"http://127.0.0.1:9200\")\n    parser.add_argument(\"--log-file\", default=\"logs/probe.jsonl\")\n    parser.add_argument(\"--timeout\", type=float, default=30)\n    parser.add_argument(\"--state\", default=\"state/probe.json\")\n    parser.add_argument(\"--metrics-file\")\n    args = parser.parse_args()\n    if not 1 <= args.timeout <= 300:\n        parser.error(\"timeout 必须在 1..300 秒\")\n    base = args.url.rstrip(\"/\")\n    state_path = Path(args.state)\n    last_success = 0.0\n    success = False\n    latency = None\n    error = None\n    event_id = \"probe-\" + uuid.uuid4().hex\n    started_wall = time.time()\n    started_mono = time.monotonic()\n    try:\n        if state_path.exists():\n            previous = json.loads(state_path.read_text(encoding=\"utf-8\"))\n            last_success = float(previous.get(\"last_success_timestamp\", 0))\n        info = http_json(base, \"GET\", \"/\", timeout=min(5.0, args.timeout))\n        if info.get(\"cluster_name\") != \"elk-lab-full\":\n            raise RuntimeError(\"拒绝写入探针：不是 elk-lab-full 实验集群\")\n        record = {\n            \"time\": datetime.now(timezone.utc).isoformat(timespec=\"milliseconds\"),\n            \"event_id\": event_id, \"run_id\": event_id, \"sequence\": 0,\n            \"service\": \"elk-probe\", \"environment\": \"lab\",\n            \"level\": \"INFO\", \"message\": \"ELK synthetic probe\",\n            \"method\": \"GET\", \"uri\": \"/synthetic-probe\",\n            \"status\": 200, \"request_time\": 0.001,\n            \"trace_id\": uuid.uuid4().hex, \"scenario\": \"synthetic-probe\",\n        }\n        log_path = Path(args.log_file)\n        log_path.parent.mkdir(parents=True, exist_ok=True)\n        # 探针从采集源进入，不通过 ES 写入 API 绕过采集链路。\n        with log_path.open(\"a\", encoding=\"utf-8\") as stream:\n            stream.write(json.dumps(record, ensure_ascii=False) + \"\\n\")\n            stream.flush()\n        deadline = started_mono + args.timeout\n        last_poll_error = None\n        while time.monotonic() < deadline:\n            remaining = deadline - time.monotonic()\n            body = {\n                \"size\": 1,\n                \"query\": {\"term\": {\"event.id\": event_id}},\n                \"_source\": [\"event.id\", \"event.ingested\", \"pipeline.version\"],\n            }\n            try:\n                result = http_json(base, \"POST\", \"/logs-lab/_search\", body,\n                                   timeout=max(0.1, min(5.0, remaining)))\n                if result.get(\"timed_out\") or result.get(\"_shards\", {}).get(\"failed\", 0):\n                    raise RuntimeError(\"探针查询超时或分片部分失败\")\n                if result.get(\"hits\", {}).get(\"hits\"):\n                    success = True\n                    latency = time.monotonic() - started_mono\n                    last_success = time.time()\n                    break\n            except RuntimeError as exc:\n                last_poll_error = str(exc)\n            time.sleep(min(1.0, max(0.0, deadline - time.monotonic())))\n        if not success:\n            raise RuntimeError(f\"探针未在期限内可见；最后查询错误：{last_poll_error}\")\n    except (RuntimeError, OSError, ValueError, TypeError) as exc:\n        error = str(exc)\n    result = {\n        \"event_id\": event_id, \"success\": success, \"latency_seconds\": latency,\n        \"last_run_timestamp\": started_wall, \"last_success_timestamp\": last_success,\n        \"error\": error,\n    }\n    try:\n        atomic_write(state_path, json.dumps(result, ensure_ascii=False, indent=2) + \"\\n\")\n        if args.metrics_file:\n            lines = [\n                \"# TYPE elk_log_probe_success gauge\",\n                f\"elk_log_probe_success {1 if success else 0}\",\n                \"# TYPE elk_log_probe_last_run_timestamp_seconds gauge\",\n                f\"elk_log_probe_last_run_timestamp_seconds {started_wall:.6f}\",\n                \"# TYPE elk_log_probe_last_success_timestamp_seconds gauge\",\n                f\"elk_log_probe_last_success_timestamp_seconds {last_success:.6f}\",\n                \"# TYPE elk_log_probe_latency_seconds gauge\",\n                f\"elk_log_probe_latency_seconds {latency:.6f}\" if latency is not None\n                else \"elk_log_probe_latency_seconds NaN\",\n            ]\n            atomic_write(Path(args.metrics_file), \"\\n\".join(lines) + \"\\n\", mode=0o644)\n    except OSError as exc:\n        print(f\"ERROR: 保存探针状态失败：{exc}\", file=sys.stderr)\n        return 1\n    print(json.dumps(result, ensure_ascii=False, indent=2))\n    return 0 if success else 2\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n```\n\n**手工运行**\n\n```bash\npython3 scripts/probe.py --timeout 30\n```\n\n预期找到唯一事件，返回 `success: true` 和可见延迟。\n未出现时返回非零状态，并保留上次成功时间。\n它没有测试 Kibana 用户登录和 Dashboard 渲染；那是另一层用户体验探针。\n\n**避免探针污染业务统计**\n\n探针的服务名固定为 `elk-probe`，场景为 `synthetic-probe`。\n业务面板应排除它，或者只选择明确的业务服务。\n不要给每次探针生成一个新的 service.name，否则会制造高基数服务标签。\n\n\n#### 接入现有 Prometheus\n\n脚本支持写入 Node Exporter textfile collector 所读取的 `.prom` 文件。\n先在自己的 Node Exporter 配置中启用并确定 textfile 目录，再赋予探针进程最小写权限。[Node Exporter textfile](https://github.com/prometheus/node_exporter#textfile-collector)\n\n```bash\n# 目录只是部署示例，应替换为已配置的 textfile collector 路径。\npython3 scripts/probe.py \\\n  --timeout 30 \\\n  --metrics-file /var/lib/node_exporter/textfile_collector/elk_probe.prom\n```\n\n脚本通过同目录临时文件再 rename，避免采集器读到半个文件。\n状态文件使用 0600，指标文件使用 0644；目录遍历权限仍须允许 Node Exporter 读取，跨用户部署需按受控组策略配置。\n不要把目录开放成任意用户可写。\n\n**需要监控探针本身是否停止运行**\n\n只有 `success` 不够。\n如果定时任务不再运行，旧文件可能一直保留最后一次成功值。\n因此同时输出最后运行和最后成功时间。\n\n下面是 Prometheus 规则结构示例，阈值仅用于 lab，生产应结合调度周期和可见性目标设定：\n\n```yaml\ngroups:\n  - name: elk-log-probe\n    rules:\n      - alert: ElkLogProbeFailed\n        expr: elk_log_probe_success == 0\n        for: 2m\n        labels:\n          severity: warning\n        annotations:\n          summary: \"日志链路探针失败\"\n          description: \"从采集源写入的探针未在期限内通过 ES 查询到。\"\n      - alert: ElkLogProbeNotRunning\n        expr: time() - elk_log_probe_last_run_timestamp_seconds > 180\n        for: 2m\n        labels:\n          severity: warning\n        annotations:\n          summary: \"日志探针任务停止更新\"\n          description: \"检查调度任务、脚本、权限及 textfile collector。\"\n```\n\n还要为指标完全缺失、Node Exporter 不可用配置独立检测。\n对多节点使用 `absent` 时要结合预期实例清单，不能只写一个全局 absent 就认为能发现任何单节点缺失。\n定时运行须避免上一轮未结束又启动下一轮，可使用 systemd timer 的单实例服务或外部锁。\n\n\n#### 对照实验完整文件：`tools/probe_v2.py`\n\n经采集入口的产品独立探针。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/probe_v2.py -->\n```python\n\"\"\"使用新样本从 Filebeat 入口检查双后端，不直接写搜索后端。\"\"\"\nimport argparse,json,time,uuid\nfrom pathlib import Path\nfrom client import Client,complete_search\nfrom datetime import datetime,timezone\np=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--timeout',type=int,default=60)\na=p.parse_args()\nif not 5<=a.timeout<=300:p.error('timeout 必须 5..300')\nc=Client(a.backend,timeout=5);c.guard();run='probe-'+uuid.uuid4().hex\nstarted=time.monotonic();eid=run+'-probe';last=None\napp={'time':datetime.now(timezone.utc).isoformat(),'event_id':eid,'run_id':run,\n     'service':'orders-api','kind':'probe','level':'INFO','message':'pipeline receipt witness'}\nenvelope={'run_id':run,'event_id':eid,'scenario':'probe','payload':json.dumps(app)}\nPath('logs').mkdir(exist_ok=True)\nwith Path('logs',run+'.jsonl').open('x') as f:f.write(json.dumps(envelope)+'\\n')\nwhile time.monotonic()-started<a.timeout:\n    try:\n        r=complete_search(c.request('POST','/exp-logs,exp-quarantine/_search?allow_partial_search_results=false',\n           {'size':2,'query':{'term':{'event.id':eid}}}))\n        hits=r['hits']['hits']\n        if len(hits)==1 and hits[0]['_source']['pipeline']['route']=='normal':\n            print(json.dumps({'status':'通过','event_id':eid,'latency_seconds':time.monotonic()-started}));break\n        if hits:last='隔离或重复，不能视为成功'\n    except RuntimeError as exc:last=str(exc)\n    time.sleep(1)\nelse:raise SystemExit('探针失败，最后证据: '+str(last))\n```", "subs": ["基础实验：端到端日志探针", "接入现有 Prometheus", "对照实验完整文件"]}, {"title": "21.3 定义错误率、异常突增与周期日志缺失的统计窗口", "content": "<a id=\"s-21-3\"></a>\n\n#### 平台监控与业务告警分开\n\n前面的平台监控关注 Kafka Lag、LS 队列、ES 磁盘等信号。\n本章补充业务日志告警：某服务请求错误比例、某种异常突然增多、应周期产生的业务 heartbeat 消失。\n\n平台告警说明观测或存储系统异常；业务告警解释被观测业务的事件。\n日志平台失效时，业务日志告警也可能失去数据来源，所以二者不能互相替代。\n\n\n#### 三类规则的明确口径\n\n| 规则 | 样本契约 | 触发条件 | 恢复前提 |\n| --- | --- | --- | --- |\n| error-ratio | 每个访问请求恰好一个 nginx.access，有合法状态码 | 窗口内有效请求≥20，5xx/有效请求≥10% | 完整可用数据且比例回落 |\n| exception-spike | error.type=InventoryTimeout 的事件 | 窗口内≥5 条 | 数据完整、计数回落；不直接证明依赖健康 |\n| heartbeat-missing | orders-api 按约定周期产生 business.heartbeat | 窗口内0条，且同采集链路见证新鲜 | heartbeat重新出现且见证正常 |\n\n这些阈值是实验假设，不是生产默认值。\n按 `service.name=orders-api`、`service.environment=lab` 过滤；正常和隔离事件分开，不把无效状态填零纳入分母。\n事件采样、同请求多行、重试多次记录、重复回放都会改变计数含义，必须写进告警说明。\n\n\n#### 迟到容忍与时间水位\n\n每分钟评估一次，但不直接评估刚结束的最近一分钟。\n本例使用 `[评估时刻-6分钟, 评估时刻-1分钟)` 的五分钟事件时间窗口，保留一分钟迟到容忍。\n另外检查最近两分钟的 `event.ingested` 采集见证。\n\n```text\n评估时刻 t\n业务窗口： [t-6m ---------------- t-1m)\n迟到容忍：                              [t-1m -- t]\n采集见证：                       [t-2m -------- t]\n```\n\n一分钟不是保证所有晚到日志都已到齐，只是本实验约定。\n超出水位的迟到事件可能改变历史统计，需要回补和迟到率监控，不能用提高保留期自动解决告警完整性。\n源时钟异常也会导致事件进入错误窗口，应分别观察事件时间、采集时间与入库时间。", "subs": ["平台监控与业务告警分开", "三类规则的明确口径", "迟到容忍与时间水位"]}, {"title": "21.4 配置原生 Monitor 与本地通知并验证触发样本", "content": "<a id=\"s-21-4\"></a>\n\n原生 OpenSearch Monitor 使用对照实验的字段与时间窗口，通知发送到实验内的本地接收端。先保留规则默认禁用状态，写入样本并对账后再启用。公共恢复状态机见 [21.5 节](04-production-operations-and-troubleshooting.md#s-21-5)，原生完成状态不自动等于业务已经恢复。\n\n#### 使用原生 Monitor 和 Notifications\n\nOpenSearch 2.19 支持 query-level monitor，通过输入查询结果和条件脚本决定触发，并可通过 Notifications 通道发送消息。[Monitor API](https://docs.opensearch.org/2.19/observing-your-data/alerting/api/) [Notifications API](https://docs.opensearch.org/2.19/observing-your-data/notifications/api/)\n本书给三个规则各创建一个监控，显式 `enabled:false`，避免创建即开始持续发送。\n\n[本节的 `native_alerts.py`](04-production-operations-and-troubleshooting.md#s-21-4) 生成完整查询、Painless 条件、每分钟调度和本地 webhook 动作。\n通道使用 Docker 网络内的 `http://receiver:8080/notify`，不向外部邮箱或聊天群发消息。\n如果安装策略限制私网 webhook，记录明确拒绝原因，在隔离实验中按官方设置放行精确目标；不要在生产开放任意地址出站。\n\n```bash\npython3 tools/native_alerts.py\n# 审阅打印的 channel 和 monitors 后执行：\npython3 tools/native_alerts.py --apply\npython3 tools/native_control.py dryrun > evidence/native-dryrun.jsonl\n```\n\n原生 `_execute?dryrun=true` 用于观察运行结果而不发送消息；真实运行结果要检查整体 error、trigger error 和 action_results，而不只看 HTTP 成功。[原生执行接口](https://docs.opensearch.org/2.19/observing-your-data/alerting/api/)\n\n\n#### 触发、通知与持续异常\n\n```bash\npython3 tools/generate.py --run-id alert-trigger --count 100 --profile trigger\n# 等待入库，并先按第35章对这批数据验收。\npython3 tools/native_control.py dryrun > evidence/native-trigger-dryrun.jsonl\npython3 tools/native_control.py execute --apply > evidence/native-trigger-send.jsonl\npython3 tools/native_control.py alerts > evidence/native-alert-status.jsonl\n```\n\n接收端会把通知原体保存到 `evidence/notifications.jsonl`。\nPainless、Mustache 和真实 Notifications 的运行均属于本地待执行项目；Python 能构造 JSON 不证明它们已经在 OpenSearch 执行成功。\n\n启停脚本会先读取服务端监控对象，保留 trigger/action ID，并用序列号和 primary term 做乐观并发控制。\n这避免用最初创建的旧 JSON 覆盖后来在 UI 中的规则变更；真实并发冲突应停止并重新审阅。\n\n确认规则语义后再开启持续调度：\n\n```bash\npython3 tools/native_control.py enable --apply\n# 完成实验后关闭，保留规则对象与证据。\npython3 tools/native_control.py disable --apply\n```\n\n三类状态分开记录：Monitor 执行是否成功、是否生成告警、动作是否成功送达接收端。\nWebhook 200 只证明接收程序确认，不代表某位人员已处理。\n\n\n#### 三类规则的样本矩阵\n\n| 场景 | 生成器/动作 | 预期（不是实测） |\n| --- | --- | --- |\n| 正常 | normal，100条 | ratio OK，exception OK，有 heartbeat |\n| 触发 | trigger，100条 | ratio ALERT，exception ALERT |\n| 持续 | 同批次重新评估 | 十分钟内公共状态机去重 |\n| 恢复 | recovery，受控新批次 | 数据完整时 RESOLVED |\n| 迟到 | late | 访问事件不在当前窗口，ratio UNKNOWN；不伪造恢复 |\n| 无业务 heartbeat | missing | 见证可见时 heartbeat ALERT |\n| 无采集见证 | 停采集后等待见证过期 | UNKNOWN，不恢复业务 incident |\n| 查询失败/部分分片 | 断后端或失败响应夹具 | UNKNOWN/执行失败，不用部分计数 |\n| 低流量 | count小于20 | ratio UNKNOWN，其他规则按各自契约 |\n\nJava 多行异常与请求错误日志不一定一一对应。\n本书 exception-spike 指定一种错误类型，不把任意 ERROR 字符串数当成业务失败请求数。\n生产中重复堆栈可能需要同请求去重或独立定义“异常事件数”指标。\n\n\n#### 对照实验完整文件：`tools/native_alerts.py`\n\nOS 原生监控和本地通知通道。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/native_alerts.py -->\n```python\n\"\"\"OpenSearch 原生 query-level monitor；公共 Python 评估器补充受门控的恢复通知。\"\"\"\nfrom datetime import datetime,timezone\nimport argparse,json\nfrom pathlib import Path\nfrom client import Client\nfrom alerts import query\n\ndef monitors(channel,run_id=None):\n    guard=(\"if(ctx.results.size()!=1) return false; def r=ctx.results[0]; \"\n           \"if(r.timed_out==true || r._shards.failed>0) return false; \"\n           \"def a=r.aggregations; if(a.witness.doc_count==0) return false; def w=a.window; \")\n    expressions={\n        'error-ratio':'w.valid.doc_count>=20 && w.errors.doc_count*1.0/w.valid.doc_count>=0.10',\n        'exception-spike':'w.exceptions.doc_count>=5',\n        'heartbeat-missing':'w.heartbeat.doc_count==0'}\n    docs=[]\n    for name,expr in expressions.items():\n        docs.append({'type':'monitor','name':'exp-'+name,'monitor_type':'query_level_monitor',\n          'enabled':False,'schedule':{'period':{'interval':1,'unit':'MINUTES'}},\n          'inputs':[{'search':{'indices':['exp-logs'],'query':query(datetime.now(timezone.utc),run_id,native=True)}}],\n          'triggers':[{'name':name,'severity':'2','condition':{'script':{'lang':'painless','source':guard+'return '+expr+';'}},\n            'actions':[{'name':'exp-local','destination_id':channel,\n                'message_template':{'lang':'mustache','source':json.dumps({'engine':'os-native','rule':name,\n                    'monitor':'{{ctx.monitor.name}}','period_end':'{{ctx.periodEnd}}'})},\n                'throttle_enabled':True,'throttle':{'value':10,'unit':'MINUTES'}}]}]})\n    return docs\n\nif __name__=='__main__':\n    p=argparse.ArgumentParser();p.add_argument('--apply',action='store_true');p.add_argument('--run-id')\n    p.add_argument('--output',default='evidence/native-monitors.json');a=p.parse_args()\n    c=Client('os');c.guard()\n    channel={'config_id':'exp-local','name':'exp-local','config':{\n        'name':'exp-local','description':'isolated learning receiver','config_type':'webhook',\n        'is_enabled':True,'webhook':{'url':'http://receiver:8080/notify'}}}\n    docs=monitors('exp-local',a.run_id)\n    if not a.apply:\n        print(json.dumps({'channel':channel,'monitors':docs,'status':'未执行'},ensure_ascii=False,indent=2))\n    else:\n        path=Path(a.output)\n        if path.exists():raise RuntimeError('监控 ID 清单已存在，不重复创建')\n        channel_id=c.request('POST','/_plugins/_notifications/configs/',channel)['config_id']\n        result=[]\n        for doc in monitors(channel_id,a.run_id):\n            r=c.request('POST','/_plugins/_alerting/monitors',doc)\n            result.append({'id':r['_id'],'name':doc['name'],'body':doc})\n            path.parent.mkdir(parents=True,exist_ok=True)\n            path.write_text(json.dumps({'channel_id':channel_id,'monitors':result},ensure_ascii=False,indent=2))\n        print(path)\n```\n\n\n#### 对照实验完整文件：`tools/native_control.py`\n\n监控预演、执行、启停和状态。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/native_control.py -->\n```python\n\"\"\"管理保存的实验监控；启停先读服务端对象，保留 trigger/action ID 并使用乐观锁。\"\"\"\nfrom __future__ import annotations\nimport argparse,copy,json,re,time\nfrom pathlib import Path\nfrom urllib.parse import quote\nfrom client import Client\n\n\ndef change_enabled(c, item, enabled):\n    ident=item['id']\n    if not re.fullmatch(r'[A-Za-z0-9_-]+',ident):raise ValueError('监控 ID 格式不合法')\n    base='/_plugins/_alerting/monitors/'+ident\n    current=c.request('GET',base)\n    doc=copy.deepcopy(current['monitor'])\n    if doc.get('name')!=item['name'] or not item['name'].startswith('exp-'):\n        raise RuntimeError('服务端监控名称与本地实验清单不符')\n    doc['enabled']=enabled\n    doc['enabled_time']=int(time.time()*1000) if enabled else None\n    # 从真实读取响应取得版本；不拿本地最初创建的旧 body 覆盖 UI 中的修改。\n    seq,term=current['_seq_no'],current['_primary_term']\n    if type(seq) is not int or type(term) is not int:raise RuntimeError('缺少监控并发版本')\n    return c.request('PUT',f'{base}?if_seq_no={seq}&if_primary_term={term}',doc)\n\n\ndef main():\n    p=argparse.ArgumentParser();p.add_argument('action',choices=['dryrun','execute','enable','disable','alerts'])\n    p.add_argument('--file',default='evidence/native-monitors.json');p.add_argument('--apply',action='store_true');a=p.parse_args()\n    c=Client('os');c.guard();config=json.loads(Path(a.file).read_text())\n    if a.action in ('enable','disable','execute') and not a.apply:raise SystemExit('修改/发送通知须显式 --apply')\n    for item in config['monitors']:\n        if not item['name'].startswith('exp-'):raise RuntimeError('非实验监控')\n        ident=quote(item['id'],safe='');base='/_plugins/_alerting/monitors/'+ident\n        if a.action in ('enable','disable'):\n            result=change_enabled(c,item,a.action=='enable')\n        elif a.action=='alerts':\n            result=c.request('GET','/_plugins/_alerting/monitors/alerts?monitorId='+ident)\n        else:result=c.request('POST',base+'/_execute'+('?dryrun=true' if a.action=='dryrun' else ''))\n        print(json.dumps({'monitor':item['name'],'result':result},ensure_ascii=False))\n\nif __name__=='__main__':main()\n```\n\n\n#### 对照实验完整文件：`receiver/server.py`\n\n本地通知接收端，仅实验网络。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: receiver/server.py -->\n```python\n\"\"\"仅实验网络内使用的通知接收器。原生通知与脚本通知都保存原体。\"\"\"\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\nfrom pathlib import Path\nimport json,time,threading\nLOCK=threading.Lock()\nclass Handler(BaseHTTPRequestHandler):\n    def do_GET(self):\n        if self.path!='/health':self.send_error(404);return\n        self.send_response(200);self.end_headers();self.wfile.write(b'ok')\n    def do_POST(self):\n        if self.path!='/notify':self.send_error(404);return\n        try:n=int(self.headers.get('Content-Length','0'))\n        except ValueError:self.send_error(400);return\n        if not 0<n<=65536:self.send_error(413);return\n        raw=self.rfile.read(n).decode('utf-8',errors='replace')\n        record={'received_at':time.time(),'path':self.path,'body':raw}\n        folder=Path('/evidence');folder.mkdir(exist_ok=True)\n        with LOCK, (folder/'notifications.jsonl').open('a',encoding='utf-8') as f:\n            f.write(json.dumps(record,ensure_ascii=False)+'\\n');f.flush()\n        self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers()\n        self.wfile.write(b'{\"accepted\":true}')\n    def log_message(self,format,*args):pass\nif __name__=='__main__':ThreadingHTTPServer(('0.0.0.0',8080),Handler).serve_forever()\n```", "subs": ["使用原生 Monitor 和 Notifications", "触发、通知与持续异常", "三类规则的样本矩阵", "对照实验完整文件"]}, {"title": "21.5 用 UNKNOWN、去重、outbox 和恢复状态避免误报", "content": "<a id=\"s-21-5\"></a>\n\n#### 无数据、查询错误与业务恢复\n\n| 结果 | 解释 | 是否允许业务恢复通知 |\n| --- | --- | --- |\n| 查询失败或超时 | 无法得出业务结论 | 否 |\n| 部分分片失败 | 统计可能偏小 | 否 |\n| 有效请求<20 | 比例不稳或没有请求 | error-ratio 不允许 |\n| 无采集见证 | 观测链路可能中断 | 否 |\n| 有见证、无业务 heartbeat | 符合缺失规则前提 | 可触发 heartbeat 告警 |\n| 完整有效数据、指标回落 | 可以评估恢复 | 按恢复策略处理 |\n\n公共状态机把 UNKNOWN 与 OK 分开。\nUNKNOWN 保留已有 incident，不发送 RESOLVED；数据再次有效后才决定继续告警或恢复。\n这避免“后端挂了，错误日志变成0，系统报告恢复”的常见逻辑错误。\n\n采集见证只证明其实际经过的路径，并不证明其他所有节点、分区或业务实例完整。\n生产中应按来源分片建立预期集合和覆盖率；本书单服务见证仅用于展示门控机制。\n\n\n#### 分组、去重、抑制与下钻\n\n公共评估器按 `backend/environment/service/rule` 建立 incident key。\n首次触发通知 FIRING，持续异常十分钟后允许 REMINDER，合法恢复发送 RESOLVED。\n这个设计是本书实现的行为，不是所有原生告警系统的默认行为。\n\n通知包含评估时刻、窗口口径、计数和来源引擎，便于回到 Dashboards 的绝对时间窗口与相同过滤条件。\n同一个事件同时被原生 OS Monitor 和公共评估器通知，在比较实验中是有意的双引擎证据；生产只能选择明确的通知责任，避免双份告警。\n\n抑制可以将“采集链路不可用”作为不下业务结论的原因，但不能无记录地吞掉所有告警。\n公共脚本打印 UNKNOWN 和错误，生产调度应将其转成独立平台告警。\n\n\n#### 原生完成状态不等于可证明的业务恢复\n\n某次条件不成立可能由业务正常、数据缺失或规则变更造成。\n本书不将原生 COMPLETED 自动翻译成“故障已解决”，也不承诺 query-level monitor 自动完成全部恢复通知语义。\n\n为了给出完整且可复现的恢复过程，使用公共 `alerts.py` 执行同一查询口径，并加上 UNKNOWN 门控、持久 incident 状态和通知 outbox。\n这同样是 Elastic 7.17 的默认对照路径：只调用搜索 API，不要求先启用特定收费连接器或 Watcher 许可证。\n如果实际使用 Watcher/Kibana Rules，应单独核对版本、许可证、连接器和权限，不能以此替代本书的公共验收。[ES Watcher 条件](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/xpack-alerting.html)\n\n```bash\n# 预览不写状态、也不发送通知。\npython3 tools/alerts.py os --run-id alert-trigger\n# 显式发送到本地接收端并记录 incident。\npython3 tools/alerts.py os --run-id alert-trigger --send\npython3 tools/generate.py --run-id alert-recovery --count 100 --profile recovery\n# 等待并对账后，用受控批次切换模拟恢复观察：\npython3 tools/alerts.py os --run-id alert-recovery --send\n```\n\n`--run-id` 是实验隔离开关，便于按受控批次验证状态机。\n生产持续规则不应每分钟换一个 run_id 过滤掉旧异常，应按同一业务流与滑动窗口评估。\n原生 monitor 默认不加 run_id，故此前异常仍在五分钟窗口内时不会立即恢复；应等窗口自然推进，或在独立测试监控中显式修改批次过滤并记录该条件变化。\n\n\n#### 通知失败、outbox 和状态持久化\n\n公共脚本先持久化待发送通知，再发送并确认后删除 outbox 项。\n失败时保留待发送项目，下一次执行先重试。\n发送成功但进程在更新 outbox 前退出，仍可能重发，因此通知中包含 notice_id，接收平台应做幂等去重。\n本书接收器保存原体，不冒充具备生产幂等通知服务。\n\n状态文件用原子替换并加文件锁，防止本机 cron 重叠执行。\n这不是分布式锁或多实例协调实现；部署多个调度副本前必须补齐唯一执行责任和共享持久状态。\n\n\n#### 业务告警后的排查动作\n\n错误率升高：先确认采集与分母完整，再按 route、实例、状态码缩小范围，读取对应原文与 Trace ID。\n异常突增：确认是新错误类型、重试放大还是堆栈重复；不要仅根据关键字推断根因。\nheartbeat 缺失：检查业务调度、实例运行和采集见证，区分任务未执行、日志未产生和日志未送达。\n\n每次复盘保存查询窗口、样本量、缺失说明、告警状态变迁、通知与恢复证据。\n日志是不完备观测，不应在漏采、采样或重复未控制时作为权威财务/订单计数。\n\n\n#### 对照实验完整文件：`tools/alerts.py`\n\n业务规则、UNKNOWN 门控、状态与 outbox。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/alerts.py -->\n```python\n\"\"\"两后端共用的实验告警评估器；不是完整调度平台。\"\"\"\nfrom __future__ import annotations\nimport argparse,copy,fcntl,hashlib,json,os,tempfile,time\nfrom datetime import datetime,timezone,timedelta\nfrom pathlib import Path\nfrom urllib.request import Request,urlopen\nfrom client import Client,complete_search\n\nRULES=('error-ratio','exception-spike','heartbeat-missing')\ndef query(now: datetime, run_id=None, native=False):\n    fmt=lambda d:d.astimezone(timezone.utc).isoformat(timespec='milliseconds')\n    bounds=({'gte':'{{period_end}}||-6m','lt':'{{period_end}}||-1m','format':'epoch_millis'} if native\n            else {'gte':fmt(now-timedelta(minutes=6)),'lt':fmt(now-timedelta(minutes=1))})\n    fresh=({'gte':'{{period_end}}||-2m','lte':'{{period_end}}','format':'epoch_millis'} if native\n           else {'gte':fmt(now-timedelta(minutes=2)),'lte':fmt(now)})\n    filters=[{'term':{'service.name':'orders-api'}},{'term':{'service.environment':'lab'}}]\n    if run_id:filters.append({'term':{'labels.run_id':run_id}})\n    valid={'bool':{'filter':[{'term':{'event.dataset':'nginx.access'}},\n                             {'range':{'http.response.status_code':{'gte':100,'lt':600}}}]}}\n    return {'size':0,'track_total_hits':True,'query':{'bool':{'filter':filters}},'aggs':{\n        'window':{'filter':{'range':{'@timestamp':bounds}},'aggs':{\n            'valid':{'filter':valid},\n            'errors':{'filter':{'bool':{'filter':[valid,{'range':{'http.response.status_code':{'gte':500,'lt':600}}}]}}},\n            'exceptions':{'filter':{'term':{'error.type':'InventoryTimeout'}}},\n            'heartbeat':{'filter':{'term':{'event.dataset':'business.heartbeat'}}}}},\n        'witness':{'filter':{'bool':{'filter':[{'term':{'event.dataset':'pipeline.probe'}},\n                                                       {'range':{'event.ingested':fresh}}]}}}}}\n\ndef evaluate(result):\n    complete_search(result)\n    aggs=result['aggregations'];w=aggs['window']\n    counts={k:w[k]['doc_count'] for k in ('valid','errors','exceptions','heartbeat')}\n    counts['witness']=aggs['witness']['doc_count']\n    if any(type(v) is not int or v<0 for v in counts.values()) or counts['errors']>counts['valid']:\n        raise ValueError('计数结构或分子分母不一致')\n    if counts['witness']==0:return {k:'UNKNOWN' for k in RULES},counts\n    values={\n        'error-ratio':('UNKNOWN' if counts['valid']<20 else ('ALERT' if counts['errors']/counts['valid']>=0.10 else 'OK')),\n        'exception-spike':'ALERT' if counts['exceptions']>=5 else 'OK',\n        'heartbeat-missing':'ALERT' if counts['heartbeat']==0 else 'OK'}\n    return values,counts\n\ndef transition(previous,outcome,now,repeat=600):\n    old=copy.deepcopy(previous or {'active':False,'last_notice':0})\n    if outcome=='UNKNOWN':\n        old['observation']='UNKNOWN';return old,None\n    if outcome not in ('OK','ALERT'):raise ValueError(outcome)\n    notice=None\n    if outcome=='ALERT':\n        if not old['active']:notice='FIRING'\n        elif now-old.get('last_notice',0)>=repeat:notice='REMINDER'\n        old['active']=True\n    elif old['active']:\n        old['active']=False;notice='RESOLVED'\n    old['observation']=outcome\n    if notice:old['last_notice']=now\n    return old,notice\n\ndef atomic_json(path,data):\n    path.parent.mkdir(parents=True,exist_ok=True)\n    with tempfile.NamedTemporaryFile('w',dir=path.parent,delete=False,encoding='utf-8') as f:\n        temp=Path(f.name);json.dump(data,f,ensure_ascii=False,indent=2);f.flush();os.fsync(f.fileno())\n    os.chmod(temp,0o600);temp.replace(path)\n\ndef deliver(payload):\n    req=Request('http://127.0.0.1:18080/notify',data=json.dumps(payload).encode(),\n                headers={'Content-Type':'application/json'},method='POST')\n    with urlopen(req,timeout=5) as response:\n        if response.status!=200:raise RuntimeError('通知接收端未确认')\n        response.read(1024)\n\nif __name__=='__main__':\n    p=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--run-id')\n    p.add_argument('--state');p.add_argument('--send',action='store_true');a=p.parse_args()\n    state_path=Path(a.state or f'evidence/alert-state-{a.backend}.json')\n    state_path.parent.mkdir(parents=True,exist_ok=True)\n    with state_path.with_suffix('.lock').open('a') as lock:\n        fcntl.flock(lock,fcntl.LOCK_EX)\n        state=json.loads(state_path.read_text()) if state_path.exists() else {'rules':{},'pending':[]}\n        if a.send:\n            # 先重试持久化 outbox；失败不丢弃。接收端按 notice_id 去重是生产扩展点。\n            while state['pending']:\n                deliver(state['pending'][0]);state['pending'].pop(0);atomic_json(state_path,state)\n        c=Client(a.backend);c.guard();now=datetime.now(timezone.utc)\n        try:\n            response=c.request('POST','/exp-logs/_search?allow_partial_search_results=false',query(now,a.run_id))\n            values,counts=evaluate(response);error=None\n        except (RuntimeError,ValueError,KeyError,TypeError) as exc:\n            values={k:'UNKNOWN' for k in RULES};counts={};error=str(exc)\n        notices=[]\n        for rule in RULES:\n            key=f'{a.backend}/lab/orders-api/{rule}'\n            updated,notice=transition(state['rules'].get(key),values[rule],now.timestamp())\n            if notice:\n                payload={'engine':'exp-python','key':key,'status':notice,'counts':counts,\n                         'evaluated_at':now.isoformat(),'late_tolerance_seconds':60}\n                payload['notice_id']=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()\n                notices.append(payload)\n                if a.send:state['pending'].append(payload)\n            state['rules'][key]=updated\n        result={'outcomes':values,'counts':counts,'error':error,'notifications':notices,'send':a.send}\n        # 预览不修改持久状态；避免预览吞掉第一次正式通知。\n        if a.send:\n            atomic_json(state_path,state)\n            while state['pending']:\n                deliver(state['pending'][0]);state['pending'].pop(0);atomic_json(state_path,state)\n        print(json.dumps(result,ensure_ascii=False,indent=2))\n        raise SystemExit(2 if 'UNKNOWN' in values.values() else 0)\n```", "subs": ["无数据、查询错误与业务恢复", "分组、去重、抑制与下钻", "原生完成状态不等于可证明的业务恢复", "通知失败、outbox 和状态持久化", "业务告警后的排查动作", "对照实验完整文件"]}]}, {"title": "第 22 章 · 安全连接、权限与日志治理", "sections": [{"title": "22.1 为后端和可视化启用 TLS 并验证信任链", "content": "<a id=\"s-22-1\"></a>\n\n#### 实验安全边界与生产差异\n\n本书最小 lab 使用无认证、仅绑定本机回环地址的服务，目的是减少入门变量。\n这不等于“内网可以不启用安全”。\n生产应分别保护数据源、采集器、Kafka、Logstash 管理接口、ES、Kibana 和快照仓库。\n\n| 边界 | 应控制 |\n| --- | --- |\n| 文件与容器日志 | 最小读取范围，避免采集宿主全部敏感文件 |\n| Filebeat → Kafka | TLS、生产者身份、Topic 写权限 |\n| Kafka → Logstash | 消费者身份、Topic 和 Group 权限 |\n| Logstash → ES | TLS、限定索引写权限 |\n| 用户 → Kibana | 登录、Space 与索引读取权限 |\n| 节点间 ES Transport | 节点身份和双向 TLS |\n| 快照仓库 | 写入者、只读恢复者、独立凭据和保留策略 |\n\n凭据只放在受控配置、Secret、Keystore 或组织的密钥系统中。\n不要把真实密码、Token、私钥或完整连接串写入公开笔记和 Git 仓库。\n\n\n#### Elasticsearch 7.17 的安全启用顺序\n\n7.17 的自管安全配置不能直接套用较新版本的 enrollment token 启动教程。\n应使用该版本的安全设置与证书工具。[基础安全](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/security-basic-setup.html)\n\n```text\n确定 DNS、IP 和证书 SAN\n→ 生成或申请专用证书\n→ 所有节点配置 Transport TLS\n→ 配置 HTTP TLS\n→ 受控重启并验证集群身份\n→ 初始化内置用户密码\n→ 配置 Kibana 与 Logstash 专用身份\n→ 验证最小权限和越权拒绝\n```\n\n已有明文 Transport 集群切换到 TLS 不应被当作随意逐台滚动的无中断操作。\n明文节点和 TLS 节点不能正常互通，该变化应按官方版本要求设计维护窗口与重启计划。\n证书轮换又是另一种变更，不能与首次启用混为一谈。\n\n**生成 Transport 证书**\n\n在受控环境使用 Elasticsearch 7.17.29 自带工具。\nCA 私钥不应复制到每个运行节点。\n\n```bash\n# 交互式工具，会询问输出文件与密码。\nbin/elasticsearch-certutil ca\nbin/elasticsearch-certutil cert --ca elastic-stack-ca.p12 --multiple\n```\n\n为每个节点填写真实名称、DNS 和 IP，生成各自的证书。\n选择 `verification_mode: full` 时，证书 SAN 必须匹配实际连接名称。\n不能因为校验失败就直接把验证关掉。\n\n**节点配置片段**\n\n```yaml\nxpack.security.enabled: true\nxpack.security.transport.ssl.enabled: true\nxpack.security.transport.ssl.verification_mode: full\nxpack.security.transport.ssl.client_authentication: required\nxpack.security.transport.ssl.keystore.path: certs/es-1.p12\nxpack.security.transport.ssl.truststore.path: certs/es-1.p12\n```\n\n其他节点使用各自证书。\n证书文件路径相对 ES 配置目录，运行用户必须可读，私钥不应公开可读。\n密码通过 Keystore 交互设置：\n\n```bash\nbin/elasticsearch-keystore add xpack.security.transport.ssl.keystore.secure_password\nbin/elasticsearch-keystore add xpack.security.transport.ssl.truststore.secure_password\n```\n\n\n#### HTTP TLS、Kibana 与客户端信任\n\nTransport TLS 保护节点间通信，HTTP TLS 保护客户端到 ES 的连接，两者需要分别配置。[HTTPS 设置](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/security-basic-setup-https.html)\n\n```bash\nbin/elasticsearch-certutil http\n```\n\n使用真实访问域名与 IP 申请每个节点的 HTTP 证书。\n按工具生成的 README 部署，不应把示例文件名理解为所有节点共用一个私钥。\n\n```yaml\nxpack.security.http.ssl.enabled: true\nxpack.security.http.ssl.keystore.path: certs/http.p12\n```\n\n```bash\nbin/elasticsearch-keystore add xpack.security.http.ssl.keystore.secure_password\n\n# 首次设置内置用户密码。不要把输出密码提交到终端录屏或工单。\nbin/elasticsearch-setup-passwords interactive\n```\n\n该密码初始化工具用于相应的初始状态，不是每次重启都运行的步骤。\n已经初始化的环境需要按该版本的密码管理流程修改凭据。\n\n**Kibana 到 ES**\n\n```yaml\nelasticsearch.hosts:\n  - https://es-1.example.internal:9200\n  - https://es-2.example.internal:9200\nelasticsearch.username: kibana_system\nelasticsearch.ssl.certificateAuthorities:\n  - /etc/kibana/certs/elasticsearch-ca.pem\n```\n\n密码写入 Kibana Keystore，不放在上述公开配置中：\n\n```bash\nbin/kibana-keystore create\nbin/kibana-keystore add elasticsearch.password\n```\n\n已有 Keystore 不要盲目重建。\n`kibana_system` 用于 Kibana 服务连接 ES，不是给用户登录界面的共享管理员账号。\n\n**浏览器到 Kibana**\n\n```yaml\nserver.ssl.enabled: true\nserver.ssl.certificate: /etc/kibana/certs/kibana.crt\nserver.ssl.key: /etc/kibana/certs/kibana.key\n```\n\n如果前方由受控反向代理终止 TLS，要明确代理到 Kibana 的网络与信任边界。\n不能只看到浏览器地址为 HTTPS，就认为后面所有链路都已加密。", "subs": ["实验安全边界与生产差异", "Elasticsearch 7", "HTTP TLS、Kibana 与客户端信任"]}, {"title": "22.2 配置 Kafka 与采集加工链路的认证和最小权限", "content": "<a id=\"s-22-2\"></a>\n\n#### Elasticsearch 最小权限\n\n本书由管理员预创建模板、Ingest Pipeline、ILM、索引和别名。\nLogstash 只写入被允许的目标，不需要使用 `elastic` 超级用户长期运行。[Logstash 安全](https://www.elastic.co/guide/en/logstash/7.17/ls-security.html)\n\n以下是角色定义示例，提交角色 API 需要管理员权限。\n名称范围必须按实际租户进一步收窄，不能让所有业务共享一个无限制写角色。\n\n```json\n{\n  \"cluster\": [\"monitor\"],\n  \"indices\": [\n    {\n      \"names\": [\"logs-lab\", \"logs-lab-*\"],\n      \"privileges\": [\"write\", \"view_index_metadata\"]\n    }\n  ]\n}\n```\n\n这是预创建资源、关闭自动模板和插件 ILM 管理的配置边界。\n写入账号没有创建模板、删除索引或管理生命周期的权限。\n如果实际插件操作报缺少某个权限，应根据审计中的具体 API 评估是否需要，而不是直接升级为超级用户。\n\n查询账号可以使用：\n\n```json\n{\n  \"cluster\": [],\n  \"indices\": [\n    {\n      \"names\": [\"logs-lab\", \"logs-lab-*\"],\n      \"privileges\": [\"read\", \"view_index_metadata\"]\n    }\n  ]\n}\n```\n\n这只是 ES 索引权限部分。\n使用 Kibana 还需要相应的 Kibana 功能和 Space 权限，不能只创建这个角色就假设所有 UI 都可用。\n需要字段级、文档级等更细粒度控制时，另核对 7.17 对应功能和许可边界。\n\n**反向验证**\n\n写账号应该能写允许的别名，但不能读取不授权的敏感索引、删除索引或修改模板。\n读账号应该能检索允许的数据，但不能写入或修改生命周期。\n正向成功和越权拒绝都要验证，才是权限验收。\n\n\n#### Kafka 2.8 的认证与 ACL\n\nKafka 的认证回答“你是谁”，ACL 回答“你能对哪些资源做什么”。\nTLS 负责保护通信和证书校验，不等于自动具有 Topic 授权。[Kafka SASL](https://kafka.apache.org/28/security/authentication-using-sasl/)、[Kafka ACL](https://kafka.apache.org/28/security/authorization-and-acls/)\n\n生产可以根据组织能力选择 SASL/SCRAM 与 TLS 等组合。\n下面以已有受控 `SASL_SSL` 集群为客户端示例，不在本书中伪造一套组织 PKI 或公开明文管理员凭据。\n\n**Broker 侧必须核对的内容**\n\n| 配置类别 | 核对点 |\n| --- | --- |\n| Listeners | 内外部地址与安全协议映射一致 |\n| advertised.listeners | 客户端可达，证书 SAN 匹配 |\n| TLS | Keystore、Truststore、证书有效期和权限 |\n| SASL | 启用机制、broker 间认证、用户凭据 |\n| Authorizer | Kafka 2.8 的 `kafka.security.authorizer.AclAuthorizer` |\n| 默认访问 | 没有 ACL 的资源不应默认对所有人开放 |\n| 管理者 | 超级用户仅用于受控管理，不给采集器使用 |\n| ZooKeeper | 访问隔离、认证和管理权限另行保护 |\n\n`allow.everyone.if.no.acl.found=false` 是需要明确审阅的拒绝默认值策略。\n首次启用 ACL 前必须准备好 broker 内部通信和管理者权限，否则可能把集群自己锁住。\n\n**对已认证集群添加精确授权**\n\n下面 `admin.properties` 是由部署系统生成、权限受控的真实客户端配置，不是把密码写进公开示例。\n命令会修改 ACL，执行前应检查目标集群和资源。\n\n```bash\nbin/kafka-acls.sh \\\n  --bootstrap-server kafka-1.example.internal:9093 \\\n  --command-config /etc/kafka/admin.properties \\\n  --add --allow-principal User:filebeat-logs \\\n  --operation Write --operation Describe \\\n  --topic prod-logs-raw\n\nbin/kafka-acls.sh \\\n  --bootstrap-server kafka-1.example.internal:9093 \\\n  --command-config /etc/kafka/admin.properties \\\n  --add --allow-principal User:logstash-logs \\\n  --operation Read --operation Describe \\\n  --topic prod-logs-raw\n\nbin/kafka-acls.sh \\\n  --bootstrap-server kafka-1.example.internal:9093 \\\n  --command-config /etc/kafka/admin.properties \\\n  --add --allow-principal User:logstash-logs \\\n  --operation Read --operation Describe \\\n  --group prod-logs-main-v1\n```\n\nFilebeat 不需要创建或删除 Topic。\nLogstash 不需要读取所有消费组和所有 Topic。\n需要回放时，为明确的回放组授权，不把长期权限扩大到通配符全部资源。\n\n\n#### Filebeat、Logstash 的安全连接片段\n\n下面替换对应输出/输入的连接字段，保留原本的 Topic、Codec、队列与路由配置。\n客户端连接示例以前置的真实证书、SASL 用户和 ACL 已完成为条件。\n\n**Filebeat 到 Kafka**\n\n```yaml\noutput.kafka:\n  hosts:\n    - kafka-1.example.internal:9093\n    - kafka-2.example.internal:9093\n    - kafka-3.example.internal:9093\n  version: \"2.0.0\"\n  topic: prod-logs-raw\n  required_acks: -1\n  compression: gzip\n  username: filebeat-logs\n  password: \"${KAFKA_PASSWORD}\"\n  sasl.mechanism: SCRAM-SHA-512\n  ssl.certificate_authorities:\n    - /etc/filebeat/certs/kafka-ca.pem\n```\n\n`KAFKA_PASSWORD` 可由 Filebeat Keystore 提供，示例不包含真实值。\n`version` 仍是 Filebeat Kafka 协议设置，不是 broker 2.8.2 的字面版本号。\n\n```bash\nfilebeat keystore create\nfilebeat keystore add KAFKA_PASSWORD\n```\n\n已有 Keystore 应直接增加或更新条目，不要重建覆盖其他密钥。\n\n**Logstash 从 Kafka 读取**\n\n```logstash\nkafka {\n  bootstrap_servers => \"kafka-1.example.internal:9093,kafka-2.example.internal:9093\"\n  topics => [\"prod-logs-raw\"]\n  group_id => \"prod-logs-main-v1\"\n  security_protocol => \"SASL_SSL\"\n  sasl_mechanism => \"SCRAM-SHA-512\"\n  sasl_jaas_config => \"org.apache.kafka.common.security.scram.ScramLoginModule required username='logstash-logs' password='${KAFKA_PASSWORD}';\"\n  ssl_truststore_location => \"/etc/logstash/certs/kafka-truststore.jks\"\n  ssl_truststore_password => \"${KAFKA_TRUSTSTORE_PASSWORD}\"\n  enable_auto_commit => false\n  decorate_events => \"basic\"\n  codec => json\n}\n```\n\n使用之前应在 10.12.2 插件和 JVM 环境中验证 Truststore 格式及 JAAS 解析。\n模板变量由 Logstash 配置替换解析，不应把含 `${...}` 的文件不经处理交给任意 Kafka Java 客户端后假设它会自动展开。\n\n**Logstash 到 ES**\n\n固定 11.4.2 Elasticsearch output 使用该版本的配置名：\n\n```logstash\nelasticsearch {\n  hosts => [\"https://es-1.example.internal:9200\", \"https://es-2.example.internal:9200\"]\n  user => \"logstash_writer\"\n  password => \"${ES_WRITER_PASSWORD}\"\n  ssl => true\n  cacert => \"/etc/logstash/certs/elasticsearch-ca.pem\"\n  index => \"prod-logs\"\n  manage_template => false\n  ilm_enabled => false\n}\n```\n\n不要直接替换成较新插件的 TLS 参数名称，再声称它适用于 7.17.29 默认插件。\n`prod-logs`、相应模板和生命周期必须由管理员预先创建。", "subs": ["Elasticsearch 最小权限", "Kafka 2", "Filebeat、Logstash 的安全连接片段"]}, {"title": "22.3 轮换凭据与证书并验证连接与授权边界", "content": "<a id=\"s-22-3\"></a>\n\n凭据轮换不是只替换服务端密码：客户端缓存、连接池和证书信任链也必须一起验证。先准备可回退的凭据或证书，再逐个更新调用方，观察认证失败与新连接；在确认旧凭据不再使用后才能撤销，避免把所有采集端同时切断。\n\n#### 凭据轮换、证书过期与变更验证\n\n轮换时先让服务端接受新凭据或新信任链，再逐步更新客户端，确认成功后撤销旧凭据。\n可否同时保留旧新身份取决于实际认证方案，不能一律假设无中断。\n\n| 变更 | 验证 |\n| --- | --- |\n| 密码轮换 | 所有副本都使用新值，旧值按计划失效 |\n| CA 轮换 | 客户端 Truststore、服务端证书链与 SAN |\n| Topic ACL | 允许操作成功，越权操作被拒绝 |\n| ES 角色调整 | 模板管理与写入分权没有被破坏 |\n| K8s Secret 更新 | 进程是否需要重启，挂载方式是否支持更新 |\n\n证书即将过期应提前告警，不要等到 Filebeat 或 Logstash 连接失败后才发现。\n配置热加载能力应按组件、文件挂载方式和版本逐项验证。", "subs": ["凭据轮换、证书过期与变更验证"]}, {"title": "22.4 处理敏感字段、原始日志、隔离数据和审计证据", "content": "<a id=\"s-22-4\"></a>\n\n同一条敏感信息可能同时存在于业务字段、message、event.original、隔离索引、DLQ 和导出证据里。治理时沿整条数据路径检查副本，不能只把某个索引字段设为不索引就认为已经脱敏。删除或采样还会改变故障复盘与告警分母，应留下可解释的策略记录。\n\n#### 敏感数据、原始日志与审计\n\n保留原始日志有利于排障，也意味着可能长期保存敏感信息。\n`event.original` 关闭索引只是不建立检索结构，不会从 `_source` 或备份中删除内容。\n\n建议建立字段分类和采集白名单：\n\n| 信息 | 处理方向 |\n| --- | --- |\n| 密码、Token、Cookie、私钥 | 不记录，源头禁止优先 |\n| 个人标识与联系方式 | 按业务必要性脱敏或受控访问 |\n| 请求体 | 默认不全量记录，按明确诊断需求采样与脱敏 |\n| 内部地址、节点信息 | 权限控制，公开报告去标识 |\n| SQL 或业务参数 | 避免直接记录敏感值，保留结构化错误类型 |\n\n脱敏最好在离开信任边界之前完成。\n只在 Kibana 展示时遮盖，不会清除 Kafka、ES `_source`、DLQ、PQ 和 Snapshot 中的原值。\n错误日志和失败旁路也必须遵循同样的安全规则。", "subs": ["敏感数据、原始日志与审计"]}]}, {"title": "第 23 章 · 备份恢复、节点维护与版本变更", "sections": [{"title": "23.1 创建快照并以重命名目标完成隔离恢复", "content": "<a id=\"s-23-1\"></a>\n\n#### Snapshot 与复制不是一回事\n\n副本保护部分节点故障；Snapshot 提供另一个恢复时间点。\n误删索引会影响主副本，不能指望副本保留一份未删除的历史数据。[Snapshot](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/snapshot-restore.html)\n\n本书用单节点文件系统仓库演示接口。\n它与 ES 数据卷在同一台机器时不能抵抗整机或磁盘域故障，生产应选择独立故障域的受控仓库。\n\n**给实验 ES 配置仓库路径**\n\n第二篇 Compose 已挂载 `es-snapshots:/mnt/snapshots`，但还没有启用 `path.repo`。\n把以下键合并进 `services.elasticsearch.environment`：\n\n```yaml\npath.repo: /mnt/snapshots\n```\n\n先确认路径权限，再重建 ES 服务使启动参数生效。\n下面只修改实验的快照目录，不递归修改 ES 数据目录。\n\n```bash\ndocker compose -p elk-full run --rm --no-deps --user root \\\n  elasticsearch sh -c 'chown 1000:0 /mnt/snapshots && chmod 750 /mnt/snapshots'\n\ndocker compose -p elk-full up -d --no-deps elasticsearch\n\ncurl -fsS 'http://127.0.0.1:9200/_nodes/settings?pretty'\n```\n\n重建期间 ES 暂时不可用，主链路依靠 Kafka/PQ 等缓冲；恢复后应检查积压。\n生产多节点共享文件系统仓库要求各相关节点按一致路径访问共享内容，而不是每台创建一个同名但不共享的本地目录。[注册仓库](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/snapshots-register-repository.html)\n\n\n#### 注册与验证仓库\n\n```bash\ncurl -fsS -X PUT 'http://127.0.0.1:9200/_snapshot/elk-lab-fs?pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"type\": \"fs\",\n  \"settings\": {\n    \"location\": \"/mnt/snapshots\",\n    \"compress\": true\n  }\n}\nJSON\n\ncurl -fsS -X POST 'http://127.0.0.1:9200/_snapshot/elk-lab-fs/_verify?pretty'\n```\n\n仓库验证检查当前节点访问能力，不是完整恢复演练。\n不要让多个集群同时向同一仓库任意写入；其他恢复集群通常应以只读方式注册，避免仓库状态冲突。\n\n**建立明确范围的快照**\n\n下面只备份正常与隔离别名覆盖的日志索引，不备份整个集群所有系统状态。\nSnapshot 名称应唯一，示例通过当前时间生成。\n\n```bash\nSNAPSHOT=\"lab-$(date -u +%Y%m%dT%H%M%SZ)\"\ncurl -fsS -X PUT \\\n  \"http://127.0.0.1:9200/_snapshot/elk-lab-fs/${SNAPSHOT}?wait_for_completion=true&pretty\" \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"indices\": \"logs-lab,logs-lab-quarantine\",\n  \"include_global_state\": false,\n  \"metadata\": {\n    \"purpose\": \"isolated-learning-lab\",\n    \"configuration_baseline\": \"elastic-7.17.29-kafka-2.8.2\"\n  }\n}\nJSON\n```\n\n查看返回状态与失败分片，不能只记录 Snapshot 名称。\n生产大快照可以异步提交再轮询状态，避免长 HTTP 请求超时被误认为任务已停止。\n这里的 `wait_for_completion` 只是小实验方便验收。\n\n\n#### 重命名恢复，避免覆盖现有数据\n\n恢复前先列出快照、包含的实际索引和状态。[恢复快照](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/snapshots-restore-snapshot.html)\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_snapshot/elk-lab-fs/_all?pretty'\n```\n\n下面的 `SNAPSHOT` 必须来自上一步的真实结果，不能使用一个猜测的快照名。\n`SOURCE_INDEX` 必须确实存在于该快照中。\n恢复使用新名称，不删除源索引，不恢复别名，不恢复全局状态。\n\n```bash\n# 在同一终端沿用刚创建的 SNAPSHOT，或显式填写查询得到的名称。\nSOURCE_INDEX=logs-lab-000001\n\ncurl -fsS -X POST \\\n  \"http://127.0.0.1:9200/_snapshot/elk-lab-fs/${SNAPSHOT}/_restore?wait_for_completion=true&pretty\" \\\n  -H 'Content-Type: application/json' --data-binary @- <<JSON\n{\n  \"indices\": \"${SOURCE_INDEX}\",\n  \"include_global_state\": false,\n  \"include_aliases\": false,\n  \"rename_pattern\": \"(.+)\",\n  \"rename_replacement\": \"restored-\\$1\",\n  \"ignore_index_settings\": [\n    \"index.lifecycle.name\",\n    \"index.lifecycle.rollover_alias\"\n  ]\n}\nJSON\n```\n\n忽略原生命周期设置，避免恢复出来的测试副本立即参与原来的滚动或清理流程。\n这个策略用于隔离验证，不能直接代替生产灾难恢复的最终生命周期设计。\n\n**恢复验收**\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cat/recovery/restored-*?v'\ncurl -fsS 'http://127.0.0.1:9200/restored-logs-lab-000001/_count?pretty'\ncurl -fsS 'http://127.0.0.1:9200/restored-logs-lab-000001/_mapping?pretty'\n```\n\n应比较快照覆盖时间点内的样本、字段和 ID，而不是与仍持续写入的源索引当前总数直接比较。\n恢复测试结束后，只有在确认对象完全属于此次实验时才计划删除 `restored-*` 中的精确索引。\n本书不提供全局通配符删除命令。\n\n\n#### 文件系统快照与隔离恢复\n\nHA Compose 给所有节点挂载同一个命名卷 `/snapshots`，用于同宿主实验。\n这不提供宿主级灾备；生产快照必须保存到独立故障域的受支持仓库，并有权限、完整性和恢复演练。\n先为实验卷设置进程可写权限，限定到该卷，不递归修改宿主目录。\n\n```bash\n# 在首次注册快照仓库前执行，仅修改实验 snapshots 卷。\ndocker compose -f compose-ha-os-joined.json run --rm --no-deps \\\n  --user 0 --entrypoint /bin/bash os-hot-a -c 'chown 1000:0 /snapshots && chmod 0770 /snapshots'\n```\n\n在 HA OS 上注册仓库、创建小索引快照：\n\n```http\nPUT /_snapshot/exp-repository\n{\"type\":\"fs\",\"settings\":{\"location\":\"/snapshots/exp\",\"compress\":true}}\nPOST /_snapshot/exp-repository/_verify\nPUT /_snapshot/exp-repository/ha-check-1?wait_for_completion=true\n{\"indices\":\"exp-ha-check\",\"include_global_state\":false}\nGET /_snapshot/exp-repository/ha-check-1\n```\n\n检查快照状态、失败分片和索引名单，而不仅是请求返回。\n恢复使用新名称且不带原别名，避免与写入入口或短删除策略相撞：[OS 快照恢复](https://docs.opensearch.org/2.19/tuning-your-cluster/availability-and-recovery/snapshots/snapshot-restore/)\n\n```http\nPOST /_snapshot/exp-repository/ha-check-1/_restore\n{\n  \"indices\":\"exp-ha-check\",\n  \"include_global_state\":false,\n  \"include_aliases\":false,\n  \"rename_pattern\":\"exp-ha-check\",\n  \"rename_replacement\":\"exp-restored-ha-check\"\n}\nGET /exp-restored-ha-check/_doc/ha-event-1\nGET /_cat/recovery/exp-restored-ha-check?format=json\n```\n\n这个源索引没有 ILM/ISM，故意避免第一次恢复就触发自动删除。\n恢复生命周期受管索引时，必须预先评审策略关联、原年龄和自动执行任务，必要时在隔离集群暂停管理并移除对应策略关联。\n不要在原生产集群全局暂停所有策略来做单索引练习，也不要假设改名自然删除所有管理元数据。\n\n\n#### 容灾验收与收尾\n\n验收分为能创建快照、能在隔离目标恢复、恢复后字段与事件正确、恢复时间符合目标四层。\n只有第一层通过，不能宣称具备灾备能力。\n\n普通停止 HA 实验保留卷：\n\n```bash\ndocker compose -f compose-ha-os-joined.json stop\n```\n\n确实要销毁时，先记录快照、源样本和证据位置，再对这份精确 Compose 执行 `down --volumes`。\n不与主实验 `elk-expansion` 混用，也不删除基础实验的实验环境。", "subs": ["Snapshot 与复制不是一回事", "注册与验证仓库", "重命名恢复，避免覆盖现有数据", "文件系统快照与隔离恢复", "容灾验收与收尾"]}, {"title": "23.2 扩容和下线节点并观察迁移与剩余容量", "content": "<a id=\"s-23-2\"></a>\n\n#### 把日常维护分成只读检查与写入变更\n\n只读检查可以频繁执行；删除、迁移、重置、改副本和切换安全配置需要评审。\n不要把所有命令写进一个每天自动执行的“修复脚本”。\n\n| 频率或触发 | 检查内容 |\n| --- | --- |\n| 日常 | 探针、积压、磁盘、ILM、解析失败、快照状态 |\n| 规则发布 | 样本、字段类型、失败率、回滚版本 |\n| 容量接近阈值 | 增长趋势、保留、迁移和扩容时间 |\n| 节点维护前 | 冗余、恢复空间、分片分布、选举能力 |\n| 升级前 | 版本兼容、弃用项、插件、Snapshot、回退前提 |\n| 故障恢复后 | 数据集合对账、队列稳定、复盘证据 |\n\n执行写操作前，至少记录集群身份、目标资源、原值、预期变化和恢复方法。\n“命令执行成功”不是变更验收的全部。\n\n\n#### Elasticsearch 节点扩容与下线\n\n扩容前确认新节点版本、角色、发现、安全配置、磁盘和故障域。\n新增节点后观察分片恢复、网络和磁盘压力，不要只看节点数增加就结束变更。\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cat/nodes?v'\ncurl -fsS 'http://127.0.0.1:9200/_cat/allocation?v'\ncurl -fsS 'http://127.0.0.1:9200/_cat/recovery?v&active_only=true'\n```\n\n单节点 lab 不适合演示有冗余的节点下线。\n下面是已有健康多节点集群的配置结构示例，不能直接对单节点实验执行。\n\n```json\n{\n  \"persistent\": {\n    \"cluster.routing.allocation.exclude._name\": \"es-to-retire\"\n  }\n}\n```\n\n通过 `_cluster/settings` 应用排除后，等待目标节点分片迁走并确认剩余节点容量。\n还要判断它是否参与主节点投票；移除 master-eligible 节点可能需要单独的投票配置维护，不能只处理数据分片。[分片分配](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-cluster.html)\n\n变更完成后移除不再需要的临时排除设置，防止未来同名节点无法接收分片。\n如果剩余容量或分配规则不满足要求，应停止下线，而不是强行关机等待系统自行恢复。\n\n\n#### 剩余容量不足、节点下线与扩容\n\n分片重建会占用网络、磁盘吞吐和临时空间。\n一个正常状态下平均只有 65% 使用率的集群，失去节点后可能没有足够空间恢复全部副本。\n在启用了温度和 zone 约束时，总空闲空间足够也可能因为空闲位于错误节点而无法使用。\n\n```http\nGET /_cat/recovery?active_only=true&format=json\nGET /_nodes/stats/fs,indices,jvm,thread_pool\nGET /_cluster/pending_tasks\n```\n\n安全下线某节点通常先添加精确分配排除，再等待其分片迁走，确认入口不再依赖它，最后停止。\n下例仅排除明确实验节点：\n\n```http\nPUT /_cluster/settings\n{\"persistent\":{\"cluster.routing.allocation.exclude._name\":\"os-hot-c\"}}\nGET /_cat/shards?format=json\n```\n\n如强制感知要求 c 区仍保留副本且只有这一台合格热节点，排除会造成无法满足的约束。\n正确方向是增加同区替代节点或重新评审副本/故障域目标，而不是等待不存在的迁移完成。\n扩容时新节点使用现有 seed hosts，不能重新使用首次引导列表创建新集群。\n\n恢复完成后清除本次精确排除设置，避免它成为数月后的隐蔽故障：\n\n```http\nPUT /_cluster/settings\n{\"persistent\":{\"cluster.routing.allocation.exclude._name\":null}}\n```", "subs": ["把日常维护分成只读检查与写入变更", "Elasticsearch 节点扩容与下线", "剩余容量不足、节点下线与扩容"]}, {"title": "23.3 迁移 Topic 配置并保存规则、模板和插件版本", "content": "<a id=\"s-23-3\"></a>\n\n#### Kafka Topic 配置迁移\n\n只迁移 Topic 元数据和迁移消息是两个任务。\n对于可重新写入的日志系统，可以选择迁移 Topic 名称、分区数、副本因子和必要配置，而不迁移历史消息。\n这意味着切换前的历史回放能力不能自动在新集群获得。\n\n```bash\nbin/kafka-topics.sh --bootstrap-server old-kafka.example.internal:9092 --list\n\nbin/kafka-topics.sh --bootstrap-server old-kafka.example.internal:9092 \\\n  --describe --topic prod-logs-raw\n\nbin/kafka-configs.sh --bootstrap-server old-kafka.example.internal:9092 \\\n  --entity-type topics --entity-name prod-logs-raw --describe\n```\n\n应导出显式 Topic 配置，并与新 broker 默认值比较。\n默认值不同可能让“没有显式配置的 Topic”在新集群表现变化。\n\n**不直接复制的内容**\n\nBroker ID、分区副本的节点分配、ACL、客户端发布地址和消费组 Offset 需要单独处理。\n旧集群的 Offset 不能直接用于另一个重新写入消息的集群。\n不要把配置迁移脚本包装成数据无损迁移工具。\n\n**切换验证**\n\n先验证新集群生产和消费，再灰度切换 Filebeat，观察 Logstash 与 ES 事件来源。\n跨集群双写可能产生重复，事件 ID 应保留源身份，恢复计划要明确去重和时间窗口。\n切换后仍保留旧集群到验收和回滚窗口结束。\n\n\n#### 规则、模板与镜像的版本管理\n\n每次发布记录 Elastic 主版本、具体补丁、Logstash 插件锁、Kafka broker 版本和解析规则版本。\n配置改动要能定位到 Git commit，并保留测试样本。\n\n| 变更 | 兼容问题 |\n| --- | --- |\n| Filebeat Input 从 log 改 filestream | 状态、输入 ID 和重复采集 |\n| Logstash 插件更新 | 配置名、ECS 默认行为、重试语义 |\n| 字段类型修改 | 旧索引不可直接原地变类型 |\n| ILM 修改 | 已进入阶段的执行状态与未来索引 |\n| Kafka 分区增加 | Key 路由和消费顺序 |\n| Kibana 升级 | Saved Objects 迁移与回退限制 |\n\n不要在基础镜像构建里无版本约束地执行所有插件 update，然后仍把它称为“7.17.29 默认环境”。\n7.17.29 只是主程序版本，插件已经变化时要重新验证全部关键行为。", "subs": ["Kafka Topic 配置迁移", "规则、模板与镜像的版本管理"]}, {"title": "23.4 制定升级切换与回退计划并核对新增数据", "content": "<a id=\"s-23-4\"></a>\n\n升级前分别确定数据、配置、插件和 UI 对象的兼容路径。先在隔离环境验证代表性输入、恢复与对账，再安排切换；回退条件和切换期间新增数据的处理方式必须在执行之前明确。不能用旧镜像直接打开被新版本写过的数据目录来代替回退方案。\n\n#### 升级与回退不是简单换镜像标签\n\n长期使用结束支持的版本会积累维护风险。\n本书讲清存量机制，但新建环境与生产升级应重新核对官方生命周期、兼容性和安全公告。[Elastic 生命周期](https://www.elastic.co/support/eol)\n\n升级前应完成 Snapshot 恢复演练、弃用项检查、客户端与插件兼容验证，以及双向数据核对方案。\n不能假设新版本写过的数据目录可以直接交给旧版本二进制打开。\nKibana Saved Objects 也可能经历不可直接反向兼容的迁移。\n\n```text\n明确目标版本\n→ 阅读对应升级路径和不兼容变化\n→ 复制代表性数据到隔离环境\n→ 验证采集、消费、解析、索引和 UI\n→ 验证备份恢复\n→ 灰度和维护窗口\n→ 监控质量及性能\n→ 按预先定义的条件决定继续或回退\n```\n\n回退可能意味着恢复旧集群和快照、切回旧写入入口，而不是把容器标签改回去。\n需要在升级之前算清新产生数据如何处理，不能发生故障后才讨论允许丢失多少。", "subs": ["升级与回退不是简单换镜像标签"]}]}, {"title": "第 24 章 · 故障排查与综合验收", "sections": [{"title": "24.1 沿源文件到检索界面定位无数据、重复和字段错误", "content": "<a id=\"s-24-1\"></a>\n\n#### 排查总入口：先保留现场，再缩小范围\n\n收到“日志平台有问题”时，先确认影响范围：哪些环境、哪些服务、从什么时候开始、是全部缺失还是延迟、旧数据还能否查询。\n随后把同一条已知事件沿数据路径追踪。\n\n```mermaid\nflowchart TD\n    A[有已知事件 ID 或源样本吗] --> B[源文件存在吗]\n    B --> C[Filebeat 读取并输出了吗]\n    C --> D[Kafka 对应 Topic 有消息吗]\n    D --> E[消费组是否推进]\n    E --> F[Logstash 队列和解析是否正常]\n    F --> G[ES Bulk 是否接受]\n    G --> H[按正确别名与时间能否查询]\n    H --> I[Kibana 条件与权限是否一致]\n```\n\n每次只改变一项候选因素。\n先保存只读结果、配置版本和失败样本，再重启或修改参数。\n重启可能暂时缓解问题，也可能清掉关键状态，使根因更难定位。\n\n**最小现场清单**\n\n```bash\nmkdir -p evidence\n\ndocker compose -p elk-full ps > evidence/compose-ps.txt\ndocker compose -p elk-full logs --tail=200 filebeat > evidence/filebeat.log\ndocker compose -p elk-full logs --tail=200 logstash > evidence/logstash.log\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/pipelines?pretty' > evidence/logstash-stats.json\ncurl -fsS 'http://127.0.0.1:9200/_cluster/health?pretty' > evidence/es-health.json\n```\n\n个别命令失败本身也是证据，应记录失败时间和错误，而不是用空文件替代成功结果。\n现场文件可能包含原始日志和内部地址，分享前需要脱敏。\n\n\n#### 日志完全查不到\n\n**现象与范围**\n\n先区分新日志不可见、历史日志不可见，还是某个服务没有数据。\n所有历史索引都查不到更像查询入口、权限或 ES 故障；只有新数据缺失则要沿采集路径排查。\n\n**源端检查**\n\n```bash\nls -l logs/access.jsonl\ntail -n 3 logs/access.jsonl\n\ndocker compose -p elk-full exec filebeat \\\n  sh -c 'ls -l /var/log/lab && tail -n 1 /var/log/lab/access.jsonl'\n```\n\n宿主文件存在但容器路径为空，优先查挂载和工作目录。\n不要立刻删除 Filebeat Registry 让它重读所有文件。\n\n**输出与中间层检查**\n\n```bash\ndocker compose -p elk-full exec filebeat filebeat test output -e\n\ndocker compose -p elk-full exec kafka kafka-topics.sh \\\n  --bootstrap-server kafka:9092 --describe --topic logs-lab-raw\n\ndocker compose -p elk-full exec kafka kafka-consumer-groups.sh \\\n  --bootstrap-server kafka:9092 --describe --group logs-lab-main-v1\n```\n\n`test output` 通过只说明当前连接测试成功，不证明某条历史事件已写入。\n应继续检查消息内容、消费者和输出错误。\n\n**修复与验收**\n\n修复具体路径、权限、Topic、Codec 或连接配置后，生成一个新 run_id。\n同时查正常和隔离别名，不要把进入隔离的数据误判为完全丢失。\n用集合对账验证此次已知输入，再决定是否回放历史数据。\n\n\n#### 日志重复\n\n**先比较身份**\n\n对重复样本比较 `event.id`、`_id`、`_index`、Kafka 位置、原始文件路径和业务时间。\n相同 message 不一定是重复事件，例如相同错误可能在不同请求中重复发生。\n\n| 特征 | 候选原因 |\n| --- | --- |\n| 不同事件 ID，相同原文 | 合法重复事件，或生产者未生成稳定 ID |\n| 相同事件 ID，不同 `_index` | 跨 Rollover 回放或目标路由变化 |\n| 相同文件被两个 Input 读取 | 静态输入与 Autodiscover 重叠 |\n| 重启后整批重现 | Registry 未持久化、输入 ID 改变 |\n| 同一 Kafka 位置被不同组写同目标 | 消费组设计或重放隔离问题 |\n\n**Filebeat 核查**\n\n检查是否同时采集 `/var/log/containers` 链接和 `/var/log/pods` 真实文件。\n检查是否更换了 `filestream.id`，是否重建了保存状态的数据卷。[Filebeat 文件身份](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-input-filestream.html)\n\n**修复前不要批量删除**\n\n先修正重复产生机制。\n然后评估哪些重复是真正同一事件，如何选择保留副本，是否会影响查询和备份。\n用只读聚合估计范围，再在隔离数据上验证清理规则。\n\n\n#### JSON、Grok 与字段类型失败\n\n**分清失败层次**\n\n外层 Filebeat 事件 JSON 解码失败，与 `message` 内应用 JSON 解码失败不是同一件事。\nGrok 匹配失败、日期失败、数值校验失败和 ES Mapping 拒绝也需要分别统计。\n\n| 失败 | 本书识别方式 |\n| --- | --- |\n| Kafka 外层 JSON | `_jsonparsefailure` |\n| 应用 JSON | `_app_json_failure` |\n| 字段校验 | `_field_validation_failure`、pipeline.errors |\n| 日期解析 | `_event_time_failure` 或场景特定标签 |\n| Java 格式 | `_java_grok_failure` |\n| ES 字段拒绝 | Elasticsearch output 日志与适用时的 DLQ |\n\n**获取原始证据**\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab-quarantine/_search?pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"size\": 5,\n  \"sort\": [{\"event.ingested\": \"desc\"}],\n  \"_source\": [\"event.original\", \"pipeline.errors\", \"pipeline.version\", \"kafka\", \"tags\"]\n}\nJSON\n```\n\n先根据原始值重现，确认错误来自输入变化还是解析规则。\n不要直接把所有无法转换的状态码和耗时补零，这会让质量问题转化为错误业务统计。\n\n**回归测试范围**\n\n正常数值、字符串数值、空值、`-`、数组、对象、科学计数法、负数、超长值、多上游和非法时间都应覆盖。\n修复后先回放小样本到隔离目标，比较原值、规范值和错误原因。\n\n\n#### Kibana 无数据或结果不同\n\n用同一身份、同一 ES 集群、同一索引范围和绝对时间执行 API 对照。\n检查全局时间、固定筛选、Dashboard 面板覆盖时间、Space 和 Index Pattern。\n\n| 现象 | 关键检查 |\n| --- | --- |\n| API 有、Discover 无 | 时间字段、范围、KQL、权限 |\n| 新字段不可选 | Mapping、Index Pattern 字段信息 |\n| 同一图不同人结果不同 | 身份权限、时区、固定筛选 |\n| 旧时间窗口突然有新数据 | 补采或回放进入历史业务时间 |\n| 请求量异常增加 | 采集范围、重复数据、Probe 和数据集 |\n\n不要删除 Index Pattern 或重建所有 Saved Objects 作为第一步。\n这些操作可能破坏已有 Dashboard 引用，并没有修复 ES 数据问题。\n\n\n#### Kubernetes 元数据缺失或 Pod 重建后漏采\n\n```bash\nkubectl -n logging-lab get daemonset filebeat\nkubectl -n logging-lab get pods -o wide\nkubectl -n logging-lab logs daemonset/filebeat --tail=100\nkubectl auth can-i get pods \\\n  --as=system:serviceaccount:logging-lab:filebeat --all-namespaces\n```\n\n第一篇 RBAC 和 ServiceAccount 名称是这个实验命名；实际集群必须按真实对象检查。\n\n**分层检查**\n\n确认 Filebeat Pod 与日志源在同一节点，宿主 `/var/log/containers` 链接指向的 `/var/log/pods` 也被挂载。\n检查 NODE_NAME 是否正确、Kubernetes API 是否可达、RBAC 是否足够，以及 metadata matcher 与路径是否匹配。\n\n| 现象 | 可能方向 |\n| --- | --- |\n| 原始行有、元数据无 | API、RBAC、节点身份或 matcher |\n| 重建后只有旧容器日志 | 文件发现、路径、输入配置 |\n| 重启后大量重复 | Registry 卷未持久化或输入 ID 改变 |\n| 同一行重复两次 | 链接与真实路径双采、静态与动态输入重叠 |\n| 已删除 Pod 无法补元数据 | 采集延迟、元数据缓存与资源生命周期 |\n\n日志文件仍在，不保证 Kubernetes API 仍保留对应 Pod 对象。\n必要时在采集时保留足够稳定身份，不能完全依赖事后查询 API 补齐。", "subs": ["排查总入口：先保留现场，再缩小范围", "日志完全查不到", "日志重复", "JSON、Grok 与字段类型失败", "Kibana 无数据或结果不同", "Kubernetes 元数据缺失或 Pod 重建后漏采"]}, {"title": "24.2 定位积压、Rebalance、429、OOM 和隔离队列增长", "content": "<a id=\"s-24-2\"></a>\n\n#### Kafka Lag 持续增长\n\n**判断哪一层接收能力不足**\n\n```bash\ndocker compose -p elk-full exec kafka kafka-consumer-groups.sh \\\n  --bootstrap-server kafka:9092 --describe --group logs-lab-main-v1\n\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/pipelines?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_nodes/stats/indices,thread_pool,indexing_pressure?pretty'\n```\n\n总 Lag 增长但某些分区正常，先看分区倾斜。\n所有分区同时停止，先看组内消费者是否在线、Pipeline 是否启动以及 ES 输出是否长期失败。\n\n**不同证据对应不同方向**\n\n| 证据 | 优先方向 |\n| --- | --- |\n| 没有活跃消费者 | 进程、配置、认证、组名称 |\n| PQ 快满，ES 重试 | ES 写入与存储问题 |\n| CPU 满，Filter 耗时高 | 解析规则与事件大小 |\n| CPU 低、网络请求慢 | 外部调用或输出等待 |\n| 单分区高 Lag | Key 倾斜、消息大小、分区热点 |\n\n不要只增加 `consumer_threads`。\n恢复后测量净排空速度，并确认剩余 Kafka 保留窗口足以覆盖积压。\n若来不及，应优先保护原始数据和扩充恢复能力，而不是等待保留策略把旧数据删除。\n\n\n#### 消费者反复 Rebalance\n\n**收集时间线**\n\n记录成员变化、发布重启、GC 停顿、poll 超时和网络错误时间。\n消费者无法及时继续 poll，可能因为队列阻塞或处理链路过慢，不能只看 Kafka broker。\n\n```bash\ndocker compose -p elk-full logs --since=10m logstash\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/jvm?pretty'\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/pipelines?pretty'\n```\n\n**常见误判**\n\n调大 `max_poll_interval_ms` 可以改变容忍时间，但不会增加实际处理能力。\n调小 session timeout 可能更快感知故障，也可能让短暂停顿频繁变成成员失效。\n参数取舍应结合实际处理时间与故障检测目标。[消费者配置](https://kafka.apache.org/28/configuration/consumer-configs/)\n\n**验收**\n\n固定流量下观察一段覆盖原故障模式的时间，确认成员稳定、消费继续推进、无持续积压。\n一次重启后暂时恢复不能证明问题已经解决。\n\n\n#### Elasticsearch 写入 429 或 Bulk 出错\n\n**区分请求级与单条错误**\n\nHTTP 请求失败、Bulk 顶层 `errors: true`、单条 Mapping 失败和代理限流需要分别处理。\n记录响应状态、错误类型、目标索引和请求大小，不只保存“写入失败”四个字。[ES output 重试](https://www.elastic.co/guide/en/logstash/7.17/plugins-outputs-elasticsearch.html)\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cat/thread_pool/write?v'\ncurl -fsS 'http://127.0.0.1:9200/_nodes/stats/jvm,fs,indexing_pressure,thread_pool?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_nodes/hot_threads?threads=3'\n```\n\n**处理顺序**\n\n先确认磁盘、内存和集群健康，再看是否有恢复、Merge、快照或大查询竞争。\n临时降低输入或回放并发，为实时写入留出空间。\n增加 ES 队列上限不能创造 CPU 或磁盘吞吐，反而可能让请求占用更多内存。\n\n**验收**\n\n比较拒绝计数增量、输出成功率、PQ 与 Kafka 净排空速度。\n吞吐上升但失败数据变多不能判为调优成功。\n\n\n#### Logstash CPU、Heap 或 OOM\n\n**先区分 CPU 与内存故障**\n\n```bash\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/jvm,process,pipelines?pretty'\ncurl -fsS 'http://127.0.0.1:9600/_node/hot_threads?pretty'\ndocker compose -p elk-full logs --tail=200 logstash\n```\n\n容器 OOMKilled 可能来自总内存限制，而不仅是 Java Heap 不足。\n检查 Heap、直接内存、事件大小、batch、PQ 映射和其他进程开销。\n\n**常见诱因**\n\n复杂正则在坏输入上耗时；把巨大 JSON 复制多次；无限制保留原始与展开字段；在 Ruby 中累积共享数组；同时增加多个 Pipeline 的 workers 和 batch。\n\n减小某个批次可以缓解峰值内存，但要验证吞吐和延迟。\n增加 Heap 前先确认宿主和容器是否有相应空间，不能导致宿主交换或其他服务 OOM。\n\n**验收**\n\n使用包含大事件和坏格式的有界样本，确认 CPU、GC、事件质量与净吞吐同时合理。\n只用短小正常日志跑通，不能证明异常流量下也稳定。\n\n\n#### DLQ 与隔离日志持续增长\n\nDLQ 和业务隔离索引负责不同失败类型。\n不能把隔离索引为空当成所有输出都成功，也不能把 DLQ 增長都归因于 Grok。[DLQ](https://www.elastic.co/guide/en/logstash/7.17/dead-letter-queues.html)\n\n先查看 Elasticsearch output 的具体错误类型和失败文档目标。\nMapping 400、某些 404 与 409 的处理方式按固定 11.4.2 插件文档核对；不要套用新插件的重试或自定义 DLQ 设置。\n\n**在 lab 读取 DLQ 的诊断配置**\n\n以下作为临时独立 Pipeline，仅用于脱敏的隔离实验。\n`path` 指向 DLQ 根目录，`pipeline_id` 指定原 Pipeline。\n`commit_offsets => false` 便于只读检查，不把此次查看作为已完成修复的消费确认。\n\n```logstash\ninput {\n  dead_letter_queue {\n    path => \"/usr/share/logstash/data/dead_letter_queue\"\n    pipeline_id => \"logs-main\"\n    commit_offsets => false\n  }\n}\noutput {\n  stdout {\n    codec => rubydebug { metadata => true }\n  }\n}\n```\n\n不要把这个输出长期打开在生产，原始事件可能包含敏感内容。\n真正重处理时使用独立目标和稳定事件身份，先修复失败原因，再验证不会把错误重新送回相同 DLQ 形成循环。\n\n**清理前验收**\n\n记录读取范围、修复规则、成功写入数量和仍失败样本。\n不能通过删除 DLQ 目录使告警消失后宣告问题解决。\n队列自身的容量上限和保留也要监控，否则错误证据可能继续丢失。", "subs": ["Kafka Lag 持续增长", "消费者反复 Rebalance", "Elasticsearch 写入 429 或 Bulk 出错", "Logstash CPU、Heap 或 OOM", "DLQ 与隔离日志持续增长"]}, {"title": "24.3 排查水位、未分配分片、生命周期、TLS 与权限故障", "content": "<a id=\"s-24-3\"></a>\n\n#### 磁盘水位与只读保护\n\nES 的磁盘水位会影响分片分配，达到 flood-stage 时可能为相关索引设置 `read_only_allow_delete` 保护。\n7.17 在磁盘使用回落到相应高水位以下后会解除该保护；仍需检查具体索引与配置。[磁盘分配设置](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-cluster.html)\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cat/allocation?v&bytes=gb'\ncurl -fsS 'http://127.0.0.1:9200/_nodes/stats/fs?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_cluster/settings?include_defaults=true&flat_settings=true&pretty'\ncurl -fsS 'http://127.0.0.1:9200/logs-lab-*/_settings?flat_settings=true&pretty'\n```\n\n百分比水位通常描述已用比例，字节水位描述剩余空间，解释时不要反过来。\n不要照搬较新版本新增的 headroom 参数到 7.17。\n\n**优先释放或增加真实空间**\n\n检查 ILM 是否失效、保留是否过长、快照目录是否意外与数据盘竞争、节点恢复是否占用额外空间。\n通过批准的精确索引删除、扩容或迁移处理。\n不要用删除文档后立即 Force Merge 作为磁盘满时的默认动作。\n\n**必要时清除残留保护**\n\n仅在已经确认空间恢复、原因处理完成，而目标索引仍残留该设置时，才对精确索引操作：\n\n```bash\ncurl -fsS -X PUT 'http://127.0.0.1:9200/logs-lab-000001/_settings' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"index.blocks.read_only_allow_delete\":null}'\n```\n\n这不会创造可用空间。\n持续反复解除保护而不处理磁盘压力，只会掩盖风险。\n\n\n#### 未分配分片与集群 Red/Yellow\n\n**先问 Elasticsearch 为什么不分配**\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cat/shards/logs-lab-*?v'\n\ncurl -fsS -X POST 'http://127.0.0.1:9200/_cluster/allocation/explain?pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"index\": \"logs-lab-000001\",\n  \"shard\": 0,\n  \"primary\": false\n}\nJSON\n```\n\n示例索引、分片号和主副标志必须替换成实际未分配对象；本书默认单节点副本为 0，可能没有这个副本可解释。\n不要把“未找到需要解释的分片”当作 API 不可用。[Allocation Explain](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/cluster-allocation-explain.html)\n\n| 原因 | 合理方向 |\n| --- | --- |\n| 单节点却设置副本 | 增加符合要求节点，或确认只是实验后调整副本 |\n| 磁盘水位 | 容量、迁移、清理 |\n| 分配过滤 | 检查下线遗留排除和节点属性 |\n| 缺少数据层 | 增加正确角色节点或修正生命周期设计 |\n| 节点丢失且主分片无副本 | 恢复节点或 Snapshot，评估数据损失 |\n| 恢复失败 | 具体错误、存储和网络 |\n\n涉及 `accept_data_loss` 的分片强制分配可能丢失数据，不是常规修复按钮。\n应先确认是否存在可恢复节点、副本或快照，由授权负责人决定灾难恢复策略。\n\n\n#### ILM 卡住或日志没有按期清理\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/logs-lab-*/_ilm/explain?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_ilm/status?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_alias/logs-lab?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_ilm/policy/logs-lab-retention?pretty'\n```\n\n**常见原因**\n\nPolicy 只加到模板但已有索引未接管；写别名缺失或指向错误；索引命名不符合滚动要求；滚动条件未达到；目标数据层不可用；执行权限或其他动作失败。\n\n“滚动 14 天后删除”不是“文档业务时间超过 14 天就删除”。\n先解释 `phase`、`action`、`step` 和 `lifecycle_date_millis`，再判断是否真的卡住。\n\n**修复后重试**\n\n明确错误已经修复且索引处于相应失败状态时，可以使用该版本的 ILM retry API：\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab-000001/_ilm/retry?pretty'\n```\n\n没有修复别名或分配问题就不断 retry，只会重复失败。\n直接移动生命周期步骤属于高级危险操作，本书不把它作为默认方案。\n\n\n#### TLS、认证与授权错误\n\n401、403、TLS 握手失败和 TCP 连接失败分别对应不同层次。\n把所有错误归类为“密码错误”会浪费排查时间。\n\n```bash\n# 使用真实受信任 CA；--user 只给用户名，让 curl 交互读取密码。\ncurl --cacert /etc/elk/certs/elasticsearch-ca.pem \\\n  --user logstash_writer \\\n  'https://es-1.example.internal:9200/'\n```\n\n| 错误 | 先检查 |\n| --- | --- |\n| TCP refused/timeout | 监听、路由、防火墙、发布地址 |\n| 证书不受信任 | CA 链、Truststore、证书到期 |\n| Hostname mismatch | 实际访问名与证书 SAN |\n| 401 | 身份、密码、认证机制 |\n| 403 | 目标资源和所需操作的权限 |\n| Kafka Topic authorization | Topic ACL 与认证 principal |\n| Kafka Group authorization | 消费组 ACL 与组名 |\n\n临时关闭证书验证只能说明问题可能与证书校验有关，不能作为生产修复终态。\n不要把真实密码放在命令参数和问题截图中。", "subs": ["磁盘水位与只读保护", "未分配分片与集群 Red/Yellow", "ILM 卡住或日志没有按期清理", "TLS、认证与授权错误"]}, {"title": "24.4 执行有界故障、恢复对账并形成分层验收记录", "content": "<a id=\"s-24-4\"></a>\n\n#### 故障实验 A：Elasticsearch 暂停\n\n只用于第二篇完整 lab。\n实验前确认 Kafka、Logstash 正常，源文件和所有数据卷保留，不执行删除。\n\n```bash\ncd ~/elk-lab-full\nRUN_ID=\"fault-es-$(date -u +%Y%m%dT%H%M%SZ)\"\n\n# 仅暂停实验 ES。\ndocker compose -p elk-full stop elasticsearch\n\npython3 scripts/generate_logs.py \\\n  --output logs/access.jsonl --count 100 --bad-every 10 \\\n  --run-id \"${RUN_ID}\" --interval 0.02\n\ncurl -fsS 'http://127.0.0.1:9600/_node/stats/pipelines?pretty'\ndocker compose -p elk-full logs --tail=80 logstash\n\n# 恢复服务。\ndocker compose -p elk-full start elasticsearch\n```\n\n预期 Logstash 出现输出连接失败和队列压力。\n因为样本只有 100 条，PQ 足够时 Kafka Lag 可能很快回到零，不能以此说明数据已经入库。\n\n恢复后用新探针检查链路，再导出该 RUN_ID 做集合对账。\n一次探针可见并不保证其他分区的旧积压全部处理完；对账失败时先观察队列并再次有界导出。\n每次导出使用新文件名，保留前一次结果以便解释恢复过程。\n\n**通过标准**\n\n正常和隔离事件总集合与源输入一致；没有重复 ID；队列回到稳定水平；新请求可见延迟恢复。\n如果只看进程状态变成 Up，不算完成数据恢复验收。\n\n\n#### 故障实验 B：Logstash 暂停与 Kafka 缓冲\n\n```bash\nRUN_ID=\"fault-ls-$(date -u +%Y%m%dT%H%M%SZ)\"\ndocker compose -p elk-full stop logstash\n\npython3 scripts/generate_logs.py \\\n  --output logs/access.jsonl --count 100 \\\n  --run-id \"${RUN_ID}\" --interval 0.02\n\ndocker compose -p elk-full exec kafka kafka-consumer-groups.sh \\\n  --bootstrap-server kafka:9092 --describe --group logs-lab-main-v1\n\ndocker compose -p elk-full start logstash\n```\n\n预期 Kafka 继续接收消息，原消费组没有活跃消费或消费位置不再推进。\n恢复 Logstash 后从已提交位置继续读取，随后对账。\n\n**对照问题**\n\n如果此时把 group_id 改成新值并使用 earliest，会发生什么？\n如果两个组同时写同一个别名，稳定 ID 能否跨 Rollover 去重？\n如果停机时间超过 Kafka 保留期，哪些记录还可以从源文件或快照恢复？\n\n这些问题应通过前面边界推导，不在生产环境盲目尝试。\n\n\n#### 故障实验 C：Kafka 暂停与采集端状态\n\n```bash\nRUN_ID=\"fault-kafka-$(date -u +%Y%m%dT%H%M%SZ)\"\ndocker compose -p elk-full stop kafka\n\npython3 scripts/generate_logs.py \\\n  --output logs/access.jsonl --count 100 \\\n  --run-id \"${RUN_ID}\" --interval 0.02\n\ndocker compose -p elk-full logs --tail=100 filebeat\ncurl -fsS 'http://127.0.0.1:5066/stats?pretty'\n\ndocker compose -p elk-full start kafka\n```\n\n观察 Filebeat 输出错误、队列及未确认事件，恢复后对账。\n这个单 broker lab 暂停 Kafka 等于整个 broker 服务不可用，不是在验证三副本集群的容错。\n\n**不扩大故障范围**\n\n不要同时删除源文件、清 Registry、重建数据卷和重置消费者 Offset。\n那会把多个独立失败组合起来，无法分辨到底哪个步骤导致数据缺失。\n先验证单故障，再为明确的组合故障单独设计实验。\n\n\n#### 字段故障、历史补采与重复回放实验\n\n完成组件暂停实验后，再验证数据质量边界。\n\n| 实验 | 输入 | 预期 |\n| --- | --- | --- |\n| 非法状态 | `status=not-a-number` | 原值保留，进入隔离 |\n| 缺耗时 | 缺字段、空值或 `-` | 不编造零值，不进入耗时聚合 |\n| 多上游 | `502, 504` | 原始列表保留，不强制转单个 integer |\n| 旧业务时间 | 生成器 `--age-hours` | @timestamp 旧，ingested 新 |\n| 超长异常 | 大堆栈 | 按已声明的上限处理并可观察损失 |\n| 同一事件重放 | 相同 event_id | 同一索引内覆盖语义可解释 |\n| Rollover 后重放 | 相同 event_id、新写索引 | 可能跨索引出现两份，需要识别 |\n\n历史业务时间实验不等于自动制造旧 Kafka record timestamp。\n主链路 Filebeat 外层时间仍是采集时间，Topic 采用 LogAppendTime；只有明确修改生产者 record timestamp 并调整 Topic 策略，才是在验证 CreateTime 保留边界。\n\n**记录实际结果而不是填写预期答案**\n\n```text\n实验编号：\n版本与插件：\n规则版本：\n源样本与 event_id：\n注入动作与时间：\n各组件证据：\n正常、隔离、DLQ 的结果：\n恢复步骤：\n集合对账：\n与预期不一致的部分：\n后续修复：\n```\n\n\n#### 整套笔记的最终验收\n\n这套笔记的完成标准不是记住五个组件的所有参数，而是能够解释每一段数据路径和失败边界。\n\n| 能力 | 最低验收 |\n| --- | --- |\n| 采集 | 解释 Registry、轮转、多行、容器路径与状态持久化 |\n| 缓冲 | 解释 Kafka 分区、副本、确认、消费组与保留 |\n| 加工 | 区分 JSON 层次、类型校验、日期、失败旁路和 DLQ |\n| 存储 | 正确管理 Mapping、模板、别名和生命周期 |\n| 检索 | 使用明确范围、时间和统计口径查询 |\n| 可靠性 | 说明重复、丢失和确认边界，不滥用 Exactly-once |\n| 性能 | 用测量定位瓶颈，不靠盲目增线程 |\n| 安全 | 认证、TLS、ACL、ES 最小权限和敏感字段治理 |\n| 运维 | 快照恢复、容量、灰度、回滚和变更证据 |\n| 排障 | 按源事件逐段定位，恢复后做集合对账 |\n\n把通过的实验记录和自己的生产案例补到对应小节，可以逐步形成适用于自身环境的运维手册。\n不要把尚未执行的预期结果改写成“生产验证通过”，也不要把实验中的单节点、零副本和无认证配置直接投入生产。\n\n\n#### 故障恢复的有界操作\n\n在主实验中暂停 OS 分支 Logstash，生成一个新批次，观察 Kafka 消费组积压，再恢复并对账。\n只停止指定容器，不重置消费组、不清 PQ、不删除 Registry。\n\n```bash\ndocker compose stop logstash-os\npython3 tools/generate.py --run-id pause-os-01 --count 100 --profile mixed\ndocker compose exec -T kafka kafka-consumer-groups.sh --bootstrap-server kafka:9092 \\\n  --group exp-os-v2 --describe\ndocker compose start logstash-os\n# 恢复稳定后使用新输出文件执行 export + audit。\npython3 tools/export_audit.py export os --run-id pause-os-01 --output evidence/pause-os-01.jsonl\npython3 tools/export_audit.py audit --manifest logs/pause-os-01.manifest.json --input evidence/pause-os-01.jsonl\n```\n\n再单独暂停 OpenSearch，保持 LS 运行，观察输出失败、PQ/Kafka 背压与恢复后的集合。\n如果组合多个故障而没有记录顺序，会难以区分日志停在源、Kafka、PQ 还是后端。\n每轮必须恢复健康后再开始下一轮。", "subs": ["故障实验 A", "故障实验 B", "故障实验 C", "字段故障、历史补采与重复回放实验", "整套笔记的最终验收", "故障恢复的有界操作"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

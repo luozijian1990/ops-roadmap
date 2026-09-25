@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ELK 与 OpenSearch 日志平台学习笔记 · 第三篇：Elasticsearch 与 OpenSearch 存储、检索及可视化 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>ELK 与 OpenSearch 日志平台学习笔记 · 第三篇：Elasticsearch 与 OpenSearch 存储、检索及可视化</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "ELK 与 OpenSearch 日志平台学习笔记 · 第三篇：Elasticsearch 与 OpenSearch 存储、检索及可视化", "intro": "> 教学基线：Elastic Stack 7.17.29、Kafka 2.8.2 ZooKeeper 模式；双后端对照采用 OpenSearch / Dashboards 2.19.6。固定版本用于教学，不表示生产推荐或联合认证。\n> 配置与脚本完整保留在四篇 Markdown；对照实验从[文件索引与提取入口](02-pipeline-and-reliability.md#s-11-1)准备。基础实验和对照实验使用独立目录、端口、数据卷及脚本。\n> 验证边界：静态与离线逻辑测试不能替代真实组件、TLS、故障、性能与 UI 验收。具体状态见[专题说明](README.md)。\n\n[返回专题](README.md) · [第1篇](01-log-foundations-and-collection.md) · [第2篇](02-pipeline-and-reliability.md) · [第4篇](04-production-operations-and-troubleshooting.md)\n\n| 章节 | 核心主题 |\n| --- | --- |\n| 12 | 双后端部署、数据模型与产品识别 |\n| 13 | 字段建模与索引结构 |\n| 14 | 模板、别名与生命周期治理 |\n| 15 | 写入、持久性与性能诊断 |\n| 16 | 查询、聚合与稳定导出 |\n| 17 | Kibana 与 Dashboards 的检索和看板 |", "parts": [{"title": "第 12 章 · 双后端部署、数据模型与产品识别", "sections": [{"title": "12.1 理解集群、节点、索引、文档与健康状态", "content": "<a id=\"s-12-1\"></a>\n\n#### 从一条日志理解集群、索引与文档\n\n应用输出 JSON，并不意味着 Elasticsearch 内部保存的就是一个普通 JSON 文件。\n请求先到达某个 HTTP 节点，再由节点依据目标索引和路由定位分片。\n字段经过 Mapping 处理后，形成可检索、可聚合的数据结构，同时通常保留原始文档的 `_source`。\n\n先将几个对象分开：\n\n| 对象 | 本书示例 | 主要用途 |\n| --- | --- | --- |\n| Cluster | `elk-lab-full` | 一组共同维护元数据和分片的节点 |\n| Node | `es-lab-1` | 一个 Elasticsearch 进程 |\n| Index | `logs-lab-000001` | 有独立设置、Mapping 和分片的一组文档 |\n| Document | 一条访问日志 | 可以按 ID 写入、读取或删除的数据单位 |\n| Alias | `logs-lab` | 给一组索引提供稳定访问名称 |\n| Shard | 主分片及副本分片 | 分布式存储和执行查询的基本单位 |\n\n本书使用别名写入：Logstash 不需要每天修改索引名，生命周期管理负责切换写索引。\n这只是访问路径，不是另外复制一份日志。\n索引、别名和 Data Stream 的正式定义见[索引与文档](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/documents-indices.html)及[别名](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/aliases.html)。\n\n```mermaid\nflowchart LR\n    L[Logstash] -->|HTTP Bulk| C[接收请求的节点]\n    C --> A[解析写别名 logs-lab]\n    A --> I[定位当前写索引]\n    I --> R[根据文档路由选择主分片]\n    R --> P[主分片处理]\n    P --> S[副本分片处理]\n    P --> V[刷新后可被搜索]\n```\n\n**文档身份不等于业务身份**\n\nES 的 `_id` 是文档标识；本书的 `event.id` 是业务事件标识字段。\n第二篇把后者同时用作输出 `document_id`，方便比较重放结果，但两者仍是不同层面的概念。\n\n一条日志也可能因为字段解析失败进入隔离索引。\n因此，“找到某个 event.id”时还要记录 `_index`，否则无法判断正常数据、失败数据或重放数据来自哪个集合。\n\n**查看实验中的实际对象**\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_cat/nodes?v'\ncurl -fsS 'http://127.0.0.1:9200/_cat/indices/logs-lab-*?v'\ncurl -fsS 'http://127.0.0.1:9200/_cat/aliases/logs-lab*?v'\n```\n\n`_cat` 适合人阅读；脚本应优先用 JSON API 或明确指定 `format=json`，不要依赖空格列位置。\n索引名称不是可靠的租户授权机制；权限边界见第四篇。\n\n\n#### 主分片、副本与路由\n\n主分片决定索引的数据分区，副本提供相应分区的数据副本。\n同一分片的主副本不能被分配到同一节点，因此单节点设置一个副本会出现未分配副本。\n不能通过增加副本让一台机器变成高可用集群。[分片分配](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-cluster.html)\n\n假设一个索引有 3 个主分片、1 个副本，则共有 6 个分片实例。\n这不等于每条日志复制 6 次：每条文档属于其中一个分区，在该分区的主分片和副本各有一份。\n\n| 配置 | 逻辑分区 | 每份文档的常规副本数量 | 主要影响 |\n| --- | ---: | ---: | --- |\n| 1 主、0 副 | 1 | 1 | 适合单节点实验，缺乏副本冗余 |\n| 1 主、1 副 | 1 | 2 | 需要至少两个数据节点才能分配完整 |\n| 3 主、1 副 | 3 | 2 | 分布范围和查询扇出都增加 |\n| 3 主、2 副 | 3 | 3 | 增加空间、复制和恢复成本 |\n\n这里描述正常副本配置，不包含 Snapshot、重放副本或底层存储自身的复制。\n\n**分片数不是越大越好**\n\n每个分片需要维护一定的内存、文件和调度开销。\n很多微小索引会累积大量小分片；一个巨大主分片又可能带来恢复时间和单分片处理压力。\n应从数据增长、查询范围和恢复目标反推布局，而不是固定套用“每个索引五个分片”。\n\n本书实验使用 1 主、0 副，目的是降低资源需求，不是生产建议。\n生产副本数应结合节点、机架、可用区及故障恢复能力评估。\n\n**默认路由与自定义路由**\n\n默认情况下，文档 ID 参与分片路由。\n显式指定 `routing` 可以把相关文档放到同一分区，但之后按 ID 获取、更新或删除时需要保持路由一致。\n不要为了“同一个服务集中在一起”就随意引入路由：热点服务可能把一个分片压满。\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cat/shards/logs-lab-*?v'\ncurl -fsS 'http://127.0.0.1:9200/logs-lab/_search_shards?pretty'\n```\n\n应能把索引、分片编号、主副本标志和节点对应起来。\n如果不知道文档落在哪个分区，不影响日常别名查询；但会影响你解释分片不均衡和恢复过程。\n\n\n#### Green、Yellow、Red 的含义\n\n集群健康颜色反映主副分片是否分配，不是业务请求成功率。[集群健康 API](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/cluster-health.html)\n\n| 状态 | 典型含义 | 需要继续确认 |\n| --- | --- | --- |\n| Green | 所有主分片和副本已分配 | 写入拒绝、查询延迟、磁盘、积压 |\n| Yellow | 主分片可用，但存在未分配副本 | 原因、冗余缺口、恢复资源 |\n| Red | 至少一个主分片未分配 | 受影响索引、是否有可恢复副本或快照 |\n\n单节点实验把副本设为 0 可以保持 Green，却没有提高可靠性。\n反过来，Yellow 集群也可能仍能处理大部分请求，但不能因此忽略冗余缺口。\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cluster/health?level=indices&pretty'\ncurl -fsS 'http://127.0.0.1:9200/_cluster/pending_tasks?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_cat/recovery?v&active_only=true'\n```\n\n**判断输出的顺序**\n\n先看受影响索引，再看是主分片还是副本，随后看节点离线、磁盘水位、分配过滤和恢复进度。\n不要只盯住最外层的颜色。\n如果没有业务索引而只有一个历史测试索引变红，处理优先级也应基于实际影响范围。\n\n\n#### 把健康检查变成可复查记录\n\n日常记录至少包括集群 UUID、版本、节点数、主副分片状态、磁盘空间、索引增长和最近一次成功写入时间。\n这些数据应在同一时间窗口采集，避免用昨天的磁盘状态解释今天的分配失败。\n\n| 检查 | 证据 | 常见误判 |\n| --- | --- | --- |\n| 身份 | `/`、`_nodes` | 用错地址却继续操作 |\n| 管理状态 | `_cluster/health`、`pending_tasks` | 颜色 Green 就认为全链路正常 |\n| 分片 | `_cat/shards`、allocation explain | 所有未分配都归因于磁盘 |\n| 数据新鲜度 | 最新 `event.ingested` | Kafka Lag 为零就认为已入库 |\n| 数据完整性 | 已知事件 ID 的集合对账 | 只比较总条数，不检查缺失与重复 |\n\n本章练习：找到一个样本事件的 `_index`，解释该索引的主副分片布局，并说明单节点实验损坏数据卷后能靠什么恢复。\n如果答案只有“重启容器”，说明还需要继续学习第四篇的备份和恢复。", "subs": ["从一条日志理解集群、索引与文档", "主分片、副本与路由", "Green、Yellow、Red 的含义", "把健康检查变成可复查记录"]}, {"title": "12.2 配置网络、JVM、持久化与系统限制", "content": "<a id=\"s-12-2\"></a>\n\n#### HTTP、Transport 与网络边界\n\n客户端常用 HTTP 9200；节点间发现、状态同步和分片复制使用 Transport 9300。\nHTTP 连通不能证明节点间网络正常，反过来也一样。[网络设置](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-network.html)\n\n| 流量 | 来源 | 目的地 | 常见错误 |\n| --- | --- | --- | --- |\n| 写入与查询 | Filebeat、Logstash、Kibana、运维客户端 | ES HTTP 端口 | 认证、HTTP TLS、代理限制 |\n| 节点通信 | Elasticsearch 节点 | Transport 端口 | 防火墙、发布地址、证书 SAN |\n| 快照访问 | ES 节点 | 共享文件系统或对象存储 | 权限、挂载、凭据 |\n\n绑定地址回答“监听哪里”，发布地址回答“告诉别人通过哪里访问我”。\n容器 IP、宿主机 IP、负载均衡地址不能凭名字互换。\n对于生产接入，应把节点间通道与用户访问通道分别设计访问控制。\n\n```bash\n# Linux 主机上的只读检查。\nss -lntp | grep -E ':9200|:9300'\n\n# 从 ES 获取实际网络信息。\ncurl -fsS 'http://127.0.0.1:9200/_nodes/http,transport?pretty'\n```\n\n当服务通过代理访问时，还要检查请求体大小限制和超时。\nBulk 失败不一定由 ES 本身产生；代理返回的 HTML 错误页与 ES JSON 错误响应应分开记录。\n\n\n#### JVM、文件系统缓存与系统限制\n\nES 不只需要 JVM Heap，还需要文件系统缓存、直接内存及其他进程空间。\n把容器全部内存分给 Heap 会挤压这些空间。\n7.17 提供基于节点角色和可用内存的自动 Heap 配置；手动设置时需要说明测量依据。[Heap 设置](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/important-settings.html#heap-size-settings)\n\n实验为了便于理解显式设置 1 GiB Heap。\n生产不要把实验数字照搬到所有节点，也不要在没有 GC、查询和索引数据前给出固定“最佳 Heap”。\n\n**手动配置的写法**\n\n```text\n# config/jvm.options.d/heap.options\n# 仅为语法示例：数值须按节点内存与实际负载确定。\n-Xms4g\n-Xmx4g\n```\n\nXms 和 Xmx 应保持一致。\n同时检查系统服务或容器是否另外设置了 JVM 环境变量，避免多个配置来源互相覆盖。\n\n**Linux 检查项**\n\n```bash\nsysctl vm.max_map_count\nulimit -n\nfree -h\ndf -h\ndf -i\n```\n\n[官方系统设置](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/important-system-configuration.html)要求检查虚拟内存映射、文件描述符、交换分区和线程等限制。\n`vm.max_map_count` 是宿主内核参数，不是在容器内写一份配置就一定生效。\n修改系统限制属于主机变更，需要范围评估和持久化配置。\n\n**内存紧张的区分**\n\n| 现象 | 先收集什么 | 不要立即做什么 |\n| --- | --- | --- |\n| Heap 长期偏高 | GC、查询、聚合、分片数量 | 直接给到宿主全部内存 |\n| 进程 RSS 高 | Heap 与非 Heap、文件映射 | 把全部 RSS 当成内存泄漏 |\n| 容器 OOMKilled | cgroup 限制、退出状态、日志 | 只看 ES JVM GC 日志 |\n| 查询抖动 | 缓存、磁盘延迟、并发、GC | 用增大 Bulk 解决查询问题 |\n\n\n#### 数据目录、持久化与维护边界\n\n容器重建和数据删除是不同操作。\n第二篇的命名卷用于保持 ES 数据，`docker compose down` 默认不删除卷；加 `-v` 则会删除相应项目卷。\n执行删除卷操作前必须明确它是可以重建的实验数据。\n\n**数据目录不是备份接口**\n\n不要在运行中的节点上复制 data 目录后声称获得一致性备份。\nElasticsearch 支持的备份方式是 Snapshot，详细恢复流程见第四篇。[快照与恢复](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/snapshot-restore.html)\n\n不要编辑 Lucene 文件、手工删除 shard 目录或在同一数据目录启动多个节点。\n磁盘空间不足应通过受控清理、扩容、迁移或生命周期修复处理，而不是绕过 ES 元数据直接删文件。\n\n**启动失败排查顺序**\n\n```text\n容器或服务是否启动\n→ 配置语法和变量替换\n→ 数据目录与证书权限\n→ 端口绑定和名称解析\n→ Bootstrap checks\n→ 发现与选举\n→ 分片恢复\n→ 客户端连接\n```\n\n```bash\ndocker compose -p elk-full logs --tail=200 elasticsearch\ncurl -fsS 'http://127.0.0.1:9200/_nodes/settings?pretty'\n```\n\n日志中出现历史警告不等于当前失败原因。\n应匹配当前启动时间、节点名称和首个导致退出的异常，不要只截取最后一行。", "subs": ["HTTP、Transport 与网络边界", "JVM、文件系统缓存与系统限制", "数据目录、持久化与维护边界"]}, {"title": "12.3 核对产品身份、API、认证与脚本适用版本", "content": "<a id=\"s-12-3\"></a>\n\n自动化工具必须在写入之前确认目标身份，并区分 HTTP 成功与查询结果完整。下面先列产品和脚本边界，再给出共用客户端与显式 API 入口；它们仅对规定的实验产品与集群工作，不是通用生产管理 SDK。\n\n#### 以能力为单位复用，而不是按品牌整体判断\n\n| 本书实际能力 | ES 7.17.29 → OS 2.19.6 | 实验安排 |\n| --- | --- | --- |\n| `keyword/text/date/integer/long` | 复用共同字段子集 | 同样本写入、精确匹配和聚合 |\n| Object / Nested | 概念可复用，Mapping 单独验收 | [相关章节](03-search-storage-and-visualization.md#s-13-1)保留对象关联反例 |\n| ES `flattened` | 不直接改成同名；OS 有 `flat_object`，限制不同 | 主模型不用该类型，保留原对象不展开 |\n| Index / Component Template | 共同 `_index_template` / `_component_template` 子集 | 独立创建，不搬系统模板 |\n| 写别名 | 共同语义 | 显式唯一 `is_write_index` |\n| Data Stream | 两边均需时间字段和匹配模板 | 单列实验，不假设插件自动开关相同 |\n| Ingest Pipeline | 本书 `set event.ingested` 可分别验证 | `_simulate`、实际写入对照 |\n| Bulk | NDJSON 和逐条状态检查可复用 | 插件重试/DLQ 另核对 |\n| 生命周期 | ILM 与 ISM 需改写 | [相关章节](03-search-storage-and-visualization.md#s-14-3)、[相关章节](04-production-operations-and-troubleshooting.md#s-19-1) |\n| PIT | 创建、关闭端点和响应不同 | 精确适配函数 |\n| Dashboards 对象 | 不保证 Kibana 无损导入 | 重建或逐对象测试 |\n\nOpenSearch `flat_object` 不应被当成 Elasticsearch `flattened` 的无条件替换；支持查询、字段访问和限制需要按对应版本逐项看。[OS Flat object](https://docs.opensearch.org/2.19/field-types/supported-field-types/flat-object/)\n同样，主实验的 `app.enabled:false` 是保留原始结构但不展开索引，不等价于扁平化搜索字段。\n\n\n#### 对原脚本的逐项适配\n\n| 原文件/函数 | 已读到的假设 | 新实现或处理 |\n| --- | --- | --- |\n| `init_es.py` | ES 版本与集群名、ES 初始化资源；重跑可能覆盖模板 | `client.py` 分支身份检查；`init_backend.py` 保留已有受管资源，不隐式覆盖生命周期 |\n| `enable_ilm.py` | ILM policy/phases、`index.lifecycle.*` | `lifecycle.py` 分别构造 ILM 和 ISM，独立 `exp-cycle` |\n| `export_run.py` | ES PIT 创建、关闭接口；读正常和隔离别名 | 主验收改为有界 Scroll；单索引 PIT 用产品适配函数 |\n| `audit_run.py` | 输入是合法 JSONL；重复源 ID 被拒绝 | 新 manifest 记录传输数与唯一事件数，允许声明的同 ID 重放，并检查路由和字段 |\n| `probe.py` | 原集群身份、原日志格式、ES 查询 | `probe_v2.py` 走新采集入口，保留产品身份和隔离判定 |\n\n这是适配清单，不是对旧文整体正确性的否定。\n旧脚本服务于当时的单产品实验，其中很多限制已经在正文注明。\n基础脚本与对照脚本在本书中分别保留，能力差异记录在[合并与验证说明](../../../docs/specs/elk-expansion-integration-notes.md)，不能直接互换。\n\n\n#### 对照实验完整文件：`tools/client.py`\n\n产品身份、HTTP 与搜索/Bulk 完整性检查。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/client.py -->\n```python\n\"\"\"隔离实验 HTTP 客户端。身份检查是防误操作，不是安全认证。\"\"\"\nfrom __future__ import annotations\nimport base64\nimport json\nimport os\nimport ssl\nfrom urllib.parse import urlsplit\nfrom urllib.request import Request, build_opener, HTTPHandler, HTTPSHandler, HTTPRedirectHandler\nfrom urllib.error import HTTPError, URLError\n\nVERSIONS = {\"es\": \"7.17.29\", \"os\": \"2.19.6\"}\nURLS = {\"es\": \"http://127.0.0.1:19200\", \"os\": \"http://127.0.0.1:29200\"}\n\nclass NoRedirect(HTTPRedirectHandler):\n    def redirect_request(self, req, fp, code, msg, headers, newurl):\n        raise RuntimeError(\"拒绝 HTTP 重定向，避免把实验凭据发送给其他地址\")\n\nclass Client:\n    def __init__(self, backend: str, url: str | None = None, timeout: float = 20):\n        if backend not in VERSIONS:\n            raise ValueError(\"backend 仅支持 es/os\")\n        self.backend, self.base, self.timeout = backend, (url or URLS[backend]).rstrip('/'), timeout\n        u = urlsplit(self.base)\n        if u.scheme not in ('http', 'https') or not u.hostname or u.username or u.password:\n            raise ValueError(\"URL 必须是无内嵌凭据的 HTTP(S) 地址\")\n        if u.query or u.fragment or u.path not in ('', '/'):\n            raise ValueError(\"本实验不支持 URL 前缀、查询串或片段\")\n        self.headers = {\"Content-Type\": \"application/json\"}\n        user, password = os.getenv('LAB_USER'), os.getenv('LAB_PASSWORD')\n        if user or password:\n            if not user or not password:\n                raise ValueError(\"LAB_USER 与 LAB_PASSWORD 必须同时设置\")\n            if u.scheme != 'https' and u.hostname not in ('127.0.0.1', 'localhost', '::1'):\n                raise ValueError(\"非回环地址发送凭据必须使用 HTTPS\")\n            token = base64.b64encode(f'{user}:{password}'.encode()).decode()\n            self.headers['Authorization'] = 'Basic ' + token\n        ctx = ssl.create_default_context(cafile=os.getenv('LAB_CA') or None)\n        self.opener = build_opener(NoRedirect(), HTTPHandler(), HTTPSHandler(context=ctx))\n\n    def request(self, method: str, path: str, body=None, missing_ok: bool = False):\n        if not path.startswith('/') or path.startswith('//'):\n            raise ValueError(\"path 必须是绝对 API 路径\")\n        headers = self.headers.copy()\n        if isinstance(body, bytes):\n            payload = body\n            headers['Content-Type'] = 'application/x-ndjson'\n        else:\n            payload = None if body is None else json.dumps(body, ensure_ascii=False, allow_nan=False).encode()\n        req = Request(self.base + path, data=payload, method=method, headers=headers)\n        try:\n            with self.opener.open(req, timeout=self.timeout) as res:\n                data = res.read(32 * 1024 * 1024 + 1)\n                if len(data) > 32 * 1024 * 1024:\n                    raise RuntimeError(\"响应超过 32MiB；请收窄范围\")\n                return json.loads(data) if data else {}\n        except HTTPError as exc:\n            detail = exc.read(8192).decode(errors='replace')\n            if missing_ok and exc.code == 404:\n                return None\n            raise RuntimeError(f'{method} {path}: HTTP {exc.code}: {detail}') from exc\n        except (URLError, TimeoutError) as exc:\n            raise RuntimeError(f'{method} {path}: 连接失败 {exc}') from exc\n\n    def guard(self):\n        info = self.request('GET', '/')\n        names = (f'elk-expansion-{self.backend}', f'elk-expansion-ha-{self.backend}')\n        if info.get('cluster_name') not in names or info.get('version', {}).get('number') != VERSIONS[self.backend]:\n            raise RuntimeError('拒绝操作：集群名称或精确版本与扩展实验不符')\n        if self.backend == 'os' and info.get('version', {}).get('distribution') != 'opensearch':\n            raise RuntimeError('拒绝操作：没有 OpenSearch distribution 标识')\n        if not info.get('cluster_uuid') or info['cluster_uuid'] == '_na_':\n            raise RuntimeError('集群尚未形成有效 UUID')\n        return info\n\ndef complete_search(result: dict):\n    shards = result.get('_shards')\n    if result.get('timed_out') is not False or not isinstance(shards, dict):\n        raise RuntimeError('缺少搜索完整性字段，或查询超时')\n    if shards.get('failed', -1) != 0:\n        raise RuntimeError('部分分片失败，拒绝把部分结果当作完整结果')\n    if result.get('terminated_early') is True:\n        raise RuntimeError('搜索提前终止')\n    return result\n\ndef check_bulk(result: dict, expected: int):\n    items = result.get('items')\n    if not isinstance(items, list) or len(items) != expected:\n        raise RuntimeError('Bulk item 数量与提交数不一致')\n    failures = []\n    for item in items:\n        if not isinstance(item, dict) or len(item) != 1:\n            raise RuntimeError('Bulk item 结构错误')\n        value = next(iter(item.values()))\n        if value.get('status') not in (200, 201) or 'error' in value:\n            failures.append(value)\n    if failures or result.get('errors') is not False:\n        raise RuntimeError('Bulk 有失败条目：' + json.dumps(failures[:5], ensure_ascii=False))\n    return result\n```\n\n\n#### 对照实验完整文件：`tools/api.py`\n\n明确实验 API 入口，写操作要求确认。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/api.py -->\n```python\n\"\"\"记录明确的实验 API；写请求显式 --apply。文本接口保留用 curl 读取。\"\"\"\nimport argparse,json\nfrom pathlib import Path\nfrom client import Client, complete_search\np=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('method',choices=['GET','POST','PUT','DELETE'])\np.add_argument('path');p.add_argument('--url');p.add_argument('--body');p.add_argument('--apply',action='store_true')\na=p.parse_args();c=Client(a.backend,a.url);c.guard()\nbody=json.loads(Path(a.body).read_text()) if a.body else None\nreadonly=a.method=='GET' or (a.method=='POST' and (a.path.split('?')[0].endswith(('/_search','/_count','/_analyze','/_explain')) or a.path.split('?')[0]=='/_cluster/allocation/explain'))\nif not readonly and not a.apply:\n    print(json.dumps({'status':'未执行','method':a.method,'path':a.path,'body':body,'reason':'修改须显式 --apply'},ensure_ascii=False,indent=2))\nelse:\n    r=c.request(a.method,a.path,body)\n    if a.path.split('?')[0].endswith('/_search'):complete_search(r)\n    print(json.dumps(r,ensure_ascii=False,indent=2))\n```", "subs": ["以能力为单位复用", "对原脚本的逐项适配", "对照实验完整文件"]}, {"title": "12.4 验证存储入口就绪并避免误初始化其他集群", "content": "<a id=\"s-12-4\"></a>\n\n基础环境 `elk-full` 与对照环境 `elk-expansion` 的集群名、端口和版本检查各不相同。先验证根响应与健康状态，再使用 [对应初始化实现](03-search-storage-and-visualization.md#s-14-1)。下面保留基础环境检查，并给出对照实验的就绪脚本；就绪不代表数据完整性已经验收。\n\n#### 基础实验：复用实验环境而不是重复创建集群\n\n基础实验的完整 Compose 见 [11.2 节](02-pipeline-and-reliability.md#s-11-2)。\n本段基础实验在该目录执行，项目名仍为 `elk-full`，ES 的 `cluster.name` 为 `elk-lab-full`。\n第一篇的直连实验应先停止，避免占用相同的本地 9200、5601 端口。\n\n```bash\ncd ~/elk-lab-full\ndocker compose -p elk-full ps\ncurl -fsS 'http://127.0.0.1:9200/?pretty'\n```\n\n预期版本为 `7.17.29`，集群名称为 `elk-lab-full`。\n如果输出不一致，不应继续执行本篇的初始化和生命周期修改。\n\n**配置的三个层次**\n\n| 位置 | 管理对象 | 示例 |\n| --- | --- | --- |\n| `elasticsearch.yml` 或容器环境 | 节点启动行为 | 节点角色、发现、网络、证书路径 |\n| 集群设置 API | 可动态调整的集群行为 | 部分分片分配设置 |\n| 索引设置、Mapping 和模板 | 数据集合及未来索引 | 副本数、刷新间隔、生命周期 |\n\n“改了配置文件但没有变化”可能是没有重启，也可能该参数由另一个配置来源覆盖。\n“修改模板后旧索引没变化”则是对象范围理解错误，不是重启问题。\n\n\n#### 对照实验完整文件：`tools/wait_ready.py`\n\n后端精确身份与健康检查。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/wait_ready.py -->\n```python\n\"\"\"检测集群身份与分片健康；不是完整业务验收。\"\"\"\nimport argparse,json,time\nfrom client import Client\np=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--url')\np.add_argument('--seconds',type=int,default=180);a=p.parse_args()\nif not 1<=a.seconds<=600:p.error('seconds 需要 1..600')\nc=Client(a.backend,a.url,timeout=5);deadline=time.monotonic()+a.seconds;error=None\nwhile time.monotonic()<deadline:\n    try:\n        info=c.guard();health=c.request('GET','/_cluster/health')\n        if health.get('status') not in ('green','yellow') or health.get('timed_out'):raise RuntimeError('健康状态未达到 yellow')\n        print(json.dumps({'identity':info,'health':health},ensure_ascii=False));break\n    except (RuntimeError,ValueError) as exc:error=str(exc);time.sleep(1)\nelse:raise SystemExit('后端未就绪: '+str(error))\n```", "subs": ["基础实验：复用实验环境而不是重复创建集群", "对照实验完整文件"]}]}, {"title": "第 13 章 · 字段建模与索引结构", "sections": [{"title": "13.1 根据检索用途选择 text、keyword 与分析器", "content": "<a id=\"s-13-1\"></a>\n\n#### 先约定字段语义，再决定类型\n\n第二篇把日志规范化为 ECS 风格字段，但并不声称完整实现全部 ECS。\n核心目的是让同一个字段在不同服务中拥有相同类型、单位和含义。\n\n| 字段 | 本书类型 | 含义 |\n| --- | --- | --- |\n| `@timestamp` | date | 经过校验的业务事件时间 |\n| `event.created` | date | Filebeat 事件创建时间 |\n| `event.ingested` | date | ES 接入时间 |\n| `http.response.status_code` | integer | 访问响应状态 |\n| `event.duration` | long | 纳秒单位耗时 |\n| `service.name` | keyword | 服务身份 |\n| `trace.id` | keyword | Trace 标识 |\n| `message` | text | 可全文检索的消息文本 |\n| `event.original` | text，关闭索引 | 原始文本，仅保留用于复查 |\n| `app` | object，关闭解析 | 原始解析对象，不进入动态 Mapping |\n\n选择 `long` 保存纳秒是有意保留单位约定；可视化时再换算成毫秒。\n把一个服务的毫秒和另一个服务的秒写入同名字段，即使都能成功入库，也会得到错误的聚合结果。\n字段模型参见[Mapping](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/mapping.html)与[字段类型](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/mapping-types.html)。\n\n**查询当前实际类型**\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/logs-lab/_mapping?pretty'\ncurl -fsS 'http://127.0.0.1:9200/logs-lab/_field_caps?fields=http.response.status_code,event.duration,service.name&pretty'\n```\n\n`_field_caps` 对跨索引类型检查尤其有用。\n别名覆盖多个索引时，最新索引正确不代表历史索引也正确。\n\n\n#### Text、Keyword 与多字段\n\n`text` 会按分析器处理，用于全文检索；`keyword` 保留适合精确匹配、排序和聚合的值。[Text](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/text.html)、[Keyword](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/keyword.html)\n\n服务名、环境、Trace ID 和枚举状态通常需要精确匹配。\n异常消息需要全文检索，但不应把完整堆栈当成无限增长的聚合维度。\n\n**独立的字段实验**\n\n下面创建一个与主链路隔离的测试索引。\n示例只用于观察类型，不配置 ILM，不长期写入。\n\n```bash\ncurl -fsS -X PUT 'http://127.0.0.1:9200/lab-mapping-demo' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"settings\": {\"number_of_shards\": 1, \"number_of_replicas\": 0},\n  \"mappings\": {\n    \"properties\": {\n      \"message\": {\n        \"type\": \"text\",\n        \"fields\": {\"raw\": {\"type\": \"keyword\", \"ignore_above\": 256}}\n      },\n      \"service\": {\"type\": \"keyword\"},\n      \"status\": {\"type\": \"integer\"}\n    }\n  }\n}\nJSON\n```\n\n```bash\ncurl -fsS -X PUT 'http://127.0.0.1:9200/lab-mapping-demo/_doc/1?refresh=wait_for' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\"message\":\"Inventory service timeout\",\"service\":\"orders-api\",\"status\":504}\nJSON\n```\n\n查询“包含 timeout 的消息”使用全文查询。\n按完整原消息精确匹配则使用 `message.raw`。\n本书主链路并未给所有字段创建 `.keyword` 子字段，因此不能习惯性给每个字段加 `.keyword`。\n\n```json\n{\n  \"query\": {\n    \"match\": {\n      \"message\": \"timeout\"\n    }\n  }\n}\n```\n\n```json\n{\n  \"query\": {\n    \"term\": {\n      \"service\": \"orders-api\"\n    }\n  }\n}\n```\n\n**`ignore_above` 不是截断 `_source`**\n\nKeyword 长度超过限制时，值可能仍在 `_source` 中，但不进入该字段的索引结构。\n因此在页面上看得见文本，不代表可以按这个字段聚合或精确查询。\n不要把 `ignore_above` 当作脱敏或删除敏感信息的功能。\n\n\n#### 先问字段如何使用\n\n平台为了“以后可能用到”把所有字段都设为 text 加 keyword，多次复制大段原文，并动态展开所有 JSON 键。\n结果常见不是单一慢查询，而是写入、存储、映射管理和查询同时变重。\n优化起点应是字段需求清单，而不是立即提高 Heap 或批量大小。\n\n| 字段 | 本书需求 | 选择 |\n| --- | --- | --- |\n| `service.name`、`event.id` | 精确过滤、排序或分组 | keyword |\n| `message` | 人读与全文检索 | text，不默认再复制超长 keyword |\n| `event.original` | 回查原始证据 | 保留但不全文索引 |\n| `event.duration` | 数字范围与分位数 | long，单位纳秒 |\n| `http.response.status_code` | 数字范围与分组 | integer |\n| `app` | 保存未知原始结构 | enabled:false；不承诺任意键检索 |\n| `route` | 受控路由模板聚合 | keyword，不直接用无限变化的原始 URL |\n\n[对照实验字段模型](03-search-storage-and-visualization.md#s-13-4)定义共同字段子集，具体产品差异仍需逐项验证。\n这套模型是教学子集，不自称完全实现 ECS；业务扩展字段仍需评审类型、单位、敏感性与索引成本。", "subs": ["先约定字段语义", "Text、Keyword 与多字段", "先问字段如何使用"]}, {"title": "13.2 解释倒排索引、doc values、source 与 segment 成本", "content": "<a id=\"s-13-2\"></a>\n\n#### 倒排索引、doc values 与 `_source`\n\n倒排索引按词项找到文档，适合搜索和过滤；text 经过分析器后存储词项，keyword 更适合精确值。\ndoc values 是面向文档值访问的列式结构，常用于排序和聚合。\n`_source` 保存原文表示，方便返回、重建和排查；它不是所有字段搜索都直接扫描的唯一材料。[ES doc values](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/doc-values.html) [ES source](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/mapping-source-field.html)\n\n删除 `_source` 可能节约某些空间，却影响重建、调试与更新等能力。\n关闭某字段索引也不等于它从 `_source` 消失。\n必须逐项解释能力变化，不能把“少占磁盘”作为唯一目标。\n\n**分析器实验**\n\n```http\nPOST /exp-logs-000001/_analyze\n{\"analyzer\":\"standard\",\"text\":\"InventoryTimeout order-1001\"}\nPOST /exp-logs-000001/_analyze\n{\"analyzer\":\"keyword\",\"text\":\"InventoryTimeout order-1001\"}\n```\n\n比较 tokens 而不是只看 API 是否成功。\n精确 ID 搜索不要依赖 text 的分词结果；也不要把 `term` 查询用于期待自动分词的全文输入。\n\n\n#### Segment 与删除文档\n\nLucene segment 具有不可变数据结构的特点，更新和删除会产生后续合并工作。\n观察 `docs.deleted` 增长不意味着磁盘会立即下降，也不意味着可以无成本强制合并。\n本书重复 ID 实验采用 index action，观察覆盖语义时也要注意旧 segment 的回收时机。\n\n小 shard 很多会增加管理和查询开销；单 shard 太大又可能拉长恢复时间和形成热点。\n合适规模依赖数据、查询和故障恢复目标，本书不给脱离环境的统一“最佳 GB”。", "subs": ["倒排索引、doc values 与 _source", "Segment 与删除文档"]}, {"title": "13.3 避免对象关联错误、动态字段膨胀和高基数失控", "content": "<a id=\"s-13-3\"></a>\n\n#### Object、Nested 与 Flattened\n\nJSON 对象只是输入表示。\n普通 Object 数组的字段可能被展开，若需要保留数组中同一个对象内部的字段配对关系，应理解 Nested 的语义与查询成本。[Object](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/object.html)、[Nested](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/nested.html)\n\n例如：\n\n```json\n{\n  \"upstreams\": [\n    {\"name\": \"inventory\", \"status\": 500},\n    {\"name\": \"payment\", \"status\": 200}\n  ]\n}\n```\n\n业务问题是“inventory 是否返回了 200”。\n不能把“某个对象有 name=inventory”和“另一个对象有 status=200”当成同一个上游满足条件。\n日志平台应优先把常用统计字段设计清楚，而不是无条件把所有对象数组变成 Nested。\n\n| 选择 | 适合场景 | 代价或边界 |\n| --- | --- | --- |\n| Object | 固定结构的单个对象 | 对象数组的关联语义需注意 |\n| Nested | 查询要求保留对象数组的配对关系 | 额外文档及查询成本 |\n| Flattened | 键集合不稳定、需要有限检索的属性包 | 叶子值按关键字式语义处理，不能代替数值字段 |\n| `enabled: false` | 保留原始对象供复查 | 对象内部不解析、不可按内部字段检索 |\n\n[Flattened](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/flattened.html)可以减少动态键造成的 Mapping 膨胀，但不是无成本保存任意业务结构的通用方案。\n需要范围查询和数值聚合的字段应单独规范化。\n\n**第二篇为什么关闭 app 的解析**\n\n`app` 保存输入 JSON，可能包含服务自定义字段、嵌套对象和错误类型。\n经过校验的核心字段复制到规范位置后，原始 `app` 只用来复查。\n这能避免一个新业务随意增加几千个动态字段进入集群元数据。\n\n它也意味着不能直接在 Kibana 中筛选 `app.status`。\n要使用规范字段 `http.response.status_code`，或在修订字段契约后增加明确 Mapping。\n\n\n#### Dynamic、Strict、Null 与错误容忍\n\n动态映射方便接入，但第一条出现的值可能影响字段类型。\n后续不同类型的值到来时，不会自动变成正确的统一模型。[动态映射](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/dynamic.html)\n\n| 设置 | 遇到未声明字段 | 使用建议 |\n| --- | --- | --- |\n| `dynamic: true` | 尝试动态增加 Mapping | 小规模探索需监控字段增长 |\n| `dynamic: false` | 不为新字段建立 Mapping，通常仍保留 `_source` | 本书规范化主链路的选择 |\n| `dynamic: strict` | 拒绝含未知字段的文档 | 适合强契约，但必须有失败处理 |\n\n`dynamic: false` 不会阻止已声明字段的类型错误。\n例如状态码已经是 integer，输入一个对象仍可能失败。\n它也不等于 `enabled: false`：前者仍解析已声明属性，后者跳过整个对象内容。\n\n**缺失不等于零**\n\n下面三种输入表达不同状态：\n\n```json\n{\"request_time\": 0}\n```\n\n```json\n{\"request_time\": null}\n```\n\n```json\n{}\n```\n\n第一种有明确零值；后两种一般没有可用于耗时聚合的观测值。\n`null_value` 是索引层替代值选项，不会自动把 `_source` 改成新值，也不能替代日志清洗规则。[Null value](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/null-value.html)\n\n**谨慎使用 ignore_malformed**\n\n部分字段支持跳过格式错误值，让整条文档继续入库。\n这样做需要同时监控 `_ignored` 或相应质量指标，不能把字段丢失隐藏掉。[Ignore malformed](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/ignore-malformed.html)\n\n本书主链路优先显式校验，失败进入隔离别名。\n这样你能看到失败原因、原值和 Kafka 位置，而不是在统计结果偏低时才发现字段没被索引。\n\n\n#### 字段数量与成本治理\n\n动态字段爆炸经常来自把请求参数、用户 ID 或任意标签直接变成 JSON 键。\n例如 `headers.<任意头名>` 和 `metrics.<任意业务编码>` 可能不断制造新字段。\n不应第一反应就提高 `index.mapping.total_fields.limit`。[Mapping 限制](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/mapping-settings-limit.html)\n\n| 问题 | 更合适的处理方向 |\n| --- | --- |\n| 任意键需要保存但不查询 | 原始对象关闭解析 |\n| 少量键需要统计 | 提取白名单字段 |\n| 不稳定属性包需要有限检索 | 评估 Flattened |\n| 同一字段承载多种单位 | 拆分字段或先转换到统一单位 |\n| 完整 URL 用作聚合维度 | 另存规范化路由或路径模板 |\n| Trace ID 做仪表盘 Top 列表 | 改为定位入口，不作为常规高基数聚合 |\n\n字段治理应记录所有者、含义、类型、单位、允许值和版本。\n业务字段新增时同时准备样本、Mapping 修改、查询验证和回滚策略。\n“数据能写入”只完成了字段治理的一部分。\n\n\n#### 多字段、动态字段与高基数\n\n同一个值既以 text 又以 keyword 保存，适合同时需要全文和精确分组的有限字段。\n但把完整堆栈、原始 JSON、长 URL 都复制多字段，会增加没有明确用途的存储和索引工作。\n高基数不代表 keyword 不能使用，而是要考虑 Terms 返回规模、global ordinals、内存和查询成本。\n\n[混合负载生成器](04-production-operations-and-troubleshooting.md#s-20-3)固定随机种子，wide 模型把 `app.debug_N` 展开，并让原文具备额外可检索字段。\nlean 模型保留原对象但不展开，删除不需要的多字段。\n两者只比较共同仍支持的查询，不能把 lean 无法回答的问题藏起来。\n\n| 对照 | 需要固定 | 不能据此宣称 |\n| --- | --- | --- |\n| wide vs lean | 文档集合、分片、副本、写入方式 | 所有业务都应关闭动态字段 |\n| 原始 URL vs route | 路由归一化规则与语义 | 不同真实路由都能合并 |\n| text+keyword vs text | 精确查询是否确实需要 | 多字段永远无价值 |\n| 索引前解析 vs 查询脚本 | 保存字段类型和更新频率 | 预计算必然更省资源 |\n\n\n#### Object 与 Nested 的关联陷阱\n\n数组中每个对象的字段关联，不能仅靠普通 object 字段的扁平索引推断。\n例如两项分别是 `{name:a,status:200}`、`{name:b,status:500}`，普通对象查询可能匹配“name=a 且 status=500”，即使没有单项满足两者。[ES Nested](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/nested.html)\n\n```http\nPUT /exp-object-demo\n{\n  \"mappings\":{\"properties\":{\n    \"checks\":{\"type\":\"nested\",\"properties\":{\n      \"name\":{\"type\":\"keyword\"},\"status\":{\"type\":\"integer\"}\n    }}\n  }}\n}\nPUT /exp-object-demo/_doc/1?refresh=wait_for\n{\"checks\":[{\"name\":\"a\",\"status\":200},{\"name\":\"b\",\"status\":500}]}\nPOST /exp-object-demo/_search\n{\n  \"query\":{\"nested\":{\"path\":\"checks\",\"query\":{\"bool\":{\"filter\":[\n    {\"term\":{\"checks.name\":\"a\"}},\n    {\"term\":{\"checks.status\":500}}\n  ]}}}}\n}\n```\n\n预期不命中，需在两个产品分别执行验证。\nNested 增加内部文档和查询开销，应只用于确实要保留对象关联的字段。\n日志中大多数原始上下文不需要默认全部转 Nested。", "subs": ["Object、Nested 与 Flattened", "Dynamic、Strict、Null 与错误容忍", "字段数量与成本治理", "多字段、动态字段与高基数", "Object 与 Nested 的关联陷阱"]}, {"title": "13.4 用字段契约修复类型冲突并验证两产品差异", "content": "<a id=\"s-13-4\"></a>\n\n字段类型冲突通常需要明确的新索引和迁移路径，不能靠修改模板追溯修复所有旧数据。对照实验的 `tools/model.py` 定义共同字段子集；应先比较它与实际来源的需求，再初始化两种后端，不把该子集描述为所有字段完全兼容。\n\n#### 类型冲突的修复路径\n\n把已有字段从 keyword 改成 long，一般不能通过简单更新 Mapping 原地完成。\n正确方向是新建符合目标模型的索引或新一代索引，在验证转换后迁移或重新写入。[更新 Mapping](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/indices-put-mapping.html)\n\n```text\n发现类型冲突\n→ 确认影响哪些索引\n→ 确认期望语义和转换规则\n→ 修复采集或加工规则\n→ 创建正确模板及新目标索引\n→ 小样本写入验证\n→ 有界 Reindex 或 Kafka 回放\n→ 对账后切换查询入口\n```\n\nReindex 复制文档，不会自动修复错误业务语义。\n把字符串 `\"-\"` 强制转换成数值之前，仍要决定它代表缺失还是零。\n\n**仅查看字段冲突范围**\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/logs-lab-*/_field_caps?fields=http.response.status_code,event.duration&pretty'\n```\n\n这个通配符包括隔离索引，是为了排查全部相关资源。\n正式统计应使用准确的正常别名，避免把隔离数据算进请求分母。\n\n**迁移实验的基本约束**\n\n源索引和目标索引不能同名。\n目标模板必须先验证；转换脚本必须有异常分支；迁移任务必须限制并发和范围。\n仍在增长的源数据需要明确切换窗口，否则一次 Reindex 完成并不代表之后的写入也被同步。\n\n\n#### 对照实验完整文件：`tools/model.py`\n\n共同字段定义，不冒充所有字段兼容。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/model.py -->\n```python\n\"\"\"两产品共同支持的教学字段子集，不声称覆盖完整 ECS。\"\"\"\nfrom __future__ import annotations\n\ndef properties():\n    keyword = lambda: {'type': 'keyword'}\n    return {\n        '@timestamp': {'type': 'date'}, 'message': {'type': 'text'},\n        'app': {'type': 'object', 'enabled': False}, 'tags': keyword(),\n        'service': {'properties': {'name': keyword(), 'environment': keyword()}},\n        'event': {'properties': {\n            'id': keyword(), 'dataset': keyword(), 'created': {'type': 'date'},\n            'ingested': {'type': 'date'}, 'duration': {'type': 'long'},\n            'original': {'type': 'text', 'index': False}, 'outcome': keyword()}},\n        'http': {'properties': {'response': {'properties': {'status_code': {'type': 'integer'}}},\n                                'request': {'properties': {'method': keyword()}}}},\n        'url': {'properties': {'original': {'type': 'keyword', 'ignore_above': 2048}}},\n        'route': {'type': 'keyword'}, 'trace': {'properties': {'id': keyword()}},\n        'log': {'properties': {'level': keyword()}},\n        'error': {'properties': {'type': keyword()}},\n        'labels': {'properties': {'run_id': keyword(), 'scenario': keyword(), 'sequence': {'type': 'long'}}},\n        'pipeline': {'properties': {'version': keyword(), 'errors': keyword(), 'route': keyword()}},\n        'kafka': {'properties': {'topic': keyword(), 'partition': {'type': 'integer'}, 'offset': {'type': 'long'}}},\n    }\n\ndef component():\n    return {'_meta': {'owner': 'elk-expansion', 'schema': 2},\n            'template': {'mappings': {'dynamic': False, 'properties': properties()}}}\n\ndef template(alias: str, replicas: int = 0):\n    return {'index_patterns': [alias + '-*'], 'priority': 700,\n            'composed_of': ['exp-fields-v2'],\n            '_meta': {'owner': 'elk-expansion', 'schema': 2},\n            'template': {'settings': {'number_of_shards': 1, 'number_of_replicas': replicas,\n                                       'index.default_pipeline': 'exp-ingested'}}}\n\nINGEST = {'description': 'elk-expansion ingress timestamp; not search visibility time',\n          'processors': [{'set': {'field': 'event.ingested', 'value': '{{{_ingest.timestamp}}}'}}]}\n```", "subs": ["类型冲突的修复路径", "对照实验完整文件"]}]}, {"title": "第 14 章 · 模板、别名与生命周期治理", "sections": [{"title": "14.1 建立组件模板、索引模板和写别名的初始化顺序", "content": "<a id=\"s-14-1\"></a>\n\n模板、写别名和 Ingest Pipeline 必须在采集启动前准备。基础实验使用 `scripts/init_es.py`；对照实验使用 `tools/init_backend.py`，依赖 [共用客户端](03-search-storage-and-visualization.md#s-12-3) 和 [字段模型](03-search-storage-and-visualization.md#s-13-4)。以下分别保留实现，禁止跨实验目录混用或为了通过检查而删除身份保护。\n\n#### 模板只影响匹配的新索引\n\n模板描述新索引创建时应应用的设置和 Mapping。\n组件模板提供可复用片段，可组合模板把它们和索引名称模式连接起来。[索引模板](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/index-templates.html)\n\n```mermaid\nflowchart TD\n    C[组件模板 logs-lab-fields] --> T[可组合模板 logs-lab-template]\n    T -->|创建时匹配| I1[logs-lab-000001]\n    T -->|未来创建时匹配| I2[logs-lab-000002]\n    I1 --> A[读写别名 logs-lab]\n    I2 --> A\n```\n\n修改 `logs-lab-fields` 后，已经存在的 `logs-lab-000001` 不会自动改变全部 Mapping。\n模板不是把每个索引实时绑定到同一配置对象的动态引用。\n\n| API | 对象 | 主要用途 |\n| --- | --- | --- |\n| `_component_template` | 组件模板 | 公共字段、公共设置 |\n| `_index_template` | 可组合模板 | 名称模式、优先级、组件组合 |\n| `_template` | Legacy Template | 维护旧部署，需要区分规则 |\n| `index/_mapping` | 已有索引 Mapping | 查看及允许范围内的更新 |\n| `index/_settings` | 已有索引设置 | 查看及调整可变设置 |\n\n旧模板的 `order` 与可组合模板的 `priority` 不要混为一谈。\n可组合模板匹配时按优先级选择，不是把所有同名模式的模板任意相加。\n同一选中模板中的组件组合顺序和最终模板内容也会影响结果。\n\n\n#### 基础实验：初始化模板、别名与入库时间 Pipeline\n\n保存下面脚本为 `scripts/init_es.py`。\n它只允许操作 `cluster_name=elk-lab-full` 且版本为 7.17.29 的实验集群，避免误把教程初始化请求发到其他集群。\n脚本创建字段组件模板、正常/隔离索引模板、写别名和 Ingest Pipeline，不删除现有文档。\n\n```python\n#!/usr/bin/env python3\n\"\"\"初始化基础链路的隔离 ES 实验资源；只允许 elk-lab-full 集群。\"\"\"\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport sys\nfrom urllib.error import HTTPError, URLError\nfrom urllib.request import Request, urlopen\n\n\ndef request(base: str, method: str, path: str, body=None, allow_404=False):\n    payload = None if body is None else json.dumps(body).encode(\"utf-8\")\n    req = Request(base + path, data=payload, method=method,\n                  headers={\"Content-Type\": \"application/json\"})\n    try:\n        with urlopen(req, timeout=20) as response:\n            data = response.read()\n            return json.loads(data) if data else {}\n    except HTTPError as exc:\n        detail = exc.read().decode(\"utf-8\", errors=\"replace\")\n        if allow_404 and exc.code == 404:\n            return None\n        raise RuntimeError(f\"{method} {path}: HTTP {exc.code}: {detail}\") from exc\n    except URLError as exc:\n        raise RuntimeError(f\"连接失败：{exc.reason}\") from exc\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--url\", default=\"http://127.0.0.1:9200\")\n    args = parser.parse_args()\n    base = args.url.rstrip(\"/\")\n    try:\n        info = request(base, \"GET\", \"/\")\n        if info.get(\"cluster_name\") != \"elk-lab-full\":\n            raise RuntimeError(\"拒绝修改：目标 cluster_name 不是 elk-lab-full\")\n        version = info.get(\"version\", {}).get(\"number\", \"\")\n        if version != \"7.17.29\":\n            raise RuntimeError(f\"拒绝修改：预期 7.17.29，实际 {version}\")\n\n        properties = {\n            \"@timestamp\": {\"type\": \"date\"},\n            \"message\": {\"type\": \"text\"},\n            \"tags\": {\"type\": \"keyword\"},\n            \"app\": {\"type\": \"object\", \"enabled\": False},\n            \"service\": {\"properties\": {\n                \"name\": {\"type\": \"keyword\"},\n                \"environment\": {\"type\": \"keyword\"}}},\n            \"event\": {\"properties\": {\n                \"id\": {\"type\": \"keyword\"},\n                \"dataset\": {\"type\": \"keyword\"},\n                \"created\": {\"type\": \"date\"},\n                \"ingested\": {\"type\": \"date\"},\n                \"duration\": {\"type\": \"long\"},\n                \"outcome\": {\"type\": \"keyword\"},\n                \"original\": {\"type\": \"text\", \"index\": False}}},\n            \"http\": {\"properties\": {\n                \"response\": {\"properties\": {\"status_code\": {\"type\": \"integer\"}}},\n                \"request\": {\"properties\": {\"method\": {\"type\": \"keyword\"}}}}},\n            \"url\": {\"properties\": {\n                \"original\": {\"type\": \"keyword\", \"ignore_above\": 2048}}},\n            \"trace\": {\"properties\": {\"id\": {\"type\": \"keyword\"}}},\n            \"log\": {\"properties\": {\n                \"level\": {\"type\": \"keyword\"},\n                \"file\": {\"properties\": {\"path\": {\"type\": \"keyword\"}}}}},\n            \"labels\": {\"properties\": {\n                \"run_id\": {\"type\": \"keyword\"},\n                \"scenario\": {\"type\": \"keyword\"},\n                \"sequence\": {\"type\": \"long\"}}},\n            \"pipeline\": {\"properties\": {\n                \"version\": {\"type\": \"keyword\"},\n                \"source_cluster\": {\"type\": \"keyword\"},\n                \"errors\": {\"type\": \"keyword\"}}},\n            \"kafka\": {\"properties\": {\n                \"topic\": {\"type\": \"keyword\"},\n                \"partition\": {\"type\": \"integer\"},\n                \"offset\": {\"type\": \"long\"}}},\n            \"nginx\": {\"properties\": {\n                \"upstream_status_raw\": {\"type\": \"keyword\", \"ignore_above\": 2048},\n                \"upstream_response_time_raw\": {\"type\": \"keyword\", \"ignore_above\": 2048}}},\n            \"host\": {\"properties\": {\"name\": {\"type\": \"keyword\"}}},\n            \"agent\": {\"properties\": {\n                \"type\": {\"type\": \"keyword\"},\n                \"version\": {\"type\": \"keyword\"}}},\n            \"container\": {\"properties\": {\"id\": {\"type\": \"keyword\"}}},\n            \"kubernetes\": {\"properties\": {\n                \"namespace\": {\"type\": \"keyword\"},\n                \"pod\": {\"properties\": {\n                    \"name\": {\"type\": \"keyword\"}, \"uid\": {\"type\": \"keyword\"}}},\n                \"node\": {\"properties\": {\"name\": {\"type\": \"keyword\"}}}}},\n            \"orchestrator\": {\"properties\": {\n                \"cluster\": {\"properties\": {\"name\": {\"type\": \"keyword\"}}}}},\n        }\n        request(base, \"PUT\", \"/_ingest/pipeline/logs-lab-ingested\", {\n            \"description\": \"教学：记录 ES ingest 接收时间，不等于搜索可见时间\",\n            \"processors\": [{\"set\": {\"field\": \"event.ingested\",\n                                     \"value\": \"{{{_ingest.timestamp}}}\"}}],\n        })\n        request(base, \"PUT\", \"/_component_template/logs-lab-fields\", {\n            \"template\": {\"mappings\": {\"dynamic\": False, \"properties\": properties}},\n            \"_meta\": {\"owner\": \"elk-learning-lab\", \"schema_version\": 1},\n        })\n        for alias, priority in [(\"logs-lab\", 500), (\"logs-lab-quarantine\", 510)]:\n            request(base, \"PUT\", f\"/_index_template/{alias}-template\", {\n                \"index_patterns\": [f\"{alias}-*\"],\n                \"priority\": priority,\n                \"composed_of\": [\"logs-lab-fields\"],\n                \"template\": {\"settings\": {\n                    \"number_of_shards\": 1,\n                    \"number_of_replicas\": 0,\n                }},\n                \"_meta\": {\"owner\": \"elk-learning-lab\"},\n            })\n            current = request(base, \"GET\", f\"/_alias/{alias}\", allow_404=True)\n            if current is None:\n                request(base, \"PUT\", f\"/{alias}-000001\", {\n                    \"aliases\": {alias: {\"is_write_index\": True}},\n                })\n                print(f\"created alias {alias}\")\n            else:\n                print(f\"kept existing alias {alias}; no index data changed\")\n        print(\"初始化完成。此阶段尚未添加 ILM 自动保留，在生命周期治理小节启用。\")\n        return 0\n    except (RuntimeError, ValueError) as exc:\n        print(str(exc), file=sys.stderr)\n        return 1\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n```\n\n**为什么同一组件模板配两个模板？**\n\n正常和隔离路径共享多数可查询字段，但索引范围不同。\n`logs-lab-*` 也能匹配 `logs-lab-quarantine-*`，因此隔离模板使用更高 priority，避免选择歧义。\n本节后续用 simulate API 验证实际命中的模板，而不是只凭文件名判断。[索引模板](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/index-templates.html)\n\n`app` 设置 `enabled: false`，用于保存解析前业务对象而不为其中任意键建立 Mapping。\n规范化字段独立索引。这样可以降低坏字段再次破坏隔离记录的概率，但不能防止磁盘满、集群故障或所有可能的数据问题。\n隔离路径自身仍需监控与恢复方案。\n\n**初始化后的阶段边界**\n\n这个初始化脚本只建立别名与模板，还没有启用自动 ILM 保留。\n因此“主链路能跑通”不等于“日志会按天自动清理”。\n策略、模板设置和已有首个索引绑定见 [14.3 节](03-search-storage-and-visualization.md#s-14-3)。\n\n\n#### 检查基础实验已经创建的模板\n\n本节前面的基础初始化脚本建立了一个字段组件模板和两个索引模板。\n正常索引优先级 500，隔离索引优先级 510。\n隔离索引名称也匹配宽泛的 `logs-lab-*`，因此需要更具体的模板及更高优先级。\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_component_template/logs-lab-fields?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_index_template/logs-lab-template?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_index_template/logs-lab-quarantine-template?pretty'\n```\n\n**创建前模拟**\n\n```bash\ncurl -fsS -X POST \\\n  'http://127.0.0.1:9200/_index_template/_simulate_index/logs-lab-000002?pretty'\n\ncurl -fsS -X POST \\\n  'http://127.0.0.1:9200/_index_template/_simulate_index/logs-lab-quarantine-000002?pretty'\n```\n\n检查最终 Mapping、分片数、副本数，以及[相关章节](03-search-storage-and-visualization.md#s-14-3)启用后将出现的生命周期设置。\n模拟不会创建实际索引，是模板变更前的重要验证工具。[模板模拟](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/indices-simulate-index.html)\n\n**覆盖旧模板的风险**\n\n`PUT _index_template/name` 提交的是目标模板内容，不是一个任意深度的局部补丁。\n只提交生命周期字段而漏掉原 `composed_of`，可能把字段契约从未来索引中移除。\n更新前先保存旧 JSON，修改完整对象，再做模拟。\n\n本节 `init_es.py` 是基础实验引导脚本，不是配置合并器。\n在启用 ILM 或添加新组件后再次运行它，会重新写入初始模板；后续应使用配置管理保存的最终版本。\n\n\n#### 读别名、写别名与真实索引\n\n别名可以指向多个索引，但一组多索引别名的写入目标必须明确。\n本书给当前写索引设置 `is_write_index: true`。[别名写索引](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/aliases.html)\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_alias/logs-lab?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_alias/logs-lab-quarantine?pretty'\n```\n\n预期至少能看到各自的初始索引和写索引标记。\n已经完成 Rollover 时，别名可能关联多代索引，只有当前一代用于新写入。\n\n**为什么不用宽泛通配符写入**\n\n查询通配符表示选一组索引；写入必须有明确目标。\n拼写错误的别名还可能在自动建索引允许时被当作新索引名，绕开既定生命周期。\n\n直接调用写入 API 时，可以使用受支持的 `require_alias` 选项要求目标是别名。\n不要据此假设固定版本 Logstash output 自动设置了同样的选项；插件能力必须单独确认。[Bulk API](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/docs-bulk.html)\n\n**原子切换的范围**\n\n`_aliases` 支持在同一次请求中执行多个别名动作。\n这能避免客户端观察到“先删除旧别名、再添加新别名”的中间状态。\n但它不负责把切换前后正在执行的所有写入做成跨系统事务。\n\n\n#### 独立别名切换实验\n\n这个实验只使用 `lab-alias-demo-*`，不改主日志链路。\n先创建两个索引，再设置初始写目标。\n\n```bash\nfor n in 1 2; do\n  curl -fsS -X PUT \"http://127.0.0.1:9200/lab-alias-demo-${n}\" \\\n    -H 'Content-Type: application/json' \\\n    -d '{\"settings\":{\"number_of_shards\":1,\"number_of_replicas\":0}}'\ndone\n\ncurl -fsS -X POST 'http://127.0.0.1:9200/_aliases' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"actions\": [\n    {\"add\": {\"index\": \"lab-alias-demo-1\", \"alias\": \"lab-alias-demo\", \"is_write_index\": true}}\n  ]\n}\nJSON\n```\n\n通过别名写入第一条样本：\n\n```bash\ncurl -fsS -X PUT \\\n  'http://127.0.0.1:9200/lab-alias-demo/_doc/before?require_alias=true&refresh=wait_for' \\\n  -H 'Content-Type: application/json' -d '{\"message\":\"before switch\"}'\n```\n\n一次请求切换写目标，同时保持两个索引都在读别名中：\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/_aliases' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"actions\": [\n    {\"add\": {\"index\": \"lab-alias-demo-1\", \"alias\": \"lab-alias-demo\", \"is_write_index\": false}},\n    {\"add\": {\"index\": \"lab-alias-demo-2\", \"alias\": \"lab-alias-demo\", \"is_write_index\": true}}\n  ]\n}\nJSON\n\ncurl -fsS -X PUT \\\n  'http://127.0.0.1:9200/lab-alias-demo/_doc/after?require_alias=true&refresh=wait_for' \\\n  -H 'Content-Type: application/json' -d '{\"message\":\"after switch\"}'\n\ncurl -fsS 'http://127.0.0.1:9200/lab-alias-demo/_search?pretty'\n```\n\n验收应比较每条命中的 `_index`，不只是看两条消息都存在。\n别名切换后，旧索引仍然可以被直接写入；业务约束、权限或只读设置需要另外管理。\n\n\n#### 初始化顺序与配置所有权\n\n本书由脚本和运维 API 管理模板、别名、ILM，Logstash output 关闭自动模板与自动 ILM 管理。\n不要再同时运行一套会写入同名模板的 Filebeat setup 或其他自动初始化任务。\n\n```text\n版本与插件核对\n→ 字段契约\n→ Ingest Pipeline\n→ Component Template\n→ Index Template\n→ 首个索引与写别名\n→ 写入者启动\n→ 样本验证\n→ 生命周期验证\n```\n\n首次创建索引先于模板，会产生不受预期 Mapping 约束的索引。\n补上模板之后需要检查已经创建的数据集合，而不是以为顺序错误已经自动修好。\n\n| 资源 | 建议所有者 | 变更验收 |\n| --- | --- | --- |\n| 采集规则 | 日志平台维护者与业务共同评审 | 样本、轮转、重复采集 |\n| 字段组件模板 | 数据模型维护者 | 类型、单位、字段数量 |\n| 索引模板与 ILM | 存储平台维护者 | 模拟结果、生命周期状态 |\n| 查询与 Dashboard | 使用团队 | 范围、口径、版本 |\n| 授权 | 平台与安全负责人 | 最小权限和越权验证 |\n\n本章结束时，应能指出一个未来索引会使用哪个模板，以及为什么隔离索引不会误用正常日志的生命周期。\n\n\n#### 对照实验完整文件：`tools/init_backend.py`\n\n首次初始化和已有资源保护。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/init_backend.py -->\n```python\n\"\"\"首次初始化；已有受管模板不覆盖。写操作必须 --apply。\"\"\"\nfrom __future__ import annotations\nimport argparse\nimport json\nfrom client import Client\nfrom model import component, template, INGEST\n\ndef initialize(c: Client, apply: bool):\n    c.guard()\n    objects = [('/_ingest/pipeline/exp-ingested', INGEST, 'ingest'),\n               ('/_component_template/exp-fields-v2', component(), 'component')]\n    objects += [(f'/_index_template/{a}-template', template(a), 'template')\n                for a in ('exp-logs', 'exp-quarantine')]\n    for path, wanted, kind in objects:\n        current = c.request('GET', path, missing_ok=True)\n        if current is not None:\n            if kind == 'component':\n                old = current['component_templates'][0]['component_template']\n            elif kind == 'template':\n                old = current['index_templates'][0]['index_template']\n            else:\n                old = current['exp-ingested']\n            if kind == 'ingest':\n                if old.get('processors') != wanted['processors']:\n                    raise RuntimeError(f'{path} 已存在且处理器不同，不自动覆盖')\n            elif old.get('_meta', {}).get('owner') != 'elk-expansion' or old.get('_meta', {}).get('schema') != 2:\n                raise RuntimeError(f'{path} 所有权/契约不符，不自动接管')\n            print('KEEP', path, '；保留已有策略和设置，需另做配置审阅')\n        else:\n            print('CREATE', path)\n            if apply:\n                c.request('PUT', path, wanted)\n    for alias in ('exp-logs', 'exp-quarantine'):\n        current = c.request('GET', f'/_alias/{alias}', missing_ok=True)\n        if current is None:\n            print('CREATE alias', alias)\n            if apply:\n                c.request('PUT', f'/{alias}-000001', {'aliases': {alias: {'is_write_index': True}}})\n        else:\n            writers = [i for i, v in current.items() if v['aliases'][alias].get('is_write_index') is True]\n            if len(writers) != 1 or any(not i.startswith(alias + '-') for i in current):\n                raise RuntimeError(f'{alias} 不满足唯一显式写索引和命名范围')\n            print('KEEP alias', alias, 'write=', writers[0])\n    if not apply:\n        print('仅预览；--apply 后才建立资源。没有启用自动删除。')\n\nif __name__ == '__main__':\n    p = argparse.ArgumentParser(); p.add_argument('backend', choices=['es','os'])\n    p.add_argument('--url'); p.add_argument('--apply', action='store_true'); a = p.parse_args()\n    initialize(Client(a.backend, a.url), a.apply)\n```", "subs": ["模板只影响匹配的新索引", "基础实验：初始化模板、别名与入库时间 Pipeline", "检查基础实验已经创建的模板", "读别名、写别名与真实索引", "独立别名切换实验", "初始化顺序与配置所有权", "对照实验完整文件"]}, {"title": "14.2 选择写别名与 Data Stream 并识别接入限制", "content": "<a id=\"s-14-2\"></a>\n\n#### Data Stream 的边界与独立实验\n\n7.17 已支持 Data Stream，不能把它写成 8.x 才有的能力。\n它由多个 backing indices 组成，对外暴露一个稳定名称，适合追加型时间序列数据。[Data Stream](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/data-streams.html)\n\n以下实验使用独立模式 `lab-stream-*`，不与主链路的 `logs-lab-*` 模板重叠。\n它仅演示数据模型，不自动配置完整保留策略。\n\n```bash\ncurl -fsS -X PUT 'http://127.0.0.1:9200/_index_template/lab-stream-template' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"index_patterns\": [\"lab-stream-*\"],\n  \"priority\": 500,\n  \"data_stream\": {},\n  \"template\": {\n    \"settings\": {\"number_of_shards\": 1, \"number_of_replicas\": 0},\n    \"mappings\": {\n      \"properties\": {\n        \"@timestamp\": {\"type\": \"date\"},\n        \"message\": {\"type\": \"text\"},\n        \"event\": {\"properties\": {\"id\": {\"type\": \"keyword\"}}}\n      }\n    }\n  }\n}\nJSON\n\ncurl -fsS -X POST 'http://127.0.0.1:9200/lab-stream-access/_doc?refresh=wait_for' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"@timestamp\": \"2026-09-24T00:00:00Z\",\n  \"message\": \"data stream demonstration\",\n  \"event\": {\"id\": \"stream-demo-1\"}\n}\nJSON\n\ncurl -fsS 'http://127.0.0.1:9200/_data_stream/lab-stream-access?pretty'\n```\n\n这是固定历史时间样本；在 Kibana 中应使用覆盖 2026-09-24 的绝对时间范围。\n主链路生成器则使用运行时当前时间，不需要手工改日期。\n\n**不能混用的点**\n\nData Stream 的追加写入与普通索引的 `index` 覆盖语义不同。\n频繁按同一 ID 覆盖文档的使用方式需要单独评估，不能把第二篇 output 改一个名称就视为完成迁移。\n本书把 Data Stream 作为对照，不替换主实验，以避免两套生命周期模型同时成为默认路径。\n\n\n#### 模板、Data Stream 与 Ingest Pipeline\n\n本书正常和隔离模板使用精确前缀，避免高优先级模板意外覆盖其他实验索引。\n创建顺序是字段组件模板、索引模板、首索引与写别名，然后启动写入者。\n修改模板通常影响之后创建的索引；不能把模板更新成功解释为既有 Mapping 已经改完。\n\n下面是两个后端都可尝试的最小 Data Stream API 实验，仅在各自独立后端使用新名称执行：\n\n```http\nPUT /_index_template/exp-ds-template\n{\n  \"index_patterns\": [\"exp-ds\"],\n  \"priority\": 900,\n  \"data_stream\": {},\n  \"template\": {\n    \"mappings\": {\n      \"properties\": {\n        \"@timestamp\": {\"type\": \"date\"},\n        \"message\": {\"type\": \"text\"},\n        \"event\": {\"properties\": {\"id\": {\"type\": \"keyword\"}}}\n      }\n    }\n  }\n}\nPUT /_data_stream/exp-ds\nPOST /exp-ds/_create/ds-example-1\n{\n  \"@timestamp\": \"2026-09-25T12:00:00Z\",\n  \"message\": \"isolated data stream example\",\n  \"event\": {\"id\": \"ds-example-1\"}\n}\nGET /_data_stream/exp-ds\nGET /exp-ds/_search\n```\n\n这个实验不继承 `exp-cycle` 的 ILM/ISM 策略。\nOS output 使用 Data Stream 名称作为 `index` 并采用 `action => create`；不要照搬 ES output 的自动 Data Stream 配置项。[OS output Data Stream](https://github.com/opensearch-project/logstash-output-opensearch/blob/2.0.3/README.md)\n重复 `_create` 会产生冲突，不能用 `index` 覆盖的预期解释它。\n\n两个后端的 `exp-ingested` 都只写入接收处理时刻。\n这不是客户端开始发送时间，也不是搜索第一次可见时间。\n先对 `_ingest/pipeline/exp-ingested/_simulate` 使用两条样本验证，再写入并核对 `_source.event.ingested`；模拟成功不证明目标索引 Mapping 一定接受。", "subs": ["Data Stream 的边界与独立实验", "模板、Data Stream 与 Ingest Pipeline"]}, {"title": "14.3 分别实现 ILM 与 ISM 的滚动、绑定和状态检查", "content": "<a id=\"s-14-3\"></a>\n\n生命周期的共同目标是有界保留，具体 API 和执行状态由各产品定义。基础 ES 示例使用 `enable_ilm.py`，对照实验使用 `lifecycle.py` 的 ES/OS 两个分支。先读策略范围与删除条件，再创建受管索引；普通 `exp-logs` 对账数据不会因为生命周期实验自动删除。\n\n#### 把保留需求翻译成索引策略\n\n“日志保存 14 天”需要进一步说明：是按事件时间、入库时间、索引创建时间，还是滚动后的时间计算。\nILM 主要按索引生命周期执行动作，不是为每条文档维护一项独立的过期计时器。\nRollover 后后续阶段的 `min_age` 基于滚动时间，这与按文档业务时间删除并不相同。[ILM 教程](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/getting-started-index-lifecycle-management.html)\n\n| 组织方式 | 适合的理由 | 需要承担的责任 |\n| --- | --- | --- |\n| 按天索引 | 日期边界直观、便于按批次管理 | 小业务产生小索引，大业务单日可能过大 |\n| 别名 + Rollover | 用大小、文档量和年龄控制索引 | 管理模板、写别名和生命周期 |\n| Data Stream | 面向时间序列追加写入 | 理解 backing index 与写入限制 |\n\n本书采用别名 + Rollover，方便同时讲清稳定事件 ID 与回放的边界。\n这不是断言它在所有场景都优于 Data Stream。\n\n**实验保留约定**\n\n正常日志：主分片最大 20 GB 或索引年龄达到 1 天时滚动，滚动 14 天后删除。\n隔离日志：主分片最大 1 GB 或索引年龄达到 1 天时滚动，滚动 7 天后删除。\n这些数字仅用于教学预算，不能直接作为所有业务的保留策略。\n\nKafka 的 72 小时保留和 ES 的 14 天保存服务于不同目标。\n如果业务要求一个月前重新解析日志，72 小时的 Kafka 保留不能满足要求，需要另外的原始归档策略。\n\n\n#### Rollover 的三个前提\n\n基于别名滚动时，需要有正确的写别名、当前写索引和索引设置。\n索引名称还需要符合可递增的尾部数字形式，如 `logs-lab-000001`。[Rollover 条件](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/ilm-rollover.html)\n\n```text\nlogs-lab\n└─ logs-lab-000001\n   ├─ is_write_index = true\n   ├─ index.lifecycle.name = logs-lab-retention\n   └─ index.lifecycle.rollover_alias = logs-lab\n```\n\n只创建 Policy，不会自动把所有日志索引纳入管理。\n只给未来模板增加 Policy，也不会自动接管已有初始索引。\n\n**配置之间的对应关系**\n\n| 对象 | 正常日志 | 隔离日志 |\n| --- | --- | --- |\n| 写别名 | `logs-lab` | `logs-lab-quarantine` |\n| 初始索引 | `logs-lab-000001` | `logs-lab-quarantine-000001` |\n| 模板 | `logs-lab-template` | `logs-lab-quarantine-template` |\n| Policy | `logs-lab-retention` | `logs-lab-quarantine-retention` |\n| Rollover alias | `logs-lab` | `logs-lab-quarantine` |\n\n主链路 Logstash 继续写别名，不需要增加日期后缀。\n本书保持 `ilm_enabled => false`，因为生命周期由管理员显式维护，不交给插件自动生成另一套资源。\n\n\n#### 基础实验：从初始实验启用生命周期\n\n下面脚本保存为 `scripts/enable_ilm.py`。\n它复用 [基础初始化脚本 `scripts/init_es.py`](03-search-storage-and-visualization.md#s-14-1) 中的 HTTP 请求函数，因此两个文件必须在同一目录。\n默认打印变更计划，只有添加 `--apply` 才修改配置。\n\n脚本读取原模板后合并生命周期设置，保留已有组件、模式和优先级。\n它仅接受各别名都只有初始一代索引的状态；已经多次 Rollover 的环境应逐索引评审，而不是盲目接管历史索引。\n\n```python\n#!/usr/bin/env python3\n\"\"\"为基础链路的隔离实验启用 ILM。默认仅预览，--apply 才修改。\"\"\"\nfrom __future__ import annotations\n\nimport argparse\nimport copy\nimport json\nimport sys\nfrom datetime import datetime, timezone\nfrom pathlib import Path\n\nfrom init_es import request\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--url\", default=\"http://127.0.0.1:9200\")\n    parser.add_argument(\"--apply\", action=\"store_true\")\n    parser.add_argument(\"--backup-dir\", default=\"backups\")\n    args = parser.parse_args()\n    base = args.url.rstrip(\"/\")\n    targets = [\n        (\"logs-lab\", \"logs-lab-template\", \"logs-lab-retention\", \"20gb\", \"14d\"),\n        (\"logs-lab-quarantine\", \"logs-lab-quarantine-template\",\n         \"logs-lab-quarantine-retention\", \"1gb\", \"7d\"),\n    ]\n    try:\n        info = request(base, \"GET\", \"/\")\n        if (info.get(\"cluster_name\") != \"elk-lab-full\" or\n                info.get(\"version\", {}).get(\"number\") != \"7.17.29\"):\n            raise RuntimeError(\"拒绝执行：仅用于 elk-lab-full / 7.17.29\")\n        plan = []\n        backups = {\"cluster_uuid\": info.get(\"cluster_uuid\"), \"resources\": []}\n        for alias, template_name, policy_name, max_size, retention in targets:\n            template_response = request(base, \"GET\", f\"/_index_template/{template_name}\")\n            template = template_response[\"index_templates\"][0][\"index_template\"]\n            if \"logs-lab-fields\" not in template.get(\"composed_of\", []):\n                raise RuntimeError(f\"{template_name} 缺少预期字段组件，停止自动修改\")\n            alias_response = request(base, \"GET\", f\"/_alias/{alias}\")\n            write_indices = [name for name, data in alias_response.items()\n                             if data[\"aliases\"][alias].get(\"is_write_index\") is True]\n            if len(write_indices) != 1:\n                raise RuntimeError(f\"{alias} 应有且仅有一个显式写索引\")\n            # 本脚本负责从基础链路初始状态启用生命周期，不猜测历史代次的归属。\n            if len(alias_response) != 1:\n                raise RuntimeError(f\"{alias} 已包含多代索引，请逐索引评审后手工接管\")\n            index_name = write_indices[0]\n            old_settings = request(base, \"GET\", f\"/{index_name}/_settings\")\n            old_policy = request(base, \"GET\", f\"/_ilm/policy/{policy_name}\", allow_404=True)\n            backups[\"resources\"].append({\n                \"template_name\": template_name, \"template\": template,\n                \"index_name\": index_name, \"settings\": old_settings,\n                \"alias\": alias, \"aliases\": alias_response,\n                \"policy_name\": policy_name, \"policy\": old_policy,\n            })\n            new_template = copy.deepcopy(template)\n            settings = new_template.setdefault(\"template\", {}).setdefault(\"settings\", {})\n            # Elasticsearch 返回的设置常以嵌套 index 对象表示。\n            # 在同一表示中修改，避免与 dotted keys 同时出现造成歧义。\n            index_settings = settings.setdefault(\"index\", {})\n            index_settings.setdefault(\"lifecycle\", {}).update({\n                \"name\": policy_name, \"rollover_alias\": alias,\n            })\n            settings.pop(\"index.lifecycle.name\", None)\n            settings.pop(\"index.lifecycle.rollover_alias\", None)\n            policy = {\"policy\": {\"phases\": {\n                \"hot\": {\"actions\": {\"rollover\": {\n                    \"max_primary_shard_size\": max_size, \"max_age\": \"1d\"}}},\n                \"delete\": {\"min_age\": retention, \"actions\": {\"delete\": {}}},\n            }}}\n            plan.extend([\n                (\"PUT\", f\"/_ilm/policy/{policy_name}\", policy),\n                (\"PUT\", f\"/_index_template/{template_name}\", new_template),\n                (\"PUT\", f\"/{index_name}/_settings\", {\"index\": {\"lifecycle\": {\n                    \"name\": policy_name, \"rollover_alias\": alias}}}),\n            ])\n        for method, path, body in plan:\n            print(method, path)\n            print(json.dumps(body, ensure_ascii=False, indent=2))\n        if not args.apply:\n            print(\"仅预览；确认清理期限与目标索引后添加 --apply。\")\n            return 0\n        folder = Path(args.backup_dir)\n        folder.mkdir(parents=True, exist_ok=True)\n        stamp = datetime.now(timezone.utc).strftime(\"%Y%m%dT%H%M%S%fZ\")\n        backup_file = folder / f\"before-ilm-{stamp}.json\"\n        backup_file.write_text(json.dumps(backups, ensure_ascii=False, indent=2) + \"\\n\",\n                               encoding=\"utf-8\")\n        print(f\"旧配置备份：{backup_file}\")\n        # 这些 API 不是一个事务；中途失败应依据备份和当前状态逐项处理。\n        for method, path, body in plan:\n            request(base, method, path, body)\n            print(\"APPLIED\", path)\n        print(\"ILM 已配置；请继续检查 alias、模板模拟和 _ilm/explain。\")\n        return 0\n    except (RuntimeError, KeyError, OSError, ValueError) as exc:\n        print(f\"ERROR: {exc}\", file=sys.stderr)\n        return 1\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n```\n\n**使用顺序**\n\n```bash\ncd ~/elk-lab-full\npython3 scripts/enable_ilm.py > ilm-plan.txt\ncat ilm-plan.txt\n\n# 确认保留期限、别名和集群身份后才执行。\npython3 scripts/enable_ilm.py --apply\n```\n\n这不是事务式迁移。\n如果中途失败，先读取当前 Policy、模板和索引设置，结合备份逐项处理；不要假设自动回滚。\n脚本不会删除日志，但启用的 ILM Policy 在到达生命周期条件后会删除相应索引。\n\n**手工理解关键请求**\n\n以下是正常日志 Policy 的完整 JSON。\n它与脚本生成的语义一致，可以用于审阅，不必重复提交。\n\n```json\n{\n  \"policy\": {\n    \"phases\": {\n      \"hot\": {\n        \"actions\": {\n          \"rollover\": {\n            \"max_primary_shard_size\": \"20gb\",\n            \"max_age\": \"1d\"\n          }\n        }\n      },\n      \"delete\": {\n        \"min_age\": \"14d\",\n        \"actions\": {\n          \"delete\": {}\n        }\n      }\n    }\n  }\n}\n```\n\n多个最大条件是“满足任一即可”的关系，不是必须同时达到大小和年龄。\n不要把 `max_size` 的全部主分片总大小与 `max_primary_shard_size` 的最大单个主分片大小混淆。\n副本空间不计入这两个条件的主分片大小定义。\n\n\n#### 验证生命周期，而不是只看配置成功\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_ilm/status?pretty'\ncurl -fsS 'http://127.0.0.1:9200/logs-lab-*/_ilm/explain?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_alias/logs-lab?pretty'\ncurl -fsS -X POST \\\n  'http://127.0.0.1:9200/_index_template/_simulate_index/logs-lab-000002?pretty'\n```\n\n查看 `managed`、`policy`、`phase`、`action`、`step` 和失败原因。\n处于 `check-rollover-ready` 不一定是故障，可能只是没有达到滚动条件。\nILM 是后台执行，不应把它当成精确到秒的删除定时器。\n\n**不改变状态的条件演练**\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab/_rollover?dry_run=true&pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"conditions\": {\n    \"max_docs\": 10\n  }\n}\nJSON\n```\n\n`dry_run=true` 只检查本次提供的条件，不修改实际写索引。\n这里用 10 条便于观察，不会把正式 Policy 的条件永久改成 10 条。\n不要因为 dry run 的条件满足就认为后台 Policy 使用了同一个门槛。\n\n**真正滚动的受控实验**\n\n仅在准备好的隔离 lab 执行，记录滚动前的 alias 和索引设置。\n下面是一次手动滚动，会创建新一代写索引。\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab/_rollover?pretty' \\\n  -H 'Content-Type: application/json' -d '{\"conditions\":{\"max_docs\":10}}'\n\ncurl -fsS 'http://127.0.0.1:9200/_alias/logs-lab?pretty'\ncurl -fsS 'http://127.0.0.1:9200/logs-lab-*/_ilm/explain?pretty'\n```\n\n完成滚动后写入新的 `run_id`，观察其 `_index`。\n随后向别名重放一个旧 `event.id`，可能在新写索引出现第二份文档。\n这正是“稳定 ID 不提供跨 Rollover 全局去重”的实验，不应误诊为 ES 忽略了 ID。\n\n\n#### 为什么不能给 ILM JSON 换一个名称\n\nILM 用 phase/action/step 描述执行阶段；ISM 用 state/action/transition 描述状态机。\n两者都能完成日志滚动和删除，但策略结构、绑定方式和状态接口不同。[ISM 策略](https://docs.opensearch.org/2.19/im-plugin/ism/policies/)\n\n本书用单独的 `exp-cycle-*` 实验策略：热索引至少满足滚动条件之一后进入保留状态；完成滚动至少 30 分钟后进入删除状态。\n分层版本在滚动后先执行温层分配，再转入删除。\n短周期删除仅用于可重建实验样本，绝不能套到 `exp-logs` 的普通学习数据上。\n\n```mermaid\nstateDiagram-v2\n  [*] --> hot\n  hot --> retain: rollover 动作完成\n  retain --> delete: min_rollover_age 达到30m\n  delete --> [*]: 索引删除\n```\n\n完整 JSON 的权威生成函数保存在本节的 `tools/lifecycle.py`。\n运行不带 `--apply` 会打印所有待提交对象，不会修改后端。\n生成的 OS 策略使用 `ism_template` 给匹配的新索引附加策略，索引模板设置 `plugins.index_state_management.rollover_alias`。\n策略绑定与滚动别名是两个条件，缺一不能靠另一个自动补齐。[ISM API](https://docs.opensearch.org/2.19/im-plugin/ism/api/)\n\n\n#### 完整操作顺序\n\n```bash\npython3 tools/lifecycle.py os\npython3 tools/lifecycle.py os --apply\npython3 tools/cycle_data.py os --apply\npython3 tools/api.py os GET '/_plugins/_ism/explain/exp-cycle-000001?show_policy=true'\npython3 tools/api.py os GET '/_alias/exp-cycle'\npython3 tools/api.py os GET '/_cat/shards/exp-cycle-*?format=json'\n```\n\n查看打印的 `run_id`，用它查询 25 个事件。\nISM 是周期性后台任务，不保证写入第 20 条后立即滚动。\n观察 `state`、`action`、`step` 和解释信息，直到写别名指向下一代索引。\n首索引进入保留状态后，等待实际策略周期完成删除；不把一次等待超时直接写成生命周期失效。\n\n普通 `exp-logs` 不启用自动删除。实验新索引 25 条中含一条三天前的事件，便于验证年龄和事件时间不是一回事。\n\n**已有索引需要显式绑定时**\n\n`ism_template` 面向之后创建的匹配索引；已有索引不要假设自动补管。\n下面只在解释接口确认该精确索引尚未受管时执行：\n\n```http\nPOST /_plugins/_ism/add/exp-cycle-000001\n{\"policy_id\":\"exp-cycle-policy\"}\nGET /_plugins/_ism/explain/exp-cycle-000001?show_policy=true\n```\n\n若已受管而需要换策略，应使用相应变更策略 API 并检查版本与执行状态；不要通过不断 add 重置执行进度。\n本实验默认禁止对已存在的策略重新安装，避免无意改变已进入删除阶段的数据命运。\n\n\n#### 与原 ILM 示例对照\n\n基础 ES 实验采用 `index.lifecycle.name`、`index.lifecycle.rollover_alias`、`_ilm/explain`。\nOS 不能接受这些字段就被视为“相同生命周期已经接管”。\n本扩展保留独立的策略函数、独立资源命名和独立状态观察。\n\n索引策略的最小保留年龄不等于文档业务事件时间。\n迟到三天的日志刚写入一个新索引，不会立即获得三天的索引年龄。\n如果业务必须按每条事件时间精确删除，需要另一种数据治理设计，不能用本书索引级实验替代。\n\n\n#### 对照实验完整文件：`tools/lifecycle.py`\n\nILM / ISM 独立策略与初始化。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/lifecycle.py -->\n```python\n\"\"\"只管理 exp-cycle-* 的独立短生命周期实验。两产品不共用策略 JSON。\"\"\"\nfrom __future__ import annotations\nimport argparse\nimport json\nfrom client import Client\nfrom model import properties\n\n\ndef policy(backend, tiered=False):\n    if backend=='es':\n        phases={'hot':{'actions':{'rollover':{'max_docs':20,'max_age':'1d'}}},\n                'delete':{'min_age':'30m','actions':{'delete':{}}}}\n        if tiered:\n            # 采用自定义温度属性；禁用自动 migrate，避免 _tier_preference 与 temp 双重约束。\n            phases['warm']={'min_age':'0ms','actions':{\n                'migrate':{'enabled':False},'allocate':{'require':{'temp':'warm'}},'readonly':{}}}\n        return {'policy':{'phases':phases}}\n    next_state='warm' if tiered else 'retain'\n    middle_actions=[{'allocation':{'require':{'temp':'warm'},'wait_for':True}},{'read_only':{}}] if tiered else []\n    return {'policy':{'description':'elk-expansion SHORT RETENTION lab only',\n             'default_state':'hot', 'ism_template':[{'index_patterns':['exp-cycle-*'],'priority':800}],\n             'states':[\n                {'name':'hot','actions':[{'rollover':{'min_doc_count':20,'min_index_age':'1d'}}],\n                 'transitions':[{'state_name':next_state}]},\n                {'name':next_state,'actions':middle_actions,\n                 'transitions':[{'state_name':'delete','conditions':{'min_rollover_age':'30m'}}]},\n                {'name':'delete','actions':[{'delete':{}}],'transitions':[]}]}}\n\n\ndef install(c,apply=False,tiered=False):\n    info=c.guard()\n    if tiered and '-ha-' not in info['cluster_name']:raise RuntimeError('分层实验必须使用 HA 实验集群')\n    path='/_ilm/policy/exp-cycle-policy' if c.backend=='es' else '/_plugins/_ism/policies/exp-cycle-policy'\n    settings={'number_of_shards':1,'number_of_replicas':1 if tiered else 0}\n    if tiered:settings['index.routing.allocation.require.temp']='hot'\n    if c.backend=='es':\n        settings.update({'index.lifecycle.name':'exp-cycle-policy','index.lifecycle.rollover_alias':'exp-cycle'})\n    else:settings['index.plugins.index_state_management.rollover_alias']='exp-cycle'\n    tmpl={'index_patterns':['exp-cycle-*'],'priority':800,\n          '_meta':{'owner':'elk-expansion','schema':2},\n          'template':{'settings':settings,'mappings':{'dynamic':False,'properties':properties()}}}\n    plan=[('PUT',path,policy(c.backend,tiered)),('PUT','/_index_template/exp-cycle-template',tmpl),\n          ('PUT','/exp-cycle-000001',{'aliases':{'exp-cycle':{'is_write_index':True}}})]\n    print(json.dumps({'warning':'索引滚动 30 分钟后可能被自动删除；仅 exp-cycle-*', 'plan':plan},ensure_ascii=False,indent=2))\n    if not apply:return\n    # 只做一次性安装；不重新解释已运行策略的状态，也不覆盖旧策略。\n    for _,p,_ in plan:\n        if c.request('GET',p,missing_ok=True) is not None:\n            raise RuntimeError(f'{p} 已存在；先审阅状态，不自动重置实验')\n    for method,p,body in plan:c.request(method,p,body)\n    # ISM 的 ism_template 自动给新索引绑定；可能异步，使用 explain 观察。\n\nif __name__=='__main__':\n    p=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--url')\n    p.add_argument('--tiered',action='store_true');p.add_argument('--apply',action='store_true');a=p.parse_args()\n    install(Client(a.backend,a.url),a.apply,a.tiered)\n```", "subs": ["把保留需求翻译成索引策略", "Rollover 的三个前提", "基础实验：从初始实验启用生命周期", "验证生命周期", "为什么不能给 ILM JSON 换一个名称", "完整操作顺序", "与原 ILM 示例对照", "对照实验完整文件"]}, {"title": "14.4 判断策略卡住、迟到日志与实际保留时间", "content": "<a id=\"s-14-4\"></a>\n\n#### 保留期、迟到日志与容量\n\n假设索引一天滚动一次，滚动后保留 14 天。\n写在该索引不同位置的文档，实际被保存的时间并不完全相同。\n迟到一周的日志写入当前索引后，也不会因为业务时间已经过去一周就只剩七天寿命。\n\n反过来，按业务日期写入历史索引时，已有生命周期可能让新补采进去的旧日志很快被删除。\n这需要在回放计划中明确目标索引和保留策略，不能只关注能否成功写入。\n\n| 时间 | 决定什么 |\n| --- | --- |\n| 业务事件时间 | 搜索时间范围、业务趋势 |\n| 入库时间 | 链路延迟与数据到达情况 |\n| 索引创建时间 | 部分滚动条件的年龄 |\n| Rollover 时间 | 后续生命周期阶段年龄 |\n| Snapshot 时间 | 备份覆盖范围，不等同所有业务事件时间 |\n\n**ILM 不是容量上限保证**\n\n日志突增、节点减少或删除阶段失败，都会让磁盘增长超出预算。\n配置 14 天并不保证磁盘永远有空间。\n容量告警必须同时考虑增长速率、当前余量、恢复空间和生命周期状态。\n\n**Hot/Warm 的前提**\n\n数据层迁移需要符合要求的目标节点、磁盘和分配规则。\n单节点 lab 没有独立 Warm 节点，不应添加一个需要 Warm 层却永远无法完成的迁移动作。\n生产配置数据层时，应先画出节点角色和容量布局，再设计阶段动作。[数据层](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/data-tiers.html)\n\n\n#### 故障分类与观察\n\n| 现象 | 只读检查 | 解释与修复前提 |\n| --- | --- | --- |\n| 索引未受管 | explain、策略模板 pattern | 模板是否先于索引创建，名字是否匹配 |\n| rollover 一直失败 | 写别名、当前写索引、索引后缀 | 必须有唯一写入者及可滚动名称 |\n| 长时间仍在 hot | 动作条件、任务调度、索引计数 | 不是每条事件时间足够老就滚动 |\n| warm allocation 失败 | 节点 temp、zone、磁盘、分配解释 | 有温层节点不代表有足够故障域与空间 |\n| delete 不执行 | rollover时间、当前状态、错误信息 | 动作前置条件是否完成 |\n| 策略 API 被拒绝 | 身份权限、插件清单 | 自建插件存在和已授权是不同条件 |\n\n修复具体原因后，对处于失败状态的精确索引使用重试接口，而不是批量重试全库：\n\n```http\nPOST /_plugins/_ism/retry/exp-cycle-000001\n{}\n```\n\n保留 API 返回的失败数和具体信息。\n“HTTP 成功”不等于目标索引已经退出失败状态，还要重新 explain 并核对别名与查询结果。", "subs": ["保留期、迟到日志与容量", "故障分类与观察"]}]}, {"title": "第 15 章 · 写入、持久性与性能诊断", "sections": [{"title": "15.1 区分写入成功、搜索可见与持久化完成", "content": "<a id=\"s-15-1\"></a>\n\n#### 一次成功覆盖了哪个阶段\n\n客户端收到成功、查询看到文档、节点崩溃后恢复、数据中心故障后找回数据，是四种不同验收。\n把它们统称为“数据落盘”会隐藏边界。\n\n| 状态 | 可以说明 | 不能单独说明 |\n| --- | --- | --- |\n| Kafka 生产确认 | 消息达到配置的 Kafka 确认条件 | ES 已入库 |\n| Logstash 接收 | 事件进入相应处理路径 | 过滤、输出成功 |\n| ES 单条写入成功 | 达到当前写入持久化和复制语义 | 搜索立刻可见、异地备份完成 |\n| Refresh 后可检索 | 查询可以看到新的变化 | 已建立独立备份 |\n| Snapshot 完成 | 存在快照覆盖的数据 | 之后的新日志也包含在其中 |\n\n正常默认 `request` translog durability 下，ES 会在主分片及已分配副本完成相应 fsync 后确认写入。\n这仍不替代多故障域副本、独立备份和恢复演练。[Translog](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/index-modules-translog.html)\n\n\n#### 可见性测试与 refresh 参数\n\n`refresh=wait_for` 等待对应写入被刷新后再响应，通常不立即强制执行刷新。\n`refresh=true` 会主动刷新相关分片，频繁使用可能产生更多小 Segment 和额外工作。[Refresh 参数](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/docs-refresh.html)\n\n```bash\ncurl -fsS -X PUT \\\n  'http://127.0.0.1:9200/lab-bulk-demo/_doc/visible-1?refresh=wait_for' \\\n  -H 'Content-Type: application/json' -d '{\"status\":201}'\n\ncurl -fsS -X POST 'http://127.0.0.1:9200/lab-bulk-demo/_search?pretty' \\\n  -H 'Content-Type: application/json' -d '{\"query\":{\"ids\":{\"values\":[\"visible-1\"]}}}'\n```\n\n实验写少量验证数据时，等待可见性有助于消除时序干扰。\n生产日志采集不应为了“看起来实时”而每条都强制刷新。\n\n**`GET /index/_doc/id` 与 Search 不是同一测试**\n\n按 ID 直接获取通常具有实时读取行为，而 Search 受刷新影响。\n刚写入时 Get 有结果、Search 没结果，并不能直接证明数据丢失。[Get API](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/docs-get.html)\n\n**调整刷新间隔的约束**\n\n如果把间隔从 1 秒调整到 5 秒，必须同步修改日志新鲜度目标和故障判断门槛。\n如果关闭自动刷新，却继续使用 `refresh=wait_for` 而没有其他刷新来源，请求可能长时间等待。\n调优动作必须有恢复原值的计划。\n\n\n#### 将四种目标拆开\n\n| 目标 | 观察 | 常见误解 |\n| --- | --- | --- |\n| 写入吞吐 | 已成功接受的文档/秒、拒绝率 | 只看发送器发了多少 |\n| 搜索可见性 | 事件写入到查询可见的延迟 | 以 Bulk 200 当作立即可搜 |\n| 持久性 | 主副确认、Translog、故障恢复 | 只看到 refresh 就认为已完成所有落盘保障 |\n| 维护成本 | Merge、恢复、快照、后台 IO | 写入快就代表长期成本低 |\n\nRefresh 主要影响新 segment 的搜索可见性；Flush 与 Translog/Lucene commit 有不同职责；Merge 重写 segment 并回收删除记录。\n它们不是三个可以互相替代的“把数据刷新到盘”按钮。[ES Refresh](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/near-real-time.html) [ES Translog](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/index-modules-translog.html)", "subs": ["一次成功覆盖了哪个阶段", "可见性测试与 refresh 参数", "将四种目标拆开"]}, {"title": "15.2 正确构造 Bulk 并观察拒绝与写读竞争", "content": "<a id=\"s-15-2\"></a>\n\n#### Bulk 是 NDJSON，不是一个 JSON 数组\n\nBulk 请求由动作行和文档行组成，最后一行需要换行。\n动作与文档必须配对，不能直接把普通 JSON 数组作为 Bulk 内容。[Bulk 格式](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/docs-bulk.html)\n\n以下示例创建独立实验索引，不影响正常日志统计。\n\n```bash\ncurl -fsS -X PUT 'http://127.0.0.1:9200/lab-bulk-demo' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"settings\": {\"number_of_shards\": 1, \"number_of_replicas\": 0},\n  \"mappings\": {\"properties\": {\"status\": {\"type\": \"integer\"}}}\n}\nJSON\n\ncat > /tmp/elk-lab-bulk.ndjson <<'NDJSON'\n{\"index\":{\"_index\":\"lab-bulk-demo\",\"_id\":\"valid-1\"}}\n{\"status\":200}\n{\"index\":{\"_index\":\"lab-bulk-demo\",\"_id\":\"invalid-1\"}}\n{\"status\":\"not-a-number\"}\nNDJSON\n\ncurl -fsS -X POST 'http://127.0.0.1:9200/_bulk?refresh=wait_for&pretty' \\\n  -H 'Content-Type: application/x-ndjson' \\\n  --data-binary @/tmp/elk-lab-bulk.ndjson\n```\n\n预期一条成功、一条字段解析失败。\n整个 HTTP 请求可能返回 200，但响应体 `errors` 为 true。\n这正是为什么写入监控不能只统计 HTTP 状态码。\n\n**检查每项结果**\n\n```python\n# 输入为已经解析成 dict 的 Bulk 响应，函数本身不发起网络请求。\ndef failed_bulk_items(response: dict) -> list[dict]:\n    failures = []\n    for item in response.get(\"items\", []):\n        for action, result in item.items():\n            if result.get(\"status\", 500) >= 300 or \"error\" in result:\n                failures.append({\"action\": action, **result})\n    return failures\n```\n\n这里的直接 API 实验不会生成 Logstash DLQ，因为请求没有经过 Logstash。\n要验证 DLQ，必须通过实际输出插件制造其支持进入 DLQ 的单条文档错误。\n\n\n#### 写入拒绝、积压与慢查询竞争\n\n写入压力超过节点处理能力时，可能出现线程池拒绝、索引压力限制或其他保护机制。\n增加客户端并发通常不能解决已经饱和的后端，反而可能增加重试流量。[索引速度调优](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/tune-for-indexing-speed.html)\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_nodes/stats/indices,jvm,fs,thread_pool?pretty'\ncurl -fsS 'http://127.0.0.1:9200/_cat/thread_pool/write?v'\ncurl -fsS 'http://127.0.0.1:9200/_nodes/hot_threads?threads=3'\n```\n\n比较相邻采样的计数增量，不要把进程启动以来累积的拒绝次数当成当前每秒拒绝量。\n查询和写入可能争用 CPU、Heap、缓存及磁盘，排查不能只看 output 的批次大小。\n\n| 证据 | 候选方向 |\n| --- | --- |\n| 写入拒绝增长，CPU 接近饱和 | 解析、索引、合并及查询竞争 |\n| 磁盘时延升高，队列堆积 | 存储吞吐、恢复、快照、Merge |\n| Heap 与 GC 停顿增加 | 分片量、查询聚合、批次内存 |\n| 单个索引明显倾斜 | 路由、热点业务、主分片布局 |\n| ES 正常但客户端报 413 | 代理或请求体上限 |\n\n限速恢复时应保留对实时流量的容量。\n不能只把历史积压排空速度作为成功指标，导致当前日志反而更晚可见。\n\n\n#### Bulk 批量与重试\n\n增加批量能摊薄 HTTP 开销，但过大的请求会同时增加客户端、代理、协调和 shard 侧的内存需求。\n批量应按字节与事件大小分布观察，不只按条数；一千条短日志和一千条堆栈的内存峰值可能很不同。\n\n[共用客户端中的 `check_bulk`](03-search-storage-and-visualization.md#s-12-3) 检查 item 数与每个状态码，失败计入错误率。\n客户端超时有“不知道后端是否已完成”的窗口：同 ID 重试可能覆盖，跨索引重试可能重复，不能把超时简单当成一定未写入。\n\n调优顺序建议：固定样本，确认无质量错误，观察后端拒绝与资源，再调整 batch 或并发；一次只改变一个参数。\n不通过丢弃大事件、非法字段或失败响应制造更漂亮的吞吐数字。", "subs": ["Bulk 是 NDJSON", "写入拒绝、积压与慢查询竞争", "Bulk 批量与重试"]}, {"title": "15.3 解释 Refresh、Flush、Merge 的代价与适用条件", "content": "<a id=\"s-15-3\"></a>\n\n#### Refresh、Flush、Merge 与 Translog\n\n```mermaid\nflowchart LR\n    W[索引写入操作] --> T[Translog]\n    W --> B[内存索引缓冲]\n    B --> R[Refresh 打开新 Segment]\n    R --> Q[搜索可见]\n    R --> M[后台 Segment Merge]\n    T --> F[Flush 与 Lucene Commit]\n    F --> N[新的 Translog 代次]\n```\n\n图示只强调不同职责，不表示每条日志都严格同步经过图中每一步。\n真实运行有批处理、并发和后台任务。\n\n| 机制 | 主要解决的问题 | 常见错误理解 |\n| --- | --- | --- |\n| Refresh | 让新索引内容被搜索看到 | 刷新就是完成备份 |\n| Translog | 支持未完成 Lucene Commit 操作的恢复 | 改成 async 永远不丢数据 |\n| Flush | Lucene Commit 并开始新的 translog 代次 | 每写一条都要手工 flush |\n| Merge | 合并 Segment、回收部分被删除数据占用 | CPU 高就立即 force merge |\n| Snapshot | 创建支持恢复的备份 | 副本分片就是 Snapshot |\n\n默认刷新周期常见为一秒，但还存在搜索空闲索引行为、刷新设置、后台负载和调用方式影响。\n不能据此承诺所有日志一秒内端到端可见。[近实时搜索](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/near-real-time.html)\n\n\n#### Force Merge 与空间回收\n\n删除文档不一定立即释放等量磁盘空间，Segment 合并和文件引用会影响回收时间。\nForce Merge 可能带来大量 I/O，并需要额外空间，不适合当成磁盘满时的无条件急救动作。[Force Merge](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/indices-forcemerge.html)\n\n更适合考虑 Force Merge 的对象是已经停止写入、经过容量评估的只读索引。\n它不是 Snapshot，不提供回滚，也不能修复 Mapping。\n\n本书不提供“对所有索引 force merge 到 1 个 Segment”的批量命令。\n正确练习是先用 `_cat/segments` 观察 Segment，再说明索引是否仍在写入、为什么需要合并、预计影响哪些资源。\n\n```bash\ncurl -fsS 'http://127.0.0.1:9200/_cat/segments/logs-lab-*?v'\ncurl -fsS 'http://127.0.0.1:9200/logs-lab/_stats/segments,merge,refresh,flush?pretty'\n```\n\n最后一个 API 的实际统计字段名称应以响应和固定版本说明为准；索引统计使用 `merge` 指标路径返回 `merges` 信息。\n不能把某个字段暂时为空等同于组件没有运行。\n\n\n#### 调整 Refresh、Flush 与恢复并发的条件\n\n批量导入且暂时不需要实时查询时，可以在精确实验索引上调整 Refresh，导入完成后恢复原值并主动验证可见性。\n不能全局关闭生产实时日志的 Refresh，然后把缺失搜索结果归咎于 Kibana。\nTranslog 持久性和副本设置涉及数据保护目标，不能为了提高 benchmark 数字偷偷改变。\n\n恢复并发和限速也是资源分配：提高速度可能抢占在线读写，降低速度会延长暴露风险窗口。\n报告应同时记录在线业务延迟、错误率和恢复完成时间，不只挑其中一个最好看的数。", "subs": ["Refresh、Flush、Merge 与 Translog", "Force Merge 与空间回收", "调整 Refresh、Flush 与恢复并发的条件"]}, {"title": "15.4 关联 Slow Log、Profile、热点线程与节点指标", "content": "<a id=\"s-15-4\"></a>\n\n#### 慢查询的定位与改写\n\n慢查询先收集请求体、范围、目标索引、响应时间和分片失败情况。\n不能只用“ES 慢”概括所有路径。\n\n| 现象 | 可以尝试的方向 | 验证重点 |\n| --- | --- | --- |\n| 扫描范围很大 | 缩小索引和时间范围 | 是否仍覆盖故障时间 |\n| 完整 message 通配符 | 改为结构化字段或合适全文查询 | 查询语义是否改变 |\n| 高基数多层聚合 | 减少维度、拆分查询 | 是否丢失必要关联 |\n| 巨大返回体 | 限制 size 与 `_source` | 是否保留复查字段 |\n| 深分页 | PIT + search_after | 分页完整性和资源释放 |\n| 历史索引类型冲突 | 定位并迁移错误索引 | 新旧结果是否一致 |\n\n`profile` 有额外开销，适合受控分析某个查询，不应对全部生产请求长期打开。[Profile API](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/search-profile.html)\n慢日志可能包含查询条件，应按敏感数据处理，不能随意公开。\n\n\n#### Slow Log：从慢的分片操作回到请求\n\n在隔离索引上临时启用索引级慢日志：\n\n```http\nPUT /exp-logs-000001/_settings\n{\n  \"index.search.slowlog.threshold.query.warn\":\"1s\",\n  \"index.search.slowlog.threshold.fetch.warn\":\"500ms\",\n  \"index.indexing.slowlog.threshold.index.warn\":\"500ms\"\n}\n```\n\n这些是实验阈值，不是生产推荐；太低会使慢日志自身成为额外负载并暴露查询和原始内容。\n分别检查两个产品的输出文件/容器日志，以及阈值是否作用于实际索引。\nES 7.17 的索引级 Slow Log 主要从 shard 操作角度观察，不等于客户端端到端延迟。[ES Slow Log](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/index-modules-slowlog.html)\n\n保留触发查询、绝对时间、索引、节点、耗时及相关 request ID。\n同一用户请求可能涉及多个 shard；把单条 shard 日志耗时当作整个分布式请求耗时会误判。\n实验后用 `-1` 关闭本次阈值，记录原值并恢复，而不是覆盖别人已有配置。\n\n\n#### Profile、热点线程与节点指标\n\n```http\nPOST /exp-logs/_search\n{\n  \"profile\":true,\n  \"size\":0,\n  \"query\":{\"bool\":{\"filter\":[\n    {\"term\":{\"service.name\":\"orders-api\"}},\n    {\"range\":{\"http.response.status_code\":{\"gte\":500,\"lt\":600}}}\n  ]}}\n}\nGET /_nodes/hot_threads?threads=3\nGET /_nodes/stats/indices,jvm,fs,thread_pool\nGET /exp-logs-000001/_stats/store,segments,merge,refresh,flush\n```\n\nProfile 展示执行结构和相关耗时，但会增加查询开销，也不完整覆盖客户端网络、排队等总延迟。\n正式性能对照要在 Profile 用于诊断后，关闭 Profile 再重复测量。[ES Profile](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/search-profile.html) [OpenSearch Profile](https://docs.opensearch.org/2.19/api-reference/profile/)\n\n| 证据 | 优先考虑 |\n| --- | --- |\n| write rejected 增长 | 后端饱和、并发与恢复竞争 |\n| Heap 与 GC 时间升高 | 高基数聚合、大请求、过多活动工作 |\n| merge IO 高且搜索慢 | 后台合并与查询竞争 |\n| CPU 低但查询端到端慢 | 队列、存储、网络或代理等待 |\n| 单节点明显热点 | routing、shard 放置、数据分布 |\n\nOpenSearch 有额外诊断能力和插件，但本书不假设新建环境全部启用。\n先使用两产品都实际支持的 API，再按插件清单解释差异，不把缺少某指标直接视为运行故障。", "subs": ["慢查询的定位与改写", "Slow Log", "Profile、热点线程与节点指标"]}]}, {"title": "第 16 章 · 查询、聚合与稳定导出", "sections": [{"title": "16.1 用 term、match、filter 和 bool 表达日志查询", "content": "<a id=\"s-16-1\"></a>\n\n#### 查询范围先于查询语法\n\n每次排查先明确环境、服务、事件时间和数据集合。\n本书正常访问日志查 `logs-lab`，解析失败查 `logs-lab-quarantine`。\n不要在正式错误率统计中直接使用覆盖两者的 `logs-lab-*`。\n\n| 查询条件 | 例子 | 缺少它可能出现什么问题 |\n| --- | --- | --- |\n| 环境 | `service.environment=lab` | 混入测试或其他环境 |\n| 服务 | `service.name=orders-api` | 不同服务的错误被汇总 |\n| 数据集 | `event.dataset=nginx.access` | 应用异常行被当成访问请求 |\n| 时间 | 最近 15 分钟或明确 UTC 窗口 | 看不到历史补采，或混入陈旧数据 |\n| 运行批次 | `labels.run_id=full-acceptance` | 实验之间相互污染 |\n\n下面是常用只读请求骨架：[Search API](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/search-search.html)\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab/_search?pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"size\": 20,\n  \"track_total_hits\": true,\n  \"query\": {\n    \"bool\": {\n      \"filter\": [\n        {\"term\": {\"service.environment\": \"lab\"}},\n        {\"term\": {\"service.name\": \"orders-api\"}},\n        {\"term\": {\"event.dataset\": \"nginx.access\"}},\n        {\"range\": {\"@timestamp\": {\"gte\": \"now-15m\", \"lt\": \"now\"}}}\n      ]\n    }\n  },\n  \"sort\": [{\"@timestamp\": \"desc\"}],\n  \"_source\": [\n    \"@timestamp\", \"event.id\", \"event.ingested\", \"message\",\n    \"http.response.status_code\", \"event.duration\", \"trace.id\"\n  ]\n}\nJSON\n```\n\n时间范围使用半开区间有助于拼接相邻窗口，避免边界值重复计算。\n只返回需要的 `_source` 字段，可以降低返回体积，但不等于改变底层索引结构或授权范围。\n\n\n#### Term、Match、Filter 与 Bool\n\n`term` 不会像全文查询那样分析搜索文本，适合精确字段；`match` 按字段分析方式处理输入，适合消息文本。[Term](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/query-dsl-term-query.html)、[Match](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/query-dsl-match-query.html)\n\n| 需求 | 适合的表达 |\n| --- | --- |\n| 查某个服务 | `term` 查询 keyword 字段 |\n| 查消息中与 timeout 相关的文本 | `match` 查询 text 字段 |\n| 筛选 5xx | `range` 查询数值字段 |\n| 限定多个条件 | `bool.filter` |\n| 排除某类已知噪声 | `bool.must_not` |\n| 多个候选条件至少命中一个 | `bool.should` 并明确 minimum_should_match |\n\n在日志筛选场景中通常不需要相关性评分。\n`filter` 表达“是否满足条件”更贴合这类意图。[Bool 查询](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/query-dsl-bool-query.html)\n\n**查询 5xx 且消息包含 timeout**\n\n```json\n{\n  \"size\": 20,\n  \"query\": {\n    \"bool\": {\n      \"filter\": [\n        {\"term\": {\"service.environment\": \"lab\"}},\n        {\"range\": {\"http.response.status_code\": {\"gte\": 500, \"lt\": 600}}},\n        {\"range\": {\"@timestamp\": {\"gte\": \"now-1h\", \"lt\": \"now\"}}}\n      ],\n      \"must\": [\n        {\"match\": {\"message\": \"timeout\"}}\n      ]\n    }\n  }\n}\n```\n\n这个例子会使用全文查询的评分，但最终日志列表仍可以按时间排序。\n`message` 中包含 timeout 只是线索，不等于已经定位数据库或网络根因。\n\n**查某一 Trace 的日志**\n\n```json\n{\n  \"size\": 100,\n  \"query\": {\n    \"bool\": {\n      \"filter\": [\n        {\"term\": {\"service.environment\": \"lab\"}},\n        {\"term\": {\"trace.id\": \"0123456789abcdef0123456789abcdef\"}}\n      ]\n    }\n  },\n  \"sort\": [{\"@timestamp\": \"asc\"}]\n}\n```\n\n这里的 Trace ID 是格式示例，要换成真实事件的值。\n有 Trace ID 不保证 Jaeger 中存在对应 Trace；采样、导出或保留策略仍可能导致链路缺失。\n这部分与现有 [OTel 笔记](https://github.com/luozijian1990/ops-roadmap/blob/main/topics/observability/otel/README.md) 配合阅读。", "subs": ["查询范围先于查询语法", "Term、Match、Filter 与 Bool"]}, {"title": "16.2 统一计数、错误率、时间分桶与分位数口径", "content": "<a id=\"s-16-2\"></a>\n\n#### 精确计数、近似计数与结果完整性\n\n`hits.total` 包含值和关系，关系为 `gte` 时不能把它当成精确总数。\n需要精确命中总数的有界实验可以设置 `track_total_hits: true`；生产大查询要评估成本。\n\n`cardinality` 聚合用于基数估算，不是严格集合对账工具。[Cardinality](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/search-aggregations-metrics-cardinality-aggregation.html)\n\n| 操作 | 回答的问题 | 不适合替代 |\n| --- | --- | --- |\n| `_count` | 匹配文档数量 | 去重后业务事件数 |\n| `track_total_hits: true` | 当前查询的准确命中总数 | 每条数据都成功返回 |\n| `cardinality(event.id)` | 事件 ID 基数估计 | 零误差对账 |\n| Terms Top N | 出现最多的一部分值 | 所有值的完整清单 |\n| 导出后集合比较 | 有界样本的缺失与重复 | 无界生产全量实时审计 |\n\n**查看某次实验的文档数量**\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab/_count?pretty' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"query\":{\"term\":{\"labels.run_id\":\"full-acceptance\"}}}'\n\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab-quarantine/_count?pretty' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"query\":{\"term\":{\"labels.run_id\":\"full-acceptance\"}}}'\n```\n\n解析失败到无法提取 run_id 的事件不一定能被上述查询找到。\n此时需要原始文本、Kafka 位置或生产者事件清单补充定位，不能直接认为失败数据消失。\n\n**部分结果必须显式处理**\n\n检查响应中的 `timed_out` 和 `_shards.failed`。\n仪表盘或脚本取得 HTTP 200 但部分分片失败时，结果可能不是全范围的完整结果。\n错误处理应保留失败原因，不应默认返回零。\n\n\n#### 错误率与时间聚合\n\n错误率必须有清楚的分子和分母。\n本书示例定义为：正常访问日志中，状态码为 500–599 的文档数，除以拥有有效状态码的访问日志数。\n这不是“所有异常日志行占全部日志行的比例”。\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab/_search?pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"size\": 0,\n  \"query\": {\n    \"bool\": {\n      \"filter\": [\n        {\"term\": {\"service.environment\": \"lab\"}},\n        {\"term\": {\"event.dataset\": \"nginx.access\"}},\n        {\"range\": {\"@timestamp\": {\"gte\": \"now-1h\", \"lt\": \"now\"}}}\n      ]\n    }\n  },\n  \"aggs\": {\n    \"per_minute\": {\n      \"date_histogram\": {\n        \"field\": \"@timestamp\",\n        \"fixed_interval\": \"1m\",\n        \"min_doc_count\": 0,\n        \"extended_bounds\": {\"min\": \"now-1h\", \"max\": \"now\"}\n      },\n      \"aggs\": {\n        \"valid_status\": {\"filter\": {\"exists\": {\"field\": \"http.response.status_code\"}}},\n        \"server_errors\": {\n          \"filter\": {\"range\": {\"http.response.status_code\": {\"gte\": 500, \"lt\": 600}}}\n        }\n      }\n    }\n  }\n}\nJSON\n```\n\n对每个桶计算 `server_errors.doc_count / valid_status.doc_count`。\n分母为零时输出无数据或明确缺失，不应显示“错误率 0%”。\n时间桶、时区和自动刷新窗口可能影响首尾桶是否完整，应在图表说明中标记。\n\n[Date Histogram](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/search-aggregations-bucket-datehistogram-aggregation.html)区分固定间隔与日历间隔。\n一分钟等固定时长与“按自然月”不是同一类分桶。\n需要按当地自然日统计时，应明确时区，而不只是把横轴显示格式改成本地时间。\n\n\n#### 耗时分位数、Top 接口与查询成本\n\n本书 `event.duration` 的单位是纳秒。\n将输出除以 1,000,000 得到毫秒，除以 1,000,000,000 得到秒。\n不要根据数值大小猜单位。\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab/_search?pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"size\": 0,\n  \"query\": {\n    \"bool\": {\n      \"filter\": [\n        {\"term\": {\"service.name\": \"orders-api\"}},\n        {\"range\": {\"@timestamp\": {\"gte\": \"now-30m\", \"lt\": \"now\"}}},\n        {\"exists\": {\"field\": \"event.duration\"}}\n      ]\n    }\n  },\n  \"aggs\": {\n    \"latency_ns\": {\n      \"percentiles\": {\n        \"field\": \"event.duration\",\n        \"percents\": [50, 95, 99]\n      }\n    },\n    \"top_urls\": {\n      \"terms\": {\"field\": \"url.original\", \"size\": 10}\n    }\n  }\n}\nJSON\n```\n\n分位数聚合通常是近似算法，适合趋势与分析，不应标注为逐条排序得到的绝对精确统计。[Percentiles](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/search-aggregations-metrics-percentile-aggregation.html)\n完整 URL 可能带参数和高基数值，生产应增加规范化路由字段，例如 `/orders/{id}`，再用于 Top 聚合。\n不要通过丢弃全部原始 URL 来解决聚合成本，否则会损失排障证据。\n\n**多层 Terms 的放大**\n\n服务、接口、实例、状态码多层组合会产生很多桶。\n查询成本与时间范围、分片数、字段基数、聚合层级及并发有关。\n应先缩短时间范围，再增加维度，不要一次对数月日志执行所有组合。\n\n**“慢请求占比”也要明确分母**\n\n耗时超过阈值的文档数应除以有有效耗时的请求数。\n如果 30% 的日志缺少耗时字段，剩下 70% 的慢请求比例不能无说明地代表全部请求。\n字段质量面板应与业务性能面板并列展示。", "subs": ["精确计数、近似计数与结果完整性", "错误率与时间聚合", "耗时分位数、Top 接口与查询成本"]}, {"title": "16.3 分别使用 PIT 与 Scroll 完成有界且可核对的导出", "content": "<a id=\"s-16-3\"></a>\n\n基础实验的导出器使用 ES PIT；双后端共同对账使用 [有界 Scroll 导出器](02-pipeline-and-reliability.md#s-9-4)，性能案例则分别实现产品 PIT。三者都必须检查超时、分片失败、结果上限和清理，不以总条数相同代替事件集合完整。\n\n#### 基础实验：深分页与 PIT\n\n`from + size` 的深分页会让各分片处理之前的候选命中，成本随翻页加深。\n不要为导出百万行日志就直接提高 `index.max_result_window`。\n7.17 支持 PIT 与 `search_after`，可在稳定视图中继续分页。[分页](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/paginate-search-results.html)\n\n```text\n打开 PIT\n→ 第一页查询\n→ 保存最后一条 sort 数组\n→ 后续请求携带 search_after\n→ 使用最新返回的 PIT ID\n→ 无结果时结束\n→ 关闭 PIT\n```\n\nPIT 保持查询视图，但会占用相应资源。\n应限制生存时间、并发和导出规模，不要把它当成长期数据库连接。\n\n**有界实验导出脚本**\n\n保存为 `scripts/export_run.py`，与 `init_es.py` 同目录。\n它只导出指定 run_id，保留 `_index`、`_id` 与 `_source`，方便 [集合对账](02-pipeline-and-reliability.md#s-9-4) 复核。\n默认上限一万条，并检查查询超时和部分分片失败。\n\n```python\n#!/usr/bin/env python3\n\"\"\"用 PIT + search_after 导出一次有界实验；不执行写入或删除。\"\"\"\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport sys\nfrom pathlib import Path\n\nfrom init_es import request\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--url\", default=\"http://127.0.0.1:9200\")\n    parser.add_argument(\"--run-id\", required=True)\n    parser.add_argument(\"--output\", required=True)\n    parser.add_argument(\"--max-docs\", type=int, default=10000)\n    args = parser.parse_args()\n    if not 1 <= args.max_docs <= 100000:\n        parser.error(\"--max-docs 必须在 1..100000，避免无界导出\")\n    base = args.url.rstrip(\"/\")\n    pit_id = None\n    total = 0\n    path = Path(args.output)\n    temporary = path.with_name(path.name + \".partial\")\n    try:\n        info = request(base, \"GET\", \"/\")\n        if info.get(\"cluster_name\") != \"elk-lab-full\":\n            raise RuntimeError(\"此实验脚本仅允许 elk-lab-full 集群\")\n        pit_id = request(base, \"POST\", \"/logs-lab,logs-lab-quarantine/_pit?keep_alive=1m\")[\"id\"]\n        after = None\n        path.parent.mkdir(parents=True, exist_ok=True)\n        # x 模式避免覆盖已有导出或未处理的失败现场。\n        if path.exists():\n            raise RuntimeError(f\"目标文件已存在：{path}\")\n        with temporary.open(\"x\", encoding=\"utf-8\") as handle:\n            while True:\n                body = {\n                    \"size\": 500,\n                    \"pit\": {\"id\": pit_id, \"keep_alive\": \"1m\"},\n                    \"query\": {\"term\": {\"labels.run_id\": args.run_id}},\n                    \"sort\": [{\"_shard_doc\": \"asc\"}],\n                    \"track_total_hits\": False,\n                    \"_source\": True,\n                }\n                if after is not None:\n                    body[\"search_after\"] = after\n                result = request(base, \"POST\", \"/_search\", body)\n                pit_id = result.get(\"pit_id\", pit_id)\n                if result.get(\"timed_out\") or result.get(\"_shards\", {}).get(\"failed\", 0):\n                    raise RuntimeError(\"查询超时或部分分片失败，导出不完整\")\n                hits = result.get(\"hits\", {}).get(\"hits\", [])\n                if not hits:\n                    break\n                if total + len(hits) > args.max_docs:\n                    raise RuntimeError(\"超过导出上限；保留 .partial，不将结果标记为完整\")\n                for hit in hits:\n                    handle.write(json.dumps({\n                        \"_index\": hit[\"_index\"], \"_id\": hit[\"_id\"],\n                        \"_source\": hit.get(\"_source\", {}),\n                    }, ensure_ascii=False) + \"\\n\")\n                total += len(hits)\n                after = hits[-1][\"sort\"]\n        temporary.rename(path)\n        print(json.dumps({\"complete\": True, \"documents\": total, \"output\": str(path)},\n                         ensure_ascii=False))\n        return 0\n    except (RuntimeError, OSError, KeyError, ValueError) as exc:\n        print(f\"ERROR: {exc}\", file=sys.stderr)\n        return 1\n    finally:\n        if pit_id:\n            try:\n                request(base, \"DELETE\", \"/_pit\", {\"id\": pit_id})\n            except RuntimeError as exc:\n                print(f\"WARN: PIT 关闭失败，将等待过期：{exc}\", file=sys.stderr)\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n```\n\n```bash\npython3 scripts/export_run.py \\\n  --run-id full-acceptance \\\n  --output exports/full-acceptance.jsonl \\\n  --max-docs 1000\n```\n\n脚本成功只说明查询视图内的匹配结果已完整导出，不说明应用原本应该产生多少条日志。\n原始生产者清单与导出结果的比较见 [回放与对账](02-pipeline-and-reliability.md#s-9-4)。\n如果输出 `.partial`，必须保留为失败现场，不能重命名后当成完整报告。\n\n\n#### PIT 与稳定分页\n\n| 步骤 | ES 7.17 | OpenSearch 2.19 |\n| --- | --- | --- |\n| 创建 | `POST /index/_pit?keep_alive=1m` | `POST /index/_search/point_in_time?keep_alive=1m` |\n| 创建响应 ID | `id` | `pit_id` |\n| 查询 | `POST /_search`，body 含 `pit.id` | 同样在 body 指定 `pit.id` |\n| 关闭 | `DELETE /_pit`，`{\"id\":\"...\"}` | `DELETE /_search/point_in_time`，`{\"pit_id\":[\"...\"]}` |\n\nOpenSearch 的 PIT 接口和生命周期按版本化 API 核对。[OS PIT API](https://docs.opensearch.org/2.19/search-plugins/searching-data/point-in-time-api/)\n[查询对照脚本 `query_cases.py`](03-search-storage-and-visualization.md#s-16-4) 使用产品分支适配，不盲用 ES `_pit` 创建接口。\n\n主对账导出选用两产品都支持的 Scroll，原因是它要遍历跨多个滚动索引的所有物理文档，包括同事件 ID 的多份副本。\nPIT 教学例子则限定单个、停止写入的 `exp-perf-*` 索引，并要求 `event.id` 唯一。\n不能把这种唯一排序条件推广到跨索引回放；需要稳定且全序的游标，以及完整的资源释放路径。\n查询中途超时、游标不前进或达到上限都应失败，而不是输出一个看似完整的文件。\n\n\n#### 案例三：深分页与稳定导出\n\n问题：为了导出所有事件，反复增大 `from`，造成重复计算和结果窗口限制；若同时写入，还可能在页之间出现漏项或重复。\n\n```text\n原方案：from=0,500,1000,... + size=500\n改写：固定读视图 + search_after + 唯一排序键\n```\n\n本书提供两个场景：正常/隔离对账采用 Scroll；单个停止写入的性能索引使用产品特定 PIT 创建和关闭 API。\n共同验收逻辑是：完整分页、游标前进、总量上限、超时/部分失败检查、资源释放和结果集合对照。\n\n`query_cases.py` 故意把原方案限制在 9000 文档以内，以免为了对比而调大生产的最大结果窗口。\n这个小规模实验可以证明适配与语义，不足以证明海量数据性能收益。\n扩大数据规模时不能继续用原 from 方案作无上限参考；应采用独立可信集合清单或流式哈希对账。\n\n| 项目 | 需要保持 |\n| --- | --- |\n| 读视图 | 对照期间停止写入，或使用相同稳定快照语义 |\n| 排序 | 单索引内唯一 event.id；完整 sort 数组作为游标 |\n| 比较 | ID、关键字段、总量，不能只比较第一页 |\n| 中止 | 超时、缺游标、不前进、超过上限都失败 |\n| 清理 | finally 关闭 PIT/Scroll，失败时保留证据 |", "subs": ["基础实验：深分页与 PIT", "PIT 与稳定分页", "案例三：深分页与稳定导出"]}, {"title": "16.4 用三个改写案例验证语义等价和查询成本", "content": "<a id=\"s-16-4\"></a>\n\n先保持索引、时间、过滤条件和输出集合一致，再比较请求结构与执行成本。下面三个案例分别处理无用评分、聚合脚本和分页；深分页机制见 [16.3 节](03-search-storage-and-visualization.md#s-16-3)。完整 `query_cases.py` 随共同文件提取，输出等价性证据后才讨论性能。\n\n#### 案例一：大范围日志筛选中的不必要评分\n\n问题：对一天或更宽时间范围的服务日志筛选，结果只按事件 ID/时间排序，不使用相关性分数，却把所有精确条件放在 scoring query 中。\n\n原查询核心：\n\n```json\n{\"query\":{\"bool\":{\"must\":[\n  {\"term\":{\"service.name\":\"orders-api\"}},\n  {\"range\":{\"http.response.status_code\":{\"gte\":500,\"lt\":600}}}\n]}},\"sort\":[{\"event.id\":\"asc\"}],\"_source\":[\"event.id\"]}\n```\n\n改写核心：\n\n```json\n{\"query\":{\"bool\":{\"filter\":[\n  {\"term\":{\"service.name\":\"orders-api\"}},\n  {\"range\":{\"http.response.status_code\":{\"gte\":500,\"lt\":600}}}\n]}},\"sort\":[{\"event.id\":\"asc\"}],\"_source\":[\"event.id\"]}\n```\n\n语义前提：不使用 `_score` 排序或阈值，精确条件相同，索引与绝对时间范围相同。\n不能通过把原来一天改成五分钟获得更快结果，然后宣称等价优化。\n若要缩小索引范围，应先证明被排除的索引不可能含本次需要的迟到事件。\n\n诊断证据：Profile 的查询树、客户端耗时、took、节点 CPU、扫描 shard 数和结果 ID。\n验收：完整有序 ID 集合相同；Profile 诊断与不带 Profile 的重复测量分开。\n[查询对照脚本 `query_cases.py`](03-search-storage-and-visualization.md#s-16-4) 实现该对照，不承诺 filter 改写在每种缓存和数据分布下都更快。\n\n\n#### 案例二：昂贵聚合中不必要的脚本\n\n问题：对已保存为 keyword 的 route 聚合，却逐文档执行脚本返回相同字段值。\n\n```json\n{\"size\":0,\"aggs\":{\"routes\":{\"terms\":{\n  \"script\":{\"source\":\"doc['route'].value\"},\n  \"size\":1000,\"order\":{\"_key\":\"asc\"}\n}}}}\n```\n\n改成直接使用字段：\n\n```json\n{\"size\":0,\"aggs\":{\"routes\":{\"terms\":{\n  \"field\":\"route\",\"size\":1000,\"order\":{\"_key\":\"asc\"}\n}}}}\n```\n\n语义前提：本实验每条文档都具有单值 route，脚本没有做额外归一化。\n多值、缺字段或脚本内有映射逻辑时，需要先定义等价行为。\n不能把真实聚合所需的业务转换删掉后仍叫等价。\n\n诊断证据：脚本执行结构、节点 CPU、聚合耗时、bucket key/count、`sum_other_doc_count`。\n验收不仅比较前十个 bucket，还检查返回范围是否完整。\n若 route 总数超过配置 size，Terms 不是全量导出工具；应使用 Composite 分页或其他明确方案，并保存 after_key。\n\n查询基数由字段分布决定，不由返回 size 单独决定。\n`size=10` 并不保证后端只处理十个唯一值。\n\n\n#### 执行三个案例并保存证据\n\n```bash\n# 先生成一份有界性能数据；会创建新的 exp-perf-* 索引。\npython3 tools/performance.py os --count 2000 --concurrency 2 --variant lean \\\n  --run-id case-a --output evidence/os-case-a-load.json --apply\n# 写入完成后再执行等价性对照，不并发修改该索引。\npython3 tools/query_cases.py os --index exp-perf-lean-case-a \\\n  --output evidence/os-case-a-equivalence.json\n```\n\nES 使用同样参数但 backend=es，输出文件改名。\nJSON 中每个案例都有 `equivalent`、查询或条件说明和耗时。\n一项不等价就判失败，先分析语义差异，不能只保留耗时更短的一方。\n\n\n#### 对照实验完整文件：`tools/query_cases.py`\n\n三组查询等价性与产品 PIT 适配。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/query_cases.py -->\n```python\n\"\"\"三组等价性实验。仅已停止写入的单个 exp-perf-* 索引，最多 9000 文档。\"\"\"\nfrom __future__ import annotations\nimport argparse,json,re,time\nfrom client import Client,complete_search\n\n\ndef pit_export(c,index,maximum=9000):\n    create=(f'/{index}/_pit?keep_alive=1m' if c.backend=='es' else\n            f'/{index}/_search/point_in_time?keep_alive=1m')\n    created=c.request('POST',create);pit=created.get('id') if c.backend=='es' else created.get('pit_id')\n    if not pit:raise RuntimeError('PIT 创建没有返回该产品的 ID 字段')\n    output=[];after=None\n    try:\n        while True:\n            q={'size':500,'track_total_hits':True,'query':{'match_all':{}},\n               'pit':{'id':pit,'keep_alive':'1m'},'sort':[{'event.id':'asc'}],\n               '_source':['event.id','route','http.response.status_code']}\n            if after is not None:q['search_after']=after\n            result=c.request('POST','/_search?allow_partial_search_results=false',q)\n            pit=result.get('pit_id',pit);complete_search(result)\n            hits=result['hits']['hits']\n            if not hits:break\n            output.extend(hits)\n            if len(output)>maximum:raise RuntimeError('PIT 导出上限')\n            following=hits[-1].get('sort')\n            if not following or following==after:raise RuntimeError('PIT 排序游标缺失或没有前进')\n            after=following\n        return output\n    finally:\n        if c.backend=='es':\n            r=c.request('DELETE','/_pit',{'id':pit})\n            if r.get('succeeded') is not True:raise RuntimeError('ES PIT 未成功关闭')\n        else:\n            r=c.request('DELETE','/_search/point_in_time',{'pit_id':[pit]})\n            if not r.get('pits') or any(not x.get('successful') for x in r['pits']):raise RuntimeError('OS PIT 未成功关闭')\n\n\ndef execute(c,index,body):\n    t=time.perf_counter();r=complete_search(c.request('POST',f'/{index}/_search?allow_partial_search_results=false',body))\n    return r, time.perf_counter()-t\n\n\ndef compare(c,index):\n    c.guard()\n    if not re.fullmatch(r'exp-perf-[a-z0-9-]+',index):raise ValueError('只允许精确 exp-perf-* 索引，不接受通配符')\n    count=c.request('GET',f'/{index}/_count')['count']\n    if not 1<=count<=9000:raise ValueError('等价性对照限定 1..9000 文档；避免 result window 上限')\n    clauses=[{'term':{'service.name':'orders-api'}},{'range':{'http.response.status_code':{'gte':500,'lt':600}}}]\n    base={'size':count,'track_total_hits':True,'sort':[{'event.id':'asc'}],\n          '_source':['event.id'],'profile':True}\n    a=base|{'query':{'bool':{'must':clauses}}}\n    b=base|{'query':{'bool':{'filter':clauses}}}\n    ra,ta=execute(c,index,a);rb,tb=execute(c,index,b)\n    ids=lambda r:[h['_id'] for h in r['hits']['hits']]\n    first={'equivalent':ids(ra)==ids(rb),'before_seconds':ta,'after_seconds':tb,\n           'before_query':a,'after_query':b,'before_profile':ra.get('profile'),'after_profile':rb.get('profile')}\n    a={'size':0,'aggs':{'routes':{'terms':{'script':{'source':\"doc['route'].value\"},'size':1000,'order':{'_key':'asc'}}}}}\n    b={'size':0,'aggs':{'routes':{'terms':{'field':'route','size':1000,'order':{'_key':'asc'}}}}}\n    ra,ta=execute(c,index,a);rb,tb=execute(c,index,b)\n    ar,br=ra['aggregations']['routes'],rb['aggregations']['routes']\n    second={'equivalent':ar['buckets']==br['buckets'] and ar.get('sum_other_doc_count')==br.get('sum_other_doc_count')==0,\n            'before_seconds':ta,'after_seconds':tb,'before_query':a,'after_query':b,'before':ar,'after':br}\n    before=[];t=time.perf_counter()\n    for start in range(0,count,500):\n        r,_=execute(c,index,{'from':start,'size':500,'query':{'match_all':{}},\n                            'sort':[{'event.id':'asc'}],'_source':['event.id','route','http.response.status_code']})\n        before.extend(r['hits']['hits'])\n    ta=time.perf_counter()-t;t=time.perf_counter();after=pit_export(c,index);tb=time.perf_counter()-t\n    identity=lambda hits:[(h['_id'],h['_source']) for h in hits]\n    third={'equivalent':len(before)==len(after)==count and identity(before)==identity(after),\n           'before_seconds':ta,'after_seconds':tb,'documents':count,\n           'precondition':'执行前已停止写入；event.id 在这个单索引内唯一；不比较 score。'}\n    return {'case1':first,'case2':second,'case3':third,\n            'status':'通过' if all(x['equivalent'] for x in (first,second,third)) else '失败',\n            'warning':'耗时一次对比不足以证明提升；Profile 增加开销，正式测量去掉 Profile 并重复运行。'}\n\nif __name__=='__main__':\n    p=argparse.ArgumentParser();p.add_argument('backend',choices=['es','os']);p.add_argument('--url')\n    p.add_argument('--index',required=True);p.add_argument('--output',required=True);a=p.parse_args()\n    from pathlib import Path\n    out=Path(a.output)\n    if out.exists():raise FileExistsError(out)\n    r=compare(Client(a.backend,a.url),a.index);out.parent.mkdir(parents=True,exist_ok=True)\n    out.write_text(json.dumps(r,ensure_ascii=False,indent=2));print(r['status'])\n    raise SystemExit(0 if r['status']=='通过' else 2)\n```", "subs": ["案例一：大范围日志筛选中的不必要评分", "案例二：昂贵聚合中不必要的脚本", "执行三个案例并保存证据", "对照实验完整文件"]}]}, {"title": "第 17 章 · Kibana 与 Dashboards 的检索和看板", "sections": [{"title": "17.1 创建索引模式并排查时间与字段范围", "content": "<a id=\"s-17-1\"></a>\n\n#### 先建立正确的 Index Pattern\n\n7.17 的界面和文档使用 Index Pattern 术语。\n不要直接照抄较新版本的 Data View 页面名称与操作路径。[Index Pattern](https://www.elastic.co/guide/en/kibana/7.17/index-patterns.html)\n\n在 Stack Management → Index Patterns 中创建：\n\n| 名称或用途 | 匹配对象 | 时间字段 |\n| --- | --- | --- |\n| 正常日志业务时间 | 精确别名 `logs-lab` | `@timestamp` |\n| 正常日志入库时间 | 同一别名，可用不同保存对象 ID | `event.ingested` |\n| 解析失败日志 | 精确别名 `logs-lab-quarantine` | `event.ingested` 或适合排查的时间 |\n\nIndex Pattern 不复制数据，也不会替你创建 Elasticsearch 索引。\n它保存的是查询目标与字段、时间等使用配置。\n\n**为什么优先用精确别名**\n\n`logs-lab-*` 会覆盖隔离索引，还可能覆盖后续实验或不同数据集。\n正常业务错误率应该只针对约定数据集。\nIndex Pattern 的范围选错，会让后面所有可视化都产生一致但错误的结果。\n\n**同一目标不同时间字段**\n\n按业务时间回答“故障什么时候发生”。\n按入库时间回答“日志什么时候到达平台”。\n历史回放时两个视图的曲线不同是正常现象，不能把这种差异自动当成数据丢失。\n\n\n#### Discover 的基本使用顺序\n\n进入 Discover 后，先确认 Index Pattern 和时间范围，再输入 KQL 条件。[Discover](https://www.elastic.co/guide/en/kibana/7.17/discover.html)\n\n建议先添加这些列：\n\n| 列 | 用途 |\n| --- | --- |\n| `@timestamp` | 业务时间 |\n| `service.name` | 服务 |\n| `log.level` | 日志等级 |\n| `http.response.status_code` | 访问状态 |\n| `event.duration` | 原始纳秒耗时 |\n| `trace.id` | 链路定位 |\n| `event.id` | 事件对账 |\n| `pipeline.version` | 解析规则版本 |\n\n对一条命中展开 JSON，检查 `event.original`、规范字段和 `_index`。\n理解一条完整文档比只看列表截断后的消息更重要。\n\n**适合保存的查询**\n\n保存“某服务最近错误请求”“字段校验失败”“某环境慢请求”等可复用查询。\n查询名称应表达环境与用途，不要用只有作者知道含义的“测试 1”“新面板”。\n时间范围是否随查询保存需要明确，避免再次打开时仍停留在旧故障窗口。\n\n\n#### ES 有数据但 Discover 没有数据\n\n按以下顺序缩小范围：\n\n```text\n同一 ES 集群吗\n→ Index Pattern 是否指向正确别名\n→ 时间字段是否正确\n→ 时间范围是否覆盖事件\n→ 浏览器时区与绝对时间\n→ KQL、固定筛选和 Dashboard 筛选\n→ 权限\n→ Mapping 与可检索字段\n```\n\n**用 API 建立对照**\n\n```bash\ncurl -fsS -X POST 'http://127.0.0.1:9200/logs-lab/_search?pretty' \\\n  -H 'Content-Type: application/json' --data-binary @- <<'JSON'\n{\n  \"size\": 1,\n  \"sort\": [{\"event.ingested\": \"desc\"}],\n  \"_source\": [\"@timestamp\", \"event.ingested\", \"event.id\", \"service.name\"]\n}\nJSON\n```\n\n把返回的实际时间复制到 Kibana 的绝对时间窗口。\n如果 `@timestamp` 很旧而 `event.ingested` 是当前时间，说明可能是补采或应用时钟问题。\n切换成“最近十五分钟”不是万能修复。\n\n**时区与日期格式**\n\n`Z` 表示 UTC，带 `+08:00` 的时间表示明确偏移。\n同一时刻用不同偏移展示不等于时间错误。\n没有时区的应用日志则需要解析规则明确补充时区，不能依赖每台 Logstash 主机的本地设置。\n\nKibana 的日期显示设置只改变展示方式，不能修复已经错误解析并保存的业务时间。\n修复旧数据需要重新转换和写入。\n\n\n#### 字段列表、Mapping 冲突与表格显示\n\n字段在 `_source` 中出现，不意味着它一定有 Mapping 或可聚合。\n第二篇关闭 `app` 的解析就是一个明确例子。\n对于超长 Keyword 值，`ignore_above` 也可能导致原值存在但未索引。\n\n| 页面现象 | 先检查 |\n| --- | --- |\n| 字段找不到 | Mapping、Index Pattern、是否仅存在 `_source` |\n| 字段不能聚合 | Text/Keyword、doc_values、跨索引冲突 |\n| 类型显示冲突 | `_field_caps` 与历史索引 |\n| 列表值为空但 JSON 有对象 | 字段路径和展示方式 |\n| 新字段不在可选列表 | 索引实际是否产生该字段，必要时刷新字段信息 |\n\n不要通过给 Text 字段随意开启 `fielddata` 来掩盖错误的数据模型。\n高基数全文字段聚合可能带来显著内存开销，通常应增加合适的 Keyword 字段并处理旧数据。\n\n\n#### 创建索引模式并验证时间范围\n\n打开 `127.0.0.1:25601`，进入 Dashboards Management 的 Index patterns，新建 `exp-logs-*`，时间字段选择 `@timestamp`。\n隔离数据使用另一个 `exp-quarantine-*`，避免业务面板混入解析错误事件。\n具体菜单受语言和插件导航布局影响，验收以索引模式对象、时间字段和实际请求为准。[DQL 与索引模式](https://docs.opensearch.org/2.19/dashboards/dql/)\n\n第一次验收使用绝对时间范围，覆盖生成样本的事件时间。\n`late` 样本被安排在三天前，只看最近 15 分钟看不到它是预期行为，不是采集丢失。\n可再建立基于 `event.ingested` 的索引模式观察最近入库的历史事件，名称要明确写成“入库时间视图”。", "subs": ["先建立正确的 Index Pattern", "Discover 的基本使用顺序", "ES 有数据但 Discover 没有数据", "字段列表、Mapping 冲突与表格显示", "创建索引模式并验证时间范围"]}, {"title": "17.2 分别使用 KQL、DQL 和 Lucene 完成日常检索", "content": "<a id=\"s-17-2\"></a>\n\n#### KQL 与 Lucene 的使用边界\n\nKQL 是 Kibana 的筛选语言，不等于 Elasticsearch Query DSL。\n不要把一段 KQL 直接作为 `_search` 的 JSON 请求体。[KQL](https://www.elastic.co/guide/en/kibana/7.17/kuery-query.html)\n\n```text\nservice.environment : \"lab\" and service.name : \"orders-api\"\n```\n\n```text\nhttp.response.status_code >= 500 and http.response.status_code < 600\n```\n\n```text\nevent.duration >= 1000000000\n```\n\n```text\npipeline.errors : *\n```\n\n```text\nlabels.run_id : \"full-acceptance\"\n```\n\n第三个条件表示至少一秒，因为本书耗时单位为纳秒。\n第四个条件寻找已索引的错误原因字段，不是全文查找“error”单词。\n\n**全文消息与精确字段**\n\n```text\nmessage : \"timeout\"\n```\n\n这与按 `trace.id` 精确匹配的语义不同。\n通配符、特殊字符、大小写以及分析器行为应结合字段类型理解。\n需要正则或其他 Lucene 特性的查询时，明确切换语言并核对语法，不要混写两种表达式。[Lucene 查询语法](https://www.elastic.co/guide/en/kibana/7.17/lucene-query.html)\n\n**不应复制到公开报告的内容**\n\n完整 Token、Cookie、邮箱、用户标识、订单详情可能出现在查询条件或原始日志中。\n保存查询和共享截图之前应脱敏。\nKibana Space 是组织与授权的一部分，不自动替代底层索引权限。\n\n\n#### DQL 和 Lucene，不混用查询栏语法\n\nDashboards 2.19 的查询栏支持 DQL 和 Lucene query-string。\n下面两组表达同一业务条件，但分别属于不同模式：[查询语言](https://docs.opensearch.org/2.19/dashboards/dql/)\n\n```text\nDQL:\nservice.name: \"orders-api\" and service.environment: \"lab\" and http.response.status_code >= 500\n\nLucene:\nservice.name:\"orders-api\" AND service.environment:\"lab\" AND http.response.status_code:[500 TO 599]\n```\n\n过滤批次时加 `labels.run_id: \"first-check\"`。\n`message: \"inventory timeout\"` 对 text 字段仍受分析器与短语语义影响；精确 ID 应查 keyword 字段 `event.id`。\n不要因为 DQL 与 KQL 外观接近就承诺所有表达式可互换。\n\n建议固定显示字段：`@timestamp`、`event.id`、`service.name`、`http.response.status_code`、`event.duration`、`trace.id` 和 `pipeline.version`。\n从隔离视图查看 `pipeline.errors` 与 `event.original`，然后回到原始文件核对。", "subs": ["KQL 与 Lucene 的使用边界", "DQL 和 Lucene"]}, {"title": "17.3 按统计契约制作业务、分布与数据质量面板", "content": "<a id=\"s-17-3\"></a>\n\n#### 先写指标定义，再拖拽图表\n\n可视化最容易出错的地方不是按钮，而是统计对象。\n访问日志、业务日志和异常堆栈行数并不天然代表同一种事件。\n\n| 面板 | 定义 | 必须标注的边界 |\n| --- | --- | --- |\n| 请求量 | 有效访问事件数量 | 数据集、重复策略、缺采情况 |\n| 5xx 比例 | 5xx / 有状态码的访问事件 | 无状态字段不等于成功 |\n| 慢请求比例 | 超阈值 / 有耗时的访问事件 | 耗时单位与阈值 |\n| P95 耗时 | 有效请求耗时的 95 分位估计 | 近似算法、缺失率 |\n| Top 接口 | 规范化接口维度的请求分布 | Top N 不是完整清单 |\n| 日志新鲜度 | 当前时间与最后入库事件的差值 | 无流量与链路中断要区分 |\n| 解析失败比例 | 隔离事件 / 同批次已接收事件 | 完全无法识别批次的错误需补充 |\n\n在没有稳定去重和完整性保证前，日志请求量应作为观测口径，而不是精确计费依据。\n\n\n#### 用 Lens 构建第一组面板\n\n7.17 的 Lens 支持以字段拖拽与公式构建可视化。[Lens](https://www.elastic.co/guide/en/kibana/7.17/lens.html)\n先选正常日志的 Index Pattern，并固定环境和数据集筛选。\n再创建时间分布、错误率和耗时面板。\n\n**面板 A：请求趋势**\n\n横轴选 `@timestamp` 的时间直方图，纵轴使用记录数。\n名称写为“有效接入访问日志数量”，而不是在未验证完整性时写“全部业务请求数”。\n选择时间桶时注意首尾不完整桶，避免把尚未结束的一分钟误认为流量骤降。\n\n**面板 B：5xx 比例**\n\n在已经限定 `event.dataset: nginx.access` 的前提下，公式示例为：\n\n```text\ncount(kql='http.response.status_code >= 500 and http.response.status_code < 600')\n/\ncount(kql='http.response.status_code : *')\n```\n\n界面中将它作为一个完整公式输入，而不是两条独立查询。\n格式设置为百分比。\n无有效状态码时应呈现无数据，不应额外强制补零。\n\n**面板 C：P95 耗时**\n\n```text\npercentile(event.duration, percentile=95) / 1000000\n```\n\n结果单位为毫秒。\n标题和纵轴都应写清单位，避免同一 Dashboard 有的图用秒、有的图用毫秒却不标注。\n公式可用性以 7.17.29 实际界面为准；不支持的表达式可改为普通 Percentile 指标，再配置显示或查询侧换算。\n\n\n#### 增加分布与质量面板\n\n只有总量和平均值，容易掩盖某个服务、接口或实例的异常。\n但无限增加拆分维度会使图表难读且查询昂贵。\n\n| 面板 | 建议维度 | 不建议直接使用 |\n| --- | --- | --- |\n| 服务错误分布 | service.name | Trace ID |\n| 响应码分布 | http.response.status_code | 完整异常堆栈 |\n| 接口分布 | 规范化路由字段 | 含用户参数的完整 URL |\n| 解析失败类型 | pipeline.errors | 任意原始 message |\n| 规则版本比较 | pipeline.version | 每条事件生成一个版本值 |\n\n主实验只记录 `url.original`，方便观察原始 URL。\n正式 Top 接口面板前应在解析规则与 Mapping 中增加规范化字段，并用多种真实路径验证聚类方式。\n不要只在图表中做一个未经检查的正则替换后，把不同接口错误归并。\n\n**字段质量要独立呈现**\n\n可以分别展示缺状态、缺耗时、非法时间、无 Trace ID 和校验失败数量。\n这些不是同一种错误，也不应都计入业务失败率。\n没有 Trace ID 可能是未埋点或采样关联不足；非法状态码则是日志格式或解析契约问题。\n\n\n#### 用四个面板完成一次业务观察\n\n| 面板 | 过滤和聚合 | 验收 |\n| --- | --- | --- |\n| 访问事件量 | dataset=`nginx.access`，Date Histogram，Count | 与该窗口有效事件清单比对 |\n| 状态码分布 | Terms on `http.response.status_code` | 200 与 504 等数值类型一致 |\n| 耗时分布 | Percentiles on `event.duration` | 单位 ns；展示前明确换算到 ms |\n| 异常类型 | Terms on `error.type`，按事件时间 | 访问错误和异常事件的口径分开 |\n\n在 Visualize 中选择聚合式图表，保存后加入新 Dashboard `exp-orders-lab`。\n不要把所有日志 Count 命名成请求量，因为 Java 堆栈、heartbeat 和探针都不是访问请求。\n不假设 Kibana Lens 在 Dashboards 中存在同等对象模型；需要的图表用已安装功能实现，并保留查询与聚合说明。\n\n**API 聚合对照**\n\n```http\nPOST /exp-logs/_search\n{\n  \"size\": 0,\n  \"query\": {\"bool\":{\"filter\":[\n    {\"term\":{\"labels.run_id\":\"first-check\"}},\n    {\"term\":{\"event.dataset\":\"nginx.access\"}}\n  ]}},\n  \"aggs\": {\n    \"status\": {\"terms\":{\"field\":\"http.response.status_code\",\"size\":10}},\n    \"latency_ns\": {\"percentiles\":{\"field\":\"event.duration\",\"percents\":[50,95,99]}}\n  }\n}\n```\n\n这是用于对照的完整查询，不代表已经执行。\n比较时保证界面和 API 的索引、时间、批次和身份相同，且检查部分分片失败。\n分位数是近似计算的统计值；不要要求不同算法配置在小数末位完全一致，更不要把过滤后的样本当成完整业务请求分布。", "subs": ["先写指标定义", "用 Lens 构建第一组面板", "增加分布与质量面板", "用四个面板完成一次业务观察"]}, {"title": "17.4 管理共享、Saved Objects 和可复查的排障证据", "content": "<a id=\"s-17-4\"></a>\n\n#### 建立一次故障检索记录\n\n一份可复查的记录至少包含：环境、服务、UTC 时间窗口、Index Pattern、查询语言、查询条件、样本事件 ID、规则版本和关键原始证据。\n截图只能辅助展示，不能替代这些信息。\n\n```text\n问题：orders-api 出现 5xx\n环境：lab\n查询入口：logs-lab\n时间：使用明确起止时间，记录时区\n筛选：service.name、status 范围、event.dataset\n样本：event.id、trace.id、_index\n解析规则：pipeline.version\n证据：event.original 与规范字段\n未知：是否缺采、是否存在 Trace、是否已覆盖所有实例\n```\n\n发现一个错误事件后，应继续判断它是全局故障、单实例故障还是少数噪声。\n不要用一条日志代表整个服务，也不要因为没有查到就直接断言业务没有出错。\n\n\n#### Dashboard 的交互与复查路径\n\n一个实用 Dashboard 应允许使用者从“整体异常”下钻到“具体样本”。\n推荐路径是环境 → 服务 → 接口或实例 → 错误列表 → 单条日志 → Trace。\n\n```mermaid\nflowchart TD\n    A[整体请求与错误趋势] --> B[按服务和接口缩小范围]\n    B --> C[异常实例与时间窗口]\n    C --> D[Discover 样本日志]\n    D --> E[原始日志与字段规则]\n    D --> F[存在时跳转 Trace]\n```\n\n跳转 Trace 的链接只提供定位入口，不代表目标后端一定有数据。\n应保留“Trace 不存在”的解释路径，避免用户把跳转失败当成日志字段错误。\n\n**使用筛选器时注意范围**\n\n固定筛选、全局时间、面板自身时间覆盖、图表点击产生的筛选可能同时生效。\n分享链接或截图时必须记录这些上下文。\n同一图表在两个人的浏览器里显示不同结果，可能只是时间或固定筛选不同。\n\n**不把 Dashboard 当作告警引擎**\n\nDashboard 用于展示，告警规则需要单独配置评估周期、无数据行为、抑制与通知。\n本专题优先把组件健康指标接入已有 Prometheus/Alertmanager，不因为已经安装 Kibana 就假设所有通知能力和许可都自动具备。\n涉及具体付费功能时应核对相应版本许可，不把本地实验能力推广成所有部署都免费可用。\n\n\n#### Saved Objects 导出与迁移\n\nDashboard 依赖 Lens、Visualization、Search 和 Index Pattern 等对象。\n只保存一个 Dashboard 对象可能缺少引用。\n7.17 的 Saved Objects Export API 可以递归包含引用，返回 NDJSON。[导出 API](https://www.elastic.co/guide/en/kibana/7.17/saved-objects-api-export.html)\n\n下面导出实验环境的对象类型，文件实际内容来自你的 Kibana，而不是手工虚构内部 ID。\n此接口在 7.17 文档标为技术预览，自动化时应固定版本并验证响应。\n\n```bash\nmkdir -p exports\ncurl -fsS -X POST 'http://127.0.0.1:5601/api/saved_objects/_export' \\\n  -H 'kbn-xsrf: true' \\\n  -H 'Content-Type: application/json' \\\n  --data-binary @- > exports/kibana-elk-lab.ndjson <<'JSON'\n{\n  \"type\": [\"dashboard\", \"visualization\", \"lens\", \"search\", \"index-pattern\"],\n  \"includeReferencesDeep\": true,\n  \"excludeExportDetails\": false\n}\nJSON\n```\n\n导出所有这些类型可能包含其他实验对象。\n生产应按具体对象 ID 和 Space 收敛范围，并审查保存查询中的敏感条件。\n\n**检查 NDJSON 结构**\n\n```bash\npython3 - <<'PY'\nimport json\nfrom pathlib import Path\npath = Path(\"exports/kibana-elk-lab.ndjson\")\ncount = 0\nfor number, line in enumerate(path.read_text(encoding=\"utf-8\").splitlines(), 1):\n    if not line.strip():\n        continue\n    item = json.loads(line)\n    count += 1\n    if \"missingRefCount\" in item and item[\"missingRefCount\"]:\n        raise SystemExit(f\"导出存在缺失引用：第 {number} 行 {item}\")\nprint(f\"NDJSON 语法通过：{count} 条记录；还需在目标 Kibana 验证引用和展示。\")\nPY\n```\n\n这只是格式和导出摘要检查，不是 Dashboard 运行验收。\n\n**导入到目标实验 Space**\n\n```bash\n# 对目标环境执行，默认不主动覆盖同 ID 对象。\ncurl -fsS -X POST 'http://127.0.0.1:5601/api/saved_objects/_import' \\\n  -H 'kbn-xsrf: true' \\\n  --form file=@exports/kibana-elk-lab.ndjson\n```\n\n检查响应中的 `success`、错误条目和冲突，不只看 HTTP 状态。[导入 API](https://www.elastic.co/guide/en/kibana/7.17/saved-objects-api-import.html)\n迁移目标的版本兼容、数据别名和权限必须另行验证。\n不要把较新版本导出的对象直接当成可向旧版本无损回退的配置。\n\n\n#### 从查询结果到证据结论\n\n展示与结论之间还需要解释。\n一个面板显示 5xx 增长，可能来自真实故障、日志覆盖变化、解析规则变化、重复回放或过滤口径变化。\n正确的结论应包含证据范围和未验证部分。\n\n| 观察 | 还需要验证 |\n| --- | --- |\n| 5xx 曲线突然增加 | 是否新增服务、采集范围或重复数据 |\n| 耗时 P95 降低 | 是否丢失慢请求、单位是否改变 |\n| 某实例没有日志 | 实例是否仍运行、采集是否正常、是否没有流量 |\n| 隔离日志减少 | 规则修复了，还是异常事件被直接丢弃了 |\n| Trace 查询为空 | 采样、导出、保留和环境是否匹配 |\n\n建议在 Dashboard 说明中记录字段契约版本、数据源、时区和统计口径。\n规则升级时同时更新说明和验收数据，防止图表外观不变但含义已经改变。\n\n\n#### 检索与看板的综合验收\n\n使用第二篇的固定批次，再加一批新的正常日志完成验证。\n不要用随手搜索到的随机文档代替已知输入。\n\n| 验收项目 | 通过标准 |\n| --- | --- |\n| 模板 | 正常与隔离索引分别命中预期模板 |\n| Mapping | 状态为 integer，耗时为 long，原始 app 不动态扩张 |\n| 别名 | 每组有明确写索引，查询范围不混入其他数据集 |\n| ILM | 初始索引受管理，未来索引也继承同一策略 |\n| Rollover | 新事件进入新写索引，旧索引仍可查询 |\n| 查询 | 同一 run_id 的正常和隔离数量可解释 |\n| 深分页 | 导出无部分分片失败，PIT 最终关闭或过期 |\n| Kibana | 业务时间与入库时间视图各自符合目的 |\n| Dashboard | 错误率和耗时单位定义明确 |\n| 迁移 | Saved Objects 引用完整，目标环境可复查 |\n\n本篇完成后，应能独立回答“为什么日志写入了却查不到”“为什么字段不能聚合”“为什么配置 ILM 后磁盘仍增长”。\n后续学习把这些机制放进容量、监控、安全和故障恢复流程。\n\n\n#### Saved Objects 与 UI 验收证据\n\n把实验 Dashboard、Visualization 和 Index Pattern 从各自产品导出，分别保存，记录产品版本、对象 ID、依赖对象和原查询。\n不能将 Kibana 7.17 导出的 NDJSON 直接视为 OpenSearch Dashboards 的通用备份格式。\n即使导入接口接受，也要验证面板引用、字段、时区、筛选与权限。[工具与产品边界](https://docs.opensearch.org/2.19/tools/)\n\nUI 验收至少记录五件事：登录/访问是否成功、索引模式与时间字段、DQL/Lucene 模式、关键面板查询、截图或导出对象位置。\n真实 Kibana / Dashboards 的界面验收仍为“未执行”；文档 Roadmap 的浏览器检查不替代产品 UI 验收。", "subs": ["建立一次故障检索记录", "Dashboard 的交互与复查路径", "Saved Objects 导出与迁移", "从查询结果到证据结论", "检索与看板的综合验收", "Saved Objects 与 UI 验收证据"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>

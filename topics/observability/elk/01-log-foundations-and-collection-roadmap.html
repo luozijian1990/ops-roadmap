@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ELK 与 OpenSearch 日志平台学习笔记 · 第一篇：日志基础、采集与组件选型 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>ELK 与 OpenSearch 日志平台学习笔记 · 第一篇：日志基础、采集与组件选型</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "ELK 与 OpenSearch 日志平台学习笔记 · 第一篇：日志基础、采集与组件选型", "intro": "> 教学基线：Elastic Stack 7.17.29、Kafka 2.8.2 ZooKeeper 模式；双后端对照采用 OpenSearch / Dashboards 2.19.6。固定版本用于教学，不表示生产推荐或联合认证。\n> 配置与脚本完整保留在四篇 Markdown；对照实验从[文件索引与提取入口](02-pipeline-and-reliability.md#s-11-1)准备。基础实验和对照实验使用独立目录、端口、数据卷及脚本。\n> 验证边界：静态与离线逻辑测试不能替代真实组件、TLS、故障、性能与 UI 验收。具体状态见[专题说明](README.md)。\n\n[返回专题](README.md) · [第2篇](02-pipeline-and-reliability.md) · [第3篇](03-search-storage-and-visualization.md) · [第4篇](04-production-operations-and-troubleshooting.md)\n\n| 章节 | 核心主题 |\n| --- | --- |\n| 1 | 日志平台的职责、数据路径与实验边界 |\n| 2 | 日志契约与可对账的样本 |\n| 3 | Filebeat 的读取状态与背压 |\n| 4 | 结构化日志、多行异常与源端处理 |\n| 5 | Linux 与 Kubernetes 日志接入 |\n| 6 | 按场景选择采集与加工组件 |", "parts": [{"title": "第 1 章 · 日志平台的职责、数据路径与实验边界", "sections": [{"title": "1.1 从排障问题理解日志、指标与 Trace 的分工", "content": "<a id=\"s-1-1\"></a>\n\n#### 从“应用报错，但平台没有日志”开始\n\n凌晨收到下单接口错误率升高的告警。应用负责人说已经打印异常，Kibana 却搜不到。\n这时最容易犯的错误，是立刻重启 Filebeat，或者认为 Elasticsearch 丢了数据。\n“没有搜到”只是查询侧的现象，并没有定位到数据路径中的具体阶段。\n\n先把问题拆成三个独立判断：应用是否生成记录，记录是否进入平台，查询是否选中了它。\n即使应用确实执行了日志方法，也还要检查日志级别、异步 Appender、缓冲刷新和输出位置。\n容器标准输出与应用内部 `/logs/app.log` 是不同的数据源，采集其中一个不会自动得到另一个。\n\n| 阶段 | 可检查证据 | 不能直接推出的结论 |\n| --- | --- | --- |\n| 应用生成 | 原始文件、容器 stdout、明确事件 ID | 调用了日志方法不等于文件已落盘 |\n| Filebeat 读取 | 匹配路径、权限、采集计数、Registry 状态 | 读取计数增长不等于 ES 写入成功 |\n| Kafka 接收 | Topic 中的实际消息、生产错误 | Topic 有消息不等于当前消费组已处理 |\n| Logstash 加工 | 输入输出计数、解析失败标签、队列 | 输入与输出计数不同不一定是丢失 |\n| ES 索引 | Bulk item 结果、按 ID 查文档 | HTTP 200 不代表 Bulk 全部成功 |\n| Kibana 查询 | Index Pattern、时间字段、过滤条件 | 空结果不代表存储中没有文档 |\n\n**一条用于排障的“探针日志”**\n\n为每次验证生成独立事件 ID，例如 `lab-20260924-a-000001`。\n在原始记录、Kafka 消息、Logstash 调试输出和 Elasticsearch 文档中查这个 ID。\n不要用“最新一条”作为唯一标准：异步处理、不同时间戳与并行分区会改变可见顺序。\n\n```json\n{\n  \"event_id\": \"lab-20260924-a-000001\",\n  \"service\": \"orders-api\",\n  \"env\": \"lab\",\n  \"level\": \"ERROR\",\n  \"message\": \"inventory request timed out\",\n  \"status\": \"504\",\n  \"request_time\": \"1.250\"\n}\n```\n\n这是一条教学记录，不包含真实订单、账号、Cookie 或认证凭据。\n生产中不能为了排障把 Authorization、访问令牌或完整请求体无差别写入日志。\n日志越容易检索，敏感数据被扩大访问的风险也越大；字段治理不是最后才补的工作。\n\n**本节练习**\n\n画出自己环境中的实际路径，并为每条箭头写一个能验证它的方法。\n例如“Filebeat → Kafka”不是写“检查网络”，而是写“从相同网络命名空间查询元数据，并消费目标 Topic 中带探针 ID 的消息”。\n这个练习的产物是一张证据路径图，而不是一份产品清单。\n\n\n#### 日志、指标与 Trace 的分工\n\n指标适合观察趋势与范围，日志适合保留事件细节，Trace 适合理解一次操作的调用关系。\n它们可以互相补充，但不能因存在关联字段就忽略数据覆盖率、采样和处理延迟。\n一条错误日志中带有 Trace ID，只说明它记录了追踪上下文，并不证明该 Trace 已被后端存储。\n\n| 问题 | 优先入口 | 接下来补充什么 |\n| --- | --- | --- |\n| 哪个服务错误率升高？ | 请求指标或完整访问日志聚合 | 环境、接口、时间范围 |\n| 某次请求返回了什么错误？ | 访问日志与应用日志 | Trace ID、实例和异常类型 |\n| 时间主要花在哪一跳？ | 对应 Trace | 下游日志和依赖指标 |\n| 某个 Pod 重启前发生了什么？ | Kubernetes Events 与应用日志 | JVM、容器和节点指标 |\n| 日志平台是否漏采？ | 端到端探针与边界计数 | 本地文件、队列和错误原因 |\n\n对访问日志计算错误率时，分母必须与分子来自相同覆盖范围。\n不能用“采样后的普通请求 + 全量错误请求”直接计算真实业务错误率。\n错误日志比例也不等于失败请求比例：同一失败请求可能产生十条异常日志，而成功请求一条都不打印。\n\n```mermaid\nflowchart LR\n    R[一次请求] --> M[指标: 聚合趋势]\n    R --> L[日志: 事件上下文]\n    R --> T[Trace: 调用关系]\n    M --> S[缩小时间和服务范围]\n    L --> S\n    T --> S\n    S --> E[形成证据并验证假设]\n```\n\n**关联字段只是索引，不是根因结论**\n\n`trace.id`、`service.name`、`service.environment`、Pod UID 和时间窗口共同构成关联条件。\n只用服务名可能把生产与测试环境混在一起；只用 Pod 名可能遇到重建和名称复用。\n只用一个错误关键词，则可能把原因日志、重试日志和上游传播日志重复计为多个故障。\n\n本专题把日志字段与存储检索讲清，不重新实现 OTel SDK 或 Jaeger。\n关于传播、采样与跨服务证据，配合仓库中 [OTel 专题](https://github.com/luozijian1990/ops-roadmap/blob/main/topics/observability/otel/README.md) 阅读。\nECS 的事件时间、服务身份与追踪字段定义可作为公共词汇，而不是强制要求所有源日志一开始就完全符合 ECS。[ECS](https://www.elastic.co/guide/en/ecs/1.12/ecs-reference.html)", "subs": ["从“应用报错", "日志、指标与 Trace 的分工"]}, {"title": "1.2 选择直连、加工和带缓冲的日志链路", "content": "<a id=\"s-1-2\"></a>\n\n#### 五个组件的职责与三种链路\n\nELK 原指 Elasticsearch、Logstash、Kibana。\n实际日志平台经常再加入 Filebeat 与 Kafka；本书沿用“ELK 日志平台”这个主题名，但明确五个组件的责任。\n\n| 组件 | 核心职责 | 不应默认交给它的工作 |\n| --- | --- | --- |\n| Filebeat | 贴近日志源读取、补充元数据、发送 | 复杂跨事件关联与长期归档 |\n| Kafka | 按分区保存消息、解耦生产与消费 | 自动保证最终 ES 文档不丢不重 |\n| Logstash | 解析、规范化、路由和批量输出 | 无限缓冲、自动理解业务字段 |\n| Elasticsearch | 建模、索引、检索与生命周期 | 任意格式永久无成本保存 |\n| Kibana | 查询、分析和展示 | 替代 ES 权限与写入结果校验 |\n\n**链路 A：Filebeat 直接写 ES**\n\n```mermaid\nflowchart LR\n    A[日志文件] --> B[Filebeat]\n    B --> E[Elasticsearch]\n    K[Kibana] --> E\n```\n\n这种路径短，适合先验证采集和检索，也适合格式简单且能接受下游压力直接传回采集端的场景。\n它不是“不专业”，关键在于格式治理、缓冲时长和故障容忍是否满足需求。\n第一篇使用这条路径建立最小可验证实验。\n\n**链路 B：Filebeat 经 Logstash 写 ES**\n\n```mermaid\nflowchart LR\n    A[日志文件] --> B[Filebeat]\n    B --> L[Logstash]\n    L --> E[Elasticsearch]\n    K[Kibana] --> E\n```\n\n当解析逻辑需要集中维护时，可以加入 Logstash。\n要同时讨论它的实例数量、队列、持久化和输出阻塞；中间多一个组件，并不自动增加可靠性。\n使用 Beats input 时，采集端确认边界与 Kafka input 不同，不能把两种管道的故障语义混写。\n\n**链路 C：Filebeat → Kafka → Logstash → ES**\n\n```mermaid\nflowchart LR\n    A[日志源] --> B[Filebeat]\n    B --> Q[Kafka Topic]\n    Q --> L[Logstash 消费组]\n    L --> E[Elasticsearch]\n    K[Kibana] --> E\n    Q --> O[其他独立消费者]\n```\n\n这条路径适合需要较长缓冲窗口、多消费者或回放的场景。\n代价是 Topic 治理、分区规划、磁盘成本、消费组与重放管理。\n是否引入 Kafka，应该由“允许 ES 中断多久、积压能保存多久、是否需要重复处理”决定，而不是因为组件越多看起来越完整。[Filebeat 输出](https://www.elastic.co/guide/en/beats/filebeat/7.17/configuring-output.html)\n\n\n#### 为日志平台定义可验证目标\n\n不要只写“日志不能丢、平台要高可用”。这些表述没有故障边界，也无法验收。\n把目标改成带条件的句子：在什么负载、什么故障和什么保留窗口内，数据应达到什么状态。\n\n| 目标类型 | 示例写法 | 验证方法 |\n| --- | --- | --- |\n| 新鲜度 | 健康状态下，探针在约定时间内可查询 | 定时生成探针并记录首个可见时间 |\n| 覆盖率 | 所有目标命名空间均有采集实例 | 节点清单、DaemonSet 与样本对照 |\n| 可恢复性 | ES 停机期间，积压不超出 Kafka 保留窗口 | 隔离实验停止后端并恢复 |\n| 格式质量 | 无效字段被标记，不能静默写成成功值 | 异常输入测试集 |\n| 可追溯性 | 文档能回溯到源事件及处理规则版本 | 事件 ID、原始记录、Pipeline 版本 |\n| 成本 | 保留范围和副本数量有明确预算 | 容量公式与实际磁盘趋势 |\n\n**用“数据在哪里”替代“哪个组件坏了”**\n\n排障开始时记录最后一个有确凿证据的阶段。\n若 Kafka 已有探针、ES 没有，优先检查消费、加工、写入和查询；不要先改采集端。\n若 ES 能按 ID 查到，但 Kibana 无结果，则先检查时间范围和 Index Pattern，而不是扩大 Kafka 分区。\n\n**章节验收**\n\n能用自己的话解释：为什么 Kafka 存活不代表日志链路健康，为什么 Kibana 没日志不能证明 Filebeat 没读。\n能指出平台的主要缓冲层，以及缓冲耗尽后压力会传播到哪里。\n能给出一个能重复执行、不会访问生产敏感数据的探针实验。\n\n\n#### 从“保留采集链路，新增搜索后端”开始\n\n团队已有 Filebeat、Kafka 和 Logstash，希望验证另一个日志搜索后端。\n合理的第一步是让一个独立消费者读取同一批数据，写入新的实验集群，然后比较事件集合与查询结果。\n不应先把生产 Logstash 的地址改掉，也不应把原 ES 数据目录交给 OpenSearch 打开。\n\nOpenSearch 承担索引、搜索、聚合及集群数据管理；OpenSearch Dashboards 是对应的交互界面。\n它们与 Elasticsearch、Kibana 有相近的职责划分，但已经是独立发布、独立演进的产品。\n这种对应关系是学习迁移的起点，不是二进制、插件和管理接口完全兼容的承诺。[工具兼容资料](https://docs.opensearch.org/2.19/tools/)\n\n```mermaid\nflowchart LR\n  F[Filebeat 7.17.29] --> K[Kafka 2.8.2]\n  K -->|消费组 exp-es-v2| E[Logstash ES 分支]\n  K -->|消费组 exp-os-v2| O[Logstash OS 分支]\n  E --> ES[Elasticsearch 7.17.29]\n  O --> OS[OpenSearch 2.19.6]\n  ES --> KI[Kibana 7.17.29]\n  OS --> DA[Dashboards 2.19.6]\n```\n\n两个消费组分别读取全部消息；使用同一消费组会分摊分区，而不是形成两份完整对照。\n两条输出使用独立进程和独立 PQ，避免一个后端长时间不可用把另一个输出同步拖住。\n实验中的单 Kafka broker 仍是共同依赖，不能由这张图推导出整条链路高可用。", "subs": ["五个组件的职责与三种链路", "为日志平台定义可验证目标", "从“保留采集链路"]}, {"title": "1.3 区分 Elastic 与 OpenSearch 的版本和能力边界", "content": "<a id=\"s-1-3\"></a>\n\n本专题保留 Elastic 7.17.29 基础实验，并用 OpenSearch 2.19.6 做独立对照。版本表说明教学条件；它不代表推荐新建生产系统使用这些历史版本，也不代表插件组合已经真实联调。先选择实验路径，再准备目录，避免把两套配置拼在一起。\n\n#### 固定版本、目录与验证范围\n\n本书明确使用 Elastic Stack 7.17.29，而不是镜像标签 `latest`。\nKafka 在第二篇固定到 2.8.2，并使用 ZooKeeper 模式；不把 Kafka 3/4 的 KRaft 命令混进主实验。\n7.17 的安全初始化、Filebeat 输入配置和 Logstash 插件选项应查对应版本资料。[7.17.29 发布说明](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/release-notes-7.17.29.html)\n\n**实验前提**\n\n建议准备一台独立 Linux 实验机，或具有足够资源的 Docker Desktop 环境。\n本篇可从 4 vCPU、8 GiB 可分配内存起步，完整链路建议留出更多资源；这是教学起点，不是生产容量结论。\n旧内核系统能运行某些组件，不等于全部依赖受当前厂商支持。不要因已有 CentOS 7 就默认所有镜像都兼容。\n\n```bash\n# 在实验宿主机检查；命令本身不修改业务数据。\nuname -a\nuname -m\nfree -h\ndf -h\ndocker version\ndocker compose version\npython3 --version\ncurl --version\n```\n\n完整 Compose 使用 Docker Compose v2 命令。\nmacOS 没有 `free` 时，从 Docker Desktop 检查虚拟机资源；ES 所见的内核参数属于虚拟机，不是 macOS 本体。\nARM 主机应核对各镜像架构；本实验以 Linux amd64 为主要教学落点，不宣称所有镜像均已在 ARM 联调。\n\n**建立目录**\n\n```bash\nmkdir -p \"$HOME/elk-lab-direct\"/{filebeat,logs,scripts}\ncd \"$HOME/elk-lab-direct\"\nprintf '%s\\n' '7.17.29' > ELASTIC_VERSION.txt\n```\n\n目录结构如下。\n所有后续“保存为”路径均相对此目录，除非明确标为另一套实验。\n\n```text\nelk-lab-direct/\n├── compose.yml\n├── ELASTIC_VERSION.txt\n├── filebeat/\n│   └── filebeat.yml\n├── logs/\n│   └── access.jsonl\n└── scripts/\n    └── generate_logs.py\n```\n\n\n#### 精确版本与兼容依据\n\n| 对象 | 本书选定值 | 依据与限制 |\n| --- | --- | --- |\n| Elasticsearch / Kibana | 7.17.29 | 延续旧文，不在扩展中升级旧基线 |\n| Filebeat | 7.17.29 | 保留文件与 Kafka 路径，不直接连接 OpenSearch |\n| Kafka | 2.8.2，Scala 2.13 包 | 保留 ZooKeeper 教学；不是 KRaft 教程 |\n| 两个 Logstash 主程序 | 7.17.29 | 便于比较相同 Filter 行为；输出插件独立管理 |\n| ES output | 11.4.2 | 原 7.17.29 发布锁定版本 |\n| OS output | 2.0.3 | 固定官方插件 tag / gemspec；并非插件最新版 |\n| Kafka integration | 10.12.2 | 固定主程序原插件；构建 OS 镜像后再次核对 |\n| Ruby filter | 3.1.8 | 固定字段规范化入口 |\n| OpenSearch / Dashboards | 2.19.6 / 2.19.6 | 官方制品页与 2.19 分支文档；独立的新实验基线 |\n\nOpenSearch 官方制品页可查到 2.19.6。本书选择仍有完整版本化资料的 2.19 系列，目的是完成存量日志链路对照，不宣称这是整个 OpenSearch 产品的最新版本。[制品](https://opensearch.org/artifacts/by-version/)\n\n插件 2.0.3 的 gemspec 接受 `logstash-core-plugin-api >= 1.60, <= 2.99`，并依赖 AWS SDK v3。\n这给出依赖级兼容证据，但不是“官方已联合测试 7.17.29 × 2.0.3 × 2.19.6”的证明。\n精确组合仍要在本地构建、启动、Bulk、故障恢复及 TLS 测试中验收。[固定 gemspec](https://github.com/opensearch-project/logstash-output-opensearch/blob/2.0.3/logstash-output-opensearch.gemspec)\n\n**为什么构建一个新 Logstash 镜像**\n\n原镜像中部分 AWS 插件依赖 AWS SDK v2，与 OS output 的 SDK v3 依赖可能冲突。\n[对照实验 Dockerfile](02-pipeline-and-reliability.md#s-8-2) 只在 OS 分支移除官方说明列出的旧 AWS 输入/输出，再安装精确 2.0.3。\n本实验不使用 AWS 服务，因此不额外引入 AWS integration 预发布插件。\n这不是建议在现网任意卸载插件；有 S3、SQS 等任务的环境必须采用独立镜像和依赖评审。[插件说明](https://github.com/opensearch-project/logstash-output-opensearch/blob/2.0.3/README.md)\n\n构建会检查 Kafka integration 和 Ruby filter 版本。\n如果依赖解析改变了它们，构建应失败，而不是悄悄继续运行。\n即便关键版本不变，也必须保存完整插件清单、镜像 ID 与 digest，记录其他传递依赖；固定三个插件不等于完整供应链已经锁定。\n\n\n#### Filebeat 7.17 的直连边界\n\nOpenSearch 的兼容工具文档明确区分旧 OSS Beats 与较新的 Beats，并建议将不支持直连的 Beats 经 Logstash 和 OpenSearch output 接入。\n本书不把 `output.elasticsearch.hosts` 指向 OpenSearch 作为 Filebeat 7.17 的受支持路径。[Beats 边界](https://docs.opensearch.org/2.19/tools/)\n\n`compatibility.override_main_response_version` 是旧客户端版本检查兼容措施，不会实现完整 Elasticsearch 7.17 API，更不会迁移模板、ILM 或模块 Ingest Pipeline。\n伪装根接口版本后“连接成功”，仍可能在模板安装、产品识别或数据写入阶段失败。\n主实验不启用这个伪装选项，客户端明确识别 `version.distribution=opensearch`。\n\n| 路径 | 本篇判断 |\n| --- | --- |\n| Filebeat 7.17 → Kafka → LS → OS output | 主实验，精确组合待真实联调 |\n| Filebeat 7.17 → LS Beats input → OS output | 可缩短链路，但另核对 Beats input 和传输缓冲 |\n| 应用样本 → LS stdin → OS output | 最短的转换与输出实验 |\n| Filebeat 7.17 Elasticsearch output → OS | 不作为受支持方案 |\n| ES output 11.4.2 改 URL → OS | 不作为替代专用 OS output 的方案 |", "subs": ["固定版本、目录与验证范围", "精确版本与兼容依据", "Filebeat 7"]}, {"title": "1.4 用固定样本跑通第一条可查询的日志", "content": "<a id=\"s-1-4\"></a>\n\n这一节只运行最短的 Filebeat → Elasticsearch 路径，所有文件保存到 `elk-lab-direct`。先启动后端、建立字段模板，再启动采集并生成样本；看到界面不算完成，必须按批次查到预期事件。这里的脚本与第二篇的完整链路、双后端对照各自独立。\n\n#### 基础实验：启动 Elasticsearch 与 Kibana\n\n下面是完整的 `compose.yml`。\n宿主机端口只绑定 `127.0.0.1`；不要把关闭认证的教学 ES 暴露到公网或办公网络。\n容器内部仍需要监听非回环地址，否则其他容器无法连接。\n\n```yaml\nservices:\n  elasticsearch:\n    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.29\n    environment:\n      cluster.name: elk-lab-direct\n      node.name: es-direct-1\n      discovery.type: single-node\n      xpack.security.enabled: \"false\"\n      ES_JAVA_OPTS: -Xms1g -Xmx1g\n    ports:\n      - \"127.0.0.1:9200:9200\"\n    volumes:\n      - es-direct-data:/usr/share/elasticsearch/data\n    healthcheck:\n      test:\n        - CMD-SHELL\n        - curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null\n      interval: 10s\n      timeout: 8s\n      retries: 30\n    restart: unless-stopped\n\n  kibana:\n    image: docker.elastic.co/kibana/kibana:7.17.29\n    environment:\n      ELASTICSEARCH_HOSTS: '[\"http://elasticsearch:9200\"]'\n      SERVER_HOST: 0.0.0.0\n    ports:\n      - \"127.0.0.1:5601:5601\"\n    depends_on:\n      elasticsearch:\n        condition: service_healthy\n    restart: unless-stopped\n\n  filebeat:\n    image: docker.elastic.co/beats/filebeat:7.17.29\n    user: root\n    command: [\"filebeat\", \"-e\", \"--strict.perms=false\"]\n    volumes:\n      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro\n      - ./logs:/var/log/lab:ro\n      - fb-direct-data:/usr/share/filebeat/data\n    depends_on:\n      elasticsearch:\n        condition: service_healthy\n    restart: unless-stopped\n\nvolumes:\n  es-direct-data:\n  fb-direct-data:\n```\n\n`--strict.perms=false` 仅为本地只读挂载的教学便利，不是生产默认做法。\n生产中应正确设置配置所有者与读写权限；非 root 采集账号需要能读取源文件，并能写自己的状态目录。\n本篇把 Filebeat 设为 root，是为了避免读权限影响第一次理解数据路径；它不需要 Docker Socket。\n\n**先启动存储，不急着启动采集**\n\n```bash\ncd \"$HOME/elk-lab-direct\"\ndocker compose -p elk-direct config\ndocker compose -p elk-direct up -d elasticsearch kibana\ndocker compose -p elk-direct ps\ncurl -fsS http://127.0.0.1:9200/\ncurl -fsS 'http://127.0.0.1:9200/_cluster/health?pretty'\n```\n\n若 Elasticsearch 报 `vm.max_map_count` 不足，先记录旧值，再在实验宿主机调整。\n此命令影响整台 Linux 主机，应由有权限的操作者执行；生产环境需要走变更流程。\n\n```bash\n# Linux 实验机，非容器内。先读，再改。\nsysctl vm.max_map_count\nsudo sysctl -w vm.max_map_count=262144\n```\n\n不要把关闭全部 Bootstrap Checks 当作通用修复。\n`single-node` 只是实验拓扑，不是多节点集群的高可用配置。[ES 配置](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/important-settings.html)\n\n\n#### 基础实验：创建字段模板与 Filebeat 配置\n\n初始实验把源 JSON 放在 `app` 对象下，避免未经治理的字段覆盖 Filebeat 的 `host`、`agent` 和 `log`。\n这一阶段的 `@timestamp` 是采集事件时间；源业务时间保存在 `app.time`。\n第二篇会改为集中解析，并把规范化后的业务时间写入 `@timestamp`。\n\n**先创建只作用于实验索引的模板**\n\n```bash\ncurl -fsS -X PUT \\\n  'http://127.0.0.1:9200/_index_template/logs-lab-direct-template' \\\n  -H 'Content-Type: application/json' \\\n  --data-binary @- <<'JSON'\n{\n  \"index_patterns\": [\"logs-lab-direct-*\"],\n  \"priority\": 300,\n  \"template\": {\n    \"settings\": {\n      \"number_of_shards\": 1,\n      \"number_of_replicas\": 0\n    },\n    \"mappings\": {\n      \"dynamic\": false,\n      \"properties\": {\n        \"@timestamp\": {\"type\": \"date\"},\n        \"message\": {\"type\": \"text\"},\n        \"error\": {\n          \"properties\": {\n            \"message\": {\"type\": \"text\"},\n            \"type\": {\"type\": \"keyword\"}\n          }\n        },\n        \"app\": {\n          \"properties\": {\n            \"time\": {\"type\": \"date\"},\n            \"event_id\": {\"type\": \"keyword\"},\n            \"run_id\": {\"type\": \"keyword\"},\n            \"sequence\": {\"type\": \"long\"},\n            \"service\": {\"type\": \"keyword\"},\n            \"env\": {\"type\": \"keyword\"},\n            \"level\": {\"type\": \"keyword\"},\n            \"message\": {\"type\": \"text\"},\n            \"status\": {\"type\": \"keyword\"},\n            \"request_time\": {\"type\": \"keyword\"},\n            \"trace_id\": {\"type\": \"keyword\"},\n            \"scenario\": {\"type\": \"keyword\"}\n          }\n        }\n      }\n    }\n  }\n}\nJSON\n```\n\n`dynamic: false` 表示未知字段仍保留在 `_source`，但不自动建立可查询映射。\n它不是删除字段，也不是拒绝整个文档。第三篇会与 `strict` 和字段类型冲突作对照。\n本实验将原始状态和耗时保留为 keyword，刻意不在这里计算数值指标，避免把未规范化值直接当测量结果。\n\n**保存为 `filebeat/filebeat.yml`**\n\n```yaml\nfilebeat.inputs:\n  - type: filestream\n    id: lab-json-v1\n    enabled: true\n    paths:\n      - /var/log/lab/*.jsonl\n    parsers:\n      - ndjson:\n          target: app\n          add_error_key: true\n\nsetup.ilm.enabled: false\nsetup.template.enabled: false\n\noutput.elasticsearch:\n  hosts: [\"http://elasticsearch:9200\"]\n  index: \"logs-lab-direct-%{+yyyy.MM.dd}\"\n\nlogging.level: info\nlogging.metrics.enabled: true\nlogging.metrics.period: 30s\n```\n\n这里显式关闭 Filebeat 的模板与 ILM 自动管理，因为实验模板由我们手动建立。\n不是建议生产永远关闭这些功能，而是避免一个实验同时由 Filebeat、Logstash 和人工三方管理相同资源。\n输入中的 `id` 应稳定；不要每次改配置都随机生成新 ID。[filestream](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-input-filestream.html)\n\n**检查并启动**\n\n```bash\ncd \"$HOME/elk-lab-direct\"\ndocker compose -p elk-direct run --rm --no-deps filebeat \\\n  filebeat test config -e --strict.perms=false\ndocker compose -p elk-direct run --rm --no-deps filebeat \\\n  filebeat test output -e --strict.perms=false\ndocker compose -p elk-direct up -d filebeat\ndocker compose -p elk-direct logs --tail=100 filebeat\n```\n\n`test config` 验证配置能被 Filebeat 加载；`test output` 检查输出连接。\n两者都不能证明路径匹配、业务字段和端到端查询正确，必须继续执行本节的样本生成和查询对账。\n\n\n#### 基础实验：生成可重复样本并完成端到端验收\n\n将下面完整脚本保存为 `scripts/generate_logs.py`。\n脚本只向指定实验文件追加日志，不连接任何生产服务。\n每次执行产生独立 `run_id`；同一批事件的 `event_id` 由 run ID 和序号组成，便于回放后对账。\n\n```python\n#!/usr/bin/env python3\n\"\"\"生成 ELK 教学用 JSON Lines；标准库即可运行。\"\"\"\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport math\nimport random\nimport time\nimport uuid\nfrom datetime import datetime, timedelta, timezone\nfrom pathlib import Path\n\n\ndef main() -> None:\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--output\", type=Path, default=Path(\"logs/access.jsonl\"))\n    parser.add_argument(\"--count\", type=int, default=20)\n    parser.add_argument(\"--interval\", type=float, default=0.05)\n    parser.add_argument(\"--run-id\", default=None)\n    parser.add_argument(\"--seed\", type=int, default=42)\n    parser.add_argument(\"--age-hours\", type=float, default=0)\n    parser.add_argument(\"--bad-every\", type=int, default=0)\n    args = parser.parse_args()\n\n    if args.count < 1 or args.count > 1_000_000:\n        parser.error(\"count 必须在 1..1000000 范围内\")\n    if not math.isfinite(args.interval) or args.interval < 0:\n        parser.error(\"interval 必须为非负有限数\")\n    if not math.isfinite(args.age_hours) or abs(args.age_hours) > 87600:\n        parser.error(\"age-hours 超出教学范围\")\n    if args.bad_every < 0:\n        parser.error(\"bad-every 不能为负\")\n\n    run_id = args.run_id or uuid.uuid4().hex\n    rng = random.Random(args.seed)\n    args.output.parent.mkdir(parents=True, exist_ok=True)\n    with args.output.open(\"a\", encoding=\"utf-8\") as stream:\n        for seq in range(args.count):\n            failed = seq % 5 == 0\n            now = datetime.now(timezone.utc) - timedelta(hours=args.age_hours)\n            status = \"504\" if failed else \"200\"\n            duration = 1.25 if failed else round(rng.uniform(0.005, 0.2), 3)\n            event = {\n                \"time\": now.isoformat(timespec=\"milliseconds\"),\n                \"event_id\": f\"{run_id}-{seq:06d}\",\n                \"run_id\": run_id,\n                \"sequence\": seq,\n                \"service\": \"orders-api\",\n                \"env\": \"lab\",\n                \"level\": \"ERROR\" if failed else \"INFO\",\n                \"message\": \"inventory timeout\" if failed else \"order accepted\",\n                \"status\": status,\n                \"request_time\": f\"{duration:.3f}\",\n                \"upstream_status\": \"504\" if failed else \"200\",\n                \"upstream_response_time\": f\"{max(0, duration - 0.003):.3f}\",\n                \"method\": \"POST\",\n                \"uri\": \"/orders\",\n                \"trace_id\": uuid.uuid4().hex,\n                \"scenario\": \"downstream_timeout\" if failed else \"normal\",\n            }\n            if args.bad_every and (seq + 1) % args.bad_every == 0:\n                event[\"status\"] = \"not-a-number\"\n                event[\"scenario\"] = \"invalid_status\"\n            stream.write(json.dumps(event, ensure_ascii=False) + \"\\n\")\n            stream.flush()\n            if args.interval:\n                time.sleep(args.interval)\n    print(json.dumps({\"run_id\": run_id, \"count\": args.count,\n                      \"output\": str(args.output)}, ensure_ascii=False))\n\n\nif __name__ == \"__main__\":\n    main()\n```\n\n**执行并记录 run ID**\n\n```bash\ncd \"$HOME/elk-lab-direct\"\npython3 scripts/generate_logs.py --count 20 --interval 0.05\nwc -l logs/access.jsonl\ntail -n 1 logs/access.jsonl\n```\n\n复制脚本输出的 `run_id`，替换下面的值。\n查询使用 `app.run_id` 精确匹配，不能只看索引总数，因为文件可能包含上一次实验的数据。\n\n```bash\nRUN_ID='替换为脚本输出的run_id'\ncurl -fsS -X POST \\\n  'http://127.0.0.1:9200/logs-lab-direct-*/_search?pretty' \\\n  -H 'Content-Type: application/json' \\\n  --data-binary \"{\\\"size\\\":5,\\\"track_total_hits\\\":true,\\\"query\\\":{\\\"term\\\":{\\\"app.run_id\\\":\\\"${RUN_ID}\\\"}}}\"\n```\n\n预期是最终能找到这批 20 个事件，且字段内容与原始文件一致。\n文件扫描与索引刷新存在延迟，可以间隔重查；不要把第一次空结果立刻定性为丢失。\n若长时间不见数据，依次检查 Filebeat 配置、挂载路径、日志错误与 ES 模板，不要删除 Registry 试运气。\n\n**在 Kibana 中验收**\n\n浏览器打开本机 5601 端口，进入 Stack Management → Index Patterns。\n创建 `logs-lab-direct-*`，时间字段选择 `@timestamp`，再进入 Discover。\n查询 `app.run_id : \"你的run_id\"`，检查 `app.event_id`、`app.status` 和 `app.message`。\n\n这一步应与 API 查询结果对照。\n如果 API 能查到而 Discover 没有，检查时间选择器、Index Pattern 和查询字段，而不是重装组件。[Discover](https://www.elastic.co/guide/en/kibana/7.17/discover.html)\n\n\n#### 基础实验：保存实验状态与安全停止\n\n实验结束可以停止容器而保留命名卷。\n不要习惯性使用 `down -v`，因为它会删除本实验的 ES 数据和 Filebeat 状态。\n\n```bash\ncd \"$HOME/elk-lab-direct\"\ndocker compose -p elk-direct stop\n# 继续学习时：\ndocker compose -p elk-direct start\n```\n\n记录以下结果，作为之后的基线。\n\n| 项目 | 要保存的内容 |\n| --- | --- |\n| 软件 | 镜像标签与本地镜像 digest |\n| 配置 | Compose、Filebeat 配置与 ES 模板 |\n| 输入 | 生成命令、run ID、事件数量 |\n| 输出 | 按 run ID 查询的计数与样本文档 |\n| 状态 | 命名卷、Registry 和 ES 数据目录归属 |\n| 边界 | 是否启用认证、是否只绑定回环端口 |\n\n配置能启动只是第一层验收；数量、字段、时间与状态可解释，才算完成本篇的最小实验。", "subs": ["基础实验：启动 Elasticsearch 与 Kibana", "基础实验：创建字段模板与 Filebeat 配置", "基础实验：生成可重复样本并完成端到端验收", "基础实验：保存实验状态与安全停止"]}]}, {"title": "第 2 章 · 日志契约与可对账的样本", "sections": [{"title": "2.1 约定时间、来源身份和可信元数据", "content": "<a id=\"s-2-1\"></a>\n\n#### 先制定日志契约，再编写解析规则\n\n日志契约不是为了追求字段多，而是约定哪些信息稳定、哪些字段允许缺失，以及缺失如何解释。\n没有契约时，同一个 `response_time` 可能在一个服务里表示毫秒，在另一个服务里表示秒。\n日志可以被成功写入，却得到完全错误的慢请求统计。\n\n**建议的最小契约**\n\n| 语义 | 源字段示例 | 规范字段 | 类型与约束 |\n| --- | --- | --- | --- |\n| 业务时间 | `time` | `@timestamp` | 带时区的时间 |\n| 服务名 | `service` | `service.name` | 稳定 keyword |\n| 环境 | 采集平台配置 | `service.environment` | 受控枚举 |\n| 日志级别 | `level` | `log.level` | 统一大小写 |\n| 原始记录 | 源文本 | `event.original` | 保留但通常不索引 |\n| 事件 ID | `event_id` | `event.id` | 单条事件的稳定身份 |\n| HTTP 状态 | `status` | `http.response.status_code` | 整数，业务范围明确 |\n| 耗时 | `request_time` | `event.duration` | ECS 约定纳秒整数 |\n| 请求路径 | `uri` | `url.original` | 注意查询参数敏感性 |\n| Trace ID | `trace_id` | `trace.id` | 真实上下文，不伪造 |\n\n源字段与规范字段不必完全相同。\n可以保留原始日志，再通过版本化的 Logstash 规则映射；关键是所有消费者知道转换关系。\n表中 `event.duration` 的纳秒单位来自 ECS 定义，不应把源日志秒值直接复制过去。[ECS event](https://www.elastic.co/guide/en/ecs/1.12/ecs-event.html)\n\n**哪些字段属于平台可信元数据？**\n\n环境、租户、来源集群等字段应优先来自受控采集配置，而不是完全信任应用日志自报。\n否则应用只要把 `env` 改成 `prod`，就可能改变索引路由或权限边界。\n即使没有恶意，测试应用复制生产配置也可能污染统计。\n\n在教学主链路中，环境由 Filebeat 的 `fields.environment` 提供。\n源 `app.env` 保留作核对，但不用于动态选择任意索引名。\n这是平台规则，不是 Filebeat 自动提供的安全保证。\n\n\n#### 处理三类时间及其时区\n\n至少区分业务发生时间、采集事件创建时间与入库时间。\n对于离线补采，三者可能相差数天；对于时钟不同步，甚至可能出现看起来“先入库后发生”的现象。\n\n| 字段 | 本书语义 | 生成位置 |\n| --- | --- | --- |\n| `@timestamp` | 规范化后的业务事件时间 | Logstash Date Filter |\n| `event.created` | 本次 Filebeat 采集事件的时间 | 从输入事件原 `@timestamp` 复制 |\n| `event.ingested` | ES Ingest Pipeline 接收时间 | `_ingest.timestamp` |\n| `app.time` | 源日志原始时间字段 | 应用或样本生成器 |\n\n`event.ingested - @timestamp` 包括业务日志延迟、采集、队列、加工和时钟误差，不能直接叫“Kafka 延迟”。\n`event.ingested` 表示进入 Ingest 的时间，也不等于文档第一次被搜索命中的精确时刻。\n要测查询可见性，需要外部探针记录首次成功查询时间。[ECS event](https://www.elastic.co/guide/en/ecs/1.12/ecs-event.html)\n\n**同一时间的不同表示**\n\n```text\n2026-09-24T10:00:00+08:00\n2026-09-24T02:00:00Z\n```\n\n这两个值表示同一时刻。\n给不带时区的本地时间指定 `Asia/Shanghai`，与给已带 `+08:00` 的时间再次手工加八小时，是完全不同的操作。\n不要通过修改源字符串“修复”Kibana 的显示时区。\n\n**Filebeat Timestamp 与 Logstash Date 语法不同**\n\nFilebeat `timestamp` 使用 Go 的参考时间布局；Logstash Date 使用自己的格式表达。\n不要把 `yyyy-MM-dd HH:mm:ss` 原样填进 Filebeat 的 `layouts`。\n7.17 文档将 Filebeat 的 Timestamp Processor 标为 beta，本书主链路因此把业务时间解析放在 Logstash。[Timestamp Processor](https://www.elastic.co/guide/en/beats/filebeat/7.17/processor-timestamp.html)\n\n```yaml\n# 独立演示片段：合并到现有 processors 列表，不是完整配置。\nprocessors:\n  - timestamp:\n      field: app.time\n      layouts:\n        - '2006-01-02T15:04:05.999Z07:00'\n      test:\n        - '2026-09-24T10:00:00.123+08:00'\n        - '2026-09-24T02:00:00.123Z'\n```\n\n这个片段用于理解语法，不要求加入第二篇的主配置。\n同一字段由两层重复解析，会增加追溯困难；应明确谁负责最终设置业务时间。\n\n\n#### 一条主线，多个明确的数据契约\n\n第二篇的主链路面向访问日志，包含状态码、耗时、上游状态及 Trace ID 校验。\nJava 应用日志和普通容器标准输出不一定拥有这些字段，不应全部套用访问日志解析器。\n\n```mermaid\nflowchart LR\n    N[Nginx JSON 访问日志] --> F[Filebeat]\n    J[Java 多行应用日志] --> F\n    C[containerd CRI 日志] --> F\n    F --> K1[访问日志 Topic]\n    F --> K2[Java 日志 Topic]\n    F --> K3[容器日志 Topic]\n    K1 --> L1[访问解析 Pipeline]\n    K2 --> L2[Java 解析 Pipeline]\n    K3 --> L3[通用容器 Pipeline]\n    L1 --> A1[访问日志别名]\n    L2 --> A2[Java 日志别名]\n    L3 --> A3[容器日志别名]\n```\n\n图中区分 Topic 和 Pipeline 是教学上的清晰分界。\n生产不必每个服务都创建 Topic，应结合隔离、访问控制、吞吐和保留需求决定粒度。\n不要把“逻辑上不同数据集”直接等同“必须部署一套独立集群”。\n\n| 数据集 | 主字段 | 不应默认存在 |\n| --- | --- | --- |\n| nginx.access | 状态、请求耗时、URI、上游信息 | 业务异常堆栈 |\n| java.application | 日志级别、线程、Logger、消息与堆栈 | 每行对应一个 HTTP 请求 |\n| kubernetes.container | 容器身份、CRI 时间、标准输出文本 | 结构化业务字段和 Trace ID |", "subs": ["先制定日志契约", "处理三类时间及其时区", "一条主线，多个明确的数据契约"]}, {"title": "2.2 区分字段缺失、解析失败和有效零值", "content": "<a id=\"s-2-2\"></a>\n\n#### 缺失、空值、零与解析失败不是一回事\n\n源日志中至少可能出现字段缺失、JSON null、空字符串、`-`、合法数字和非法文本。\n把所有情况都改成 `0`，虽然可能降低部分写入错误，却把“未知”伪装成“测量结果为零”。\n对于耗时、字节数和状态码，这会直接改变聚合意义。\n\n| 原值 | 建议解释 | 处理策略 |\n| --- | --- | --- |\n| 字段不存在 | 未提供该信息 | 不写规范数值字段 |\n| `null` | 显式未知 | 保留原始，规范字段缺失 |\n| `\"\"` | 空值 | 按契约视为未知并统计 |\n| `\"-\"` | Nginx 等日志中的占位 | 保留原始，不能当数字 |\n| `\"0\"` | 合法的零值候选 | 按字段业务范围校验 |\n| `\"0.035\"` | 合法小数候选 | 转换并统一单位 |\n| `\"200, 502\"` | 多次上游尝试 | 作为序列或原始字符串 |\n| `\"abc\"` | 格式错误 | 标记错误并进入质量治理 |\n\nHTTP 响应状态码 `0` 不是一个正常的 HTTP 状态码。\n若系统确实用 0 表示“未收到响应”，应使用额外字段描述该状态，不要把它与服务器返回码混用。\n同样，`upstream_response_time` 的多值可能表示重试或多个上游，不应简单截取第一个值而不说明语义。\n\n**历史索引已经要求默认零怎么办？**\n\n可以保留一个兼容字段，例如 `legacy.request_time`，并补充 `pipeline.defaulted_fields`。\n新的统计查询应排除被默认填充的值，或直接使用新的规范字段。\n变更要覆盖模板、解析规则、仪表盘和回放策略，不能只修改一个 Convert 配置。\n\n```json\n{\n  \"legacy\": {\"request_time\": 0},\n  \"pipeline\": {\n    \"defaulted_fields\": [\"legacy.request_time\"],\n    \"errors\": [\"request_time:missing\"]\n  },\n  \"event\": {\"original\": \"原始日志仍被保留\"}\n}\n```\n\n这是迁移期的示意对象，不是本书主链路的默认输出。\n主链路对可选缺失值保持缺失，对不合法值记录错误，并避免将非法文本写进数值字段。", "subs": ["缺失、空值、零与解析失败不是一回事"]}, {"title": "2.3 保留原始记录并建立可检索的规范字段", "content": "<a id=\"s-2-3\"></a>\n\n#### 结构化 JSON、原始记录与 ECS 的取舍\n\n结构化日志把格式责任前移到应用，可以减少复杂正则，但仍然需要字段契约。\n合法 JSON 不等于有效日志：`status` 是对象、`time` 是错误日期、`service` 是数组，都可以是语法合法的 JSON。\n采集层应先识别载荷，治理层再验证类型和业务约束。\n\n**一层信封，一层业务载荷**\n\n```json\n{\n  \"@timestamp\": \"2026-09-24T02:00:01.000Z\",\n  \"agent\": {\"type\": \"filebeat\", \"version\": \"7.17.29\"},\n  \"host\": {\"name\": \"lab-node-1\"},\n  \"log\": {\"file\": {\"path\": \"/var/log/lab/access.jsonl\"}},\n  \"message\": \"{\\\"service\\\":\\\"orders-api\\\",\\\"status\\\":\\\"200\\\"}\",\n  \"fields\": {\"environment\": \"lab\"}\n}\n```\n\n第二篇的 Kafka 消息保存这种 Filebeat 信封。\nLogstash Kafka input 的 JSON Codec 解开信封后，Filter 再解析 `message` 中的业务 JSON。\n这两次 JSON 解码处理的是不同层级，不是无意义地重复处理同一对象。\n\n保留 `event.original` 有助于回放与规则修正，但增加存储与敏感数据保留范围。\n即使配置 `index: false`，它仍在 `_source`，能被有读取权限的人访问。\n“不索引”不是“脱敏”或“不可见”。[Mapping source](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/mapping-source-field.html)\n\n**ECS 应按需要采用**\n\n优先统一服务、时间、HTTP、追踪和来源身份等公共字段。\n业务特有字段可以放在受控的 `labels` 或独立对象下，不必硬塞到不相干的 ECS 字段。\n不要因为启用插件的 `ecs_compatibility`，就宣称所有业务字段已自动转成 ECS。\n\n\n#### 用样本契约防止规则回归\n\n为每种日志准备正常、缺失、边界、非法和历史兼容样本。\n每个样本应带预期字段和预期错误，而不仅是“处理后能写入”。\n\n| 样本 | 预期结果 | 不能接受的结果 |\n| --- | --- | --- |\n| 正常访问 | 状态码整数、耗时纳秒、时间准确 | 状态和耗时仍为无说明的字符串 |\n| 上游为空 | 上游规范数值字段缺失 | 自动写 0 并纳入平均值 |\n| 非法 JSON | 有原始记录和解析错误 | 静默丢弃 |\n| 数字非法 | 不把非法值送入数值字段 | 写入失败后无限阻塞且无告警 |\n| 超长堆栈 | 按限制处理并知道截断边界 | 假装完整记录仍被保存 |\n| 历史补采 | 保留业务时间与新入库时间 | 全部改成当前时间 |\n\n实验结果要进入版本控制。\n规则变更前后比较文档数、错误数、字段类型和聚合结果，而不是只比较 YAML 文本。", "subs": ["结构化 JSON、原始记录与 ECS 的取舍", "用样本契约防止规则回归"]}, {"title": "2.4 用批次、事件 ID 和实验信封生成异常样本", "content": "<a id=\"s-2-4\"></a>\n\n基础实验的生成器见 [1.4 节](01-log-foundations-and-collection.md#s-1-4)；这里进一步为双后端对照设计可追踪的异常输入。外层信封承载测试身份，内层载荷才是故意损坏的应用日志。完整 `tools/generate.py` 保存在本节，运行前须按 [11.1 节](02-pipeline-and-reliability.md#s-11-1) 提取所有依赖文件。\n\n#### 为什么增加一层实验传输信封\n\n原应用字段保持 `run_id`、`event_id`、`service` 等；进入后端后仍使用 `labels.run_id` 和 `event.id`。\n不过非法 JSON 自身无法可靠承载可解析的批次 ID。\n如果直接把文件截断后再按解析出的 `run_id` 查询，它可能消失在对账范围之外。\n\n为验证这种失败，[对照实验生成器](01-log-foundations-and-collection.md#s-2-4)使用合法的外层实验信封，`payload` 保存应用原文，包括刻意损坏的 JSON。\n这是测试夹具的设计，不要求所有生产应用修改日志格式。\n\n```json\n{\n  \"run_id\": \"sample-run\",\n  \"event_id\": \"sample-run-000001\",\n  \"scenario\": \"invalid-json\",\n  \"payload\": \"{\\\"service\\\":\\\"orders-api\\\"\"\n}\n```\n\n采集端不提前解析此信封；Kafka 中保存的是 Filebeat 的完整事件，Logstash 再解析 `message` 中的信封和 `payload`。\n有三层 JSON 时，必须注明哪一层失败。\n真正的外层信封也损坏时，只能用 Kafka 位置生成隔离身份并标为 `unattributed`，不能从未知内容猜测 run_id。\n这种记录需要全局未归属告警和原始消息回查，不能被当成已通过本批次对账。\n\n\n#### 样本集合的预期\n\n`mixed --count 100` 生成 100 个访问事件、1 个业务 heartbeat、1 个采集见证、1 个 Java 多行事件，并重复发送一个已有访问事件。\n因此传输事件数为 104，唯一事件 ID 为 103；其中 10 个进入隔离，93 个进入正常索引。\n这是生成器定义的预期，不是实际后端验收结果。\n\n| 样本 | 转换与验收要求 |\n| --- | --- |\n| 正常 JSON | 状态码 integer、耗时秒转纳秒、服务与批次一致 |\n| 非法应用 JSON | 原文保留，ID 与批次仍在，进入隔离 |\n| 错误字段类型 | 不强制转零，保存 `pipeline.errors` |\n| Java 多行异常 | 合成一个事件，堆栈不被拆成多个请求 |\n| 迟到日志 | 事件时间旧、入库时间新；不算入最近业务窗口 |\n| 相同 ID 重放 | 同一具体索引内覆盖；跨滚动索引仍可能重复 |\n\n验收必须同时检查正常与隔离索引，且要比较 ID 集合、重复 ID、路由和关键字段。\n只比较总数会漏掉“一条丢失、一条重复”互相抵消的错误。\nCLI 对账还会核验清单同目录中的源文件 SHA-256；样本被修改时直接拒绝，不能用旧清单证明新输入完整。\n\n```bash\n# 等待处理稳定后执行；尚未稳定时使用新的输出文件重试，不覆盖前次证据。\npython3 tools/export_audit.py export os --run-id first-check --output evidence/os-first.jsonl\npython3 tools/export_audit.py audit --manifest logs/first-check.manifest.json --input evidence/os-first.jsonl\npython3 tools/export_audit.py export es --run-id first-check --output evidence/es-first.jsonl\npython3 tools/export_audit.py audit --manifest logs/first-check.manifest.json --input evidence/es-first.jsonl\n```\n\n导出失败保留 `.partial`，正式结果文件只在分页完整后生成。\n对账脚本拒绝空清单，也会把历史滚动导致的同 ID 多文档判为重复。\n这符合实验验收定义，不代表生产中所有重复都应自动删除。\n\n\n#### 对照实验完整文件：`tools/generate.py`\n\n正常、错误、迟到、重放和多行样本。下面是完整文件；保存路径相对于双后端对照实验根目录。\n\n<!-- file: tools/generate.py -->\n```python\n\"\"\"生成可对账样本；传输信封保护非法应用 JSON 的事件身份。\"\"\"\nfrom __future__ import annotations\nimport argparse\nimport copy\nfrom datetime import datetime, timezone, timedelta\nimport hashlib\nimport json\nfrom pathlib import Path\nimport re\nimport uuid\n\n\ndef iso(dt):\n    return dt.astimezone(timezone.utc).isoformat(timespec='milliseconds')\n\ndef generate(root: Path, run: str, count: int = 100, profile: str = 'mixed', now=None):\n    if not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}', run) or not 1 <= count <= 100000:\n        raise ValueError('run_id 格式或 count 范围错误')\n    if profile not in ('mixed','normal','trigger','recovery','missing','late'):\n        raise ValueError('profile 无效')\n    root.mkdir(parents=True, exist_ok=True)\n    base = now or datetime.now(timezone.utc)\n    records, expected = [], {}\n    def add(event, scenario, route='normal', malformed=False):\n        event = copy.deepcopy(event)\n        payload = json.dumps(event, ensure_ascii=False, allow_nan=False)\n        if malformed:\n            payload = payload[:-1]  # 仅破坏应用 payload，信封保持合法。\n        records.append({'run_id': run, 'event_id': event['event_id'],\n                        'scenario': scenario, 'payload': payload})\n        checks = {'event.dataset': {'access':'nginx.access','heartbeat':'business.heartbeat','probe':'pipeline.probe'}.get(event['kind'])}\n        if route == 'normal' and event['kind'] == 'access':\n            checks['http.response.status_code'] = event['status']\n            checks['event.duration'] = 10000000\n        if malformed:\n            checks = {}  # 仍验证 ID、run、隔离归属，不要求不可解析字段。\n        expected[event['event_id']] = {'route': route, 'checks': checks, 'scenario': scenario}\n    for i in range(count):\n        scenario, route, malformed = 'normal', 'normal', False\n        # 业务告警样本放在 now-3m，落入 [now-6m, now-1m) 水位窗口。\n        event = {'time': iso(base - timedelta(minutes=3, milliseconds=count-i)),\n                 'event_id': f'{run}-{i:06d}', 'run_id': run, 'sequence': i,\n                 'service':'orders-api', 'environment':'lab', 'kind':'access',\n                 'level':'INFO', 'message':'order accepted', 'status':200,\n                 'request_time':'0.010', 'uri':f'/orders/{i}?source=lab',\n                 'trace_id':uuid.uuid4().hex}\n        if profile == 'trigger' or (profile == 'mixed' and i % 5 == 0):\n            event.update(status=504, level='ERROR', message='inventory timeout', error_type='InventoryTimeout')\n        if profile == 'mixed' and i % 20 == 1:\n            scenario, route, malformed = 'invalid-json', 'quarantine', True\n        elif profile == 'mixed' and i % 20 == 2:\n            event['status'] = {'bad':'object'}\n            scenario, route = 'invalid-type', 'quarantine'\n        elif profile == 'late' or (profile == 'mixed' and i % 20 == 3):\n            event['time'] = iso(base - timedelta(days=3))\n            scenario = 'late'\n        event['scenario'] = scenario\n        add(event, scenario, route, malformed)\n    if profile != 'missing':\n        add({'time':iso(base-timedelta(minutes=2)), 'event_id':run+'-heartbeat',\n             'run_id':run,'service':'orders-api','kind':'heartbeat','level':'INFO',\n             'message':'scheduled business heartbeat'}, 'heartbeat')\n    # 新鲜度见证与业务 heartbeat 分开；它必须从同一文件采集链路进入。\n    add({'time':iso(base), 'event_id':run+'-probe','run_id':run,'service':'orders-api',\n         'kind':'probe','level':'INFO','message':'pipeline receipt witness'}, 'probe')\n    java = ''\n    if profile == 'mixed':\n        records.append(copy.deepcopy(records[0]))\n        java_id = run + '-java'\n        java = (f'{iso(base-timedelta(minutes=2))} ERROR run={run} event={java_id} inventory timeout\\n'\n                'java.net.SocketTimeoutException: read timed out\\n'\n                '    at lab.InventoryClient.call(InventoryClient.java:42)\\n'\n                '    at lab.OrderService.submit(OrderService.java:81)\\n')\n        expected[java_id] = {'route':'normal','checks':{'event.dataset':'java.application',\n                             'log.level':'error'},'scenario':'multiline'}\n    paths = [root/f'{run}.jsonl', root/f'{run}.java.log', root/f'{run}.manifest.json']\n    if any(p.exists() for p in paths):\n        raise FileExistsError('批次路径已存在；使用新 run_id，不覆盖旧样本')\n    body = ''.join(json.dumps(r, ensure_ascii=False)+'\\n' for r in records)\n    paths[0].write_text(body, encoding='utf-8')\n    paths[1].write_text(java, encoding='utf-8')\n    manifest = {'run_id':run,'profile':profile,'generated_at':iso(base),\n                'transport_records':len(records)+(1 if java else 0),\n                'unique_expected_events':len(expected),'events':expected,\n                'source_files':{paths[0].name:hashlib.sha256(body.encode()).hexdigest(),\n                                paths[1].name:hashlib.sha256(java.encode()).hexdigest()}}\n    paths[2].write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\\n',encoding='utf-8')\n    return manifest\n\nif __name__ == '__main__':\n    p=argparse.ArgumentParser();p.add_argument('--run-id',required=True)\n    p.add_argument('--count',type=int,default=100);p.add_argument('--directory',default='logs')\n    p.add_argument('--profile',default='mixed',choices=['mixed','normal','trigger','recovery','missing','late'])\n    a=p.parse_args();print(json.dumps(generate(Path(a.directory),a.run_id,a.count,a.profile),ensure_ascii=False,indent=2))\n```", "subs": ["为什么增加一层实验传输信封", "样本集合的预期", "对照实验完整文件"]}]}, {"title": "第 3 章 · Filebeat 的读取状态与背压", "sections": [{"title": "3.1 理解文件发现、Harvester 与 Registry 的确认边界", "content": "<a id=\"s-3-1\"></a>\n\n#### 文件发现、Harvester 与发布管道\n\nFilebeat 需要先发现符合路径规则的文件，再按输入配置读取内容，最后经队列与输出发送。\n文件发现频率与文件持续读取不是一个参数控制的动作。\n把扫描间隔调得极小，通常不能修复已经打开文件的输出阻塞。\n\n```mermaid\nflowchart LR\n    P[路径规则与扫描] --> H[文件读取器]\n    H --> R[行解析与多行合并]\n    R --> X[Processors]\n    X --> Q[内部队列]\n    Q --> O[Output]\n    O --> A[确认]\n    A --> S[已确认进度状态]\n```\n\n这是理解责任的概念图，不代表所有版本的内部函数调用顺序完全相同。\n排障时至少记录发现了多少文件、打开了多少读取器、产生多少事件、输出是否确认，以及队列是否持续增长。\n单独看进程 CPU 很低，不能证明它没有工作，也不能证明没有阻塞。[filestream](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-input-filestream.html)\n\n**三种“偏移”不要混淆**\n\n文件字节偏移指读到了文件的哪个位置。\nKafka Offset 指某个分区中的消息位置。\nLogstash PQ 的读写进度属于它本地队列的状态。\n它们没有天然的一一数值对应关系，不能用文件行号直接推算 Kafka Offset。\n\n| 名称 | 所属系统 | 生命周期 |\n| --- | --- | --- |\n| 文件偏移 | Filebeat 输入状态 | 随文件身份与读取推进 |\n| Kafka Offset | Topic Partition | 随分区追加消息推进 |\n| Consumer Offset | 消费组 | 随组提交进度推进 |\n| ES `_id` | 具体索引 | 标识某个索引中的文档 |\n\n多行合并会把多条物理行变成一个事件；过滤会减少事件；重试可能造成重复；路由可能分流。\n因此，全链路对账优先使用事件身份和明确转换规则，而不是要求所有计数始终完全相等。\n\n\n#### Registry 保存什么，不保存什么\n\nRegistry 用于记录输入文件的状态与读取进度，帮助重启后继续处理。\n它不是日志全文备份，也不是业务归档。\n删除状态文件可能触发重复读取，不能恢复已经被源端删除且没有进入其他持久层的数据。\n\n**正确理解重启后的行为**\n\n当输出确认与本地状态持久化之间存在时间窗口，异常终止后可能再次发送已经被下游接受的事件。\n这是为什么日志链路经常需要容忍重复，而不应仅凭“有 Registry”就承诺 exactly-once。\n另一方面，源文件在读取前被轮转删除，也可能造成无法补回的缺失。\n\n| 操作 | 潜在后果 | 较稳妥的替代 |\n| --- | --- | --- |\n| 删除整个 Registry | 大范围重采 | 先隔离输入并保留状态副本 |\n| 多进程共享 `path.data` | 锁冲突或状态不一致 | 每实例独立状态目录 |\n| 改输入 ID | 旧状态可能不再关联 | 保持稳定并按迁移方案切换 |\n| 把状态放临时容器层 | 重建后丢失进度 | 持久卷或节点稳定目录 |\n| 把状态复制到另一台 | 路径与设备身份不匹配 | 用隔离回放任务，不冒充原实例 |\n\n**检查状态目录归属**\n\n```bash\n# Docker 实验中，只读查看挂载和卷；不要直接编辑内部状态文件。\ndocker compose -p elk-direct ps -q filebeat\nCID=$(docker compose -p elk-direct ps -q filebeat)\ndocker inspect \"$CID\" --format '{{json .Mounts}}'\ndocker compose -p elk-direct exec filebeat \\\n  sh -c 'ls -ld /usr/share/filebeat/data /usr/share/filebeat/data/registry'\n```\n\nRegistry 内部文件结构可能随版本和输入实现变化。\n不应把手工修改其中某个 JSON 字段写成跨版本通用操作。\n真要修复状态，先停止相关实例、保存原件、限定文件范围，并有重复/缺失验收计划。", "subs": ["文件发现、Harvester 与发布管道", "Registry 保存什么"]}, {"title": "3.2 配置 filestream 并判断路径、权限和长行问题", "content": "<a id=\"s-3-2\"></a>\n\n#### 在 7.17 中选择输入类型\n\n新文件采集优先学习 `filestream`；维护旧配置时仍需要认识 `log`。\n容器输入则额外处理 Docker/CRI 记录格式，不能把运行时包裹层当作业务文本直接做 JSON 解码。\n本书针对固定补丁示例，不把较新主版本的默认值倒推到所有 7.17 环境。\n\n| 输入 | 适合学习的问题 | 维护注意 |\n| --- | --- | --- |\n| `filestream` | 普通文件、新采集规则 | 稳定 ID、parsers、scanner 配置 |\n| `log` | 存量配置理解 | 已弃用，不与 filestream 参数混写 |\n| `container` | 7.17 容器日志兼容路径 | 运行时格式、symlink 与真实目录 |\n| Modules | 已知软件标准格式 | Ingest Pipeline 与模板也要安装 |\n\n**filestream 的基本结构**\n\n```yaml\nfilebeat.inputs:\n  - type: filestream\n    id: orders-json-v1\n    paths:\n      - /data/logs/orders/*.jsonl\n    fields:\n      environment: lab\n      log_kind: nginx.access\n    fields_under_root: false\n```\n\n这里是独立输入片段，需要与输出配置组合后才能运行。\n`fields_under_root: false` 把自定义字段放在 `fields` 下，减少与保留字段冲突。\n不要让动态文件名或用户输入直接决定索引名和 Kafka Topic。[filestream](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-input-filestream.html)\n\n\n#### 路径、扫描、编码与行大小\n\n路径表达式首先由 Filebeat 解释，不是交给 Shell 展开。\n容器内路径必须对应实际挂载位置，不能照抄宿主机路径后认为两者自动一致。\n同样，应用 Pod 内的 `/logs` 不会自动出现在 Filebeat DaemonSet 容器中。\n\n```yaml\n# filestream 输入片段：普通宿主机文件，不用于 Kubernetes symlink 例子。\nfilebeat.inputs:\n  - type: filestream\n    id: host-app-v1\n    paths:\n      - /data/logs/*/*.log\n    prospector.scanner.check_interval: 10s\n    prospector.scanner.exclude_files: ['\\.gz$']\n    encoding: utf-8\n    message_max_bytes: 1048576\n```\n\n`message_max_bytes` 是该输入的单条消息边界之一。\n下游 Kafka 还有自己的消息大小限制，JSON 转义与元数据会增加最终编码大小。\n源文件中的 1 MiB 文本，不一定能装进输出侧 1 MiB 的编码消息上限。\n\n**路径排障顺序**\n\n```bash\n# 在采集容器中检查实际看到的路径。\ndocker compose -p elk-direct exec filebeat \\\n  sh -c 'ls -l /var/log/lab; head -n 1 /var/log/lab/access.jsonl'\n# 在宿主机检查原始文件是否仍在增长。\nls -li \"$HOME/elk-lab-direct/logs/access.jsonl\"\nwc -c \"$HOME/elk-lab-direct/logs/access.jsonl\"\n```\n\n有目录不等于有文件读取权限；有读取权限不等于 SELinux/AppArmor 允许访问。\n发生权限拒绝时先查看审计记录和挂载标签，不应把永久关闭强制访问控制作为默认教程步骤。\n\n**长行需要单独的质量指标**\n\n超长 SQL、巨大异常堆栈或完整请求体很容易超过各层边界。\n不要只提高一个 `max_message_bytes`：还要考虑 Filebeat 内存、Kafka broker、消费者、Logstash 和 ES 请求大小。\n更合理的治理常常是限制源端日志体积、保留摘要与可追溯外部对象，而不是无限增大管道。\n\n\n#### Modules 与自定义规则的边界\n\nModules 通常不仅包含读取路径，还依赖字段模板、Ingest Pipeline 和可视化资源。\n把输出从 ES 改到 Kafka 后，这些资源不会因为 Kafka 收到消息就自动在目标 ES 安装完成。\nLogstash 也不会自动执行 `@metadata.pipeline` 指向的 ES Ingest Pipeline，除非输出明确传递且目标资源存在。\n\n| 方案 | 使用条件 | 常见漏项 |\n| --- | --- | --- |\n| Filebeat Module 直连 ES | 标准格式且资源安装完整 | `setup` 权限与版本 |\n| Module 经 Logstash | 保留 pipeline 元数据并正确输出 | Ingest Pipeline 未装 |\n| Module 经 Kafka | 显式保存需要跨队列传递的字段 | `@metadata` 不自动持久传输 |\n| 自定义采集 + Logstash | 规则由平台维护 | 模板、字段和测试需自建 |\n\n本书主线选择“自定义采集 + 集中解析”，便于看到完整数据变化。\n这不是宣称 Modules 不好，而是为了避免教学中把隐含资源误认为组件天然具备。\n现有 Modules 环境应按实际资源与输出路径做对照，不要盲目替换。[Filebeat 安装与资源设置](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-installation-configuration.html)", "subs": ["在 7.17 中选择输入类型", "路径、扫描、编码与行大小", "Modules 与自定义规则的边界"]}, {"title": "3.3 解释轮转、文件身份和清理设置造成的重复与缺失", "content": "<a id=\"s-3-3\"></a>\n\n#### 轮转、文件身份与日志保留窗口\n\n文件路径不是永久身份。\n同一路径可以被新文件替换；同一个 inode 也可能在文件删除后被复用。\n采集系统需要用文件身份和状态判断是继续读取还是开始新文件。\n\n**rename-create 与 copytruncate**\n\n| 轮转方式 | 操作 | 主要采集风险 |\n| --- | --- | --- |\n| rename-create | 重命名旧文件并创建新文件 | 路径匹配、文件描述符、保留不足 |\n| copytruncate | 复制文件后截断原文件 | 复制与截断之间的写入窗口 |\n| 容器运行时轮转 | 运行时按大小管理文件 | 保留数量、Pod 删除、符号链接 |\n| 应用内置轮转 | Appender 自己切换文件 | 文件名规则与多进程竞争 |\n\n对高频日志，源端保留应覆盖最大采集阻塞窗口及恢复时间。\n不能只看“保留 10 个文件”，还要结合每个文件大小与峰值写入速率换算实际时间。\n\n**不要同时读取符号链接与真实文件**\n\nKubernetes 的 `/var/log/containers` 常用于从文件名获得容器身份，但实际内容可能在 `/var/log/pods`。\n若两个输入分别读取链接和真实路径，就可能重复采集。\n只挂载链接所在目录而没有挂载目标目录，则可能看得到文件名却打不开内容。[Kubernetes 部署](https://www.elastic.co/guide/en/beats/filebeat/7.17/running-on-kubernetes.html)\n\n**输入迁移也是数据变更**\n\n从 `log` 切到 `filestream` 不只是改一个 type 字段。\n需要检查文件身份、输入 ID、状态迁移支持、关闭与清理参数以及多行语法。\n先在独立样本上验证切换前后数量和内容，不把整集群的状态作为首次实验对象。\n\n\n#### 用故障时间线解释重复与缺失\n\n设一条事件已发给下游，但本地尚未保存对应进度，此时采集进程被异常终止。\n重启后再次读取这条记录，并不说明采集算法完全失效；它可能是确认与持久化边界的正常风险。\n为了避免重复而过早推进状态，又可能扩大丢失风险。\n\n```text\nt0  应用追加事件 E\n t1 Filebeat 读取 E\n t2 下游接受 E\n t3 本地状态更新到 E 之后\n```\n\n在不同时间点故障，恢复行为不同。\n实验应分别测试正常停止与异常终止，并比较最终事件身份，而不是只看瞬时计数。\n\n| 故障点 | 需要问的问题 |\n| --- | --- |\n| t0 之前 | 应用是否真的写出事件？ |\n| t0 与 t1 之间 | 源文件能保留到采集恢复吗？ |\n| t1 与 t2 之间 | 队列是否持久化，能否重读源文件？ |\n| t2 与 t3 之间 | 是否可能重复，落库是否容忍？ |\n| t3 之后 | 下游是否仍有持久副本，查询是否选中？ |\n\n这一模型也用于 [Kafka、PQ 与后端确认边界](02-pipeline-and-reliability.md#s-9-1) 的分析。\n结论应描述故障条件，不应只给出“至少一次所以不会丢”的口号。\n\n\n#### 文件关闭、忽略与状态清理\n\n关闭文件、忽略旧文件和清理状态是三个不同操作。\n关闭读取器主要释放句柄；忽略规则决定是否继续关注某些文件；清理状态影响未来是否把文件视为新文件。\n把它们统一理解成“删除旧日志”是错误的。\n\n```yaml\n# 仅用于可控实验的 filestream 参数关系示例。\nfilebeat.inputs:\n  - type: filestream\n    id: lifecycle-lab-v1\n    paths:\n      - /data/logs/lifecycle/*.log\n    close.on_state_change.inactive: 5m\n    ignore_older: 24h\n    clean_inactive: 48h\n    prospector.scanner.check_interval: 10s\n```\n\n这些值不是通用生产推荐。\n应结合日志写入间隔、文件轮转频率与最大故障窗口确定。\n尤其是低频日志，长时间没有新增并不代表文件永远不会再写。[filestream 生命周期](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-input-filestream.html)\n\n| 动作 | 提问 | 风险检查 |\n| --- | --- | --- |\n| 关闭 inactive 文件 | 多久不读才释放句柄？ | 下一次写入能否重新发现 |\n| 忽略旧文件 | 根据哪个时间判断旧？ | 历史补采是否被跳过 |\n| 清理状态 | 以后是否还会匹配此文件？ | 重新发现后是否重采 |\n| 关闭 removed 文件 | 文件是否已被删除？ | 还有未读内容吗 |\n| 固定读取超时 | 是否为了释放被删除文件？ | 是否截断未完成多行事件 |\n\n**验证关系而不是记忆数字**\n\n创建一个很少写入的文件，超过 inactive 时间后再追加日志，检查是否能继续采集。\n再创建一个较旧文件，确认 `ignore_older` 的实际行为。\n所有实验都应在新目录进行，并使用独立输入 ID，避免污染主采集状态。", "subs": ["轮转、文件身份与日志保留窗口", "用故障时间线解释重复与缺失", "文件关闭、忽略与状态清理"]}, {"title": "3.4 用输出阻塞和重启实验观察队列与恢复", "content": "<a id=\"s-3-4\"></a>\n\n#### 队列与背压如何传播\n\n输出变慢后，内部队列先吸收短暂波动；队列满后，压力会反向影响读取。\n是否最终丢失，取决于源文件还能保留多久、轮转策略、队列持久性以及下游恢复速度。\n“Filebeat 会重试”不能推导成“无论停机多久日志都不会丢”。\n\n**内存队列示意配置**\n\n```yaml\n# 合并到 filebeat.yml 顶层；教学起点，不是通用最优值。\nqueue.mem:\n  events: 4096\n  flush.min_events: 512\n  flush.timeout: 1s\n```\n\n队列大小以事件数量表达时，大消息会显著改变实际内存占用。\n估算时至少考虑平均事件、长尾事件和编码开销，不要把“4096 条”理解为固定几 MiB。\n`flush.min_events` 和超时改变批次与延迟取舍；它们不是修复错误字段或网络不可达的办法。[内部队列](https://www.elastic.co/guide/en/beats/filebeat/7.17/configuring-internal-queue.html)\n\n**关于 7.17 的磁盘队列**\n\n不同补丁与文档阶段的持久队列选项可能存在成熟度差异。\n使用 `queue.disk` 前，应核对所运行版本的参考配置、容量、重启恢复与磁盘故障行为。\n本书不把 Filebeat 磁盘队列作为主实验的必需条件；核心长期缓冲放在第二篇的 Kafka，并单独讨论它的保留窗口。\n\n**背压传播路径**\n\n```mermaid\nflowchart RL\n    E[ES 拒绝或变慢] --> L[Logstash 输出等待]\n    L --> P[PQ 或内存队列增长]\n    P --> K[Kafka 消费变慢]\n    K --> D[Kafka 存储占用增长]\n    D --> F[生产发送受限]\n    F --> Q[Filebeat 队列占满]\n    Q --> S[源文件等待采集]\n```\n\nKafka 消费慢不会立即阻塞生产，但保留容量有限。\n当积压年龄接近 Topic 保留时间，风险可能已经很高，即使磁盘还没到 100%。\n要同时观察消息数量、字节数、年龄和增长速度。\n\n\n#### 输出阻塞与恢复实验\n\n停止 ES 后继续少量追加数据，观察采集端错误和队列变化。\n只停止存储容器，不删除命名卷，不修改 Registry。\n\n```bash\ncd \"$HOME/elk-lab-direct\"\ndocker compose -p elk-direct stop elasticsearch\npython3 scripts/generate_logs.py --count 100 --run-id es-outage-a --interval 0\ndocker compose -p elk-direct logs --tail=100 filebeat\ndocker compose -p elk-direct start elasticsearch\n```\n\n恢复后按 `es-outage-a` 查询，记录从恢复到全部事件可见的过程。\n100 条只是功能实验，不代表已经验证了长时间停机能力。\n要评估最大容忍时间，必须结合源文件保留、队列容量和恢复处理速率。\n\n**有意义的观察**\n\n| 观察 | 可能解释 | 下一步 |\n| --- | --- | --- |\n| 输出报连接拒绝 | ES 确实不可达 | 检查后端恢复与连接 |\n| 文件仍增长但输出不增 | 背压或失败重试 | 检查队列和源端保留 |\n| 恢复后批量出现数据 | 积压被处理 | 核对字段与事件身份 |\n| 只出现部分历史事件 | 源保留、输入忽略或其他限制 | 比较原始文件与规则 |\n| 反复重试同类写入错误 | 不是单纯网络故障 | 检查 Mapping 与数据 |\n\n如果同时停止 ES、修改模板、删除状态再重启，就无法判断哪一步造成变化。\n故障实验一次只改变一个关键因素。", "subs": ["队列与背压如何传播", "输出阻塞与恢复实验"]}]}, {"title": "第 4 章 · 结构化日志、多行异常与源端处理", "sections": [{"title": "4.1 识别 JSON 所在层次并验证解码顺序", "content": "<a id=\"s-4-1\"></a>\n\n#### 判断 JSON 到底在哪一层\n\n日志中可能有运行时包裹、Filebeat 信封和业务 JSON 三层结构。\n解析前先拿到一条原始字节样本，识别每层的边界。\n不能看到几个花括号就连续执行多次 JSON Filter。\n\n```text\nCRI 行头 + 业务文本\n    ↓ container parser\n业务文本（可能为 JSON，也可能为异常堆栈）\n    ↓ Filebeat 输出 JSON 编码\nKafka 中的 Filebeat 事件信封\n    ↓ Kafka input json codec\nLogstash 事件，业务文本位于 message\n    ↓ json filter target=app\n业务对象 app\n```\n\n**filestream 直接解析 JSON**\n\n```yaml\nfilebeat.inputs:\n  - type: filestream\n    id: json-example-v1\n    paths: [/var/log/example/*.jsonl]\n    parsers:\n      - ndjson:\n          target: app\n          add_error_key: true\n```\n\n**对普通字符串字段执行解码**\n\n```yaml\n# 处理器片段；只在 input 尚未解析该字段时使用。\nprocessors:\n  - decode_json_fields:\n      fields: [message]\n      target: app\n      overwrite_keys: false\n      add_error_key: true\n      process_array: false\n      max_depth: 1\n```\n\n不要把这两个示例一起套到同一条业务记录，除非确实有两层字符串化 JSON。\n也不要开 `overwrite_keys` 后把业务载荷直接展开到根对象，却不检查保留字段。\n处理器的输入字段、目标和顺序需要写进测试用例。[Processors](https://www.elastic.co/guide/en/beats/filebeat/7.17/defining-processors.html)\n\n\n#### JSON 内含多行文本时的顺序\n\n应用也可能每行输出一个 JSON 对象，其中 `message` 本身表示堆栈片段。\n此时“物理行 JSON”与“业务事件多行”是两层问题，应先解析外层 JSON，再对指定字符串进行合并。\n`filestream` 的 parsers 顺序可表达这类处理，但必须保证用于合并的字段是字符串。[filestream](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-input-filestream.html)\n\n```yaml\n# 独立示例，不并入本书 access.jsonl 主输入。\nfilebeat.inputs:\n  - type: filestream\n    id: json-stack-v1\n    paths:\n      - /var/log/json-stack/*.jsonl\n    parsers:\n      - ndjson:\n          target: app\n          message_key: message\n          add_error_key: true\n      - multiline:\n          type: pattern\n          pattern: '^\\d{4}-\\d{2}-\\d{2}[ T]'\n          negate: true\n          match: after\n          timeout: 5s\n```\n\n这里的 `message_key` 指原始 JSON 对象里的顶层键名，并不是让读者随意填任意嵌套路径。\n若源 JSON 已经把完整堆栈作为带转义换行的单个字符串输出，通常不需要再多行合并。\n先判断“一行是否已经是一件完整事件”，再决定是否增加状态化处理。\n\n**必须覆盖的反例**\n\n测试没有 `message`、`message` 是对象、JSON 不合法、堆栈中出现类似日期的内容。\n还要测试两个线程交错输出的情况：若源文件本身已交错破坏事件边界，采集端不一定能可靠重建。\n把不可恢复的源信息缺失写出来，比用复杂正则制造“看似完整”的记录更重要。", "subs": ["判断 JSON 到底在哪一层", "JSON 内含多行文本时的顺序"]}, {"title": "4.2 正确合并 Java 异常并保留事件边界", "content": "<a id=\"s-4-2\"></a>\n\n#### 在源端合并 Java 多行异常\n\n多行合并应尽量在仍能明确区分文件或容器流的位置完成。\n把多个来源先混进 Kafka，再在一个 Logstash multiline codec 中按“上一行”合并，容易把不同服务的堆栈拼到一起。\nElastic 文档也明确提醒这类混流风险。[多行日志](https://www.elastic.co/guide/en/beats/filebeat/7.17/multiline-examples.html)\n\n**基于“新事件行头”的合并**\n\n```yaml\nfilebeat.inputs:\n  - type: filestream\n    id: java-stack-v1\n    paths:\n      - /var/log/java/*.log\n    parsers:\n      - multiline:\n          type: pattern\n          pattern: '^\\d{4}-\\d{2}-\\d{2}[ T]'\n          negate: true\n          match: after\n          max_lines: 300\n          timeout: 5s\n    fields:\n      environment: lab\n      log_kind: java.application\n```\n\n规则含义是：不以日期开头的行，附加到前一个事件。\n这要求正常日志的新事件行确实有稳定日期前缀；没有前缀的普通文本可能被误合并。\n不要把这份规则当成所有 Java 框架的通用配置。\n\n**样本与预期**\n\n```text\n2026-09-24 10:00:00.123 ERROR [orders-api] request failed\njava.lang.IllegalStateException: inventory unavailable\n    at demo.OrderService.create(OrderService.java:42)\nCaused by: java.net.SocketTimeoutException: Read timed out\n    at demo.InventoryClient.call(InventoryClient.java:18)\n2026-09-24 10:00:01.456 INFO [orders-api] health check passed\n```\n\n预期生成两个事件，而不是六个，也不是一个。\n第一条事件包含完整异常块，第二条是独立健康检查。\n若第一条迟迟不发送，检查是否还在等待新行或 timeout；不要立即认为输出坏了。\n\n**max_lines 与 timeout 的代价**\n\n过大的多行上限增加内存占用，过小会丢掉超出边界的行。\n过长 timeout 增加低频异常的可见延迟，过短可能拆开缓慢输出的堆栈。\n正确配置需要真实样本分布与长尾测试，而不是只拿最短示例验证。", "subs": ["在源端合并 Java 多行异常"]}, {"title": "4.3 安排字段转换、过滤和降噪的处理顺序", "content": "<a id=\"s-4-3\"></a>\n\n#### 字段转换、重命名与失败策略\n\nConvert 只解决类型转换的一部分，不负责决定默认值的业务含义。\n`ignore_missing: true` 不等于“自动填零”，`fail_on_error: false` 也不等于“字段已变成有效数值”。\n当转换失败时，原始值和目标字段状态仍需要检查。[Convert](https://www.elastic.co/guide/en/beats/filebeat/7.17/convert.html)\n\n```yaml\nprocessors:\n  - convert:\n      fields:\n        - from: app.status\n          to: http.response.status_code\n          type: integer\n      ignore_missing: true\n      fail_on_error: false\n```\n\n该片段只用于说明配置，不是本书最终的完整字段治理。\n如果后续仍把 `app.status` 放进一个数值 Mapping，非法值仍可能导致文档失败。\n因此不能把“处理器没有让 Filebeat 退出”当成“ES 不会再有 Mapping 错误”。\n\n**顺序错误示例**\n\n```yaml\n# 反例：先删除，再转换，目标字段可能永远得不到。\nprocessors:\n  - drop_fields:\n      fields: [app.status]\n  - convert:\n      fields:\n        - from: app.status\n          to: http.response.status_code\n          type: integer\n      ignore_missing: true\n```\n\n这个 YAML 语法可能合法，业务逻辑却是错误的。\n对处理器链的验收必须包含输入与输出样本，不应只做 YAML 解析。\n\n**原始字段与规范字段分开**\n\n在规则尚未稳定时，把原始业务载荷保存在 `app`，将规范字段写到确定的位置。\n等规则与查询稳定后，再决定是否删除冗余原始字段或缩短保留时间。\n不要让同一个键既保存原始字符串，又在某些分支中变成对象或数组。\n\n\n#### 过滤、降噪与不可逆变化\n\n日志过滤应有明确对象和可回退的数据来源。\n删除字段与丢弃整个事件是不同风险级别；误删一个说明字段和丢弃所有 5xx 请求的影响也不同。\n上线 `drop_event` 前，先用旁路统计确认匹配范围。\n\n```yaml\n# 示例：仅用于明确约定为无诊断价值的健康检查，不能直接全量推广。\nprocessors:\n  - drop_event:\n      when:\n        and:\n          - equals:\n              app.uri: /healthz\n          - equals:\n              app.status: \"200\"\n```\n\n这要求源 `status` 确实是字符串。\n如果部分应用输出整数 200，条件可能匹配不到；这不是 Filebeat 随机行为，而是契约不一致。\n要把两种类型加入测试，或在统一类型之后再过滤。\n\n**降噪变更检查**\n\n| 检查点 | 问题 |\n| --- | --- |\n| 过滤前计数 | 当前匹配多少事件、占多大流量？ |\n| 错误覆盖 | 是否会误过滤错误或慢请求？ |\n| 分母变化 | 仪表盘还会用剩余日志计算业务错误率吗？ |\n| 恢复来源 | 原始文件或上游 Topic 保留多久？ |\n| 审计 | 谁批准规则，什么时候生效？ |\n\n全量日志与 AIOps 精选日志可以有不同消费路径，但需要明确字段和覆盖范围。\n不要把精选事件当作完整业务总体；第四篇会继续讨论成本与证据覆盖。", "subs": ["字段转换、重命名与失败策略", "过滤、降噪与不可逆变化"]}, {"title": "4.4 为解析、轮转和重启建立采集验收矩阵", "content": "<a id=\"s-4-4\"></a>\n\n#### 建立采集验收矩阵\n\n验收应覆盖正常流量、低频写入、多行、轮转、阻塞和重启。\n只验证“写一行然后能搜到”，只能证明一个很窄的健康路径。\n下面实验均限定在本篇创建的实验目录，禁止直接对生产日志执行故障注入。\n\n| 编号 | 实验 | 核心观察 | 成功标准 |\n| --- | --- | --- | --- |\n| FB-01 | 正常写入 20 条 | 按 run ID 查询 | 事件数与字段一致 |\n| FB-02 | 不合法 JSON | `error` 与原始消息 | 失败可识别，不静默 |\n| FB-03 | Java 多行 | 物理行与事件数 | 不同事件不串行 |\n| FB-04 | rename-create 轮转 | 新旧文件身份 | 所有预期事件可定位 |\n| FB-05 | 正常重启 | Registry 与结果数量 | 无无法解释的缺失 |\n| FB-06 | 输出暂时不可用 | 重试、队列、恢复 | 在保留窗口内恢复 |\n| FB-07 | 长行 | 采集与输出大小限制 | 知道是否截断或丢弃 |\n| FB-08 | 低频文件 | inactive 后再追加 | 新事件能继续采集 |\n\n每个实验记录原始输入、开始结束时间、run ID、配置版本和查询结果。\n故障实验的重点是暴露边界，不是无论发生什么都给“通过”。\n\n\n#### 正常、非法 JSON 与字段异常实验\n\n先恢复最小环境，使用独立 run ID 追加数据。\n只统计这一批，避免把历史重采误认为本次重复。\n\n```bash\ncd \"$HOME/elk-lab-direct\"\ndocker compose -p elk-direct start\npython3 scripts/generate_logs.py --count 50 --bad-every 10\nprintf '%s\\n' '{\"broken_json\":' >> logs/access.jsonl\n```\n\n本篇模板把原始 `app.status` 设为 keyword，因此 `not-a-number` 仍可能写入。\n这是刻意保留的教学边界：JSON 合法与字段业务有效并不相同。\n第二篇将这些事件识别为质量异常并进入隔离路径。\n\n**非法 JSON 查询**\n\n```bash\ncurl -fsS -X POST \\\n  'http://127.0.0.1:9200/logs-lab-direct-*/_search?pretty' \\\n  -H 'Content-Type: application/json' \\\n  --data-binary @- <<'JSON'\n{\n  \"size\": 10,\n  \"sort\": [{\"@timestamp\": \"desc\"}],\n  \"query\": {\"exists\": {\"field\": \"error.message\"}}\n}\nJSON\n```\n\n检查失败事件是否保留原始文本，以及错误字段实际位置。\n某些 Parser 失败不会阻止事件继续流向输出；因此需要质量查询或告警来显式发现。\n测试结束后不要仅删除错误标签，让事件伪装成正常值。\n\n\n#### 轮转与重启实验\n\n先生成一批 A，再重命名文件，再创建新文件生成 B。\n此操作只针对 `elk-lab-direct/logs`，不应作用于业务 Appender 正在管理的生产文件。\n\n```bash\ncd \"$HOME/elk-lab-direct\"\npython3 scripts/generate_logs.py --count 20 --run-id rotate-a\nmv logs/access.jsonl logs/access-rotated.jsonl\npython3 scripts/generate_logs.py --count 20 --run-id rotate-b\nls -li logs/\ndocker compose -p elk-direct restart filebeat\n```\n\n两份文件都匹配 `*.jsonl`。\n检查 A 和 B 各自的事件 ID 集合，不要仅用全索引总数判断。\n如果历史文件中已有其他事件，也应保留其范围说明。\n\n**数量核对查询**\n\n```bash\ncurl -fsS -X POST \\\n  'http://127.0.0.1:9200/logs-lab-direct-*/_search?pretty' \\\n  -H 'Content-Type: application/json' \\\n  --data-binary @- <<'JSON'\n{\n  \"size\": 0,\n  \"query\": {\"terms\": {\"app.run_id\": [\"rotate-a\", \"rotate-b\"]}},\n  \"aggs\": {\n    \"runs\": {\n      \"terms\": {\"field\": \"app.run_id\", \"size\": 10},\n      \"aggs\": {\n        \"ids\": {\"cardinality\": {\"field\": \"app.event_id\", \"precision_threshold\": 1000}}\n      }\n    }\n  }\n}\nJSON\n```\n\nCardinality 是近似聚合，适合快速观察，不应成为严格对账唯一依据。\n小批量精确验收应导出事件 ID 集合，与输入逐个比较。\n若有重复，保留重复 ID、文件 inode、重启时间与输出确认信息，才能解释原因。\n\n\n#### 形成采集问题的只读排查顺序\n\n采集故障首先收集证据，不先执行破坏性“修复”。\n推荐按来源、挂载、配置、状态、输出和查询顺序缩小范围。\n\n```bash\n# 1. 原始记录是否存在？\ntail -n 3 \"$HOME/elk-lab-direct/logs/access.jsonl\"\n# 2. 容器实际看到了什么？\ndocker compose -p elk-direct exec filebeat ls -l /var/log/lab\n# 3. 当前实例和挂载是否正确？\ndocker compose -p elk-direct ps\n# 4. 有无解析、权限、输出错误？\ndocker compose -p elk-direct logs --since=10m filebeat\n# 5. ES 是否可访问？\ncurl -fsS 'http://127.0.0.1:9200/_cluster/health?pretty'\n```\n\n配置验证建议用独立 `run --rm` 容器，避免第二个 Filebeat 进程争用正在运行实例的 `path.data`。\n不要在同一个状态目录启动第二套常驻采集进程。\n采集规则之外，还应检查时间选择器和索引匹配范围。\n\n**本篇完成标准**\n\n能从原始文件定位到一个具体 ES 文档，并解释两层时间和字段位置。\n能说明重启、轮转、队列阻塞与源文件保留之间的关系。\n能分别配置 JSON、Java 多行和 containerd/CRI 日志，不把不同输入的参数混用。\n能写出一个不会先删除 Registry 的排查路径。\n\n后续学习在此基础上加入 Kafka 2.8.2 与 Logstash，并把原始载荷转为一致的可查询字段。", "subs": ["建立采集验收矩阵", "正常、非法 JSON 与字段异常实验", "轮转与重启实验", "形成采集问题的只读排查顺序"]}]}, {"title": "第 5 章 · Linux 与 Kubernetes 日志接入", "sections": [{"title": "5.1 部署宿主机采集并管理持久状态与配置变更", "content": "<a id=\"s-5-1\"></a>\n\n#### 在 Linux 上以服务方式运行\n\n包安装可提供标准目录与 systemd 单元，但仍需要确认实际配置与状态目录。\n本节以 RPM/DEB 安装后的常见路径为例；tar 包需要显式指定 `path.home`、`path.config`、`path.data` 和 `path.logs`。\n不要把容器内的目录布局直接当作包安装路径。[安装指南](https://www.elastic.co/guide/en/beats/filebeat/7.17/filebeat-installation-configuration.html)\n\n```bash\n# 只读检查，具体包管理器按操作系统选择。\nfilebeat version\nsystemctl cat filebeat\nsystemctl show filebeat -p User -p Group -p ExecStart\nls -ld /etc/filebeat /var/lib/filebeat /var/log/filebeat\nsudo filebeat test config -e -c /etc/filebeat/filebeat.yml\nsudo filebeat test output -e -c /etc/filebeat/filebeat.yml\njournalctl -u filebeat --since '30 minutes ago' --no-pager\n```\n\n权限应同时覆盖父目录遍历和文件读取。\n某个文件是 `644`，但父目录是另一用户的 `700`，采集账号仍无法访问。\n日志轮转后新文件的 owner/group 也必须正确，否则可能只采到第一代文件。\n\n**服务变更与回滚**\n\n修改配置前保存当前版本，执行配置检查，再选择重载支持范围或重启。\n重启后核对事件 ID 连续性和采集错误，不只检查 systemd `active`。\n回滚时恢复配置，不要顺手删除 `/var/lib/filebeat`。\n\n```bash\n# 示例变更步骤，路径与权限需按本机确认。\nsudo cp -a /etc/filebeat/filebeat.yml /etc/filebeat/filebeat.yml.before-change\nsudo filebeat test config -e -c /etc/filebeat/filebeat.yml\nsudo systemctl restart filebeat\nsudo systemctl status filebeat --no-pager\nsudo journalctl -u filebeat -n 100 --no-pager\n```\n\n\n#### 输出选择与配置管理边界\n\nFilebeat 的主输出配置不是任意多后端并行广播列表。\n本书每套完整配置只启用一个输出；需要多个消费者时，优先在 Kafka 侧设计独立消费组。\n不要同时保留 `output.elasticsearch` 与 `output.kafka`，期待 Filebeat 自动双写。[输出配置](https://www.elastic.co/guide/en/beats/filebeat/7.17/configuring-output.html)\n\n**主配置与动态输入文件**\n\n```yaml\n# 顶层片段：适合多个静态输入文件，先在隔离环境验证 reload。\nfilebeat.config.inputs:\n  enabled: true\n  path: ${path.config}/inputs.d/*.yml\n  reload.enabled: true\n  reload.period: 10s\n```\n\n```yaml\n# inputs.d/orders.yml：输入文件是列表，不再包 filebeat.inputs。\n- type: filestream\n  id: orders-reload-v1\n  paths:\n    - /data/logs/orders/*.jsonl\n  fields:\n    environment: lab\n```\n\n输入热加载与输出切换是不同范围的变更。\n先验证配置文件能被加载，再观察旧读取器退出、新读取器接管以及事件计数。\n“没有重启进程”不等于“没有发生状态切换”。\n\n**变更记录最少包含什么？**\n\n记录规则版本、匹配范围、输入 ID、字段变化、预期计数变化与回滚条件。\n新规则先以少量节点或测试目录验证，尤其不要直接上线包含大量 `drop_event` 的过滤条件。\n回滚配置不会恢复已经被过滤掉的事件；只有源文件或上游保留仍在时才可能补采。", "subs": ["在 Linux 上以服务方式运行", "输出选择与配置管理边界"]}, {"title": "5.2 解释 containerd、CRI 与业务日志的嵌套关系", "content": "<a id=\"s-5-2\"></a>\n\n#### 理解 containerd 的日志路径\n\nKubernetes 容器标准输出通常经运行时写为 CRI 格式。\n常见访问入口是 `/var/log/containers/*.log`，其符号链接指向 `/var/log/pods` 下的实际文件。\n实际布局应在目标节点验证，不应把某个 Docker 环境的路径强行用于 containerd。[Kubernetes 日志架构](https://kubernetes.io/docs/concepts/cluster-administration/logging/)\n\n```text\n/var/log/containers/\n  orders-abc_lab_orders-<container-id>.log\n       └── symlink → /var/log/pods/<namespace>_<pod>_<uid>/<container>/0.log\n```\n\n**CRI 一行示意**\n\n```text\n2026-09-24T02:00:00.123456789Z stdout F {\"service\":\"orders-api\",\"status\":\"200\"}\n```\n\n时间、stdout/stderr 与完整/部分记录标志属于运行时包裹层。\n业务 JSON 从后面开始；直接把整行送给 JSON Parser 会失败。\n运行时长日志拆分与应用异常多行不是同一种边界，不能只靠一个泛化正则解决。\n\n**只读验证**\n\n```bash\n# 在已授权的目标节点执行。\nls -l /var/log/containers/ | head\nreadlink -f /var/log/containers/某个已确认的日志文件.log\nhead -n 2 /var/log/pods/实际路径/0.log\n```\n\n不要从 `kubectl logs` 可读就推断 DaemonSet 对宿主目录有权限。\nAPI 读取路径与宿主文件挂载路径不同；排障时需要验证采集容器真正能看到的文件。", "subs": ["理解 containerd 的日志路径"]}, {"title": "5.3 部署 DaemonSet 并验证元数据与 RBAC", "content": "<a id=\"s-5-3\"></a>\n\n#### 部署最小 Filebeat DaemonSet\n\n下面是完整的 Kubernetes 教学清单，保存为 `filebeat-k8s.yaml`。\n它采集 containerd/CRI 日志并发往已经存在、可达的 Kafka；**不会在 Kubernetes 内创建 Kafka**。\n先修改 ConfigMap 中的 broker 地址，再在隔离集群或限定节点验证。\n\n清单用 `container` input 作为 7.17 兼容示例，避免把新版容器解析默认行为混入。\n它只处理运行时封装，不假定所有容器的业务文本都是 JSON。\n[相关章节](02-pipeline-and-reliability.md#s-8-5)提供该 Topic 的专用容器 Pipeline；不要把这类日志送入第二篇的访问日志解析器。\n\n```yaml\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: logging-lab\n---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: filebeat\n  namespace: logging-lab\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: filebeat-lab\nrules:\n  - apiGroups: [\"\"]\n    resources: [\"pods\", \"namespaces\", \"nodes\"]\n    verbs: [\"get\", \"list\", \"watch\"]\n  - apiGroups: [\"apps\"]\n    resources: [\"replicasets\"]\n    verbs: [\"get\", \"list\", \"watch\"]\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata:\n  name: filebeat-lab\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: ClusterRole\n  name: filebeat-lab\nsubjects:\n  - kind: ServiceAccount\n    name: filebeat\n    namespace: logging-lab\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: filebeat-config\n  namespace: logging-lab\ndata:\n  filebeat.yml: |\n    filebeat.inputs:\n      - type: container\n        paths:\n          - /var/log/containers/*.log\n        stream: all\n        format: auto\n        symlinks: true\n        fields:\n          environment: lab\n          log_kind: kubernetes.container\n    processors:\n      - add_kubernetes_metadata:\n          host: ${NODE_NAME}\n          matchers:\n            - logs_path:\n                logs_path: /var/log/containers/\n      - add_fields:\n          target: orchestrator.cluster\n          fields:\n            name: lab-k8s\n    setup.ilm.enabled: false\n    setup.template.enabled: false\n    output.kafka:\n      hosts: [\"kafka-1.logging.example:9092\", \"kafka-2.logging.example:9092\"]\n      version: \"2.0.0\"\n      topic: logs-lab-container\n      required_acks: -1\n      compression: gzip\n      max_message_bytes: 1000000\n    logging.level: info\n---\napiVersion: apps/v1\nkind: DaemonSet\nmetadata:\n  name: filebeat\n  namespace: logging-lab\nspec:\n  selector:\n    matchLabels:\n      app: filebeat-lab\n  template:\n    metadata:\n      labels:\n        app: filebeat-lab\n    spec:\n      serviceAccountName: filebeat\n      terminationGracePeriodSeconds: 30\n      containers:\n        - name: filebeat\n          image: docker.elastic.co/beats/filebeat:7.17.29\n          args: [\"-e\", \"-c\", \"/etc/filebeat.yml\", \"--strict.perms=false\"]\n          env:\n            - name: NODE_NAME\n              valueFrom:\n                fieldRef:\n                  fieldPath: spec.nodeName\n          securityContext:\n            runAsUser: 0\n            allowPrivilegeEscalation: false\n            capabilities:\n              drop: [\"ALL\"]\n          resources:\n            requests:\n              cpu: 100m\n              memory: 128Mi\n            limits:\n              cpu: \"1\"\n              memory: 512Mi\n          volumeMounts:\n            - name: config\n              mountPath: /etc/filebeat.yml\n              subPath: filebeat.yml\n              readOnly: true\n            - name: containers\n              mountPath: /var/log/containers\n              readOnly: true\n            - name: pods\n              mountPath: /var/log/pods\n              readOnly: true\n            - name: data\n              mountPath: /usr/share/filebeat/data\n      volumes:\n        - name: config\n          configMap:\n            name: filebeat-config\n        - name: containers\n          hostPath:\n            path: /var/log/containers\n            type: Directory\n        - name: pods\n          hostPath:\n            path: /var/log/pods\n            type: Directory\n        - name: data\n          hostPath:\n            path: /var/lib/filebeat-lab\n            type: DirectoryOrCreate\n```\n\n资源值仅是教学起点；日志量、多行缓冲与输出阻塞可能需要更多内存。\n该清单使用宿主挂载和 root 用户，需符合集群安全策略；它没有挂 Docker Socket，也没有请求 privileged。\n若需要控制平面节点采集，应按实际 taint 添加精确 toleration，不默认容忍所有污点。\n\n**应用与验收**\n\n```bash\n# 先修改 broker 地址并确认 Topic 已存在。\nkubectl apply --dry-run=server -f filebeat-k8s.yaml\nkubectl apply -f filebeat-k8s.yaml\nkubectl -n logging-lab rollout status daemonset/filebeat\nkubectl -n logging-lab get pods -o wide\nkubectl -n logging-lab logs daemonset/filebeat --tail=100\n```\n\n检查所有目标节点是否有采集 Pod，文件能否读取，Kafka 是否出现对应来源消息。\n如果配置通过 subPath 挂载，更新 ConfigMap 后不会自动刷新该挂载文件；需要按变更流程滚动重启。\n不能以 ConfigMap 已更新就认定所有节点已经运行新规则。[Kubernetes ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/)\n\n\n#### 元数据关联与权限的验证\n\n`add_kubernetes_metadata` 依赖有效的集群访问与索引/匹配规则。\nPod 名、UID、命名空间与标签不是从日志正文凭空猜出来的。\n当文件路径中的容器 ID 无法匹配缓存中的 Pod 信息时，可能只有日志而没有元数据。[Kubernetes Metadata](https://www.elastic.co/guide/en/beats/filebeat/7.17/add-kubernetes-metadata.html)\n\n**检查来源身份**\n\n| 字段 | 用途 | 易错点 |\n| --- | --- | --- |\n| `kubernetes.namespace` | 环境/业务范围 | 不等于租户安全边界 |\n| `kubernetes.pod.name` | 人类可读实例 | 重建或名称复用 |\n| `kubernetes.pod.uid` | Pod 生命周期身份 | 不应随意删除 |\n| `container.id` | 运行时容器身份 | 容器重启后变化 |\n| `kubernetes.node.name` | 节点范围 | 主机名与自定义命名不同 |\n| `orchestrator.cluster.name` | 多集群区分 | 需要平台显式提供 |\n\n标签应使用白名单或控制字段展开规模。\n把所有动态标签、注解和用户自定义键都索引，会增加 Mapping 字段数量与敏感信息暴露面。\n需要全文保留但不查询的元数据，可以在模板中禁用索引或限制动态映射，而不是无条件展开。\n\n**RBAC 只读检查**\n\n```bash\nkubectl auth can-i list pods --all-namespaces \\\n  --as=system:serviceaccount:logging-lab:filebeat\nkubectl auth can-i watch nodes \\\n  --as=system:serviceaccount:logging-lab:filebeat\nkubectl auth can-i delete pods --all-namespaces \\\n  --as=system:serviceaccount:logging-lab:filebeat\n```\n\n最后一个结果应为否。\n这些命令需要操作者有权使用 impersonation；不能执行不代表 Filebeat 的实际权限一定不足。\n还要从采集 Pod 日志检查 403、证书和 API Server 连接错误。", "subs": ["部署最小 Filebeat DaemonSet", "元数据关联与权限的验证"]}, {"title": "5.4 选择标准输出、文件采集和 Autodiscover", "content": "<a id=\"s-5-4\"></a>\n\n#### Autodiscover、标准输出与文件采集的选择\n\n所有容器统一采用同一输入规则时，静态 DaemonSet 配置更容易理解。\n当不同容器有不同多行或解析需求时，Autodiscover 可以按标签、注解或模板产生输入。\n代价是规则动态变化，必须避免多个模板同时匹配同一文件而重复采集。\n\n**静态采集与动态发现的对照**\n\n| 方式 | 优点 | 需要额外验证 |\n| --- | --- | --- |\n| 静态容器路径 | 规则集中、行为直观 | 不同格式如何分流 |\n| 模板式 Autodiscover | 按服务制定规则 | 匹配条件与生成输入 |\n| Hints 注解 | 团队可自助表达需求 | 注解权限与可控范围 |\n| Sidecar 文件采集 | 接近应用文件 | Pod 成本、状态与重复来源 |\n\n应用同时把同一日志写 stdout 和文件时，只应选一条主采集路径，或明确定义去重。\nSidecar 读取共享卷并不自动优于 DaemonSet；节点采集看不到应用私有卷时，则需要重新设计日志输出或挂载。\n平台规范应先规定“哪个来源是事实来源”，再讨论采集组件放在哪里。\n\n**灰度验证**\n\n只选择一个测试服务和一个确定节点。\n对比变更前后的输入配置、事件数量、Pod UID 与文件路径。\n不要在没有对照样本的情况下同时修改 Autodiscover、Parser 和索引路由。", "subs": ["Autodiscover、标准输出与文件采集的选择"]}]}, {"title": "第 6 章 · 按场景选择采集与加工组件", "sections": [{"title": "6.1 用同一组可靠性与资源维度比较四类采集器", "content": "<a id=\"s-6-1\"></a>\n\n选型先比较同一种来源、字段契约和故障模型。下面的支持能力来自固定版本资料；实测结果仍需要相同样本、相同缓冲上限和相同故障窗口来验证，不能将插件存在直接解释为生产链路可靠。\n\n#### 固定观察版本，不给组件做无条件排名\n\n本节是选型实践，不扩建四套平行教程。\n固定观察 Filebeat 7.17.29、Fluent Bit 3.2.10、Vector 0.45.0、OTel Collector Contrib 0.136.0、Data Prepper 2.11.0。\n这些是配置观察基线，不代表它们都已与本书 OpenSearch 联调，也不代表都是核查日最新版。[Fluent Bit 发行](https://github.com/fluent/fluent-bit/releases/tag/v3.2.10) [Vector 发行](https://vector.dev/releases/0.45.0/) [Collector 固定文档](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.136.0/receiver/filelogreceiver/README.md) [Data Prepper 固定版本](https://github.com/opensearch-project/data-prepper/blob/2.11.0/README.md)\n\n| 维度 | Filebeat | Fluent Bit | Vector | OTel Collector Contrib |\n| --- | --- | --- | --- | --- |\n| 学习切入点 | 文件读取状态和 Beats 管道 | 插件式轻量采集与路由 | source/transform/sink 图与 VRL | Receiver/Processor/Exporter，多信号模型 |\n| 本场景来源 | 存量文件、容器日志 | 文件、容器及其他输入插件 | 文件、网络与多种消息源 | filelog、OTLP、Kubernetes 等具体组件 |\n| 解析 | processors、多行、JSON | parsers、filters、多行 | VRL 与 transforms | filelog operators、transform 等 |\n| 元数据 | Beats 与 Kubernetes 字段 | Kubernetes filter 等 | 显式转换与 Kubernetes 来源 | Resource 与 LogRecord 属性 |\n| 状态/缓冲 | Registry 与发送队列分别看 | Tail DB 与 filesystem buffering 分别看 | source checkpoint 与 sink buffer 分别看 | receiver offset storage 与 exporter queue 分别看 |\n| 主要验收风险 | 旧版本直连边界、输入迁移 | 插件格式、buffer 满时动作 | 编码、ACK 覆盖范围与磁盘缓冲 | 每个组件稳定性及最终发行版是否包含 |\n\nCollector 0.136.0 的 filelog receiver 标为 logs beta，默认读取起点、持久化 offset 与 retry-on-failure 都有明确配置条件。\n不能一句“OTel 稳定”就跳过具体 receiver/exporter 的成熟度检查。[固定 filelog README](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.136.0/receiver/filelogreceiver/README.md)\nFluent Bit 的文件读取 DB 与下游 filesystem buffer 也不是同一种状态；持久化读取偏移不等于日志正文已经安全排队。[缓冲资料](https://docs.fluentbit.io/manual/3.2/administration/buffering-and-storage)", "subs": ["固定观察版本"]}, {"title": "6.2 为存量文件与 Kubernetes 选择接入方案", "content": "<a id=\"s-6-2\"></a>\n\n#### 场景一：大量存量文件日志\n\n已有 Filebeat 配置、轮转规范、Kafka 和运维经验时，先保留采集器，给 OpenSearch 增加独立 LS 输出分支，通常比同时换采集器和存储更容易定位差异。\n选择不是因为 Filebeat 对所有环境更好，而是对照实验希望验证后端差异，减少同时变化的因素。\n\n如果节点资源成为明确瓶颈，再用相同文件、相同轮转和坏样本测试 Fluent Bit 或 Vector。\n比较 CPU、RSS、读取延迟、重启后的集合对账与缓冲耗尽行为；不只比较正常小日志下的吞吐。\n\n以下为 Fluent Bit 3.2 系列的选型观察配置，不是主实验文件，也不承担完整 JSON/多行处理：\n\n```ini\n[SERVICE]\n    Flush 1\n    storage.path /var/lib/fluent-bit/buffer\n    storage.sync normal\n\n[INPUT]\n    Name tail\n    Path /var/log/selection/*.log\n    Tag selection.file\n    DB /var/lib/fluent-bit/tail.db\n    Read_from_Head On\n    storage.type filesystem\n\n[OUTPUT]\n    Name stdout\n    Match selection.*\n```\n\n用 stdout 先确认来源与读取状态，不要未经验证就替换 OS output 并宣称完成相同契约。\n重启保留两个状态目录；再分别丢失 Tail DB 和 buffer，观察不同结果。\n\n\n#### 场景二：Kubernetes 容器日志\n\n先写出采集职责：读取 CRI 外层、恢复分片日志、处理应用多行、附加 Pod 身份、限制高基数字段、保护节点资源。\n组件能列出 Kubernetes 插件，不等于这些职责已经在当前配置中连接起来。\n\n已有 DaemonSet 文件读取方案可以比较 Filebeat 与 Fluent Bit；已采用 OTLP 和统一 Resource 规范的团队，可以评价 Collector 的 filelog/container 解析与 Kubernetes metadata。\nVector 的来源与转换图适合明确多出口与字段治理，但也要验证其 sink 编码和端到端 ACK 边界。[Vector ES sink](https://vector.dev/docs/reference/configuration/sinks/elasticsearch/)\n\n选型测试至少包含 Pod 重建、短 Job、节点重启、采集端重启、长堆栈、非法 JSON、下游暂停。\nKubernetes 元数据能否补齐取决于采集时机和 API 对象生命周期；事后查不到 Pod 不等于原日志文件不存在。\n\n**Vector 与 Collector 的最小观测配置**\n\n以下配置只用于比较文件读取与解析后的事件形态，**不连接主实验 Kafka 或 OpenSearch**，也不输出与主实验完全等价的 ECS 文档。\n这样可以先判断“源事件有没有读对”，再单独评估输出编码与确认边界。\n\n```toml\n# Vector 0.45.0 的选型观察配置。文件目录与 data_dir 需要事先建立并可写。\ndata_dir = \"/tmp/exp-vector-state\"\n[sources.files]\ntype = \"file\"\ninclude = [\"/tmp/exp-selection/*.log\"]\nread_from = \"beginning\"\n\n[transforms.inspect]\ntype = \"remap\"\ninputs = [\"files\"]\nsource = '''\nparsed, err = parse_json(.message)\nif err != null {\n  .parse_error = \"invalid_json\"\n} else {\n  .app = parsed\n}\n'''\n\n[sinks.console]\ntype = \"console\"\ninputs = [\"inspect\"]\nencoding.codec = \"json\"\n```\n\nconsole 演示不是持久输出队列测试；评价 Vector 磁盘 buffer 时，要选定实际 sink，配置 buffer 类型、大小、满时策略和端到端 acknowledgements，再注入下游故障。\n不能把 console 打印正常解释为 Elasticsearch/OpenSearch sink 兼容通过。\n\n```yaml\n# Collector Contrib 0.136.0 选型观察：filelog -> debug。\n# /tmp/exp-otel-state 需要可写；未连接本书后端，也没有构造完整 ECS 映射。\nextensions:\n  file_storage/offsets:\n    directory: /tmp/exp-otel-state\nreceivers:\n  filelog/selection:\n    include: [/tmp/exp-selection/*.log]\n    start_at: beginning\n    storage: file_storage/offsets\n    include_file_path: true\n    retry_on_failure:\n      enabled: true\nexporters:\n  debug:\n    verbosity: detailed\nservice:\n  extensions: [file_storage/offsets]\n  pipelines:\n    logs:\n      receivers: [filelog/selection]\n      exporters: [debug]\n```\n\n此处 `storage` 持久化的是 receiver offset，不是 exporter 可靠队列。\n`debug` 会输出原始日志，必须只使用无敏感信息的实验样本。\n实际后端接入应核对选定 exporter 的格式、稳定性和队列配置；本书不默认用某个 exporter 替代专用 OS output。", "subs": ["场景一：大量存量文件日志", "场景二：Kubernetes 容器日志"]}, {"title": "6.3 区分 Logstash、Data Prepper 与 Ingest Pipeline 的职责", "content": "<a id=\"s-6-3\"></a>\n\n采集器负责发现和读取源事件，服务端加工层负责跨来源解析、转换与路由，搜索后端的 Ingest Pipeline 则在写入端执行处理。选择位置时要同时看是否需要持久缓冲、失败旁路、独立扩容，以及计算是否会挤占查询资源。\n\n#### 场景三：大流量、缓冲和复杂加工\n\n| 条件 | 设计方向 | 新增责任 |\n| --- | --- | --- |\n| 后端短暂停机仍要接收日志 | 评估持久缓冲和源保留窗口 | 容量、重放、去重、满队列策略 |\n| 两个后端需独立消费 | Kafka 独立消费组或明确可隔离的扇出 | 消费组、Schema、保留和双份存储成本 |\n| 复杂解析、查表、插件积累 | 保留独立 Logstash 加工层 | JVM、PQ、插件锁和失败隔离 |\n| OTel 到 OpenSearch 的服务端数据管道 | 评估 Data Prepper | Source/Processor/Sink 插件与缓冲实现 |\n| 只有少量无状态字段增补 | 可评估搜索后端 Ingest Pipeline | 计算与搜索节点竞争、故障在写入侧暴露 |\n\nData Prepper 是服务端采集加工平台，不是把 Logstash 配置换后缀即可运行的解释器。[Data Prepper](https://github.com/opensearch-project/data-prepper/blob/2.11.0/README.md)\n其 OpenSearch sink 有专门配置和失败处理能力，必须按所选插件核对，不把某云托管 ingestion 的托管弹性能力当作自建免费附带。[DP sink](https://docs.opensearch.org/2.19/data-prepper/pipelines/configuration/sinks/opensearch/)\n\n**什么时候不需要 Kafka**\n\n单来源、低流量、可接受短暂停机、源文件保留足够、没有独立多消费者时，短链路可能更容易维护。\nKafka 解决特定解耦与回放需求，不会让所有下游自动获得 Exactly-once，也不会消除源轮转丢失风险。\n引入之前应算清 broker 磁盘、保留期、消费者恢复速度、升级与告警责任。", "subs": ["场景三：大流量、缓冲和复杂加工"]}, {"title": "6.4 用代表性样本验证选型并形成变更条件", "content": "<a id=\"s-6-4\"></a>\n\n先把“必须支持的来源”“允许中断多久”“需要保留哪些字段”写成验收条件，再比较候选方案。至少准备一组轮转、多行、坏字段与输出阻塞样本；检查事件集合、重启恢复、资源消耗和维护责任。任何一个硬条件不满足，都应保留当前方案并记录缺口，而不是用总吞吐掩盖它。\n\n#### 一个可以落地的选型流程\n\n```mermaid\nflowchart TD\n  A[明确来源 数据契约 故障容忍] --> B[保留当前方案作为可对账基线]\n  B --> C{是否需要独立消费和长期缓冲}\n  C -->|需要| D[评价 Kafka 与容量恢复预算]\n  C -->|不需要| E[优先验证短链路]\n  D --> F[按相同坏样本和故障矩阵测试候选组件]\n  E --> F\n  F --> G[比较数据完整性 资源 延迟 维护责任]\n  G --> H[选择满足约束的方案并记录未覆盖项]\n```\n\n把“支持一个插件”记为资料能力，把“配置可解析”记为静态结果，把“故障后事件完整”记为真实链路结果。\n三个等级不能互相替代。\n本书的对照实验只实现已选定的 Filebeat/Kafka/Logstash 对照，其他候选保留选型说明和代表性配置，不增加无必要的工程依赖。", "subs": ["一个可以落地的选型流程"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
