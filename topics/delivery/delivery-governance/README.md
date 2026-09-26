@@ -15,14 +15,14 @@
 
 | 顺序 | 学习内容 | 核心重点 | 学习入口 |
 | --- | --- | --- | --- |
-| 1 | 认知与转型决策 | 协作断层、CALMS 边界、起步姿势、价值流分析、失败模式 | [Markdown](./01-cognition-and-transformation.md) |
-| 2 | 工程治理命题 | 配置与依赖、环境数量决策、质量门禁、构建与制品、发布治理 | [Markdown](./02-engineering-governance.md) |
-| 3 | 度量、平台与组织 | 度量分层与失真、数据度量平台、平台产品设计、平台研发组织 | [Markdown](./03-metrics-platform-and-organization.md) |
-| 4 | 容量保障与稳定性工程 | 容量口径、容量测试、治理手段取舍、全链路压测、容量预测、大促保障 | [Markdown](./04-capacity-and-stability.md) |
+| 1 | 认知与转型决策 | 协作断层、CALMS 边界、起步姿势、价值流分析、失败模式 | [Markdown](./01-cognition-and-transformation.md) · [Roadmap](./01-cognition-and-transformation-roadmap.html) |
+| 2 | 工程治理命题 | 配置与依赖、环境数量决策、质量门禁、构建与制品、发布治理 | [Markdown](./02-engineering-governance.md) · [Roadmap](./02-engineering-governance-roadmap.html) |
+| 3 | 度量、平台与组织 | 度量分层与失真、数据度量平台、平台产品设计、平台研发组织 | [Markdown](./03-metrics-platform-and-organization.md) · [Roadmap](./03-metrics-platform-and-organization-roadmap.html) |
+| 4 | 容量保障与稳定性工程 | 容量口径、容量测试、治理手段取舍、全链路压测、容量预测、大促保障 | [Markdown](./04-capacity-and-stability.md) · [Roadmap](./04-capacity-and-stability-roadmap.html) |
 
 ## 阅读建议
 
 - 先读第一册建立判断框架，再按当前最紧迫的问题挑后续册。只关心容量与稳定性的话，可以直接从第四册开始。
 - 本主题只写决策与治理，工具操作请回到对应主题：[Ansible](../ansible/README.md)、[Jenkins](../jenkins/guide.md)、[GitOps](../gitops/README.md)、[Argo CD](../argo-cd/README.md)、[Docker 第五册](../../cloud-native/docker/05-application-containerization-and-multi-platform-builds.md)。容量相关的算法与模型（排队论推导、限流算法、熔断状态机、Little 定律）见 [架构设计第二册](../../architecture/02-performance-and-capacity.md)。
 - 每节末尾都配了可执行的练习，建议边读边在真实环境里做一次基线采集——本主题多数判断都以「有没有可采集的证据」为前提。
-- Markdown 是内容源，Roadmap HTML 由仓库根目录的 `scripts/build-roadmaps.sh` 统一生成。本主题的 Roadmap 尚未产出，生成后需把入口补进上表，并同步根目录 `index.html` 与 `README.md`。
+- Markdown 是内容源，Roadmap HTML 由仓库根目录的 `scripts/build-roadmaps.sh` 统一生成；正文更新后需重新生成并核对本页和根目录入口。
