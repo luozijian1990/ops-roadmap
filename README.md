@@ -4,9 +4,9 @@
 
 **一份持续整理的个人运维学习笔记与交互式路线图合集。**
 
-![Topics](https://img.shields.io/badge/topics-36-1f2933?style=flat-square)
-![Markdown notes](https://img.shields.io/badge/markdown_notes-113-1f2933?style=flat-square)
-![Roadmaps](https://img.shields.io/badge/roadmaps-111-f4c95d?style=flat-square)
+![Topics](https://img.shields.io/badge/topics-39-1f2933?style=flat-square)
+![Markdown notes](https://img.shields.io/badge/markdown_notes-118-1f2933?style=flat-square)
+![Roadmaps](https://img.shields.io/badge/roadmaps-118-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
 [快速开始](#快速开始) · [内容导航](#内容导航) · [提示词资料库](#提示词资料库) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
@@ -51,7 +51,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 119 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 118 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
@@ -61,7 +61,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 | 可观测性 | [ELK 与 OpenSearch](./topics/observability/elk/) · [Loki](./topics/observability/loki/) · [OpenTelemetry](./topics/observability/otel/) · [Prometheus](./topics/observability/prometheus/) · [Kube-Prometheus](./topics/observability/kube-prometheus/) · [VictoriaMetrics](./topics/observability/victoria-metrics/) · [VictoriaMetrics Flags](./topics/observability/victoria-metrics-flags/) · [VictoriaMetrics PromQL](./topics/observability/victoria-metrics-promql/) |
 | 数据系统 | [MySQL](./topics/data-systems/mysql/) · [Kafka](./topics/data-systems/kafka/) · [RabbitMQ](./topics/data-systems/rabbitmq/) |
 | 编程与自动化 | [Python 运维自动化与工程实践](./topics/programming/python-for-operations/) · [Go 运维开发与云原生工程](./topics/programming/go-for-operations/) |
-| 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) · [GitOps](./topics/delivery/gitops/) · [Argo CD](./topics/delivery/argo-cd/) · [交付治理与容量保障](./topics/delivery/delivery-governance/) |
+| 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) · [GitOps](./topics/delivery/gitops/) · [Argo CD](./topics/delivery/argo-cd/) · [交付治理与容量保障](./topics/delivery/delivery-governance/) · [AI 原生 SDLC](./topics/delivery/ai-native-sdlc/) |
 | Web 基础设施 | [Nginx](./topics/web/nginx/) · [Traefik](./topics/web/traefik/) |
 | AI 基础设施 | [GPU AI Infrastructure](./topics/ai-infrastructure/gpu/) |
 | AIOps | [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |
