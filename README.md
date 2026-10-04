@@ -9,7 +9,7 @@
 ![Roadmaps](https://img.shields.io/badge/roadmaps-118-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
-[快速开始](#快速开始) · [内容导航](#内容导航) · [提示词资料库](#提示词资料库) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
+[快速开始](#快速开始) · [新手学习路线](#新手学习路线) · [内容导航](#内容导航) · [提示词资料库](#提示词资料库) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
 
 </div>
 
@@ -48,6 +48,12 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 > [!TIP]
 > 直接打开 `index.html` 和各个 Roadmap 也能阅读。使用本地 HTTP 服务后，所有页面共享同一个 origin，学习进度的 `localStorage` 读取会更加稳定。
+
+## 新手学习路线
+
+如果还不确定先学什么，可以从 [运维学习路线](./learning-paths/index.html) 开始。它按岗位方向组织六条路径：Linux / 应用运维、云运维 / 阿里云、Kubernetes、DevOps / 交付、SRE / 稳定性、运维开发。
+
+每条路线按「阶段 → 能力模块 → 学习节点」展开，提供前置知识、掌握目标与实践验收，支持搜索、入门 / 进阶 / 选修筛选和本地进度记录。节点链接到 `topics/` 中的专题笔记，便于继续深入。[使用说明与截图](./learning-paths/README.md)
 
 ## 内容导航
 
@@ -109,6 +115,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 ├── assets/                         # README 等公共资源
 ├── cases/                          # 分类后的企业实践案例库
 ├── prompts/                        # 模型专项双语提示词资料库
+├── learning-paths/                 # 六条岗位学习路线、使用说明与截图
 ├── scripts/build-roadmaps.sh       # Roadmap 批量生成脚本
 └── topics/<category>/<topic>/
     ├── guide.md                    # 未分卷的 Markdown 笔记
