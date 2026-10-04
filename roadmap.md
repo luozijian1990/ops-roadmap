@@ -1,6 +1,6 @@
 # Ops Roadmap 思维导图预览
 
-这张图按照 `topics/<category>/<topic>/` 的实际目录组织，采用从左向右展开的三列树形布局，只展示“总览 → 分类 → 专题”，暂不展开各专题下的 Markdown 分册。
+这张图根据 `topics/` 的实际内容组织，采用从左向右展开的树形布局，以“总览 → 分类 → 专题”为主。架构设计按五个分册展示，Agent 扩展工程进一步展开 Skills 与 MCP，其余专题暂不展开 Markdown 分册。
 
 ```mermaid
 flowchart LR
@@ -27,8 +27,12 @@ flowchart LR
   cloudNative --> kubernetesNetworking[Kubernetes 容器网络]
   cloudNative --> consul[Consul]
   cloudNative --> etcd[etcd]
+  cloudNative --> terraform[Terraform]
 
   root --> observability[可观测性]
+  observability --> elk[ELK 与 OpenSearch]
+  observability --> loki[Loki]
+  observability --> otel[OpenTelemetry]
   observability --> prometheus[Prometheus]
   observability --> kubePrometheus[Kube-Prometheus]
   observability --> victoriaMetrics[VictoriaMetrics]
@@ -42,13 +46,19 @@ flowchart LR
 
   root --> programming[编程与自动化]
   programming --> pythonForOperations[Python 运维自动化与工程实践]
+  programming --> goForOperations[Go 运维开发与云原生工程]
 
   root --> delivery[持续交付]
   delivery --> ansible[Ansible]
   delivery --> jenkins[Jenkins]
+  delivery --> gitops[GitOps]
+  delivery --> argoCd[Argo CD]
+  delivery --> deliveryGovernance[交付治理与容量保障]
+  delivery --> aiNativeSdlc[AI 原生 SDLC]
 
   root --> webInfra[Web 基础设施]
   webInfra --> nginx[Nginx]
+  webInfra --> traefik[Traefik]
 
   root --> aiInfra[AI 基础设施]
   aiInfra --> gpu[GPU AI Infrastructure]
@@ -69,4 +79,4 @@ flowchart LR
   class systems,architecture,cloudNative,observability,dataSystems,programming,delivery,webInfra,aiInfra,aiops,aiAgent categoryNode
 ```
 
-> 说明：思维导图用于展示知识版图；README 中原有的内容导航表格仍更适合作为可点击入口。
+> 说明：思维导图用于展示知识版图；可点击入口见 [README 内容导航](./README.md#内容导航)，交互式学习路线图见 [首页](./index.html)。
