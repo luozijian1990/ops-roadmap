@@ -23,17 +23,31 @@
 
 ## 页面预览
 
-路线图以黄色节点连接学习阶段，浅黄色模块可展开成独立的学习点。
+以下截图采用统一桌面布局，每张展示一条路线的全部六个阶段和能力模块。具体学习节点可在页面中展开，查看目标、前置知识与实践验收。
 
-![Linux 学习路线与可展开的能力模块](./assets/overview.png)
+### Linux / 应用运维
 
-每个学习节点都有目标、前置知识、独立验收动作和相关资料。下图展示 OpenTelemetry Collector 节点的学习详情。
+![Linux 与应用运维完整路线总览](./assets/linux.png)
 
-![学习节点的掌握目标与实践验收](./assets/node-detail.png)
+### 云运维 / 阿里云
 
-手机默认使用清单视图，也可以切回路线图缩放浏览。
+![云运维与阿里云完整路线总览](./assets/cloud.png)
 
-<img src="./assets/mobile.png" alt="手机端学习清单与主修语言选择" width="390">
+### Kubernetes
+
+![Kubernetes 运维完整路线总览](./assets/kubernetes.png)
+
+### DevOps / 交付
+
+![DevOps 与持续交付完整路线总览](./assets/devops.png)
+
+### SRE / 稳定性
+
+![SRE 与稳定性工程完整路线总览](./assets/sre.png)
+
+### 运维开发
+
+![运维开发与平台工程完整路线总览，Python 主修](./assets/platform.png)
 
 ## 使用方法
 
@@ -70,8 +84,6 @@ python3 -m http.server 8000
 这是一份带实践目标的学习导航，尚未为每个节点提供完整教材、实验包、标准答案或自动评分。部分资料链接指向相关专题或官方产品目录，需要按节点范围选择章节。暂无专属资料的节点会明确提示。
 
 学习顺序和验收标准是本项目的教学设计，并不等于厂商认证大纲或岗位录用标准。需要云账号、集群或故障注入的练习，应在自己授权、可恢复的实验环境完成。
-
-内容参考仓库专题笔记、官方文档和少量公开招聘样本。招聘样本用于帮助判断方向，不构成市场占比统计；部分岗位已经结束。代表性来源包括 [声网 SRE 实习](https://www.nowcoder.com/jobs/detail/398618)、[完美世界 Linux 运维实习](https://www.nowcoder.com/jobs/detail/449298)、[Shopee SRE 校招](https://www.nowcoder.com/jobs/detail/461342) 和 [拓竹资深 SRE](https://www.v2ex.com/t/1230053)。
 
 路线图的视觉组织参考 [roadmap.sh Linux](https://roadmap.sh/linux) 与 [DevOps](https://roadmap.sh/devops)，中文内容、层级、优先级和验收任务独立整理。
 
