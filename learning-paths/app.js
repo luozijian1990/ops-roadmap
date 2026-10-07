@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s);
 const routes=window.OPS_LEARNING_ROUTES;
 const statusNames={todo:'未开始',learning:'学习中',done:'已完成'};
 const tiers=['入门','进阶','选修'];
-let route, nodes=[], progress={}, legacy={}, key='', storageOK=true;
+let route, nodes=[], progress={}, legacy={}, notes={}, key='', storageOK=true, pendingImport=null;
 let view=innerWidth<700?'list':'map', track='python', scale=1, fitMode=true, canvasHeight=0;
 let opened=new Set(), selected=null, returnTarget=null, activeDetail=null;
 let viewByRoute=new Map(), noticeTimer;
@@ -16,15 +16,16 @@ const leafById=id=>route.nodes.find(n=>n.id===id);
 const oldKey=id=>`ops-atlas-${id}-v1`;
 function readObject(name){const value=JSON.parse(localStorage.getItem(name)||'{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{}}
 function loadProgress(){
- progress={};legacy={};storageOK=true;
+ progress={};legacy={};notes={};storageOK=true;
  let saved={},old={};
  try{saved=readObject(key)}catch{storageOK=false}
  // A damaged legacy record must never hide valid new-node progress.
  try{old=readObject(oldKey(route.id))}catch{}
  for(const n of route.nodes)if(Object.hasOwn(statusNames,saved.states?.[n.id]))progress[n.id]=saved.states[n.id];
+ for(const n of route.nodes)if(typeof saved.notes?.[n.id]==='string')notes[n.id]=saved.notes[n.id].slice(0,2000);
  for(const m of route.modules){const value=saved.legacyModules?.[m.id]||old[m.id];if(['learning','done'].includes(value))legacy[m.id]=value}
 }
-function saveProgress(){try{localStorage.setItem(key,JSON.stringify({version:1,states:progress,legacyModules:legacy}));storageOK=true}catch{storageOK=false}}
+function saveProgress(){try{localStorage.setItem(key,JSON.stringify({version:1,states:progress,legacyModules:legacy,notes}));storageOK=true}catch{storageOK=false}}
 function matching(n){
  const q=$('#search').value.trim().toLowerCase(),filter=$('#filter').value,stage=$('#stage-filter').value;
  const m=moduleById(n.moduleId);
@@ -123,11 +124,17 @@ function closeDrawer(){
 }
 function openDrawer(kind,id){
  const scope=view==='map'?'#canvas':'#list';
- returnTarget=kind==='leaf'?`${scope} [data-leaf="${id}"]`:kind==='module'?`${scope} [data-module="${id}"]`:kind==='legacy'?'#legacy-records':`${scope} [data-${kind}="${id}"]`;
+ returnTarget=kind==='leaf'?`${scope} [data-leaf="${id}"]`:kind==='module'?`${scope} [data-module="${id}"]`:kind==='legacy'?'#legacy-records':kind==='selfcheck'?'#self-check':kind==='import'?'#import-progress':`${scope} [data-${kind}="${id}"]`;
  activeDetail={kind,id};selected=kind==='leaf'?id:null;
  renderDetail();$('#drawer').hidden=false;$('#backdrop').hidden=false;isolate(true);$('#drawer').scrollTop=0;$('.close').focus();
 }
-function resourceHTML(resource){return resource?`<a class="resource" href="${esc(/^https?:/.test(resource)?resource:'../topics/'+resource)}" target="_blank" rel="noopener">${/^https?:/.test(resource)?'阅读官方资料':'阅读相关模块笔记'} ↗</a><p class="boundary">这是相关模块的资料入口，先学习本节点范围；部分资料尚待细化到章节。</p>`:'<p class="boundary">本节点暂无专属资料。先按目标实践，保存自己的实验记录；可先按目标练习并记录结果。</p>'}
+function resourceHTML(resource){
+ if(!resource)return '<p class="boundary">本节点暂无专属资料。先按目标实践，保存自己的实验记录。</p>';
+ const external=/^https?:/.test(resource),lab=resource.startsWith('labs/');
+ const url=external||lab?resource:'../topics/'+resource;
+ const label=external?'阅读官方资料':lab?'打开实验步骤':resource.includes('#')?'阅读对应章节':'阅读相关模块笔记';
+ return `<a class="resource" href="${esc(url)}" target="_blank" rel="noopener">${label} ↗</a><p class="boundary">按本节点目标选择阅读范围；未定位到章节的资料仍是模块入口。</p>`;
+}
 function renderDetail(){
  const {kind,id}=activeDetail;let title='',context='',body='',controls='';
  if(kind==='leaf'){
@@ -136,17 +143,24 @@ function renderDetail(){
   <section class="detail-section"><h3>前置知识</h3><div class="pre">${esc(n.pre)}</div>${n.relatedRoutes.map(rid=>`<button class="next-route" data-switch="${rid}">相关路线：${esc(routes.find(r=>r.id===rid).label)} →</button>`).join('')}</section>
   <section class="detail-section"><h3>独立验收</h3><div class="assessment">${esc(n.exercise)}</div><p class="boundary">留下命令、输出或观察记录，再判断是否达标。模块边界：${esc(n.boundary)}</p></section>
   <section class="detail-section"><h3>学习资料</h3>${resourceHTML(n.resource)}</section>
+  <section class="detail-section"><h3><label for="evidence-note">验收笔记</label></h3><textarea id="evidence-note" maxlength="2000" rows="5" placeholder="记录环境、命令、结果和实验文件路径；请勿保存密钥。">${esc(notes[id]||'')}</textarea><p id="evidence-state" class="boundary" role="status">自动保存在当前浏览器，可随进度导出（最多 2000 字符）。</p></section>
   <button class="module-link" data-open-module="${m.id}">查看「${esc(m.title)}」全部 ${activeChildren(m).length} 个节点 →</button>`;
   controls=`<div class="drawer-status"><p>${storageOK?'进度只标记当前学习节点。':'浏览器存储不可用，进度仅保留在本次页面。'}</p><div class="status-buttons">${Object.entries(statusNames).map(([value,label])=>`<button data-status-action="${value}" class="${state(id)===value?'active':''}" aria-pressed="${state(id)===value}">${label}${value==='done'?' ✓':''}</button>`).join('')}</div></div>`;
  }else if(kind==='module'){
   const m=moduleById(id);title=m.title;context=`${route.chapters[m.stage]} / 能力模块`;
   body=`<p class="description">${esc(m.outcome)}</p><p class="boundary">已完成 ${countModule(m)} 个节点。${legacy[id]?`旧版模块记录：${statusNames[legacy[id]]}；不计入新节点完成数。`:''}</p><section class="detail-section"><h3>学习范围</h3><ul>${m.topics.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></section><section class="detail-section"><h3>具体学习节点</h3><div class="chapter-items">${activeChildren(m).map(n=>`<button data-open-leaf="${n.id}">${esc(n.title)}<small>${n.tier} / ${statusNames[state(n.id)]}</small></button>`).join('')}</div></section><section class="detail-section"><h3>模块综合练习</h3><div class="assessment">${esc(m.exercise)}</div></section>${resourceHTML(m.resource)}`;
+ }else if(kind==='selfcheck'){
+  title='从哪一阶段开始';context=route.label+' / 自测';
+  body=`<p class="description">${esc(route.pre)}</p><p class="boundary">按顺序勾选你能独立完成、且有记录证明的任务。建议从第一个未通过的阶段开始；这里只定位学习入口，不自动标记完成。</p><div class="selfcheck-items">${route.stages.map((s,i)=>`<label><input type="checkbox" data-selfcheck="${i}"><span><strong>${i+1}. ${esc(s.task)}</strong><small>${esc(s.proof)}</small></span></label>`).join('')}</div><p id="selfcheck-result" role="status"></p><button id="start-recommended" class="module-link">从第 1 阶段开始 →</button><a class="resource" href="labs/index.html">打开实验室与验收模板 ↗</a><p class="boundary">Linux 完成网站部署后，可按需进入 DevOps 的 Compose 模块或 Kubernetes 的容器基础，不必先学完中间件进阶。</p>`;
+ }else if(kind==='import'){
+  title='确认合并学习记录';context='进度备份 / 导入预览';
+  body=`<p class="description">备份中的同名节点状态和笔记会覆盖当前值，未包含的记录保留。建议先导出当前记录。不会执行笔记中的任何内容。</p><ul>${Object.entries(pendingImport).map(([id,data])=>`<li>${esc(routes.find(r=>r.id===id).label)}：${Object.keys(data.states).length} 条进度，${Object.keys(data.notes).length} 条笔记，${Object.keys(data.legacyModules).length} 条旧模块记录</li>`).join('')}</ul><button id="confirm-import" class="module-link">合并导入这些记录</button><p id="import-result" role="status"></p>`;
  }else if(kind==='legacy'){
   title='旧版模块学习记录';context='进度迁移说明';
   body=`<p class="description">旧版进度已保留。由于一个模块拆成了多个独立能力，不会自动把它们都标成已完成。</p><div class="chapter-items">${route.modules.filter(m=>legacy[m.id]).map(m=>`<button data-open-module="${m.id}">${esc(m.title)}<small>旧版${statusNames[legacy[m.id]]}</small></button>`).join('')}</div><p class="boundary">请按已有能力逐项复核。新记录单独保存，旧版存储未被修改。</p>`;
  }else{
   const stage=route.stages[Number(id)];title=kind==='practice'?stage.task:route.chapters[Number(id)];context=`阶段 ${Number(id)+1} / ${kind==='practice'?'综合实践':'学习范围'}`;
-  body=`<p class="description">${esc(stage.sub)}</p><section class="detail-section"><h3>阶段验收</h3><div class="assessment">${esc(stage.proof)}</div></section><section class="detail-section"><h3>本阶段能力模块</h3><div class="chapter-items">${route.modules.filter(m=>m.stage===Number(id)).map(m=>`<button data-open-module="${m.id}">${esc(m.title)}<small>${countModule(m)} 节点完成</small></button>`).join('')}</div></section><p class="boundary">各模块支持单独复习，综合实践用于检验跨模块能力，不自动改变节点状态。</p>`;
+  body=`<p class="description">${esc(stage.sub)}</p><section class="detail-section"><h3>阶段验收</h3><div class="assessment">${esc(stage.proof)}</div><a class="resource" href="labs/index.html#${route.id}">实验起点、步骤与验收材料 ↗</a></section><section class="detail-section"><h3>本阶段能力模块</h3><div class="chapter-items">${route.modules.filter(m=>m.stage===Number(id)).map(m=>`<button data-open-module="${m.id}">${esc(m.title)}<small>${countModule(m)} 节点完成</small></button>`).join('')}</div></section><p class="boundary">各模块支持单独复习，综合实践用于检验跨模块能力，不自动改变节点状态。</p>`;
  }
  $('#drawer').innerHTML=`<div class="drawer-bar"><span>${esc(context)}</span><button class="close" aria-label="关闭详情">×</button></div><div class="drawer-body"><h2 id="detail-title">${esc(title)}</h2>${body}</div>${controls}`;
 }
@@ -171,6 +185,8 @@ $('.workspace').addEventListener('click',event=>{
 });
 $('#drawer').addEventListener('click',event=>{
  if(event.target.closest('.close'))return closeDrawer();
+ if(event.target.closest('#start-recommended')){const first=[...$('#drawer').querySelectorAll('[data-selfcheck]')].findIndex(el=>!el.checked);closeDrawer();$('#stage-filter').value=String(first<0?route.stages.length-1:first);update();$('.tools').scrollIntoView({block:'start'});$('#stage-filter').focus();return}
+ if(event.target.closest('#confirm-import')){try{OPS_PROGRESS.merge(localStorage,pendingImport,routes);pendingImport=null;loadProgress();closeDrawer();$('#backup-message').textContent='导入完成；已保留文件中未包含的记录。'}catch(error){$('#import-result').textContent=error.message}return}
  const module=event.target.closest('[data-open-module]');if(module){activeDetail={kind:'module',id:module.dataset.openModule};renderDetail();$('#drawer').scrollTop=0;$('.close').focus();return}
  const leaf=event.target.closest('[data-open-leaf]');if(leaf){selected=leaf.dataset.openLeaf;activeDetail={kind:'leaf',id:selected};renderDetail();$('#drawer').scrollTop=0;$('.close').focus();return}
  const button=event.target.closest('[data-status-action]');if(!button||activeDetail.kind!=='leaf')return;
@@ -182,11 +198,17 @@ $('#map-view').addEventListener('click',()=>setView('map'));$('#list-view').addE
 $('#expand-all').addEventListener('click',()=>{opened=new Set(route.modules.map(m=>m.id));update()});$('#collapse-all').addEventListener('click',()=>{opened.clear();update()});
 $('#language').addEventListener('change',()=>{track=$('#language').value;try{localStorage.setItem('ops-path-language',track)}catch{}update()});
 $('#legacy-records').addEventListener('click',()=>openDrawer('legacy',''));
+$('#self-check').addEventListener('click',()=>openDrawer('selfcheck',''));
+$('#drawer').addEventListener('change',event=>{if(!event.target.matches('[data-selfcheck]'))return;const first=[...$('#drawer').querySelectorAll('[data-selfcheck]')].findIndex(el=>!el.checked);$('#selfcheck-result').textContent=first<0?'所有阶段均自评通过，可回看最终交付或选择进阶节点。':`建议从第 ${first+1} 阶段开始：${route.chapters[first]}`;$('#start-recommended').textContent=first<0?'复核最终交付 →':`从第 ${first+1} 阶段开始 →`});
+$('#drawer').addEventListener('input',event=>{if(event.target.id!=='evidence-note'||activeDetail?.kind!=='leaf')return;notes[activeDetail.id]=event.target.value;saveProgress();$('#evidence-state').textContent=storageOK?'验收笔记已保存。':'浏览器写入失败，笔记仅在本次页面保留，请复制备份。'});
+$('#export-progress').addEventListener('click',()=>{try{saveProgress();if(!storageOK)throw new Error('当前进度无法写入浏览器，请先复制验收笔记。');const data=OPS_PROGRESS.snapshot(localStorage,routes),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='ops-roadmap-progress-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);$('#backup-message').textContent='已生成六条路线的备份文件，请确认浏览器下载完成。'}catch(error){$('#backup-message').textContent='导出失败：'+error.message}});
+$('#import-progress').addEventListener('click',()=>$('#progress-file').click());
+$('#progress-file').addEventListener('change',async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>5*1024*1024)throw new Error('文件超过 5 MB');pendingImport=OPS_PROGRESS.parse(await file.text(),routes);openDrawer('import','')}catch(error){$('#backup-message').textContent='导入失败：'+error.message}finally{event.target.value=''}});
 $('#zoom-in').addEventListener('click',()=>{fitMode=false;scale=Math.min(1.4,scale+.15);applyScale()});$('#zoom-out').addEventListener('click',()=>{fitMode=false;scale=Math.max(.3,scale-.15);applyScale()});$('#fit').addEventListener('click',()=>{fitMode=true;applyScale()});window.addEventListener('resize',applyScale);
 $('#backdrop').addEventListener('click',closeDrawer);
 document.addEventListener('keydown',event=>{
  if($('#drawer').hidden)return;if(event.key==='Escape')return closeDrawer();
- if(event.key==='Tab'){const all=[...$('#drawer').querySelectorAll('button,a[href]')],first=all[0],last=all.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}
+ if(event.key==='Tab'){const all=[...$('#drawer').querySelectorAll('button,a[href],input,textarea,select')].filter(el=>!el.disabled),first=all[0],last=all.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}
 });
 document.addEventListener('click',event=>{const target=event.target.closest('[data-switch]');if(target&&target.dataset.switch!==route.id)location.hash=target.dataset.switch});
 window.addEventListener('hashchange',()=>{switchRoute(location.hash.slice(1));$('.routes .active').focus({preventScroll:true})});

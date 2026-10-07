@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>贯穿实验室 | Ops Roadmap</title><link rel="icon" href="data:,"><link rel="stylesheet" href="../styles.css"></head>
+<body><header><div class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">op</span>Ops Roadmap / 实验室</a><a href="../index.html">返回学习路线</a></div></header>
+<main class="page lab-page"><div class="heading"><div><h1>一个服务，六条学习路线</h1><p class="lead">先跑通、再观察故障，最后用数据证明恢复。</p></div></div>
+<p class="description">起始应用是一份 Python 标准库 HTTP 服务，数据保存在 SQLite。它提供业务读取、存活与就绪检查、版本、结构化日志和请求计数指标。SQLite 用于降低起步门槛；MySQL / Redis 使用独立实验，不把 SQLite 恢复等同于 MySQL 时间点恢复。</p>
+<nav aria-label="实验路线"><a href="#linux">Linux</a><a href="#cloud">云运维</a><a href="#kubernetes">Kubernetes</a><a href="#devops">DevOps</a><a href="#sre">SRE</a><a href="#platform">运维开发</a><a href="evidence-template.md">验收模板</a></nav>
+<section id="start"><h2>准备与启动</h2><p>在仓库副本中进入下列目录。基础版只需 Python 3.9+，建议预留 256 MB 内存和 100 MB 磁盘作为实验预算；这不是性能容量保证。Linux 服务管理实验另需一台可恢复的 Linux 虚拟机。Compose 数据库分支建议预留 4 GB 内存和 5 GB 磁盘，并先确认本机端口未被其他服务占用。</p>
+<pre><code>cd learning-paths/labs
+python3 app.py
+# 保持前台运行，在另一终端进入同一目录：
+python3 labctl.py verify
+python3 labctl.py add second-deployment
+curl -fsS http://127.0.0.1:8088/api/items
+curl -fsS http://127.0.0.1:8088/metrics</code></pre>
+<p>预期：四项检查返回 200；业务记录至少包含 <code>first-deployment</code> 和新增记录。日志逐请求输出状态、耗时及版本。使用 Ctrl-C 停止前台应用。重新启动会保留数据。</p>
+<p class="assessment">实验约束：应用没有用户认证，仅用于本机或隔离环境；默认监听回环地址。故障开关影响这份应用，不会修改宿主机路由、防火墙或磁盘。请使用独立状态目录，不要把真实数据放入实验。</p></section>
+<section id="linux"><h2>01 / Linux：从进程到恢复</h2><table><thead><tr><th>阶段</th><th>起点与任务</th><th>留下的证据</th></tr></thead><tbody>
+<tr><td>1. 实验环境</td><td>准备可重建虚拟机、普通账号与 SSH；保存快照后启动应用。</td><td>系统版本、资源、登录身份和快照恢复结果。</td></tr>
+<tr><td>2. 服务管理</td><td>按 <a href="README.md#linux-服务管理">安装说明</a>部署 <a href="ops-lab.service">systemd unit</a>；故意改错 ExecStart，再通过 journal 修复。</td><td>启动失败原因、修复差异、重启后就绪结果。</td></tr>
+<tr><td>3. 请求路径</td><td>先用不存在的域名、未监听的端口访问，区分解析失败和拒绝连接；TLS 实验另配本地 CA。</td><td>DNS → 路由 → 监听 → 应用的分层检查。证书配置步骤见 <a href="README.md#https-与证书故障">HTTPS 实验</a>。</td></tr>
+<tr><td>4. Web 与中间件</td><td>运行下方 Compose 入口，发布 v2 再回退 v1；消息队列与服务发现按进阶节点选择。</td><td>入口响应、版本变化和回滚后的业务验证。</td></tr>
+<tr><td>5. 数据库与缓存</td><td>启动 MySQL / Redis 分支，验证账号、锁等待、逻辑恢复与缓存过期；参考<a href="database-drills.md">数据库独立实验</a>逐步扩展。</td><td>写入前后数据、拒绝访问、恢复对账与持久化边界。</td></tr>
+<tr><td>6. 监控与恢复</td><td>执行延迟、就绪失败与隔离恢复实验；为 /metrics 和 /readyz 接入监控及测试通知。</td><td>正常 / 故障 / 恢复三组请求和告警记录。</td></tr>
+<tr><td>7. 脚本与协作</td><td>把 verify 接入脚本；在两台实验主机用 Ansible 执行限定任务，验证幂等和分批失败停止；让另一人复现。</td><td>脚本退出码、Inventory、Playbook、变更记录和<a href="evidence-template.md">验收记录</a>。步骤参考<a href="../../topics/delivery/ansible/02-playbooks-operations-and-delivery.md">Ansible 专题</a>。</td></tr>
+</tbody></table>
+<h3 id="linux-commands">命令组合先练这三项</h3><pre><code># 在 labs 目录，先 Ctrl-C 停掉已运行的前台应用
+python3 app.py &gt; .state/app.log 2&gt;&amp;1
+# 另一终端生成请求后，查看记录；这些命令不修改应用数据
+grep '"status": 200' .state/app.log | tail -n 5
+python3 labctl.py verify; echo $?
+# 故障模式下再执行 verify，对比退出码；脚本中不要忽略非零状态</code></pre>
+<h3>受控故障与恢复</h3><pre><code>python3 labctl.py fault slow
+curl -s -o /dev/null -w '%{http_code} %{time_total}\n' http://127.0.0.1:8088/api/items
+python3 labctl.py fault unready
+curl -i http://127.0.0.1:8088/healthz
+curl -i http://127.0.0.1:8088/readyz
+python3 labctl.py verify
+python3 labctl.py fault none
+python3 labctl.py verify</code></pre><p>预期：slow 给业务请求增加约 1 秒延迟；unready 时存活仍为 200，就绪与业务读取为 503，verify 非零退出；none 恢复为 200。这是应用模拟的依赖异常，不代表已验证真实数据库断网。</p>
+<h3>备份必须在新目录验证</h3><pre><code>python3 labctl.py backup .state/before.db
+python3 labctl.py add after-backup
+python3 labctl.py restore .state/before.db .state/restored/app.db
+python3 app.py --state .state/restored --port 8089
+# 另一终端比较原实例和恢复实例：
+python3 labctl.py verify --url http://127.0.0.1:8089
+curl -fsS http://127.0.0.1:8088/api/items</code></pre><p>预期：恢复实例有备份前记录，没有 <code>after-backup</code>；原实例仍有新增记录。记录备份时刻、恢复耗时及数据差距。工具拒绝覆盖已存在的目标文件，重复练习请换新路径。</p>
+<h3>Compose：反向代理、版本与数据库分支</h3><pre><code># 先停掉宿主机上占用 8088 的实验应用
+docker compose up -d --build
+curl -fsS http://127.0.0.1:8080/api/items
+docker compose exec app python3 labctl.py --state /data add release-check
+LAB_VERSION=v2 docker compose up -d app
+curl -fsS http://127.0.0.1:8080/version
+LAB_VERSION=v1 docker compose up -d app
+# 应用重建后 Nginx DNS 缓存最多约 5 秒，暂时失败可稍后重试并保留现象
+curl -fsS http://127.0.0.1:8080/api/items
+docker compose --profile databases up -d mysql redis
+# MySQL / Redis 的独立练习见下方说明
+docker compose down</code></pre><p><a href="database-drills.md">MySQL 锁等待、事务与逻辑恢复 / Redis TTL 与持久化实验 →</a>。基础栈中的应用仍使用 SQLite；数据库分支不自动接入应用。<code>down</code> 保留数据卷；确认实验数据不再需要后，才使用 <code>docker compose --profile databases down -v</code> 删除本项目卷。</p></section>
+<section id="cloud"><h2>02 / 云运维：迁移同一个服务</h2><p>起点：Linux 基础验收通过，具备自己的实验账号、预算和清理权限。将应用部署到私网 ECS；入口使用负载均衡，管理通道限源。第一轮保留单实例 SQLite，完成快照与隔离恢复；需要多实例共享写入时，先把应用适配到 RDS，不要把本地 SQLite 文件当作共享数据库。</p><p>顺序：账号与预算 → 私网和访问控制 → 单实例部署 → 无状态入口双实例演练 → 日志与恢复 → Terraform 重建和清理。交付资源清单、费用记录和恢复证据。此处提供迁移任务，未提供一键创建收费云资源的脚本。</p></section>
+<section id="kubernetes"><h2>03 / Kubernetes：把同一服务交给控制器</h2><p>起点：容器基础与独立实验集群。使用 <a href="kubernetes.yaml">最小清单</a>（单副本、emptyDir，不保留业务数据），先验证探针和资源，再自行替换 PVC。必须指定实验 context，且确认镜像已加载或推送到可访问的仓库。</p><pre><code>docker build -t ops-roadmap-lab:local .
+# 例如 kind：将镜像装入你自己的实验集群
+kind load docker-image ops-roadmap-lab:local --name YOUR_LAB_CLUSTER
+kubectl --context YOUR_LAB_CONTEXT apply -f kubernetes.yaml
+kubectl --context YOUR_LAB_CONTEXT -n ops-roadmap-lab rollout status deploy/lab
+kubectl --context YOUR_LAB_CONTEXT -n ops-roadmap-lab port-forward svc/lab 8088:8088
+# 另一终端运行 verify；结束后仅清理本实验命名空间
+kubectl --context YOUR_LAB_CONTEXT delete -f kubernetes.yaml</code></pre><p>进阶顺序：故意改错探针或镜像 → 检查事件并回退 → PVC 重建数据验证 → 多节点拓扑分布与 PDB → 控制面 / Webhook 故障 → 快照恢复。emptyDir 随 Pod 删除而丢失，不能据此通过持久化验收；CSI 快照、跨节点故障域和控制面操作需要相应集群能力。交付清单差异、事件时间线和业务验证结果。</p></section>
+<section id="devops"><h2>04 / DevOps：让每次发布有证据</h2><p>起点：能运行测试和构建镜像。先在本地执行同一条检查，再接入自己的 CI 工具：</p><pre><code>python3 -m unittest discover -s tests -v
+docker build -t ops-roadmap-lab:local .
+docker compose up -d --build
+python3 labctl.py verify --url http://127.0.0.1:8080</code></pre><p>顺序：提交与审查 → 测试门禁 → 带提交标识的镜像与摘要 → 测试环境部署 → 业务校验 → 版本回退。然后增加配置灰度、并发发布锁、凭证轮换和制品保留。模拟执行器中断后先核对实际部署状态，再重试。交付 CI 配置、构建记录、制品摘要和失败发布记录；本实验不自动安装 Jenkins 或连接外部仓库。</p></section>
+<section id="sre"><h2>05 / SRE：从能响应到能衡量</h2><p>起点：应用与正常业务样本。把 <code>/api/items</code> 的成功请求作为一个用户旅程，明确时间窗口、请求总数和延迟阈值；就绪检查不能代替用户侧 SLI。</p><p>顺序：正常样本 → slow / unready 故障 → 告警和时间线 → 恢复反证 → 备份数据对账 → 容量与持续负载。请求计数可从 <code>/metrics</code> 采集，耗时在结构化日志里；这份应用尚未提供 Histogram 或分布式追踪，需自行埋点后再完成相关节点。</p><p>实验设计：先写稳态假设与停止阈值，再用同一请求比较三种状态；压测明确到达率、实际完成请求和未发出请求，不能只报告并发数。最终交付 SLO、告警、复盘、数据差距与未覆盖风险。</p></section>
+<section id="platform"><h2>06 / 运维开发：把手工验证变成可靠工具</h2><p>起点：选择 Python 或 Go。先写清谁使用巡检、允许检查哪些目标及失败如何表达，再重写 verify 为支持 JSON 输出、超时和退出码的 CLI；随后增加任务 API、状态存储、身份授权和审计，接入有界 Worker，验证重复消息、崩溃与取消。</p><p>交付顺序：需求与实现计划 → 可测试 CLI → 带权限的任务 API → 可靠任务执行 → 受控 Agent → 监控与恢复 → 他人可安装的发布包。沿用 <a href="evidence-template.md">验收模板</a>记录真实数据库和队列测试与替身测试的边界。</p><p>AI 协作分支：按<a href="../../topics/delivery/ai-native-sdlc/playbook.md#ops-intent">手册的运维开发落地章节</a>准备规格和上下文，使用成功、就绪失败、未授权目标三类固定案例评估工作流，记录失败与重试；发布关卡只用假的动作测试。基础应用未实现这些扩展，不要把无认证实验服务发布到公网。</p></section>
+<footer class="footer"><p>材料范围：可运行的基础应用、Compose 配置、systemd 示例、Kubernetes 起始清单、故障及备份恢复工具。各路线的高级能力仍需按节点完成独立实验。</p><p><a href="README.md">文件与操作说明</a> · <a href="../README.md">路线使用说明</a> · <a href="../index.html">返回路线</a></p></footer></main></body></html>

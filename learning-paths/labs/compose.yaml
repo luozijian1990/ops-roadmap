@@ -1,0 +1,45 @@
+name: ops-roadmap-lab
+services:
+  app:
+    build: .
+    environment:
+      LAB_VERSION: ${LAB_VERSION:-v1}
+    ports:
+      - "127.0.0.1:8088:8088"
+    volumes:
+      - app-data:/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/readyz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+  nginx:
+    image: nginx:1.28.0-alpine
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+  mysql:
+    image: mysql:8.4.4
+    profiles: [databases]
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: lab
+      MYSQL_USER: learner
+      MYSQL_PASSWORD: local-lab-only
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init.sql:/docker-entrypoint-initdb.d/01-lab.sql:ro
+  redis:
+    image: redis:7.4.2-alpine
+    profiles: [databases]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+volumes:
+  app-data:
+  mysql-data:
+  redis-data:
