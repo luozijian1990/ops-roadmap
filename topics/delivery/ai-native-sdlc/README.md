@@ -10,6 +10,8 @@
 
 **配套示例**：[用 AI 原生 SDLC 六阶段完成一次运维工具迭代](./example.md)。以巡检 CLI 增加就绪检查与 JSON 输出为例，展示 `intent.md → spec.md → plan.md → 测试与评审 → 发布 → 故障回流` 的完整过程，说明每阶段的输入、产物、人工关卡与度量，并给出按变更规模裁剪流程的方法。建议先阅读手册，再对照示例。本例为本仓库编写的教学演练，角色与记录均为虚构，命令和配置未在真实环境验证。
 
+**课程导读与进阶实践**：[Claude Academy：AI 原生 SDLC 课程导读与进阶实践](./academy.md)（[交互式学习路线](./academy-roadmap.html)）。整理官方 14 节课与本主题手册、运维示例的对应关系，进一步说明任务回放式评估、可信审批和故障回归，并提供两个进阶练习。建议阅读手册与示例后按需查阅。内容包含课程归纳与本仓库的运维实践补充；练习需自行准备实验环境。
+
 ## 可以学到什么
 
 - 用 `intent.md`、`spec.md` 和 `plan.md` 记录意图、设计与实现计划，让阶段交接有可审查的依据。
@@ -34,4 +36,4 @@
 
 本主题关注研发交付流程；通用治理框架可结合[交付治理与容量保障](../delivery-governance/README.md)，Skills 与 MCP 的技术细节见 [Agent 扩展工程](../../ai-agents/agent-extensions/README.md)，生产诊断和自动修复见 [LLM-AIOps](../../aiops/llm-aiops/README.md)。
 
-Markdown 是内容源；修改正文后，在仓库根目录运行 `./scripts/build-roadmaps.sh topics/delivery/ai-native-sdlc/playbook.md`，并同步检查本页及根目录导航。
+Markdown 是内容源；修改正文后，在仓库根目录运行 `./scripts/build-roadmaps.sh topics/delivery/ai-native-sdlc/playbook.md topics/delivery/ai-native-sdlc/academy.md`，并同步检查本页及根目录导航。

@@ -5,8 +5,8 @@
 **一份持续整理的个人运维学习笔记与交互式路线图合集。**
 
 ![Topics](https://img.shields.io/badge/topics-39-1f2933?style=flat-square)
-![Markdown notes](https://img.shields.io/badge/markdown_notes-118-1f2933?style=flat-square)
-![Roadmaps](https://img.shields.io/badge/roadmaps-118-f4c95d?style=flat-square)
+![Markdown notes](https://img.shields.io/badge/markdown_notes-120-1f2933?style=flat-square)
+![Roadmaps](https://img.shields.io/badge/roadmaps-119-f4c95d?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8bcf8b?style=flat-square)](./LICENSE)
 
 [快速开始](#快速开始) · [新手学习路线](#新手学习路线) · [内容导航](#内容导航) · [提示词资料库](#提示词资料库) · [案例库](#企业案例库整理中) · [生成方式](#内容如何生成) · [仓库结构](#仓库结构)
