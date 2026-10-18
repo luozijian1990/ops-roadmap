@@ -57,7 +57,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 
 ## 内容导航
 
-根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 118 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
+根目录的 [`index.html`](./index.html) 是全部 Roadmap 的入口，包含 120 份标准路线图，以及 Linux 性能优化和 Kubernetes 的完整动画版。
 
 | 分类 | 主题 |
 | --- | --- |
@@ -70,7 +70,7 @@ Ops Roadmap 是我在学习和实践过程中整理的个人知识库，目前�
 | 持续交付 | [Ansible](./topics/delivery/ansible/) · [Jenkins](./topics/delivery/jenkins/) · [GitOps](./topics/delivery/gitops/) · [Argo CD](./topics/delivery/argo-cd/) · [交付治理与容量保障](./topics/delivery/delivery-governance/) · [AI 原生 SDLC](./topics/delivery/ai-native-sdlc/) |
 | Web 基础设施 | [Nginx](./topics/web/nginx/) · [Traefik](./topics/web/traefik/) |
 | AI 基础设施 | [GPU AI Infrastructure](./topics/ai-infrastructure/gpu/) |
-| AIOps | [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |
+| AIOps | [AIOps 的一些理解](./topics/aiops/fundamentals/) · [LLM-AIOps 中文学习路线](./topics/aiops/llm-aiops/) |
 | AI Agent | [DeepAgent](./topics/ai-agents/deepagent/) · [Claude Agent SDK](./topics/ai-agents/claude-agent-sdk/) · [Agent 扩展工程：Skills 与 MCP](./topics/ai-agents/agent-extensions/) |
 
 ## 提示词资料库
