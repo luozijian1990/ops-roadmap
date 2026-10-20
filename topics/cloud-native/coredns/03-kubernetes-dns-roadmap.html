@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CoreDNS Kubernetes DNS 实践 学习笔记 · Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']]},
+    options: {skipHtmlTags: ['script','noscript','style','textarea','pre','code']},
+    startup: {typeset: false}
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:false, theme:'base', themeVariables:{
+    background:'#fffdf5', primaryColor:'#fff9d6', primaryBorderColor:'#1f2933',
+    primaryTextColor:'#1f2933', lineColor:'#1f2933', fontFamily:'inherit'}});
+  window.__mermaid = mermaid;
+</script>
+<style>
+  :root{
+    --bg:#fdf6e3; --ink:#1f2933; --muted:#6b6657;
+    --paper:#fffdf5; --line:#1f2933;
+    --todo:#cbd5e1; --doing:#facc15; --done:#22c55e;
+    --accent:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;}
+  header{padding:32px 40px 16px;border-bottom:2px dashed var(--ink);
+    position:sticky;top:0;background:var(--bg);z-index:5;}
+  h1{margin:0 0 8px;font-size:28px;letter-spacing:1px}
+  .meta{display:flex;gap:24px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .progress{flex:1;min-width:220px;height:10px;background:#e7dfc7;
+    border:1px solid var(--ink);border-radius:6px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:var(--done);width:0;transition:width .3s}
+  .legend{display:flex;gap:14px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;border:1px solid var(--ink);display:inline-block;vertical-align:middle;margin-right:4px}
+  .dot.todo{background:var(--todo)} .dot.doing{background:var(--doing)} .dot.done{background:var(--done)}
+  button.reset, a.back{background:var(--paper);border:1px solid var(--ink);
+    border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit;text-decoration:none;color:var(--ink)}
+  button.reset:hover, a.back:hover{background:var(--accent)}
+  main{padding:32px 40px 80px;max-width:1280px;margin:0 auto}
+  .part{margin-bottom:48px;position:relative}
+  .part-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .part-num{width:42px;height:42px;border-radius:50%;background:var(--ink);
+    color:var(--bg);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:18px;flex-shrink:0}
+  .part-title{font-size:20px;font-weight:600;margin:0}
+  .part-bar{flex:1;height:0;border-top:2px dashed var(--ink);opacity:.4}
+  .sections{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;padding-left:56px}
+  .card{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:10px;padding:12px 14px;cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .12s,box-shadow .12s;
+    position:relative;display:flex;align-items:center;gap:10px;min-height:64px}
+  .card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .card[data-status="doing"]{background:#fff9d6}
+  .card[data-status="done"]{background:#d9f7d9}
+  .card .status{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink);
+    flex-shrink:0;background:var(--todo);cursor:pointer}
+  .card[data-status="doing"] .status{background:var(--doing)}
+  .card[data-status="done"] .status{background:var(--done)}
+  .card .ttl{font-size:13.5px;line-height:1.35;font-weight:500}
+  .card .badge{margin-left:auto;font-size:11px;color:var(--muted);
+    background:rgba(31,41,51,.05);border:1px solid rgba(31,41,51,.15);
+    padding:1px 7px;border-radius:10px;flex-shrink:0}
+  /* drawer 顶部胶囊条（1-2 排自动折行，每个胶囊不同色） */
+  .tags-bar{display:flex;flex-wrap:wrap;gap:7px 8px;padding:14px 24px 14px;
+    border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .tags-bar .pill{font-size:12px;color:var(--ink);
+    border:1px solid var(--ink);padding:3px 10px;border-radius:14px;
+    white-space:nowrap;box-shadow:1.5px 1.5px 0 var(--ink);font-weight:500}
+  .tags-bar .pill.more{background:transparent;border-style:dashed;color:var(--muted);
+    box-shadow:none;cursor:help}
+  .tags-bar.empty{display:none}
+  .search input{padding:6px 10px;border:1px solid var(--ink);border-radius:6px;font:inherit;background:var(--paper)}
+  .drawer{position:fixed;top:0;right:0;width:var(--drawer-width,min(640px,92vw));height:100vh;
+    background:var(--paper);border-left:2px solid var(--ink);
+    max-width:calc(100vw - 28px);min-width:min(360px,92vw);
+    transform:translateX(100%);transition:transform .25s;z-index:20;
+    display:flex;flex-direction:column}
+  .drawer.open{transform:translateX(0)}
+  .drawer.resizing{transition:none}
+  .drawer-resizer{position:absolute;top:0;left:-10px;width:18px;height:100%;
+    cursor:ew-resize;touch-action:none;z-index:2;background:transparent}
+  .drawer-resizer::after{content:"";position:absolute;top:0;bottom:0;left:8px;width:3px;
+    background:transparent;border-left:1px dashed rgba(31,41,51,.5);border-right:1px dashed rgba(31,41,51,.25)}
+  .drawer.open .drawer-resizer:hover::after,.drawer.open .drawer-resizer:focus-visible::after,
+  .drawer.resizing .drawer-resizer::after{background:var(--accent);border-color:var(--ink)}
+  body.drawer-resizing{cursor:ew-resize;user-select:none}
+  .drawer header{position:sticky;top:0;display:flex;align-items:center;
+    gap:12px;padding:16px 20px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .drawer h2{margin:0;font-size:17px;flex:1}
+  .drawer .body{padding:18px 24px;overflow:auto;flex:1;line-height:1.7;font-size:14.5px}
+  .drawer .body pre{background:#1a1d23;color:#eee;padding:12px;border-radius:6px;overflow:auto}
+  .drawer .body code{font-family:'JetBrains Mono','Menlo',monospace;font-size:13px}
+  .drawer .body :not(pre) > code{background:#f1ead0;padding:2px 5px;border-radius:3px}
+  .drawer .body .mermaid{background:var(--paper);border:1.5px solid var(--ink);
+    border-radius:8px;padding:14px;margin:10px 0;box-shadow:3px 3px 0 var(--ink);
+    overflow:auto;text-align:center;cursor:zoom-in}
+  .drawer .body .mermaid svg{max-width:100%;height:auto}
+  .drawer .body h1,.drawer .body h2,.drawer .body h3,.drawer .body h4{margin:1.2em 0 .4em}
+  .drawer .body table{border-collapse:collapse;margin:8px 0}
+  .drawer .body th,.drawer .body td{border:1px solid #c8c0a4;padding:5px 9px}
+  .drawer .toggle-group{display:flex;gap:6px}
+  .drawer .toggle-group button{padding:4px 10px;border:1px solid var(--ink);
+    background:transparent;border-radius:5px;font:inherit;cursor:pointer;font-size:12px}
+  .drawer .toggle-group button.active{background:var(--ink);color:var(--bg)}
+  .drawer .edit-only{display:none !important}
+  .drawer.editable .edit-only{display:inline-flex !important}
+  .drawer.editable .edit-actions.edit-only{display:none !important}
+  .drawer.editable.editing .edit-btn{display:none !important}
+  .drawer .edit-btn,.drawer .save,.drawer .cancel{padding:4px 10px;border:1px solid var(--ink);
+    background:var(--paper);border-radius:5px;font:inherit;cursor:pointer;font-size:12px;color:var(--ink)}
+  .drawer .edit-btn:hover,.drawer .save:hover,.drawer .cancel:hover{background:var(--accent)}
+  .drawer.editing .body{display:none}
+  .drawer .edit-actions{grid-template-columns:1fr auto auto;gap:8px;
+    padding:12px 24px;border-bottom:1px dashed var(--ink);background:#fffdf5;align-items:center}
+  .drawer.editable.editing .edit-actions{display:grid !important}
+  .drawer .edit-title{grid-column:1 / -1;padding:8px 10px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;font-size:14px}
+  .drawer .editor-body{display:none;width:calc(100% - 48px);min-height:45vh;margin:18px 24px;
+    padding:12px;border:1px solid var(--ink);border-radius:8px;background:#fffdf5;color:var(--ink);
+    font:13px/1.65 'JetBrains Mono','Menlo',monospace;resize:vertical}
+  .drawer.editing .editor-body{display:block !important}
+  .drawer .save-state{font-size:12px;color:var(--muted);align-self:center}
+  .drawer .close{background:transparent;border:none;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+  .drawer .nav-hint{display:flex;align-items:center;gap:6px;padding:7px 24px;
+    font-size:11.5px;color:var(--muted);background:#fffdf5;border-bottom:1px dashed var(--ink)}
+  .drawer .nav-hint kbd{font-family:inherit;font-size:11px;line-height:1.5;padding:0 5px;
+    border:1px solid var(--ink);border-radius:4px;background:var(--paper);box-shadow:1px 1px 0 var(--ink)}
+  .backdrop{position:fixed;inset:0;background:rgba(31,41,51,.35);z-index:15;display:none}
+  .backdrop.open{display:block}
+  .diagram-backdrop{position:fixed;inset:0;background:rgba(31,41,51,.55);z-index:35;display:none}
+  .diagram-backdrop.open{display:block}
+  .diagram-modal{position:fixed;inset:clamp(10px,3vmin,28px);background:var(--paper);
+    border:2px solid var(--ink);border-radius:10px;box-shadow:6px 6px 0 var(--ink);
+    z-index:40;display:none;flex-direction:column;overflow:hidden}
+  .diagram-modal.open{display:flex}
+  .diagram-modal header{position:static;display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--ink);background:var(--paper)}
+  .diagram-modal header strong{font-size:15px;flex:1}
+  .diagram-controls{display:flex;align-items:center;gap:6px}
+  .diagram-controls button{width:30px;height:30px;border:1px solid var(--ink);
+    border-radius:6px;background:var(--paper);font:inherit;line-height:1;cursor:pointer}
+  .diagram-controls button:hover{background:var(--accent)}
+  .diagram-zoom{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+  .diagram-close{background:transparent;border:none;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .diagram-body{overflow:auto;flex:1;background:#fffdf5;color:var(--ink)}
+  .diagram-canvas{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center}
+  .diagram-inner{transform-origin:center center}
+  .diagram-inner .mermaid{display:block;margin:0;padding:0;background:transparent;
+    border:0;box-shadow:none;text-align:center;cursor:default;color:var(--ink)}
+  .diagram-inner .mermaid svg{display:block;max-width:none !important;height:auto !important}
+  .hidden{display:none !important}
+  @media (max-width:640px){
+    main{padding:18px}
+    .sections{padding-left:0;grid-template-columns:1fr}
+    header{padding:18px 20px 12px}
+    .drawer{width:100vw;max-width:100vw;min-width:0;border-left:0}
+    .drawer-resizer{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>CoreDNS Kubernetes DNS 实践 学习笔记</h1>
+  <div class="meta">
+    <a class="back" href="../../../index.html">← 返回总览</a>
+    <div class="legend">
+      <span><span class="dot todo"></span>待学</span>
+      <span><span class="dot doing"></span>在学</span>
+      <span><span class="dot done"></span>已学</span>
+    </div>
+    <div class="progress" title="学习进度"><span id="bar"></span></div>
+    <span id="progress-text">0 / 0</span>
+    <span class="search"><input id="search" type="search" placeholder="搜索小节…"></span>
+    <button class="reset" id="reset">重置进度</button>
+  </div>
+</header>
+<main id="roadmap"></main>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-resizer" id="drawer-resizer" role="separator" aria-orientation="vertical"
+    aria-label="调整笔记面板宽度" aria-valuemin="360" tabindex="0"></div>
+  <header>
+    <h2 id="d-title"></h2>
+    <div class="toggle-group" data-role="status">
+      <button data-status="todo">待学</button>
+      <button data-status="doing">在学</button>
+      <button data-status="done">已学</button>
+    </div>
+    <button class="edit-btn edit-only" id="edit-section">编辑</button>
+    <button class="close" id="d-close">×</button>
+  </header>
+  <div class="nav-hint"><kbd>←</kbd><kbd>→</kbd> 切换小节</div>
+  <div class="tags-bar empty" id="d-tags"></div>
+  <div class="edit-actions edit-only" id="edit-actions">
+    <input class="edit-title" id="edit-title" type="text" aria-label="小节标题">
+    <button class="save" id="save-section">保存</button>
+    <button class="cancel" id="cancel-edit">取消</button>
+    <span class="save-state" id="save-state"></span>
+  </div>
+  <div class="body" id="d-body"></div>
+  <textarea class="editor-body" id="edit-content" spellcheck="false" aria-label="小节内容"></textarea>
+</aside>
+<div class="diagram-backdrop" id="diagram-backdrop"></div>
+<section class="diagram-modal" id="diagram-modal" role="dialog" aria-modal="true" aria-label="放大图表">
+  <header>
+    <strong>Mermaid 图表</strong>
+    <div class="diagram-controls" aria-label="图表缩放">
+      <button id="diagram-zoom-out" title="缩小">-</button>
+      <span class="diagram-zoom" id="diagram-zoom">100%</span>
+      <button id="diagram-zoom-in" title="放大">+</button>
+    </div>
+    <button class="diagram-close" id="diagram-close" title="关闭">×</button>
+  </header>
+  <div class="diagram-body" id="diagram-body">
+    <div class="diagram-canvas" id="diagram-canvas">
+      <div class="diagram-inner" id="diagram-inner"></div>
+    </div>
+  </div>
+</section>
+
+<script id="data" type="application/json">{"title": "CoreDNS Kubernetes DNS 实践 学习笔记", "intro": "", "parts": [{"title": "第 1 章 · 沿着 Pod 请求找到 DNS 服务", "sections": [{"title": "连接 Pod 配置、Service 与 CoreDNS", "content": "<!-- src: https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/tasks/administer-cluster/dns-custom-nameservers.md; https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/concepts/services-networking/dns-pod-service.md -->\n\n本篇的 Kubernetes 行为依据官方 `release-1.34` 文档，插件语法依据 CoreDNS v1.12.4。两者是学习资料基线，并不表示 Kubernetes 1.34 一定安装该 CoreDNS 版本。托管集群、安装工具、CNI 与 DNS 插件都可能改变实际部署。\n\n#### DNS 请求与业务请求是两条链路\n\n普通 ClusterFirst Pod 中，kubelet 生成解析器配置，应用解析器据此选择 DNS 服务器。常见集群通过名为 `kube-dns` 的 Service 暴露 CoreDNS Pod；这个 Service 名是兼容入口，并不能用来判断后端仍是旧 kube-dns 实现。\n\n```mermaid\ngraph TD\n    A[应用调用解析器] --> B[Pod 内 resolv.conf]\n    B --> C[kube-dns Service 地址]\n    C --> D[CoreDNS Pod]\n    D --> E[Kubernetes 对象本地缓存]\n    D --> F[外部 DNS 上游]\n    D --> G[DNS 回答返回应用]\n    G --> H[应用另行连接业务地址]\n```\n\n图示为未引入 NodeLocal 的常见路径；Service 到端点的转发可由 kube-proxy 或其他数据面实现。DNS 返回 Service ClusterIP 后，应用才开始访问业务 Service。解析成功不证明业务 Endpoint 可达，业务连接失败也不能直接归因为 DNS。\n\n#### 先读现场而不是套默认值\n\n以下命令为只读检查，要求有对应集群权限；资源名和标签按现场调整：\n\n```bash\nkubectl -n kube-system get svc kube-dns -o wide\nkubectl -n kube-system get endpointslice -l kubernetes.io/service-name=kube-dns\nkubectl -n kube-system get pods -l k8s-app=kube-dns -o wide\nkubectl -n kube-system get configmap coredns -o yaml\n```\n\n还要在实际失败 Pod 的容器里读取 `/etc/resolv.conf`，不要仅检查本机或节点的文件。若 nameserver 是节点本地地址，应把 NodeLocal 加入链路。`cluster.local`、DNS Service IP 和 Deployment 名称均不能写死为所有环境的事实。\n\n练习时画出自己环境的 DNS 服务地址、端点地址、域后缀和外部上游。只要其中一项未知，就把它记为待确认，而不是把教程示例当作现场数据。", "subs": ["DNS 请求与业务请求是两条链路", "先读现场而不是套默认值"]}, {"title": "拆解集群 Corefile 并确认实际版本", "content": "<!-- src: https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/README.md; https://github.com/coredns/coredns/blob/v1.12.4/plugin/health/README.md; https://github.com/coredns/coredns/blob/v1.12.4/plugin/cache/README.md; https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/tasks/administer-cluster/dns-custom-nameservers.md -->\n\n集群 Corefile 同时包含服务发现、转发、缓存和运行维护设置。下例改编自 Kubernetes 文档，用来解释职责；它不是可以直接覆盖任意集群的生产模板，也不代表某个安装工具的默认文件。\n\n```text\n.:53 {\n    errors\n    health {\n        lameduck 5s\n    }\n    ready\n    kubernetes cluster.local in-addr.arpa ip6.arpa {\n        pods disabled\n        fallthrough in-addr.arpa ip6.arpa\n        ttl 30\n    }\n    prometheus :9153\n    forward . /etc/resolv.conf\n    cache 30\n    loop\n    reload\n    loadbalance\n}\n```\n\n#### 逐项解释职责边界\n\n`kubernetes` 为集群域及配置的反向区域生成记录，`forward` 处理到达它的其他查询，`cache` 减少重复后端访问。反向区域的 fallthrough 允许未命中查询继续，但集群正向域不存在时通常应由 kubernetes 给出明确否定回答。\n\n`pods disabled` 是本例主动选择的教学设置，禁用 IP 形式的 Pod 记录，不等于禁用所有 Service 与 Headless 记录。官方常见示例中的 `pods insecure` 主要用于兼容，是否保留应先查应用依赖。\n\n`forward . /etc/resolv.conf` 读取的是 CoreDNS 进程所见文件。该文件若指回 CoreDNS 自身，会造成循环；不能仅因这是“默认示例”就认定安全。探针端口、指标监听地址还要与 Deployment 和采集配置一致。\n\n#### 查清运行版本与实际生效配置\n\n```bash\nkubectl -n kube-system get deployment coredns -o jsonpath='{.spec.template.spec.containers[*].image}{\"\\n\"}'\nkubectl -n kube-system logs -l k8s-app=kube-dns --tail=80 --prefix=true\nkubectl -n kube-system get deployment coredns -o yaml\n```\n\n检查镜像 tag/digest、容器参数、挂载路径、探针、dnsPolicy 和日志里的版本。镜像名可能被内部仓库重新打包，必要时用实际二进制版本补充确认。\n\nKubernetes 文档可能保留早期示例，不能把过时的 `upstream` 等字段直接复制进当前插件配置。也不要按 Corefile 书写顺序推断执行顺序，应以实际构建的 `plugin.cfg` 为依据。", "subs": ["逐项解释职责边界", "查清运行版本与实际生效配置"]}]}, {"title": "第 2 章 · 从 Kubernetes 对象理解 DNS 记录", "sections": [{"title": "比较普通 Service、Headless 与命名端口", "content": "<!-- src: https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/concepts/services-networking/dns-pod-service.md; https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/README.md -->\n\n集群 DNS 把 Kubernetes 对象映射为名称，而不是替每次请求选择具体业务 Pod。普通 Service 通常返回 ClusterIP；Headless Service 没有 ClusterIP，DNS 返回其可发布端点的地址集合。两种模式把后端选择责任放在不同位置。\n\n| 对象 | 典型名称 | 预期内容 |\n| --- | --- | --- |\n| 普通 Service | `web.dns-lab.svc.cluster.local.` | Service ClusterIP |\n| Headless Service | `web-headless.dns-lab.svc.cluster.local.` | 可发布 Endpoint 地址 |\n| 命名端口 SRV | `_http._tcp.web.dns-lab.svc.cluster.local.` | 端口与目标名称 |\n| Headless 下有主机名的端点 | `web-0.web-headless.dns-lab.svc.cluster.local.` | 对应端点 IP |\n\n#### 将 DNS 回答与对象逐一核对\n\n在后面的实验命名空间创建资源后，可以运行：\n\n```bash\nkubectl -n dns-lab get svc web web-headless -o wide\nkubectl -n dns-lab get endpointslice -l kubernetes.io/service-name=web-headless -o yaml\nkubectl -n dns-lab exec dnsutils -- dig web.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab exec dnsutils -- dig web-headless.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab exec dnsutils -- dig _http._tcp.web-headless.dns-lab.svc.cluster.local. SRV\n```\n\n双栈环境还需分别核对 A 与 AAAA。普通 Service 即使没有 ready 后端，也可能仍能解析 ClusterIP；不能把“DNS 有 IP”当作后端就绪证明。Headless 回答通常受端点 ready 状态影响，`publishNotReadyAddresses` 会改变发布边界。\n\n#### 名称成立需要对象条件\n\nPod 的 `hostname`、`subdomain` 与同名 Headless Service 可以共同形成可解析的 Pod FQDN。仅给 Pod 起一个 metadata.name，不意味着任意形式的 Pod 名称都会自动成为稳定 DNS 记录。\n\n客户端使用 Headless 时应正确处理多个地址、地址变化和连接失败。DNS 记录顺序不保证业务请求均匀分布。ExternalName 是另一类别名机制，不能用普通 ClusterIP 的排查预期套用它；需要检查 CNAME 目标及实际应用协议中的主机名行为。", "subs": ["将 DNS 回答与对象逐一核对", "名称成立需要对象条件"]}, {"title": "理解对象同步、RBAC 与 Pod 记录模式", "content": "<!-- src: https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/README.md; https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/tasks/administer-cluster/dns-debugging-resolution.md -->\n\n`kubernetes` 插件通过 Kubernetes API 的 list/watch 同步对象，再基于本地缓存回答请求。它不是每收到一个 DNS 查询都同步访问 API Server。因而 DNS 查询 QPS、API 请求量和对象变更量不能简单画等号。\n\n#### 初始同步失败会影响可回答范围\n\n```mermaid\ngraph TD\n    A[启动 kubernetes 插件] --> B[认证并建立对象 watch]\n    B --> C{初始同步完成}\n    C -->|是| D[报告就绪并回答记录]\n    C -->|等待超时| E[开始服务并继续同步]\n    E --> F[未同步的 Kubernetes 查询可能 SERVFAIL]\n```\n\n基线默认初始等待上限为 5 秒，可用 `startup_timeout` 调整。增加等待时间不会修复 RBAC 拒绝或网络不通，只会改变启动阶段行为。插件通过 EndpointSlice API 观察服务端点，缺少相关权限可能影响记录生成。\n\n```bash\nkubectl -n kube-system get deployment coredns -o jsonpath='{.spec.template.spec.serviceAccountName}{\"\\n\"}'\nkubectl -n kube-system logs -l k8s-app=kube-dns --since=10m --prefix=true\nkubectl get clusterrole system:coredns -o yaml\n```\n\nClusterRole 名并非所有发行版相同，应结合实际 ServiceAccount、RoleBinding/ClusterRoleBinding 查权限。具备 impersonation 权限的管理员可再用 `kubectl auth can-i` 验证该账号对 services、namespaces、endpointslices 的 list/watch。不要仅看到 `forbidden` 就授予 cluster-admin。\n\n#### 选择 Pod 记录模式需要考虑成本\n\n| 模式 | IP 形式 Pod 查询行为 | 主要取舍 |\n| --- | --- | --- |\n| `disabled` | 不提供此类记录 | 适合没有依赖的场景 |\n| `insecure` | 按查询中的 IP 生成回答 | 兼容但不验证 Pod 存在 |\n| `verified` | 校验命名空间内匹配 Pod | 维护 Pod watch，增加内存成本 |\n\n这里讨论的是类似 `10-0-0-1.ns.pod.cluster.local` 的 IP 编码名称，不能把该选项解释成“开启或关闭全部 Pod/Service DNS”。`autopath` 还依赖 verified 模式与原始客户端 Pod IP，经过 NodeLocal 或 NAT 后要重新判断是否满足条件。\n\n初始同步完成后 API 中断时，已有本地对象数据与新变更的表现可能不同。排查时分别验证旧记录、新建记录和更新记录；`/ready` 成功不能证明最新对象都已经传播到每个实例。", "subs": ["初始同步失败会影响可回答范围", "选择 Pod 记录模式需要考虑成本"]}, {"title": "追踪对象变更从 API 到客户端答案的传播", "content": "<!-- src: https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/controller.go; https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/kubernetes.go; https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/ready.go; https://github.com/coredns/coredns/blob/v1.12.4/plugin/cache/handler.go; https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/concepts/services-networking/dns-pod-service.md -->\n\n一次 Kubernetes API 修改成功，只能说明相应写入已经被 API 接受，不能证明每个 CoreDNS 实例和客户端都已使用新数据。要理解传播延迟，需要把 Kubernetes 对象更新链路与 DNS 响应缓存链路连接起来。\n\n#### 对象缓存负责生成答案，响应缓存负责复用答案\n\nv1.12.4 的 kubernetes 插件为 Service、EndpointSlice、Namespace 等对象建立 ListWatch 和索引。初始 list 提供对象集合，后续 watch 跟踪变更；查询时通过本地对象视图寻找服务与端点，再构造 DNS 记录。Pod 对象 watch 是否启用还受插件选项影响。\n\n| 层次 | 保存内容 | 更新依据 | 不应混淆的概念 |\n| --- | --- | --- | --- |\n| kubernetes 对象缓存 | Service、端点等对象的内部表示与索引 | API list/watch | 不是按 DNS TTL 定期拉取所有对象 |\n| cache 响应缓存 | 某类 DNS 查询已产生的回答 | 查询填充、TTL 与刷新策略 | 不会仅因 API 对象修改就必然同步失效 |\n| NodeLocal/应用缓存 | 上游答案或应用自身解析结果 | 各层策略 | 不与集中 CoreDNS 共享同一份内存 |\n\n`kubernetes ttl 30` 控制所生成 DNS 记录的 TTL，不是 API watch 周期，也不是 EndpointSlice 控制器的刷新间隔。关闭响应缓存不等于关闭对象缓存，更不意味着每个查询都会重新读取 API。[对象控制器源码](https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/controller.go)\n\n#### 一次标签变更可能经过多次独立传播\n\n```mermaid\nsequenceDiagram\n    participant U as 运维操作\n    participant A as API Server\n    participant E as 端点控制器\n    participant K as CoreDNS 对象视图\n    participant C as DNS 响应缓存\n    participant P as 客户端\n    U->>A: 更新 Pod 标签\n    A-->>E: 控制器观察变更\n    E->>A: 更新 EndpointSlice\n    A-->>K: watch 分发端点事件\n    P->>C: 查询 Headless 名称\n    alt 旧响应仍有效\n        C-->>P: 继续返回已缓存结果\n    else 需要重新获取\n        C->>K: 按当前对象视图生成回答\n        K-->>C: 返回新结果\n        C-->>P: 保存并交付新结果\n    end\n```\n\n这是单次变更的概念顺序，不保证所有事件都按某个固定时长传播。多个对象、多个 CoreDNS 副本、不同查询填充时间，都可能形成不同观察窗口。不能只把 cache TTL 当作从 API 写入到客户端更新的唯一延迟。\n\n#### 初始未同步与运行中失去更新能力不同\n\n初始同步尚未完成时，插件可能无法回答相关记录；运行中的 API 连接中断则可能保留已有本地对象，旧名称仍然可回答，而新增或删除对象尚不可见。已有 DNS 响应缓存还可能进一步遮蔽对象视图问题。\n\n`ready` 通过插件暴露的就绪接口判断状态；kubernetes 的实现检查控制器是否完成初始同步。它不逐条比对 API 中所有对象是否与本地完全一致，因此“ready 成功”和“每条记录反映最新变更”不是同一个判据。\n\n#### 用一个受控标签变更验证传播层次\n\n先完成第三篇 `dns-lab` 实验，并确认 `web-0` 是该实验专用 Pod。在管理机记录 Pod、Service、EndpointSlice；移除选择标签后比较普通 Service 与 Headless 回答，再恢复标签：\n\n```bash\nkubectl -n dns-lab get pod web-0 -o wide\nkubectl -n dns-lab get svc web web-headless -o wide\nkubectl -n dns-lab get endpointslice -l kubernetes.io/service-name=web-headless -o yaml\nkubectl -n dns-lab label pod web-0 app-\nkubectl -n dns-lab get endpointslice -l kubernetes.io/service-name=web-headless -o yaml\nkubectl -n dns-lab exec dnsutils -- dig web-headless.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab exec dnsutils -- dig web.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab label pod web-0 app=dns-lab-web --overwrite\n```\n\n以上假定集群域为 cluster.local。对象控制器更新端点与缓存过期都需要时间，应记录时间并重复观察，不能仅查询一次就判定实现错误。恢复标签后再次确认 EndpointSlice 地址和 Headless 回答恢复；若中途实验失败，也应执行恢复步骤。\n\n普通 Service 的 ClusterIP 可继续存在，而 Headless 可发布端点集合发生变化，这正好区分“服务对象存在”与“可发布端点存在”。进一步逐个直查 CoreDNS Pod IP、节点缓存和应用解析入口，便能找出旧答案停留在哪一层。不要在生产环境阻断 API 来做此验证。", "subs": ["对象缓存负责生成答案", "一次标签变更可能经过多次独立传播", "初始未同步与运行中失去更新能力不同", "用一个受控标签变更验证传播层次"]}]}, {"title": "第 3 章 · 解释应用与命令行的解析差异", "sections": [{"title": "验证 search、ndots 与完整域名", "content": "<!-- src: https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/concepts/services-networking/dns-pod-service.md -->\n\n客户端输入 `web` 时，CoreDNS 不一定收到字面上的 `web.`。Pod 解析器会根据 search 列表和 ndots 决定尝试哪些候选名称。这一过程发生在客户端，可能产生多个查询、多个响应码，甚至 A 与 AAAA 并行请求。\n\n#### 从容器的真实配置开始\n\n```text\nnameserver 10.96.0.10\nsearch dns-lab.svc.cluster.local svc.cluster.local cluster.local\noptions ndots:5\n```\n\n这里的 IP 只是示例。常见解析器会把点数不足阈值的名字先结合 search 尝试；具体顺序、重试和并发取决于 libc、语言运行时与选项。末尾带点的绝对名称通常用于排除 search 扩展。\n\n```bash\nkubectl -n dns-lab exec dnsutils -- cat /etc/resolv.conf\nkubectl -n dns-lab exec dnsutils -- dig +search web A\nkubectl -n dns-lab exec dnsutils -- dig web.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab exec dnsutils -- dig +search example.com A\nkubectl -n dns-lab exec dnsutils -- dig example.com. A\n```\n\n`dig` 默认行为与应用的 `getaddrinfo` 不相同，因此显式使用 `+search`，再结合日志或抓包看实际发出的名称。不能仅拿一次默认 dig 的成功输出证明应用端 search 行为正常。\n\n#### 调 ndots 需要验证应用兼容性\n\n降低 ndots 可能减少外部域名查询的 search 尝试，但也可能改变部分限定名称的查找顺序。优先在单个工作负载灰度，检查同命名空间短名、跨命名空间名、外部域名及失败路径。\n\n观察 NXDOMAIN 增加时，应区分真实不存在的名称与 search 产生的候选失败。候选失败后最终成功，并不一定是服务故障，但会消耗查询资源。不要用固定“一个请求放大几倍”的数字概括所有应用，应从实际名称、查询类型、重试和缓存数据测量。", "subs": ["从容器的真实配置开始", "调 ndots 需要验证应用兼容性"]}, {"title": "正确选择 dnsPolicy 与 dnsConfig", "content": "<!-- src: https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/concepts/services-networking/dns-pod-service.md -->\n\n`dnsPolicy` 决定基础解析配置，`dnsConfig` 在此基础上提供自定义选项。名字为 `Default` 的策略并不是 Pod 未填写字段时的默认策略；未指定通常使用 `ClusterFirst`。\n\n| 策略 | 典型用途 | 注意事项 |\n| --- | --- | --- |\n| `ClusterFirst` | 普通集群工作负载 | 外部域交由集群 DNS 的上游处理 |\n| `Default` | 继承节点解析配置 | 不保证能解析集群服务名 |\n| `ClusterFirstWithHostNet` | hostNetwork 且需集群 DNS | 这里按 Linux 场景讨论 |\n| `None` | 完全显式指定 DNS | 必须提供 dnsConfig 和 nameserver |\n\n#### 工作负载级修改比集群级更易验证\n\n以下为 Pod spec 片段，可用于后文实验 Pod；它不是完整 Kubernetes 资源：\n\n```yaml\ndnsPolicy: ClusterFirst\ndnsConfig:\n  options:\n    - name: ndots\n      value: \"2\"\n```\n\n若使用 hostNetwork，通常应明确选择 `ClusterFirstWithHostNet`；否则可能落回节点配置行为。使用 `None` 时需要自行配置 nameservers、searches 与 options，并承担集群服务名能否解析的责任。\n\n修改控制器模板后应创建新 Pod，再读取新容器的 `/etc/resolv.conf`，同时保留旧 Pod 的对照结果。只查看 Deployment YAML 不能证明已经运行的容器采用了新设置。\n\n#### 配置存在合并与平台限制\n\ndnsConfig 与策略生成的配置有合并和去重过程。Kubernetes 文档对 nameserver 数量、search 数量和总长度均有约束；不同运行时也可能存在兼容差异。Windows 的解析行为与 Linux 不完全相同，不应照搬此处 search 与 hostNetwork 结论。\n\n一个常见误区是给应用 Pod 配外部公共 nameserver 来“绕过 CoreDNS”，结果外部名称恢复而内部服务名失败。正确做法是先确定故障范围，再修复对应上游或配置，避免把单个场景的成功变成新的局部故障。", "subs": ["工作负载级修改比集群级更易验证", "配置存在合并与平台限制"]}]}, {"title": "第 4 章 · 安全调整集群解析策略", "sections": [{"title": "配置企业域名转发并守住集群域边界", "content": "<!-- src: https://github.com/coredns/coredns/blob/v1.12.4/plugin/forward/README.md; https://github.com/coredns/coredns/blob/v1.12.4/plugin/kubernetes/README.md; https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/tasks/administer-cluster/dns-custom-nameservers.md -->\n\n企业私有区域通常有独立权威或递归上游。CoreDNS 可通过额外 Server Block 分流，让企业域查询去指定上游，其他查询继续保持原有策略。配置前需要验证从 CoreDNS 所在网络到上游的 UDP/TCP 53 连通性，而不只是管理员电脑能查到。\n\n#### 使用明确的区域块\n\n下面块追加到经审核的 Corefile；`192.0.2.53` 为占位地址，必须替换成实际企业 DNS：\n\n```text\ncorp.example:53 {\n    errors\n    cache 30\n    forward . 192.0.2.53\n}\n```\n\n同时检查企业域是否与已有 `cluster.local`、自定义集群域或其他子域重叠。若企业上游又把该域转回集群，会产生环路。需要观察此块的指标时，再按现有采集设计加入 prometheus，不应假设根块的监控覆盖全部块。\n\n| 查询组 | 预期责任方 | 验收重点 |\n| --- | --- | --- |\n| 已知集群 Service | kubernetes 插件 | 仍返回正确 ClusterIP 或端点 |\n| 已知企业域名 | 企业上游 | 地址与企业权威数据一致 |\n| 不存在的企业域名 | 企业上游否定回答 | 不被不相关上游伪造成功 |\n| 外部域名 | 原有外部上游 | 行为保持符合原策略 |\n| 反向查询 | 配置负责的插件或上游 | 不意外泄漏或循环 |\n\n#### 不把回落当作所有问题的修复\n\n不要为了让一个内部域名能解析，就给整个 kubernetes 插件添加无范围的 `fallthrough`。这样可能把不存在的集群服务名交给外部 DNS，模糊错误边界。更合理的做法是确定该名称属于哪个 Zone，并在相应块配置数据源。\n\nConfigMap 的写入、卷文件更新、Corefile 重载和缓存刷新是不同阶段。变更后应查询每个 CoreDNS 端点，并检查重载日志；单次通过 Service 的查询只覆盖其中一次路由，不能证明所有副本一致。", "subs": ["使用明确的区域块", "不把回落当作所有问题的修复"]}, {"title": "用独立实验验证 Service 记录与变更", "content": "<!-- src: https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/concepts/services-networking/dns-pod-service.md; https://github.com/coredns/coredns/blob/v1.12.4/plugin/reload/README.md -->\n\n下面实验面向已授权的测试集群，创建独立 `dns-lab` 命名空间，不修改集群 CoreDNS。需要集群能拉取示例镜像；离线环境先将镜像替换成内部等价镜像，并确保诊断镜像包含 dig。执行前确认当前 context 与命名空间不存在同名业务资源。\n\n#### 创建普通与 Headless Service 的对照组\n\n保存为 `dns-lab.yaml`：\n\n```yaml\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: dns-lab\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-0\n  namespace: dns-lab\n  labels:\n    app: dns-lab-web\nspec:\n  hostname: web-0\n  subdomain: web-headless\n  containers:\n    - name: web\n      image: nginx:1.28.0-alpine\n      ports:\n        - containerPort: 80\n      readinessProbe:\n        httpGet:\n          path: /\n          port: 80\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\n  namespace: dns-lab\nspec:\n  selector:\n    app: dns-lab-web\n  ports:\n    - name: http\n      port: 80\n      targetPort: 80\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: web-headless\n  namespace: dns-lab\nspec:\n  clusterIP: None\n  selector:\n    app: dns-lab-web\n  ports:\n    - name: http\n      port: 80\n      targetPort: 80\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: dnsutils\n  namespace: dns-lab\nspec:\n  containers:\n    - name: dnsutils\n      image: registry.k8s.io/e2e-test-images/agnhost:2.39\n      imagePullPolicy: IfNotPresent\n  restartPolicy: Never\n```\n\n```bash\nkubectl config current-context\nkubectl apply -f dns-lab.yaml\nkubectl -n dns-lab wait --for=condition=Ready pod/web-0 pod/dnsutils --timeout=120s\nkubectl -n dns-lab exec dnsutils -- dig web.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab exec dnsutils -- dig web-headless.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab exec dnsutils -- dig web-0.web-headless.dns-lab.svc.cluster.local. A\nkubectl -n dns-lab exec dnsutils -- dig _http._tcp.web-headless.dns-lab.svc.cluster.local. SRV\n```\n\n若实际集群域不是 cluster.local，应统一替换查询后缀。普通 Service 的 A 应与 ClusterIP 对应，Headless 与端点 FQDN 应与 web-0 Pod IP 对应，SRV 的端口应为 80。镜像拉取失败或 Pod 尚未就绪时，先处理这些前提，不把它们当作 DNS 算法错误。\n\n#### 观察端点移除与恢复\n\n在实验中移除 web-0 的 `app` 标签，观察 EndpointSlice、Headless 回答与普通 Service 回答的差异，再恢复标签。要给对象同步与 TTL 留出时间，记录改变发生到查询可见的延迟，不预设为零。\n\n清理时仅删除本实验创建的资源：确认 `dns-lab` 仍专用于本实验后执行 `kubectl delete -f dns-lab.yaml`。该文件包含 Namespace，删除会删除其中其他资源，因此不能把共享业务资源放入这个命名空间。本系列交付仅对 YAML 做静态检查，未声称在真实集群运行过此实验。", "subs": ["创建普通与 Headless Service 的对照组", "观察端点移除与恢复"]}]}, {"title": "第 5 章 · 引入并维护 NodeLocal DNSCache", "sections": [{"title": "解释节点缓存如何改变请求路径", "content": "<!-- src: https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/tasks/administer-cluster/nodelocaldns.md -->\n\nNodeLocal DNSCache 在每个节点运行 DNS 缓存代理，通常以 DaemonSet 部署。目的包括让缓存更接近应用、减少集中 DNS 的重复查询，以及改善部分网络路径与连接跟踪开销。它增加了一层组件和缓存，也增加了排障层次。\n\n```mermaid\ngraph TD\n    P[业务 Pod] --> N[本节点 DNS 缓存]\n    N --> H{缓存命中}\n    H -->|是| R[直接回答]\n    H -->|否 集群域| C[集群 CoreDNS]\n    H -->|否 其他域| U[按配置选择上游]\n    C --> K[Kubernetes 对象缓存]\n    U --> E[企业或外部 DNS]\n```\n\n不能把所有 NodeLocal 未命中请求都画成必经集中 CoreDNS；非集群域的路径由 NodeLocal Corefile 决定。更改集中 CoreDNS 的企业域规则后，还要检查 NodeLocal 是否实际沿那条路径转发。\n\n#### 对照引入前后的观测位置\n\n| 观测点 | 引入前后可能变化 | 排查意义 |\n| --- | --- | --- |\n| Pod 的 nameserver | Service IP 或节点本地 IP | 确认入口 |\n| 集中 CoreDNS QPS | 因本地命中而减少 | 减少不等于业务请求减少 |\n| 集中 CoreDNS 所见源地址 | 可能变成缓存代理来源 | 客户端归因需调整 |\n| TTL 与负缓存 | 增加一层缓存 | 新记录可见性要逐层查 |\n| 故障分布 | 可能只影响特定节点 | 比较好节点和坏节点 |\n\n官方设计可在特定路径上避开 Pod 到 DNS Service 的 DNAT/conntrack，并可把缓存到集群 DNS 的请求升级为 TCP。具体收益依赖网络实现与查询负载，应以实际路径和指标验证，不承诺固定延迟或 QPS 提升比例。", "subs": ["对照引入前后的观测位置"]}, {"title": "按网络模式验证部署、资源与回滚", "content": "<!-- src: https://github.com/kubernetes/website/blob/release-1.34/content/en/docs/tasks/administer-cluster/nodelocaldns.md -->\n\nNodeLocal 不是“应用一个 YAML 就完成”的统一变更。应从匹配集群版本的官方清单出发，确认 kube-proxy 或替代数据面模式、集群域、DNS Service 地址、节点本地地址与现有端口占用，再替换模板变量。\n\n#### iptables 与 IPVS 的配置不同\n\n官方文档描述的 iptables 模式可同时监听 kube-dns Service IP 与节点本地 IP；IPVS 模式中 Service IP 已由 IPVS 接口占用，NodeLocal 只监听节点本地 IP，并需要相应调整 kubelet clusterDNS。eBPF 等其他实现应遵循对应实现文档，不能直接套这两种模式的结论。\n\n```bash\nkubectl -n kube-system get daemonset node-local-dns -o yaml\nkubectl -n kube-system get configmap node-local-dns -o yaml\nkubectl -n kube-system get pods -l k8s-app=node-local-dns -o wide\nkubectl -n kube-system logs -l k8s-app=node-local-dns --since=10m --prefix=true\n```\n\n资源名、标签与是否允许直接编辑由实际安装方式决定。还应在测试 Pod 中读取 nameserver，并分别查询节点缓存、集中 CoreDNS 和实际上游，证明路径符合设计。\n\n#### 资源设置与回滚要一起设计\n\n缓存内存随条目、Server Block 和查询模式变化，不能把节点 Pod 数量直接换算成固定内存。上游慢时并发也会占用内存，可结合 forward 的 max_concurrent 设计保护。官方文档指出 OOM 后节点上的转发规则可能尚未清理，流量仍被导向不健康代理，导致短暂 DNS 中断。\n\n灰度应选少量节点，检查重启、内存峰值、节点级错误率、命中率与集中 DNS 压力。若调整过 kubelet clusterDNS，回滚必须恢复可达的 DNS 地址并验证新 Pod；不能先删除 DaemonSet，再让所有工作负载继续查询已经消失的本地地址。\n\n最后验证正常与故障节点、已有与新建 Pod、集群与企业域、UDP 与 TCP。只有覆盖入口配置和数据路径，才算完成 NodeLocal 变更验收。", "subs": ["iptables 与 IPVS 的配置不同", "资源设置与回滚要一起设计"]}]}]}</script>
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('data').textContent);
+  const STORAGE_KEY = 'roadmap:' + data.title;
+  const DRAWER_WIDTH_KEY = 'learning-roadmap:drawerWidth';
+  const DRAWER_MIN_WIDTH = 360;
+  const DRAWER_EDGE_GAP = 28;
+  const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  const EDIT = data.edit || {};
+  const EDIT_ENABLED = !!EDIT.enabled;
+  const SAVE_ENDPOINT = EDIT.endpoint || '/__learning_roadmap_save';
+
+  const root = document.getElementById('roadmap');
+  let totalCount = 0;
+
+  data.parts.forEach((part, pi) => {
+    const partEl = document.createElement('section');
+    partEl.className = 'part';
+    partEl.innerHTML = `
+      <div class="part-head">
+        <div class="part-num">${pi+1}</div>
+        <h2 class="part-title">${escapeHtml(part.title)}</h2>
+        <div class="part-bar"></div>
+      </div>
+      <div class="sections"></div>
+    `;
+    const grid = partEl.querySelector('.sections');
+    part.sections.forEach((sec, si) => {
+      totalCount++;
+      const id = `${pi}-${si}`;
+      const status = state[id] || 'todo';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.id = id;
+      card.dataset.status = status;
+      card.dataset.title = sec.title.toLowerCase();
+      const subCount = (sec.subs || []).length;
+      card.innerHTML = `
+        <div class="status" title="点击切换状态"></div>
+        <div class="ttl">${escapeHtml(sec.title)}</div>
+        ${subCount ? `<span class="badge" title="${subCount} 个知识点">${subCount}</span>` : ''}
+      `;
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('status')) {
+          cycleStatus(id);
+        } else {
+          openDrawer(pi, si);
+        }
+      });
+      grid.appendChild(card);
+    });
+    root.appendChild(partEl);
+  });
+
+  const drawer = document.getElementById('drawer');
+  const drawerResizer = document.getElementById('drawer-resizer');
+  const backdrop = document.getElementById('backdrop');
+  const dTitle = document.getElementById('d-title');
+  const dBody = document.getElementById('d-body');
+  const editButton = document.getElementById('edit-section');
+  const editTitle = document.getElementById('edit-title');
+  const editContent = document.getElementById('edit-content');
+  const saveButton = document.getElementById('save-section');
+  const cancelEditButton = document.getElementById('cancel-edit');
+  const saveState = document.getElementById('save-state');
+  const diagramBackdrop = document.getElementById('diagram-backdrop');
+  const diagramModal = document.getElementById('diagram-modal');
+  const diagramBody = document.getElementById('diagram-body');
+  const diagramCanvas = document.getElementById('diagram-canvas');
+  const diagramInner = document.getElementById('diagram-inner');
+  const diagramZoom = document.getElementById('diagram-zoom');
+  const diagramZoomOut = document.getElementById('diagram-zoom-out');
+  const diagramZoomIn = document.getElementById('diagram-zoom-in');
+  let diagramScale = 1;
+  let diagramBaseWidth = 1;
+  let diagramBaseHeight = 1;
+  let currentId = null;
+  let currentPi = null;
+  let currentSi = null;
+  if (EDIT_ENABLED) drawer.classList.add('editable');
+  setupDrawerResize();
+
+  const dTags = document.getElementById('d-tags');
+  function pillColor(i){
+    // 黄金角分布，柔和粉彩，深色 ink 字看得清
+    const h = (i * 47) % 360;
+    return `hsl(${h}, 72%, 86%)`;
+  }
+  function renderTags(subs){
+    const MAX = 12;
+    if (!subs || !subs.length) { dTags.className = 'tags-bar empty'; dTags.innerHTML = ''; return; }
+    dTags.className = 'tags-bar';
+    const visible = subs.slice(0, MAX);
+    const rest = subs.slice(MAX);
+    dTags.innerHTML = visible.map((s, i) =>
+      `<span class="pill" style="background:${pillColor(i)}">${escapeHtml(s)}</span>`
+    ).join('') + (rest.length
+      ? `<span class="pill more" title="${escapeHtml(rest.join(' · '))}">+${rest.length}</span>`
+      : '');
+  }
+  function openDrawer(pi, si){
+    const sec = data.parts[pi].sections[si];
+    cancelEdit();
+    currentId = `${pi}-${si}`;
+    currentPi = pi;
+    currentSi = si;
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    dBody.scrollTop = 0;
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    syncStatusButtons();
+  }
+  function renderSectionBody(sec){
+    dBody.innerHTML = marked.parse(sec.content || '*（此小节没有正文）*');
+    dBody.querySelectorAll('pre > code.language-mermaid').forEach((code, idx) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.id = 'mmd-' + Date.now() + '-' + idx;
+      div.title = '点击放大图表';
+      div.textContent = code.textContent;
+      code.parentElement.replaceWith(div);
+    });
+    dBody.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    if (window.__mermaid) {
+      window.__mermaid.run({nodes: dBody.querySelectorAll('.mermaid')}).catch(()=>{});
+    }
+    typesetMath(dBody);
+  }
+  function typesetMath(root){
+    if (!window.MathJax) return;
+    const run = () => window.MathJax.typesetPromise ? window.MathJax.typesetPromise([root]).catch(()=>{}) : null;
+    if (window.MathJax.startup && window.MathJax.startup.promise) {
+      window.MathJax.startup.promise.then(run).catch(()=>{});
+    } else {
+      run();
+    }
+  }
+  function closeDrawer(){
+    cancelEdit();
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    currentId = null;
+    currentPi = null;
+    currentSi = null;
+  }
+  document.getElementById('d-close').onclick = closeDrawer;
+  backdrop.onclick = closeDrawer;
+  document.getElementById('diagram-close').onclick = closeDiagram;
+  diagramBackdrop.onclick = closeDiagram;
+  diagramZoomOut.onclick = () => setDiagramScale(diagramScale / 1.2);
+  diagramZoomIn.onclick = () => setDiagramScale(diagramScale * 1.2);
+  dBody.addEventListener('click', e => {
+    const diagram = e.target.closest('.mermaid');
+    if (diagram) openDiagram(diagram);
+  });
+  editButton.onclick = startEdit;
+  cancelEditButton.onclick = cancelEdit;
+  saveButton.onclick = saveEdit;
+
+  function getCurrentSection(){
+    if (currentPi === null || currentSi === null) return null;
+    const part = data.parts[currentPi];
+    return part && part.sections[currentSi] ? part.sections[currentSi] : null;
+  }
+  function updateDrawerTitle(sec){
+    if (!sec || currentPi === null || currentSi === null) return;
+    // 若小节标题已含 "N.N " 或 "N.N.N " 编号，去掉避免与自动编号重复
+    const cleanTitle = sec.title.replace(/^\d+(\.\d+)*\s+/, '');
+    dTitle.textContent = `${currentPi+1}.${currentSi+1}  ${cleanTitle}`;
+  }
+  function startEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    const sec = getCurrentSection();
+    if (!sec) return;
+    editTitle.value = sec.title;
+    editContent.value = sec.content || '';
+    saveState.textContent = '';
+    drawer.classList.add('editing');
+    editContent.focus();
+  }
+  function cancelEdit(){
+    if (!drawer) return;
+    drawer.classList.remove('editing');
+    if (saveState) saveState.textContent = '';
+  }
+  async function saveEdit(){
+    if (!EDIT_ENABLED || currentId === null) return;
+    if (location.protocol === 'file:') {
+      saveState.textContent = '需要通过 --serve --editable 打开';
+      return;
+    }
+    const title = editTitle.value.trim();
+    if (!title) {
+      saveState.textContent = '标题不能为空';
+      editTitle.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    saveState.textContent = '保存中...';
+    try {
+      const response = await fetch(SAVE_ENDPOINT, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: EDIT.source,
+          roadmap: EDIT.roadmap || location.pathname.replace(/^\/+/, ''),
+          sectionId: currentId,
+          title,
+          content: editContent.value,
+          shift: EDIT.shift || 0,
+          backHref: EDIT.backHref || null
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || '保存失败');
+      }
+      applySavedSection(result.section || {title, content: editContent.value, subs: []});
+      drawer.classList.remove('editing');
+      saveState.textContent = '已保存';
+    } catch (err) {
+      saveState.textContent = err.message || '保存失败';
+    } finally {
+      saveButton.disabled = false;
+    }
+  }
+  function applySavedSection(section){
+    if (currentPi === null || currentSi === null) return;
+    const sec = data.parts[currentPi].sections[currentSi];
+    sec.title = section.title;
+    sec.content = section.content || '';
+    sec.subs = section.subs || [];
+    updateDrawerTitle(sec);
+    renderTags(sec.subs);
+    renderSectionBody(sec);
+    refreshCard(currentId, sec);
+  }
+  function refreshCard(id, sec){
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    card.dataset.title = sec.title.toLowerCase();
+    const titleEl = card.querySelector('.ttl');
+    if (titleEl) titleEl.textContent = sec.title;
+    const subCount = (sec.subs || []).length;
+    let badge = card.querySelector('.badge');
+    if (!subCount && badge) {
+      badge.remove();
+      return;
+    }
+    if (subCount && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge';
+      card.appendChild(badge);
+    }
+    if (badge) {
+      badge.textContent = subCount;
+      badge.title = `${subCount} 个知识点`;
+    }
+  }
+  function setupDrawerResize(){
+    if (!drawer || !drawerResizer) return;
+    let resizing = false;
+    applySavedDrawerWidth();
+
+    drawerResizer.addEventListener('pointerdown', e => {
+      if (isCompactDrawer()) return;
+      resizing = true;
+      drawer.classList.add('resizing');
+      document.body.classList.add('drawer-resizing');
+      drawerResizer.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    drawerResizer.addEventListener('pointermove', e => {
+      if (!resizing) return;
+      const nextWidth = applyDrawerWidth(window.innerWidth - e.clientX);
+      updateDrawerResizeValue(nextWidth);
+    });
+    drawerResizer.addEventListener('pointerup', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('pointercancel', e => finishDrawerResize(e.pointerId));
+    drawerResizer.addEventListener('keydown', e => {
+      if (isCompactDrawer() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      e.preventDefault();
+      const delta = e.key === 'ArrowLeft' ? 32 : -32;
+      const nextWidth = applyDrawerWidth(drawer.getBoundingClientRect().width + delta);
+      saveDrawerWidth(nextWidth);
+      updateDrawerResizeValue(nextWidth);
+    });
+    window.addEventListener('resize', applySavedDrawerWidth);
+
+    function finishDrawerResize(pointerId){
+      if (!resizing) return;
+      resizing = false;
+      drawer.classList.remove('resizing');
+      document.body.classList.remove('drawer-resizing');
+      try { drawerResizer.releasePointerCapture(pointerId); } catch (_) {}
+      saveDrawerWidth(drawer.getBoundingClientRect().width);
+    }
+  }
+  function applySavedDrawerWidth(){
+    if (isCompactDrawer()) {
+      drawer.style.removeProperty('--drawer-width');
+      return;
+    }
+    const savedWidth = Number(localStorage.getItem(DRAWER_WIDTH_KEY));
+    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+      const nextWidth = applyDrawerWidth(savedWidth);
+      updateDrawerResizeValue(nextWidth);
+    }
+  }
+  function applyDrawerWidth(width){
+    const maxWidth = Math.max(DRAWER_MIN_WIDTH, window.innerWidth - DRAWER_EDGE_GAP);
+    const nextWidth = clamp(width, DRAWER_MIN_WIDTH, maxWidth);
+    drawer.style.setProperty('--drawer-width', Math.round(nextWidth) + 'px');
+    return nextWidth;
+  }
+  function saveDrawerWidth(width){
+    const nextWidth = applyDrawerWidth(width);
+    localStorage.setItem(DRAWER_WIDTH_KEY, String(Math.round(nextWidth)));
+  }
+  function updateDrawerResizeValue(width){
+    drawerResizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  }
+  function isCompactDrawer(){
+    return window.matchMedia('(max-width:640px)').matches;
+  }
+  window.addEventListener('resize', () => {
+    if (diagramModal.classList.contains('open')) fitDiagramToViewport();
+  });
+  // 按渲染顺序扁平化所有小节，供方向键顺序切换（跨主章节连续）
+  const flatIds = [];
+  data.parts.forEach((part, pi) => {
+    part.sections.forEach((sec, si) => flatIds.push(`${pi}-${si}`));
+  });
+  function navigateDrawer(delta){
+    if (currentId === null) return;
+    const next = flatIds.indexOf(currentId) + delta;
+    if (next < 0 || next >= flatIds.length) return;  // 到头/到尾不循环
+    const [pi, si] = flatIds[next].split('-').map(Number);
+    openDrawer(pi, si);
+    const card = document.querySelector(`.card[data-id="${flatIds[next]}"]`);
+    if (card) card.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (diagramModal.classList.contains('open')) closeDiagram();
+      else closeDrawer();
+      return;
+    }
+    // 抽屉打开时（且未在放大图表），←/→ 切换上一/下一小节（↑/↓ 留给正文滚动）
+    if (currentId !== null && !diagramModal.classList.contains('open')
+        && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      navigateDrawer(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  function openDiagram(diagram){
+    diagramInner.innerHTML = '';
+    resetDiagramViewport();
+    const clone = diagram.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('title');
+    rewriteSvgIds(clone, 'zoom-' + Date.now() + '-');
+    normalizeDiagramSvg(clone);
+    diagramInner.appendChild(clone);
+    diagramModal.classList.add('open');
+    diagramBackdrop.classList.add('open');
+    requestAnimationFrame(() => {
+      relaxDiagramNodeLabels(clone);
+      normalizeDiagramSvg(clone);
+      const size = measureDiagram(clone);
+      diagramBaseWidth = size.width;
+      diagramBaseHeight = size.height;
+      fitDiagramToViewport();
+    });
+  }
+  function closeDiagram(){
+    diagramModal.classList.remove('open');
+    diagramBackdrop.classList.remove('open');
+    diagramInner.innerHTML = '';
+  }
+  function resetDiagramViewport(){
+    diagramScale = 1;
+    diagramCanvas.style.width = '';
+    diagramCanvas.style.height = '';
+    diagramInner.style.transform = 'scale(1)';
+    diagramZoom.textContent = '100%';
+  }
+  function fitDiagramToViewport(){
+    const bodyBox = diagramBody.getBoundingClientRect();
+    const roomW = Math.max(1, bodyBox.width - 32);
+    const roomH = Math.max(1, bodyBox.height - 32);
+    const fit = Math.min(roomW / diagramBaseWidth, roomH / diagramBaseHeight);
+    const readableMin = window.innerWidth < 700 ? 0.55 : 0.75;
+    setDiagramScale(clamp(fit, readableMin, 1.5));
+  }
+  function setDiagramScale(scale){
+    diagramScale = clamp(scale, 0.1, 3);
+    const pad = 32;
+    diagramCanvas.style.width = Math.ceil(diagramBaseWidth * diagramScale + pad) + 'px';
+    diagramCanvas.style.height = Math.ceil(diagramBaseHeight * diagramScale + pad) + 'px';
+    diagramInner.style.transform = `scale(${diagramScale})`;
+    diagramZoom.textContent = Math.round(diagramScale * 100) + '%';
+    requestAnimationFrame(() => {
+      diagramBody.scrollLeft = Math.max(0, (diagramCanvas.scrollWidth - diagramBody.clientWidth) / 2);
+      diagramBody.scrollTop = Math.max(0, (diagramCanvas.scrollHeight - diagramBody.clientHeight) / 2);
+    });
+  }
+  function measureDiagram(root){
+    const svg = root.querySelector('svg');
+    if (svg) {
+      const viewBox = svg.viewBox && svg.viewBox.baseVal;
+      if (viewBox && viewBox.width && viewBox.height) {
+        return {width: viewBox.width, height: viewBox.height};
+      }
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height) return {width: rect.width, height: rect.height};
+    }
+    const rect = root.getBoundingClientRect();
+    return {width: Math.max(1, rect.width), height: Math.max(1, rect.height)};
+  }
+  function normalizeDiagramSvg(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    if (viewBox && viewBox.width && viewBox.height) {
+      svg.setAttribute('width', viewBox.width);
+      svg.setAttribute('height', viewBox.height);
+      svg.style.maxWidth = 'none';
+    }
+  }
+  function relaxDiagramNodeLabels(root){
+    const svg = root.querySelector('svg');
+    if (!svg) return;
+    let changed = false;
+    svg.querySelectorAll('g.node').forEach(node => {
+      const shape = node.querySelector('rect,polygon,circle,ellipse,path');
+      const foreignObject = node.querySelector('foreignObject');
+      const htmlLabel = foreignObject && foreignObject.querySelector('div,span');
+      if (!shape || !foreignObject || !htmlLabel) return;
+
+      const foBox = foreignObject.getBBox();
+      const foRect = foreignObject.getBoundingClientRect();
+      const labelRect = htmlLabel.getBoundingClientRect();
+      if (!foBox.width || !foBox.height || !foRect.width || !foRect.height) return;
+
+      const scaleX = foRect.width / foBox.width;
+      const scaleY = foRect.height / foBox.height;
+      const labelWidth = labelRect.width / scaleX;
+      const labelHeight = labelRect.height / scaleY;
+      const nextFoWidth = Math.ceil(Math.max(foBox.width, labelWidth + 10));
+      const nextFoHeight = Math.ceil(Math.max(foBox.height, labelHeight + 8));
+      const dx = nextFoWidth - foBox.width;
+      const dy = nextFoHeight - foBox.height;
+      if (dx <= 1 && dy <= 1) return;
+
+      centerForeignObject(foreignObject, dx, dy);
+      foreignObject.setAttribute('width', nextFoWidth);
+      foreignObject.setAttribute('height', nextFoHeight);
+      expandNodeShape(shape, nextFoWidth + 24, nextFoHeight + 18);
+      changed = true;
+    });
+    if (changed) refreshSvgViewBox(svg);
+  }
+  function centerForeignObject(foreignObject, dx, dy){
+    const labelGroup = foreignObject.closest('g.label');
+    if (labelGroup && labelGroup !== foreignObject.ownerSVGElement) {
+      const shifted = shiftTranslate(labelGroup, -dx / 2, -dy / 2);
+      if (shifted) return;
+    }
+    const x = parseFloat(foreignObject.getAttribute('x') || foreignObject.getBBox().x || 0);
+    const y = parseFloat(foreignObject.getAttribute('y') || foreignObject.getBBox().y || 0);
+    foreignObject.setAttribute('x', x - dx / 2);
+    foreignObject.setAttribute('y', y - dy / 2);
+  }
+  function shiftTranslate(el, dx, dy){
+    const transform = el.getAttribute('transform') || '';
+    const match = transform.match(/translate\(\s*([-0-9.]+)(?:[ ,]+([-0-9.]+))?\s*\)/);
+    if (!match) return false;
+    const x = parseFloat(match[1]);
+    const y = parseFloat(match[2] || '0');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    el.setAttribute('transform', transform.replace(match[0], `translate(${x + dx}, ${y + dy})`));
+    return true;
+  }
+  function expandNodeShape(shape, minWidth, minHeight){
+    const box = shape.getBBox();
+    const targetWidth = Math.max(box.width, minWidth);
+    const targetHeight = Math.max(box.height, minHeight);
+    if (targetWidth <= box.width + 1 && targetHeight <= box.height + 1) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'rect') {
+      shape.setAttribute('x', cx - targetWidth / 2);
+      shape.setAttribute('y', cy - targetHeight / 2);
+      shape.setAttribute('width', targetWidth);
+      shape.setAttribute('height', targetHeight);
+    } else if (tag === 'ellipse') {
+      shape.setAttribute('rx', targetWidth / 2);
+      shape.setAttribute('ry', targetHeight / 2);
+    } else if (tag === 'circle') {
+      shape.setAttribute('r', Math.max(targetWidth, targetHeight) / 2);
+    } else if (tag === 'polygon') {
+      expandPolygon(shape, box, targetWidth, targetHeight);
+    }
+  }
+  function expandPolygon(shape, box, targetWidth, targetHeight){
+    const sx = box.width ? targetWidth / box.width : 1;
+    const sy = box.height ? targetHeight / box.height : 1;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const points = (shape.getAttribute('points') || '').trim().split(/\s+/).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return pair;
+      return `${cx + (x - cx) * sx},${cy + (y - cy) * sy}`;
+    });
+    shape.setAttribute('points', points.join(' '));
+  }
+  function refreshSvgViewBox(svg){
+    try {
+      const box = svg.getBBox();
+      const pad = 8;
+      svg.setAttribute('viewBox', `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    } catch (_) {}
+  }
+  function clamp(value, min, max){
+    return Math.max(min, Math.min(max, value));
+  }
+  function rewriteSvgIds(root, prefix){
+    const idMap = new Map();
+    root.querySelectorAll('[id]').forEach(el => {
+      const oldId = el.id;
+      const newId = prefix + oldId;
+      idMap.set(oldId, newId);
+      el.id = newId;
+    });
+    if (!idMap.size) return;
+    const replacements = [...idMap.entries()].sort((a, b) => b[0].length - a[0].length);
+    root.querySelectorAll('*').forEach(el => {
+      for (const attr of [...el.attributes]) {
+        let value = attr.value;
+        replacements.forEach(([oldId, newId]) => {
+          value = value.replaceAll(`#${oldId}`, `#${newId}`);
+        });
+        if (value !== attr.value) el.setAttribute(attr.name, value);
+      }
+    });
+    root.querySelectorAll('style').forEach(style => {
+      let css = style.textContent || '';
+      replacements.forEach(([oldId, newId]) => {
+        css = css.replaceAll(`#${oldId}`, `#${newId}`);
+      });
+      style.textContent = css;
+    });
+  }
+
+  drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+    btn.onclick = () => {
+      if (!currentId) return;
+      setStatus(currentId, btn.dataset.status);
+      syncStatusButtons();
+    };
+  });
+  function syncStatusButtons(){
+    const cur = state[currentId] || 'todo';
+    drawer.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === cur);
+    });
+  }
+
+  function cycleStatus(id){
+    const order = ['todo','doing','done'];
+    const cur = state[id] || 'todo';
+    const next = order[(order.indexOf(cur)+1) % order.length];
+    setStatus(id, next);
+  }
+  function setStatus(id, status){
+    if (status === 'todo') delete state[id]; else state[id] = status;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (card) card.dataset.status = status;
+    if (currentId === id) syncStatusButtons();
+    updateProgress();
+  }
+
+  function updateProgress(){
+    const done = Object.values(state).filter(v => v === 'done').length;
+    document.getElementById('bar').style.width = (done / totalCount * 100) + '%';
+    document.getElementById('progress-text').textContent = `${done} / ${totalCount}`;
+  }
+  updateProgress();
+
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.toggle('hidden', q && !c.dataset.title.includes(q));
+    });
+    document.querySelectorAll('.part').forEach(p => {
+      const anyVisible = [...p.querySelectorAll('.card')].some(c => !c.classList.contains('hidden'));
+      p.classList.toggle('hidden', !anyVisible);
+    });
+  });
+
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('重置所有进度？')) return;
+    for (const k of Object.keys(state)) delete state[k];
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('.card').forEach(c => c.dataset.status = 'todo');
+    updateProgress();
+  };
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
