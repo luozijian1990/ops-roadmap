@@ -19,18 +19,6 @@ MCP 的职责是交换上下文和调用能力，不负责模型如何推理、A
 
 如果任务只有一个固定的后端调用，且不需要让模型选择工具或组合多个系统，直接调用可能更简单。MCP 适合需要跨客户端复用、让模型按上下文选择能力，或需要把资源、工具和提示组织在一起的场景。判断时要比较完整生命周期成本，包括 Server 进程、认证、观测、升级和安全评审，而不是只比较第一次开发的代码量。
 
-#### 阅读版本、材料来源和知识边界
-
-本笔记以本地材料采用的 MCP 2026-07-28 为协议基线。材料中的 Python 教程要求 MCP SDK 2.0.0 或更高版本，但其他语言示例的依赖与更新进度不完全相同。协议日期、SDK 包版本和 Host 产品版本是三套编号；理解某段示例时，需要分别确认它采用的数据模型、SDK 接口和客户端支持范围。
-
-来源上，第 1、2 章主要对应 `1.txt` 和 `2.txt` 的[协议架构](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture)，其中 `3.txt`、`4.txt` 与 `2.txt` 重复。第 3 章依据 `5/6.txt` 的[本地接入](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers)与[远程接入](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-remote-servers)，第 4 章依据 `7.txt` 的 [Agent Skills 开发方法](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-with-agent-skills)。
-
-第 5、6 章沿用 `8/9.txt` 中 [Server](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server) 与 [Client](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-client) 的讲解线索，以 Prometheus 插件替换原教程案例。第 7 章参考 `10.txt` 的[客户端最佳实践](https://modelcontextprotocol.io/docs/2026-07-28/develop/clients/client-best-practices)，`11.txt` 与其重复；第 8 章参考 `12.txt` 的[安全最佳实践](https://modelcontextprotocol.io/specification/2026-07-28/basic/security_best_practices)，第 9 章串联前述知识。
-
-本地材料位于 `temp/mcp-docs/`，上述编号用于追溯来源。正文可独立阅读，代码和报文用于解释机制，不依赖配套工程，也不表示已经完成运行验证。Prometheus 案例参照 `personal-mcp/src/plugins/prometheus` 的实际实现，源码阅读基于该项目提交 `3665c45` 对应的工作区。工具注册、查询适配、配置读取分别来自 `index.ts`、`client.ts`、`config.ts`，配置管理来自 `config-manager.ts`。文中会区分已有实现与用于说明扩展方式的设想；协议原理仍以本地官方材料为依据，阅读不需要安装该项目。
-
-材料提及但未展开的扩展，只说明其用途并保留阅读入口，不从概念介绍推导出完整接口。文中“建议”通常是工程判断；标有协议版本的字段与规则才适用于相应版本的通信契约。
-
 ### 1.2 Tools、Resources 和 Prompts 分别解决什么问题
 <!-- src: 1.txt; 2.txt -->
 
